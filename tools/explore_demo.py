@@ -674,17 +674,14 @@ def main(argv=None) -> int:
         # blinking cursor would otherwise look like "still changing" forever (that stalled the 23:20 run).
         busy = not box_open(tm_ready) and (st["stable_frames"] < 4 or joy_ignore)
         if busy:
-            if not st.get("waiting"):
-                st["waiting"] = True
-                log(f"[waiting: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen still changing'} - cutscene?]", "res")
-            st["wait_frames"] = st.get("wait_frames", 0) + a.frames_per_step
-            extra_wait = {"joy": joy_ignore, "stable": st["stable_frames"], "frames": st["wait_frames"]}
-            if st["wait_frames"] < 60 * 4:  # at most ~4 s of game time, then act anyway and log it
-                return
-            log(f"[waited 4 s, acting anyway: {extra_wait}]", "res")
-        if st.get("waiting"):
-            st["waiting"] = False
-            log(f"[ready after waiting {st.get('wait_frames', 0)} frames]", "res"); st["wait_frames"] = 0
+            # Cutscene / forced walk / fade (Robert, 2026-11-03): do not wait for it - MASH A. A is harmless while the
+            # joypad is ignored and it skips any text the moment it appears. The press is logged like any other.
+            st["mash"] = st.get("mash", 0) + 1
+            if st["mash"] == 1:
+                log(f"[cutscene: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen moving on its own'} - mashing A]", "res")
+            do_press("A", "agent", "cutscene/forced walk: mashing A to get through it"); return
+        if st.get("mash"):
+            log(f"[cutscene over after {st['mash']} A presses]", "res"); st["mash"] = 0
         m, x, y = pos()
         tm_now = emu.read_range(TILEMAP, TILEMAP_LEN)
         lines_now = frame_lines(tm_now) if box_open(tm_now) else []
