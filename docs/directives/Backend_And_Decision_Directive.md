@@ -109,11 +109,11 @@ import from `emulator.py` (directive 1 may not have landed).
 
 ## 7. Completion criteria
 
-- [ ] `decision.py` with `Decision`, `VALID_BUTTONS`, `parse_reply`
-- [ ] `backend.py` with `BackendError`, `Backend`, `StubBackend`, `ClaudeCliBackend`
-- [ ] `tests/test_decision.py`, `tests/test_backend.py`
-- [ ] `uv run pytest -q` green (paste the tail in the report)
-- [ ] Status row moved to Review with the branch name
+- [x] `decision.py` with `Decision`, `VALID_BUTTONS`, `parse_reply`
+- [x] `backend.py` with `BackendError`, `Backend`, `StubBackend`, `ClaudeCliBackend`
+- [x] `tests/test_decision.py`, `tests/test_backend.py`
+- [x] `uv run pytest -q` green (paste the tail in the report)
+- [x] Status row moved to Review with the branch name
 
 ## 8. Report
 
