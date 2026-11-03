@@ -1,4 +1,4 @@
-"""pokeagent CLI: ``run`` the agent, ``check-rom``, or print the RAM ``state``.
+"""pokeagent CLI: ``run`` the agent, ``check-rom``, print the RAM ``state``, or ``mcp``.
 
 Usage::
 
@@ -6,6 +6,7 @@ Usage::
                   [--steps N] [--headless] [--state PATH] [--runs-dir runs]
     pokeagent check-rom [--rom PATH]
     pokeagent state [--rom PATH] [--state PATH]
+    pokeagent mcp [--rom PATH] [--state PATH] [--headless] [--idle-fps 60]
 
 The ROM path comes from ``--rom``, else ``$POKEAGENT_ROM``, else
 ``roms/Pokemon Red.gb``. A real backend requires an explicit ``--steps`` so a
@@ -134,6 +135,18 @@ def _cmd_state(args: argparse.Namespace) -> int:
         emu.close()
 
 
+def _cmd_mcp(args: argparse.Namespace) -> int:
+    # Imported lazily so cli.py (and its tests) never pay for the mcp import.
+    from pokeagent.mcp_server import serve
+
+    return serve(
+        _rom_path(args),
+        Path(args.state) if args.state else None,
+        headless=args.headless,
+        idle_fps=args.idle_fps,
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pokeagent",
@@ -162,6 +175,15 @@ def _build_parser() -> argparse.ArgumentParser:
     state.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
     state.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
     state.set_defaults(func=_cmd_state)
+
+    mcp = sub.add_parser("mcp", help="serve the emulator as MCP tools over stdio")
+    mcp.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    mcp.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
+    mcp.add_argument("--headless", action="store_true",
+                     help="no SDL2 window, full emulation speed")
+    mcp.add_argument("--idle-fps", type=int, default=60, metavar="N",
+                     help="idle tick rate between tool calls (0 = no idle ticking)")
+    mcp.set_defaults(func=_cmd_mcp)
 
     cli_hex.register(sub)
     return parser
