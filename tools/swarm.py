@@ -56,6 +56,16 @@ def merge_memory(dst: dict, src: dict) -> dict:
                 same["replays"] = max(same.get("replays", 0), dm.get("replays", 0))
             else:
                 demos.append(dm)
+        npcs = d.setdefault("npcs", {})
+        for k, e in s.get("npcs", {}).items():
+            cur = npcs.setdefault(k, {"pic": e["pic"], "slot": e["slot"], "positions": {}, "first_seen": e.get("first_seen", 0), "text": "", "talked": 0})
+            for p, n in e.get("positions", {}).items():
+                cur["positions"][p] = max(cur["positions"].get(p, 0), n)
+            cur["moves"] = len(cur["positions"]) > 1
+            cur["talked"] = max(cur.get("talked", 0), e.get("talked", 0))
+            if len(e.get("text", "")) > len(cur.get("text", "")):
+                cur["text"] = e["text"]
+            cur["last"] = e.get("last", cur.get("last"))
         d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():

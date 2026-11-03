@@ -298,6 +298,29 @@ class MapMemory:
             if c not in e.setdefault("choices", []):
                 e["choices"].append(c)
 
+    def observe_npcs(self, map_id: int, emu, step: int):
+        """NPCs by hex: the sprite table (slots 1-15: picture id at 0xC1x0, map y/x+4 at 0xC2x4/5) sampled every
+        press. A slot's picture id plus its first-seen tile identifies the NPC; positions accumulate, so a
+        wandering NPC shows 'moves': true and a static one keeps one tile. Addresses are being verified by this
+        very data: a slot that never moves across runs at a known NPC spot is a static NPC."""
+        npcs = self.m(map_id).setdefault("npcs", {})
+        for i in range(1, 16):
+            pic = emu.read(0xC100 + 16 * i)
+            if not pic:
+                continue
+            x, y = emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4
+            key = f"slot{i}:pic{pic}"
+            e = npcs.setdefault(key, {"pic": pic, "slot": i, "positions": {}, "first_seen": step, "text": "", "talked": 0})
+            e["positions"][f"{x},{y}"] = e["positions"].get(f"{x},{y}", 0) + 1
+            e["moves"] = len(e["positions"]) > 1
+            e["last"] = [x, y]
+
+    def npc_at(self, map_id: int, x: int, y: int) -> dict | None:
+        for e in self.m(map_id).get("npcs", {}).values():
+            if e.get("last") == [x, y]:
+                return e
+        return None
+
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
 
@@ -554,6 +577,15 @@ def main(argv=None) -> int:
                 extra["trigger"] = True  # a box with no A press is a contact/scripted event, not an interaction
                 result += f'; event on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
+        mem.observe_npcs(after[0], emu, st["step"])
+        if name == "A" and box_after and not box_before:  # talked to whatever is in front: tie the text to the NPC there
+            dx, dy = DIRS[st["facing"]]
+            npc = mem.npc_at(before[0], before[1] + dx, before[2] + dy)
+            if npc is not None:
+                npc["talked"] += 1
+                if len(text) > len(npc.get("text", "")):
+                    npc["text"] = text[:160]
+                result += f" [NPC pic {npc['pic']}{' (moves)' if npc.get('moves') else ''}]"
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
         # Beat capture: the presses from a box opening (keyed by its first text) to its closing, graded by progress.
         if box_after and not box_before:
