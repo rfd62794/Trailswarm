@@ -147,7 +147,7 @@ def move_scores(emu) -> dict[str, tuple[float, str]]:
     return out
 
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter"]  # goals.json order
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]  # goals.json order
 
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
@@ -187,7 +187,8 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen,
          "oaks_parcel": has_parcel or st.get("had_parcel", False),
          "deliver_parcel": st.get("had_parcel", False) and not has_parcel,
-         "to_route2": 0x0D in seen, "to_pewter": 0x02 in seen}
+         "to_route2": 0x0D in seen, "to_pewter": 0x02 in seen,
+         "to_gym": 0x36 in seen, "beat_brock": bool(emu.read(0xD356) & 1)}  # Pewter Gym map 0x36; wObtainedBadges bit0 = BOULDERBADGE (pokered.sym)
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:
