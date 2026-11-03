@@ -41,6 +41,10 @@ class WorldGraph:
             if warp:
                 yield (warp[0], warp[1], warp[2]), name
                 continue
+            jump = d.get("jumps", {}).get(key)
+            if jump:  # a learned ledge: one-way hop to a tile more than one step away
+                yield (m, jump[0], jump[1]), name
+                continue
             if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy

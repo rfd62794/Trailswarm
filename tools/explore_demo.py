@@ -323,6 +323,15 @@ class MapMemory:
             taken[key] = taken.get(key, 0) + 1
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
             return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
+        if m1 == m0 and abs(x1 - x0) + abs(y1 - y0) > 1:
+            # A LEDGE JUMP (one-way): the press moved us more than one tile. Remember the jump, and that the landing
+            # tile cannot go back the way we came - without this the agent looped jump/walk-around forever.
+            self.m(m0).setdefault("jumps", {})[key] = [x1, y1]
+            back = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}[button]
+            bk = f"{x1},{y1},{back}"
+            if bk not in blocked:
+                blocked.append(bk)
+            return f"LEDGE jump {button} to ({x1},{y1}) - one way"
         if (x1, y1) == (x0, y0):
             fails = self.m(m0).setdefault("fails", {})  # failures NOT required to be consecutive: alternating
             fails[key] = fails.get(key, 0) + 1          # presses at a map edge never confirmed a wall before
