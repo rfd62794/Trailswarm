@@ -1321,7 +1321,9 @@ def main(argv=None) -> int:
             st["explore_burst"] -= 1
             name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367), grass="neutral")
             do_press(name, "agent", f"exploring a new discovery ({st['explore_burst']} left): {why}"); return
-        planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
+        parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in mem.data.get("items", [])
+                       if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
+        planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])
         if planned and "at Mom, talking" in planned[1]:

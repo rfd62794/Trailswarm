@@ -189,6 +189,14 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 return p[0], f"goal train to L8 (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
         return None  # on Route 1: let exploration roam (grass encounters happen on their own)
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):
+        # Already known from earlier agents: the spot where "got OAK PARCEL" was seen. Go there and talk (known facts first).
+        known = [tuple(goals["_parcel_spot"])] if goals.get("_parcel_spot") else []  # (map, x, y, facing) from the item log
+        for (m, x, y, f) in known + interaction_spots(maps, "OAK PARCEL") + interaction_spots(maps, "PARCEL"):
+            if pos == (m, x, y):
+                return ("A" if facing == f else f), f"goal parcel: at the mart clerk spot ({x},{y}), {'talking' if facing == f else 'facing him'}"
+            p = g.path(pos, lambda n: n == (m, x, y))
+            if p:
+                return p[0], f"goal parcel: {len(p)} steps to the known mart clerk spot ({x},{y}) on map 0x{m:02X}"
         # The parcel is at the Viridian Mart: explore Viridian's buildings - take warps on map 0x01 never taken yet.
         if pos[0] == 0x01:
             d = maps.get("1", {})
