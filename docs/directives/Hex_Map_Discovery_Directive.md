@@ -153,7 +153,7 @@ real-ROM calibration run.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-hex-map-discovery-directive |
 | Base branch | - |
@@ -168,4 +168,5 @@ real-ROM calibration run.
 - 2026-11-02 22:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-hex-map-discovery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FQS1FQGYQ6ZT9DDNGKB8T9
 - 2026-11-02 22:41 · dispatcher · launched pid=7744; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-hex-map-discovery-directive; provisioned: uv sync --frozen
 - 2026-11-02 22:46 · devin-overseer (delegated) · In progress → Review — Done. uv run pytest -q: 115 passed, 1 skipped. Spec conflict flagged: section 3 seeds 4 verified entries with evidence 'make_baseline 2026-11-02'; section 4/7 say all verified:false. Followed section 3 (wCurMap, wYCoord, wXCoord, wPlayerMoney verified). 'uv run pokeagent hex --help' was sandbox-refused; covered by test_cli_hex.py::test_hex_help_lists_subcommands instead. hex find test exact output: 'D362 wXCoord'.; under delegate.envelope [origin] spent: devin 4 min est. n/a
+- 2026-11-02 23:00 · robert-claude-laptop · Review → Done — note: merged via PR #7 (af40c3b); Sonnet review CHANGES-NEEDED minor, fixed by controller (charmap é/cursor, ASCII gender glyphs, utf-8 console); 115 passed 1 skipped; real-ROM hex find isolates wXCoord
 <!-- queue:end -->
