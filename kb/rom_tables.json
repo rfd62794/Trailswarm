@@ -1,0 +1,3773 @@
+{
+ "source": "ROM via pokered.sym offsets",
+ "moves": {
+  "1": {
+   "name": "POUND",
+   "effect": 0,
+   "power": 40,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "2": {
+   "name": "KARATE CHOP",
+   "effect": 0,
+   "power": 50,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "3": {
+   "name": "DOUBLESLAP",
+   "effect": 29,
+   "power": 15,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 10
+  },
+  "4": {
+   "name": "COMET PUNCH",
+   "effect": 29,
+   "power": 18,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 15
+  },
+  "5": {
+   "name": "MEGA PUNCH",
+   "effect": 0,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "6": {
+   "name": "PAY DAY",
+   "effect": 16,
+   "power": 40,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "7": {
+   "name": "FIRE PUNCH",
+   "effect": 4,
+   "power": 75,
+   "type": "FIRE",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "8": {
+   "name": "ICE PUNCH",
+   "effect": 5,
+   "power": 75,
+   "type": "ICE",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "9": {
+   "name": "THUNDERPUNCH",
+   "effect": 6,
+   "power": 75,
+   "type": "ELECTRIC",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "10": {
+   "name": "SCRATCH",
+   "effect": 0,
+   "power": 40,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "11": {
+   "name": "VICEGRIP",
+   "effect": 0,
+   "power": 55,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "12": {
+   "name": "GUILLOTINE",
+   "effect": 38,
+   "power": 1,
+   "type": "NORMAL",
+   "accuracy": 0.3,
+   "pp": 5
+  },
+  "13": {
+   "name": "RAZOR WIND",
+   "effect": 39,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 10
+  },
+  "14": {
+   "name": "SWORDS DANCE",
+   "effect": 50,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "15": {
+   "name": "CUT",
+   "effect": 0,
+   "power": 50,
+   "type": "NORMAL",
+   "accuracy": 0.95,
+   "pp": 30
+  },
+  "16": {
+   "name": "GUST",
+   "effect": 0,
+   "power": 40,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "17": {
+   "name": "WING ATTACK",
+   "effect": 0,
+   "power": 35,
+   "type": "FLYING",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "18": {
+   "name": "WHIRLWIND",
+   "effect": 28,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "19": {
+   "name": "FLY",
+   "effect": 43,
+   "power": 70,
+   "type": "FLYING",
+   "accuracy": 0.95,
+   "pp": 15
+  },
+  "20": {
+   "name": "BIND",
+   "effect": 42,
+   "power": 15,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 20
+  },
+  "21": {
+   "name": "SLAM",
+   "effect": 0,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 20
+  },
+  "22": {
+   "name": "VINE WHIP",
+   "effect": 0,
+   "power": 35,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "23": {
+   "name": "STOMP",
+   "effect": 37,
+   "power": 65,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "24": {
+   "name": "DOUBLE KICK",
+   "effect": 44,
+   "power": 30,
+   "type": "FIGHTING",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "25": {
+   "name": "MEGA KICK",
+   "effect": 0,
+   "power": 120,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 5
+  },
+  "26": {
+   "name": "JUMP KICK",
+   "effect": 45,
+   "power": 70,
+   "type": "FIGHTING",
+   "accuracy": 0.95,
+   "pp": 25
+  },
+  "27": {
+   "name": "ROLLING KICK",
+   "effect": 37,
+   "power": 60,
+   "type": "FIGHTING",
+   "accuracy": 0.85,
+   "pp": 15
+  },
+  "28": {
+   "name": "SAND-ATTACK",
+   "effect": 22,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "29": {
+   "name": "HEADBUTT",
+   "effect": 37,
+   "power": 70,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "30": {
+   "name": "HORN ATTACK",
+   "effect": 0,
+   "power": 65,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "31": {
+   "name": "FURY ATTACK",
+   "effect": 29,
+   "power": 15,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "32": {
+   "name": "HORN DRILL",
+   "effect": 38,
+   "power": 1,
+   "type": "NORMAL",
+   "accuracy": 0.3,
+   "pp": 5
+  },
+  "33": {
+   "name": "TACKLE",
+   "effect": 0,
+   "power": 35,
+   "type": "NORMAL",
+   "accuracy": 0.95,
+   "pp": 35
+  },
+  "34": {
+   "name": "BODY SLAM",
+   "effect": 36,
+   "power": 85,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "35": {
+   "name": "WRAP",
+   "effect": 42,
+   "power": 15,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "36": {
+   "name": "TAKE DOWN",
+   "effect": 48,
+   "power": 90,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "37": {
+   "name": "THRASH",
+   "effect": 27,
+   "power": 90,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "38": {
+   "name": "DOUBLE-EDGE",
+   "effect": 48,
+   "power": 100,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "39": {
+   "name": "TAIL WHIP",
+   "effect": 19,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "40": {
+   "name": "POISON STING",
+   "effect": 2,
+   "power": 15,
+   "type": "POISON",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "41": {
+   "name": "TWINEEDLE",
+   "effect": 77,
+   "power": 25,
+   "type": "BUG",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "42": {
+   "name": "PIN MISSILE",
+   "effect": 29,
+   "power": 14,
+   "type": "BUG",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "43": {
+   "name": "LEER",
+   "effect": 19,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "44": {
+   "name": "BITE",
+   "effect": 31,
+   "power": 60,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "45": {
+   "name": "GROWL",
+   "effect": 18,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "46": {
+   "name": "ROAR",
+   "effect": 28,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "47": {
+   "name": "SING",
+   "effect": 32,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.55,
+   "pp": 15
+  },
+  "48": {
+   "name": "SUPERSONIC",
+   "effect": 49,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.55,
+   "pp": 20
+  },
+  "49": {
+   "name": "SONICBOOM",
+   "effect": 41,
+   "power": 1,
+   "type": "NORMAL",
+   "accuracy": 0.9,
+   "pp": 20
+  },
+  "50": {
+   "name": "DISABLE",
+   "effect": 86,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.55,
+   "pp": 20
+  },
+  "51": {
+   "name": "ACID",
+   "effect": 69,
+   "power": 40,
+   "type": "POISON",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "52": {
+   "name": "EMBER",
+   "effect": 4,
+   "power": 40,
+   "type": "FIRE",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "53": {
+   "name": "FLAMETHROWER",
+   "effect": 4,
+   "power": 95,
+   "type": "FIRE",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "54": {
+   "name": "MIST",
+   "effect": 46,
+   "power": 0,
+   "type": "ICE",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "55": {
+   "name": "WATER GUN",
+   "effect": 0,
+   "power": 40,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "56": {
+   "name": "HYDRO PUMP",
+   "effect": 0,
+   "power": 120,
+   "type": "WATER",
+   "accuracy": 0.8,
+   "pp": 5
+  },
+  "57": {
+   "name": "SURF",
+   "effect": 0,
+   "power": 95,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "58": {
+   "name": "ICE BEAM",
+   "effect": 5,
+   "power": 95,
+   "type": "ICE",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "59": {
+   "name": "BLIZZARD",
+   "effect": 5,
+   "power": 120,
+   "type": "ICE",
+   "accuracy": 0.9,
+   "pp": 5
+  },
+  "60": {
+   "name": "PSYBEAM",
+   "effect": 76,
+   "power": 65,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "61": {
+   "name": "BUBBLEBEAM",
+   "effect": 70,
+   "power": 65,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "62": {
+   "name": "AURORA BEAM",
+   "effect": 68,
+   "power": 65,
+   "type": "ICE",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "63": {
+   "name": "HYPER BEAM",
+   "effect": 80,
+   "power": 150,
+   "type": "NORMAL",
+   "accuracy": 0.9,
+   "pp": 5
+  },
+  "64": {
+   "name": "PECK",
+   "effect": 0,
+   "power": 35,
+   "type": "FLYING",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "65": {
+   "name": "DRILL PECK",
+   "effect": 0,
+   "power": 80,
+   "type": "FLYING",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "66": {
+   "name": "SUBMISSION",
+   "effect": 48,
+   "power": 80,
+   "type": "FIGHTING",
+   "accuracy": 0.8,
+   "pp": 25
+  },
+  "67": {
+   "name": "LOW KICK",
+   "effect": 37,
+   "power": 50,
+   "type": "FIGHTING",
+   "accuracy": 0.9,
+   "pp": 20
+  },
+  "68": {
+   "name": "COUNTER",
+   "effect": 0,
+   "power": 1,
+   "type": "FIGHTING",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "69": {
+   "name": "SEISMIC TOSS",
+   "effect": 41,
+   "power": 1,
+   "type": "FIGHTING",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "70": {
+   "name": "STRENGTH",
+   "effect": 0,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "71": {
+   "name": "ABSORB",
+   "effect": 3,
+   "power": 20,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "72": {
+   "name": "MEGA DRAIN",
+   "effect": 3,
+   "power": 40,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "73": {
+   "name": "LEECH SEED",
+   "effect": 84,
+   "power": 0,
+   "type": "GRASS",
+   "accuracy": 0.9,
+   "pp": 10
+  },
+  "74": {
+   "name": "GROWTH",
+   "effect": 13,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "75": {
+   "name": "RAZOR LEAF",
+   "effect": 0,
+   "power": 55,
+   "type": "GRASS",
+   "accuracy": 0.95,
+   "pp": 25
+  },
+  "76": {
+   "name": "SOLARBEAM",
+   "effect": 39,
+   "power": 120,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "77": {
+   "name": "POISONPOWDER",
+   "effect": 66,
+   "power": 0,
+   "type": "POISON",
+   "accuracy": 0.75,
+   "pp": 35
+  },
+  "78": {
+   "name": "STUN SPORE",
+   "effect": 67,
+   "power": 0,
+   "type": "GRASS",
+   "accuracy": 0.75,
+   "pp": 30
+  },
+  "79": {
+   "name": "SLEEP POWDER",
+   "effect": 32,
+   "power": 0,
+   "type": "GRASS",
+   "accuracy": 0.75,
+   "pp": 15
+  },
+  "80": {
+   "name": "PETAL DANCE",
+   "effect": 27,
+   "power": 70,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "81": {
+   "name": "STRING SHOT",
+   "effect": 20,
+   "power": 0,
+   "type": "BUG",
+   "accuracy": 0.95,
+   "pp": 40
+  },
+  "82": {
+   "name": "DRAGON RAGE",
+   "effect": 41,
+   "power": 1,
+   "type": "DRAGON",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "83": {
+   "name": "FIRE SPIN",
+   "effect": 42,
+   "power": 15,
+   "type": "FIRE",
+   "accuracy": 0.7,
+   "pp": 15
+  },
+  "84": {
+   "name": "THUNDERSHOCK",
+   "effect": 6,
+   "power": 40,
+   "type": "ELECTRIC",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "85": {
+   "name": "THUNDERBOLT",
+   "effect": 6,
+   "power": 95,
+   "type": "ELECTRIC",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "86": {
+   "name": "THUNDER WAVE",
+   "effect": 67,
+   "power": 0,
+   "type": "ELECTRIC",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "87": {
+   "name": "THUNDER",
+   "effect": 6,
+   "power": 120,
+   "type": "ELECTRIC",
+   "accuracy": 0.7,
+   "pp": 10
+  },
+  "88": {
+   "name": "ROCK THROW",
+   "effect": 0,
+   "power": 50,
+   "type": "ROCK",
+   "accuracy": 0.65,
+   "pp": 15
+  },
+  "89": {
+   "name": "EARTHQUAKE",
+   "effect": 0,
+   "power": 100,
+   "type": "GROUND",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "90": {
+   "name": "FISSURE",
+   "effect": 38,
+   "power": 1,
+   "type": "GROUND",
+   "accuracy": 0.3,
+   "pp": 5
+  },
+  "91": {
+   "name": "DIG",
+   "effect": 39,
+   "power": 100,
+   "type": "GROUND",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "92": {
+   "name": "TOXIC",
+   "effect": 66,
+   "power": 0,
+   "type": "POISON",
+   "accuracy": 0.85,
+   "pp": 10
+  },
+  "93": {
+   "name": "CONFUSION",
+   "effect": 76,
+   "power": 50,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 25
+  },
+  "94": {
+   "name": "PSYCHIC",
+   "effect": 71,
+   "power": 90,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "95": {
+   "name": "HYPNOSIS",
+   "effect": 32,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 0.6,
+   "pp": 20
+  },
+  "96": {
+   "name": "MEDITATE",
+   "effect": 10,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "97": {
+   "name": "AGILITY",
+   "effect": 52,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "98": {
+   "name": "QUICK ATTACK",
+   "effect": 0,
+   "power": 40,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "99": {
+   "name": "RAGE",
+   "effect": 81,
+   "power": 20,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "100": {
+   "name": "TELEPORT",
+   "effect": 28,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "101": {
+   "name": "NIGHT SHADE",
+   "effect": 41,
+   "power": 0,
+   "type": "GHOST",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "102": {
+   "name": "MIMIC",
+   "effect": 82,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "103": {
+   "name": "SCREECH",
+   "effect": 59,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 40
+  },
+  "104": {
+   "name": "DOUBLE TEAM",
+   "effect": 15,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "105": {
+   "name": "RECOVER",
+   "effect": 56,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "106": {
+   "name": "HARDEN",
+   "effect": 11,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "107": {
+   "name": "MINIMIZE",
+   "effect": 15,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "108": {
+   "name": "SMOKESCREEN",
+   "effect": 22,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "109": {
+   "name": "CONFUSE RAY",
+   "effect": 49,
+   "power": 0,
+   "type": "GHOST",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "110": {
+   "name": "WITHDRAW",
+   "effect": 11,
+   "power": 0,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "111": {
+   "name": "DEFENSE CURL",
+   "effect": 11,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "112": {
+   "name": "BARRIER",
+   "effect": 51,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "113": {
+   "name": "LIGHT SCREEN",
+   "effect": 64,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "114": {
+   "name": "HAZE",
+   "effect": 25,
+   "power": 0,
+   "type": "ICE",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "115": {
+   "name": "REFLECT",
+   "effect": 65,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "116": {
+   "name": "FOCUS ENERGY",
+   "effect": 47,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "117": {
+   "name": "BIDE",
+   "effect": 26,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "118": {
+   "name": "METRONOME",
+   "effect": 83,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "119": {
+   "name": "MIRROR MOVE",
+   "effect": 9,
+   "power": 0,
+   "type": "FLYING",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "120": {
+   "name": "SELFDESTRUCT",
+   "effect": 7,
+   "power": 130,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 5
+  },
+  "121": {
+   "name": "EGG BOMB",
+   "effect": 0,
+   "power": 100,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 10
+  },
+  "122": {
+   "name": "LICK",
+   "effect": 36,
+   "power": 20,
+   "type": "GHOST",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "123": {
+   "name": "SMOG",
+   "effect": 33,
+   "power": 20,
+   "type": "POISON",
+   "accuracy": 0.7,
+   "pp": 20
+  },
+  "124": {
+   "name": "SLUDGE",
+   "effect": 33,
+   "power": 65,
+   "type": "POISON",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "125": {
+   "name": "BONE CLUB",
+   "effect": 31,
+   "power": 65,
+   "type": "GROUND",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "126": {
+   "name": "FIRE BLAST",
+   "effect": 34,
+   "power": 120,
+   "type": "FIRE",
+   "accuracy": 0.85,
+   "pp": 5
+  },
+  "127": {
+   "name": "WATERFALL",
+   "effect": 0,
+   "power": 80,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "128": {
+   "name": "CLAMP",
+   "effect": 42,
+   "power": 35,
+   "type": "WATER",
+   "accuracy": 0.75,
+   "pp": 10
+  },
+  "129": {
+   "name": "SWIFT",
+   "effect": 17,
+   "power": 60,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "130": {
+   "name": "SKULL BASH",
+   "effect": 39,
+   "power": 100,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "131": {
+   "name": "SPIKE CANNON",
+   "effect": 29,
+   "power": 20,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "132": {
+   "name": "CONSTRICT",
+   "effect": 70,
+   "power": 10,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 35
+  },
+  "133": {
+   "name": "AMNESIA",
+   "effect": 53,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "134": {
+   "name": "KINESIS",
+   "effect": 22,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 0.8,
+   "pp": 15
+  },
+  "135": {
+   "name": "SOFTBOILED",
+   "effect": 56,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "136": {
+   "name": "HI JUMP KICK",
+   "effect": 45,
+   "power": 85,
+   "type": "FIGHTING",
+   "accuracy": 0.9,
+   "pp": 20
+  },
+  "137": {
+   "name": "GLARE",
+   "effect": 67,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 30
+  },
+  "138": {
+   "name": "DREAM EATER",
+   "effect": 8,
+   "power": 100,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "139": {
+   "name": "POISON GAS",
+   "effect": 66,
+   "power": 0,
+   "type": "POISON",
+   "accuracy": 0.55,
+   "pp": 40
+  },
+  "140": {
+   "name": "BARRAGE",
+   "effect": 29,
+   "power": 15,
+   "type": "NORMAL",
+   "accuracy": 0.85,
+   "pp": 20
+  },
+  "141": {
+   "name": "LEECH LIFE",
+   "effect": 3,
+   "power": 20,
+   "type": "BUG",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "142": {
+   "name": "LOVELY KISS",
+   "effect": 32,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.75,
+   "pp": 10
+  },
+  "143": {
+   "name": "SKY ATTACK",
+   "effect": 39,
+   "power": 140,
+   "type": "FLYING",
+   "accuracy": 0.9,
+   "pp": 5
+  },
+  "144": {
+   "name": "TRANSFORM",
+   "effect": 57,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "145": {
+   "name": "BUBBLE",
+   "effect": 70,
+   "power": 20,
+   "type": "WATER",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "146": {
+   "name": "DIZZY PUNCH",
+   "effect": 0,
+   "power": 70,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "147": {
+   "name": "SPORE",
+   "effect": 32,
+   "power": 0,
+   "type": "GRASS",
+   "accuracy": 1.0,
+   "pp": 15
+  },
+  "148": {
+   "name": "FLASH",
+   "effect": 22,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 0.7,
+   "pp": 20
+  },
+  "149": {
+   "name": "PSYWAVE",
+   "effect": 41,
+   "power": 1,
+   "type": "PSYCHIC",
+   "accuracy": 0.8,
+   "pp": 15
+  },
+  "150": {
+   "name": "SPLASH",
+   "effect": 85,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "151": {
+   "name": "ACID ARMOR",
+   "effect": 51,
+   "power": 0,
+   "type": "POISON",
+   "accuracy": 1.0,
+   "pp": 40
+  },
+  "152": {
+   "name": "CRABHAMMER",
+   "effect": 0,
+   "power": 90,
+   "type": "WATER",
+   "accuracy": 0.85,
+   "pp": 10
+  },
+  "153": {
+   "name": "EXPLOSION",
+   "effect": 7,
+   "power": 170,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 5
+  },
+  "154": {
+   "name": "FURY SWIPES",
+   "effect": 29,
+   "power": 18,
+   "type": "NORMAL",
+   "accuracy": 0.8,
+   "pp": 15
+  },
+  "155": {
+   "name": "BONEMERANG",
+   "effect": 44,
+   "power": 50,
+   "type": "GROUND",
+   "accuracy": 0.9,
+   "pp": 10
+  },
+  "156": {
+   "name": "REST",
+   "effect": 56,
+   "power": 0,
+   "type": "PSYCHIC",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "157": {
+   "name": "ROCK SLIDE",
+   "effect": 0,
+   "power": 75,
+   "type": "ROCK",
+   "accuracy": 0.9,
+   "pp": 10
+  },
+  "158": {
+   "name": "HYPER FANG",
+   "effect": 31,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 0.9,
+   "pp": 15
+  },
+  "159": {
+   "name": "SHARPEN",
+   "effect": 10,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "160": {
+   "name": "CONVERSION",
+   "effect": 24,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 30
+  },
+  "161": {
+   "name": "TRI ATTACK",
+   "effect": 0,
+   "power": 80,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "162": {
+   "name": "SUPER FANG",
+   "effect": 40,
+   "power": 1,
+   "type": "NORMAL",
+   "accuracy": 0.9,
+   "pp": 10
+  },
+  "163": {
+   "name": "SLASH",
+   "effect": 0,
+   "power": 70,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 20
+  },
+  "164": {
+   "name": "SUBSTITUTE",
+   "effect": 79,
+   "power": 0,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  },
+  "165": {
+   "name": "STRUGGLE",
+   "effect": 48,
+   "power": 50,
+   "type": "NORMAL",
+   "accuracy": 1.0,
+   "pp": 10
+  }
+ },
+ "type_chart": [
+  [
+   "WATER",
+   "FIRE",
+   2.0
+  ],
+  [
+   "FIRE",
+   "GRASS",
+   2.0
+  ],
+  [
+   "FIRE",
+   "ICE",
+   2.0
+  ],
+  [
+   "GRASS",
+   "WATER",
+   2.0
+  ],
+  [
+   "ELECTRIC",
+   "WATER",
+   2.0
+  ],
+  [
+   "WATER",
+   "ROCK",
+   2.0
+  ],
+  [
+   "GROUND",
+   "FLYING",
+   0.0
+  ],
+  [
+   "WATER",
+   "WATER",
+   0.5
+  ],
+  [
+   "FIRE",
+   "FIRE",
+   0.5
+  ],
+  [
+   "ELECTRIC",
+   "ELECTRIC",
+   0.5
+  ],
+  [
+   "ICE",
+   "ICE",
+   0.5
+  ],
+  [
+   "GRASS",
+   "GRASS",
+   0.5
+  ],
+  [
+   "PSYCHIC",
+   "PSYCHIC",
+   0.5
+  ],
+  [
+   "FIRE",
+   "WATER",
+   0.5
+  ],
+  [
+   "GRASS",
+   "FIRE",
+   0.5
+  ],
+  [
+   "WATER",
+   "GRASS",
+   0.5
+  ],
+  [
+   "ELECTRIC",
+   "GRASS",
+   0.5
+  ],
+  [
+   "NORMAL",
+   "ROCK",
+   0.5
+  ],
+  [
+   "NORMAL",
+   "GHOST",
+   0.0
+  ],
+  [
+   "GHOST",
+   "GHOST",
+   2.0
+  ],
+  [
+   "FIRE",
+   "BUG",
+   2.0
+  ],
+  [
+   "FIRE",
+   "ROCK",
+   0.5
+  ],
+  [
+   "WATER",
+   "GROUND",
+   2.0
+  ],
+  [
+   "ELECTRIC",
+   "GROUND",
+   0.0
+  ],
+  [
+   "ELECTRIC",
+   "FLYING",
+   2.0
+  ],
+  [
+   "GRASS",
+   "GROUND",
+   2.0
+  ],
+  [
+   "GRASS",
+   "BUG",
+   0.5
+  ],
+  [
+   "GRASS",
+   "POISON",
+   0.5
+  ],
+  [
+   "GRASS",
+   "ROCK",
+   2.0
+  ],
+  [
+   "GRASS",
+   "FLYING",
+   0.5
+  ],
+  [
+   "ICE",
+   "WATER",
+   0.5
+  ],
+  [
+   "ICE",
+   "GRASS",
+   2.0
+  ],
+  [
+   "ICE",
+   "GROUND",
+   2.0
+  ],
+  [
+   "ICE",
+   "FLYING",
+   2.0
+  ],
+  [
+   "FIGHTING",
+   "NORMAL",
+   2.0
+  ],
+  [
+   "FIGHTING",
+   "POISON",
+   0.5
+  ],
+  [
+   "FIGHTING",
+   "FLYING",
+   0.5
+  ],
+  [
+   "FIGHTING",
+   "PSYCHIC",
+   0.5
+  ],
+  [
+   "FIGHTING",
+   "BUG",
+   0.5
+  ],
+  [
+   "FIGHTING",
+   "ROCK",
+   2.0
+  ],
+  [
+   "FIGHTING",
+   "ICE",
+   2.0
+  ],
+  [
+   "FIGHTING",
+   "GHOST",
+   0.0
+  ],
+  [
+   "POISON",
+   "GRASS",
+   2.0
+  ],
+  [
+   "POISON",
+   "POISON",
+   0.5
+  ],
+  [
+   "POISON",
+   "GROUND",
+   0.5
+  ],
+  [
+   "POISON",
+   "BUG",
+   2.0
+  ],
+  [
+   "POISON",
+   "ROCK",
+   0.5
+  ],
+  [
+   "POISON",
+   "GHOST",
+   0.5
+  ],
+  [
+   "GROUND",
+   "FIRE",
+   2.0
+  ],
+  [
+   "GROUND",
+   "ELECTRIC",
+   2.0
+  ],
+  [
+   "GROUND",
+   "GRASS",
+   0.5
+  ],
+  [
+   "GROUND",
+   "BUG",
+   0.5
+  ],
+  [
+   "GROUND",
+   "ROCK",
+   2.0
+  ],
+  [
+   "GROUND",
+   "POISON",
+   2.0
+  ],
+  [
+   "FLYING",
+   "ELECTRIC",
+   0.5
+  ],
+  [
+   "FLYING",
+   "FIGHTING",
+   2.0
+  ],
+  [
+   "FLYING",
+   "BUG",
+   2.0
+  ],
+  [
+   "FLYING",
+   "GRASS",
+   2.0
+  ],
+  [
+   "FLYING",
+   "ROCK",
+   0.5
+  ],
+  [
+   "PSYCHIC",
+   "FIGHTING",
+   2.0
+  ],
+  [
+   "PSYCHIC",
+   "POISON",
+   2.0
+  ],
+  [
+   "BUG",
+   "FIRE",
+   0.5
+  ],
+  [
+   "BUG",
+   "GRASS",
+   2.0
+  ],
+  [
+   "BUG",
+   "FIGHTING",
+   0.5
+  ],
+  [
+   "BUG",
+   "FLYING",
+   0.5
+  ],
+  [
+   "BUG",
+   "PSYCHIC",
+   2.0
+  ],
+  [
+   "BUG",
+   "GHOST",
+   0.5
+  ],
+  [
+   "BUG",
+   "POISON",
+   2.0
+  ],
+  [
+   "ROCK",
+   "FIRE",
+   2.0
+  ],
+  [
+   "ROCK",
+   "FIGHTING",
+   0.5
+  ],
+  [
+   "ROCK",
+   "GROUND",
+   0.5
+  ],
+  [
+   "ROCK",
+   "FLYING",
+   2.0
+  ],
+  [
+   "ROCK",
+   "BUG",
+   2.0
+  ],
+  [
+   "ROCK",
+   "ICE",
+   2.0
+  ],
+  [
+   "GHOST",
+   "NORMAL",
+   0.0
+  ],
+  [
+   "GHOST",
+   "PSYCHIC",
+   0.0
+  ],
+  [
+   "FIRE",
+   "DRAGON",
+   0.5
+  ],
+  [
+   "WATER",
+   "DRAGON",
+   0.5
+  ],
+  [
+   "ELECTRIC",
+   "DRAGON",
+   0.5
+  ],
+  [
+   "GRASS",
+   "DRAGON",
+   0.5
+  ],
+  [
+   "ICE",
+   "DRAGON",
+   2.0
+  ],
+  [
+   "DRAGON",
+   "DRAGON",
+   2.0
+  ]
+ ],
+ "species_by_dex": {
+  "1": {
+   "hp": 45,
+   "atk": 49,
+   "def": 49,
+   "spd": 45,
+   "spc": 65,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 64
+  },
+  "2": {
+   "hp": 60,
+   "atk": 62,
+   "def": 63,
+   "spd": 60,
+   "spc": 80,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 141
+  },
+  "3": {
+   "hp": 80,
+   "atk": 82,
+   "def": 83,
+   "spd": 80,
+   "spc": 100,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 208
+  },
+  "4": {
+   "hp": 39,
+   "atk": 52,
+   "def": 43,
+   "spd": 65,
+   "spc": 50,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 45,
+   "base_exp": 65
+  },
+  "5": {
+   "hp": 58,
+   "atk": 64,
+   "def": 58,
+   "spd": 80,
+   "spc": 65,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 45,
+   "base_exp": 142
+  },
+  "6": {
+   "hp": 78,
+   "atk": 84,
+   "def": 78,
+   "spd": 100,
+   "spc": 85,
+   "type1": "FIRE",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 209
+  },
+  "7": {
+   "hp": 44,
+   "atk": 48,
+   "def": 65,
+   "spd": 43,
+   "spc": 50,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 66
+  },
+  "8": {
+   "hp": 59,
+   "atk": 63,
+   "def": 80,
+   "spd": 58,
+   "spc": 65,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 143
+  },
+  "9": {
+   "hp": 79,
+   "atk": 83,
+   "def": 100,
+   "spd": 78,
+   "spc": 85,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 210
+  },
+  "10": {
+   "hp": 45,
+   "atk": 30,
+   "def": 35,
+   "spd": 45,
+   "spc": 20,
+   "type1": "BUG",
+   "type2": "BUG",
+   "catch_rate": 255,
+   "base_exp": 53
+  },
+  "11": {
+   "hp": 50,
+   "atk": 20,
+   "def": 55,
+   "spd": 30,
+   "spc": 25,
+   "type1": "BUG",
+   "type2": "BUG",
+   "catch_rate": 120,
+   "base_exp": 72
+  },
+  "12": {
+   "hp": 60,
+   "atk": 45,
+   "def": 50,
+   "spd": 70,
+   "spc": 80,
+   "type1": "BUG",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 160
+  },
+  "13": {
+   "hp": 40,
+   "atk": 35,
+   "def": 30,
+   "spd": 50,
+   "spc": 20,
+   "type1": "BUG",
+   "type2": "POISON",
+   "catch_rate": 255,
+   "base_exp": 52
+  },
+  "14": {
+   "hp": 45,
+   "atk": 25,
+   "def": 50,
+   "spd": 35,
+   "spc": 25,
+   "type1": "BUG",
+   "type2": "POISON",
+   "catch_rate": 120,
+   "base_exp": 71
+  },
+  "15": {
+   "hp": 65,
+   "atk": 80,
+   "def": 40,
+   "spd": 75,
+   "spc": 45,
+   "type1": "BUG",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 159
+  },
+  "16": {
+   "hp": 40,
+   "atk": 45,
+   "def": 40,
+   "spd": 56,
+   "spc": 35,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 255,
+   "base_exp": 55
+  },
+  "17": {
+   "hp": 63,
+   "atk": 60,
+   "def": 55,
+   "spd": 71,
+   "spc": 50,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 120,
+   "base_exp": 113
+  },
+  "18": {
+   "hp": 83,
+   "atk": 80,
+   "def": 75,
+   "spd": 91,
+   "spc": 70,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 172
+  },
+  "19": {
+   "hp": 30,
+   "atk": 56,
+   "def": 35,
+   "spd": 72,
+   "spc": 25,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 255,
+   "base_exp": 57
+  },
+  "20": {
+   "hp": 55,
+   "atk": 81,
+   "def": 60,
+   "spd": 97,
+   "spc": 50,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 90,
+   "base_exp": 116
+  },
+  "21": {
+   "hp": 40,
+   "atk": 60,
+   "def": 30,
+   "spd": 70,
+   "spc": 31,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 255,
+   "base_exp": 58
+  },
+  "22": {
+   "hp": 65,
+   "atk": 90,
+   "def": 65,
+   "spd": 100,
+   "spc": 61,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 90,
+   "base_exp": 162
+  },
+  "23": {
+   "hp": 35,
+   "atk": 60,
+   "def": 44,
+   "spd": 55,
+   "spc": 40,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 255,
+   "base_exp": 62
+  },
+  "24": {
+   "hp": 60,
+   "atk": 85,
+   "def": 69,
+   "spd": 80,
+   "spc": 65,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 90,
+   "base_exp": 147
+  },
+  "25": {
+   "hp": 35,
+   "atk": 55,
+   "def": 30,
+   "spd": 90,
+   "spc": 50,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 190,
+   "base_exp": 82
+  },
+  "26": {
+   "hp": 60,
+   "atk": 90,
+   "def": 55,
+   "spd": 100,
+   "spc": 90,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 75,
+   "base_exp": 122
+  },
+  "27": {
+   "hp": 50,
+   "atk": 75,
+   "def": 85,
+   "spd": 40,
+   "spc": 30,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 255,
+   "base_exp": 93
+  },
+  "28": {
+   "hp": 75,
+   "atk": 100,
+   "def": 110,
+   "spd": 65,
+   "spc": 55,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 90,
+   "base_exp": 163
+  },
+  "29": {
+   "hp": 55,
+   "atk": 47,
+   "def": 52,
+   "spd": 41,
+   "spc": 40,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 235,
+   "base_exp": 59
+  },
+  "30": {
+   "hp": 70,
+   "atk": 62,
+   "def": 67,
+   "spd": 56,
+   "spc": 55,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 120,
+   "base_exp": 117
+  },
+  "31": {
+   "hp": 90,
+   "atk": 82,
+   "def": 87,
+   "spd": 76,
+   "spc": 75,
+   "type1": "POISON",
+   "type2": "GROUND",
+   "catch_rate": 45,
+   "base_exp": 194
+  },
+  "32": {
+   "hp": 46,
+   "atk": 57,
+   "def": 40,
+   "spd": 50,
+   "spc": 40,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 235,
+   "base_exp": 60
+  },
+  "33": {
+   "hp": 61,
+   "atk": 72,
+   "def": 57,
+   "spd": 65,
+   "spc": 55,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 120,
+   "base_exp": 118
+  },
+  "34": {
+   "hp": 81,
+   "atk": 92,
+   "def": 77,
+   "spd": 85,
+   "spc": 75,
+   "type1": "POISON",
+   "type2": "GROUND",
+   "catch_rate": 45,
+   "base_exp": 195
+  },
+  "35": {
+   "hp": 70,
+   "atk": 45,
+   "def": 48,
+   "spd": 35,
+   "spc": 60,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 150,
+   "base_exp": 68
+  },
+  "36": {
+   "hp": 95,
+   "atk": 70,
+   "def": 73,
+   "spd": 60,
+   "spc": 85,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 25,
+   "base_exp": 129
+  },
+  "37": {
+   "hp": 38,
+   "atk": 41,
+   "def": 40,
+   "spd": 65,
+   "spc": 65,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 190,
+   "base_exp": 63
+  },
+  "38": {
+   "hp": 73,
+   "atk": 76,
+   "def": 75,
+   "spd": 100,
+   "spc": 100,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 75,
+   "base_exp": 178
+  },
+  "39": {
+   "hp": 115,
+   "atk": 45,
+   "def": 20,
+   "spd": 20,
+   "spc": 25,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 170,
+   "base_exp": 76
+  },
+  "40": {
+   "hp": 140,
+   "atk": 70,
+   "def": 45,
+   "spd": 45,
+   "spc": 50,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 50,
+   "base_exp": 109
+  },
+  "41": {
+   "hp": 40,
+   "atk": 45,
+   "def": 35,
+   "spd": 55,
+   "spc": 40,
+   "type1": "POISON",
+   "type2": "FLYING",
+   "catch_rate": 255,
+   "base_exp": 54
+  },
+  "42": {
+   "hp": 75,
+   "atk": 80,
+   "def": 70,
+   "spd": 90,
+   "spc": 75,
+   "type1": "POISON",
+   "type2": "FLYING",
+   "catch_rate": 90,
+   "base_exp": 171
+  },
+  "43": {
+   "hp": 45,
+   "atk": 50,
+   "def": 55,
+   "spd": 30,
+   "spc": 75,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 255,
+   "base_exp": 78
+  },
+  "44": {
+   "hp": 60,
+   "atk": 65,
+   "def": 70,
+   "spd": 40,
+   "spc": 85,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 120,
+   "base_exp": 132
+  },
+  "45": {
+   "hp": 75,
+   "atk": 80,
+   "def": 85,
+   "spd": 50,
+   "spc": 100,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 184
+  },
+  "46": {
+   "hp": 35,
+   "atk": 70,
+   "def": 55,
+   "spd": 25,
+   "spc": 55,
+   "type1": "BUG",
+   "type2": "GRASS",
+   "catch_rate": 190,
+   "base_exp": 70
+  },
+  "47": {
+   "hp": 60,
+   "atk": 95,
+   "def": 80,
+   "spd": 30,
+   "spc": 80,
+   "type1": "BUG",
+   "type2": "GRASS",
+   "catch_rate": 75,
+   "base_exp": 128
+  },
+  "48": {
+   "hp": 60,
+   "atk": 55,
+   "def": 50,
+   "spd": 45,
+   "spc": 40,
+   "type1": "BUG",
+   "type2": "POISON",
+   "catch_rate": 190,
+   "base_exp": 75
+  },
+  "49": {
+   "hp": 70,
+   "atk": 65,
+   "def": 60,
+   "spd": 90,
+   "spc": 90,
+   "type1": "BUG",
+   "type2": "POISON",
+   "catch_rate": 75,
+   "base_exp": 138
+  },
+  "50": {
+   "hp": 10,
+   "atk": 55,
+   "def": 25,
+   "spd": 95,
+   "spc": 45,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 255,
+   "base_exp": 81
+  },
+  "51": {
+   "hp": 35,
+   "atk": 80,
+   "def": 50,
+   "spd": 120,
+   "spc": 70,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 50,
+   "base_exp": 153
+  },
+  "52": {
+   "hp": 40,
+   "atk": 45,
+   "def": 35,
+   "spd": 90,
+   "spc": 40,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 255,
+   "base_exp": 69
+  },
+  "53": {
+   "hp": 65,
+   "atk": 70,
+   "def": 60,
+   "spd": 115,
+   "spc": 65,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 90,
+   "base_exp": 148
+  },
+  "54": {
+   "hp": 50,
+   "atk": 52,
+   "def": 48,
+   "spd": 55,
+   "spc": 50,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 190,
+   "base_exp": 80
+  },
+  "55": {
+   "hp": 80,
+   "atk": 82,
+   "def": 78,
+   "spd": 85,
+   "spc": 80,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 75,
+   "base_exp": 174
+  },
+  "56": {
+   "hp": 40,
+   "atk": 80,
+   "def": 35,
+   "spd": 70,
+   "spc": 35,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 190,
+   "base_exp": 74
+  },
+  "57": {
+   "hp": 65,
+   "atk": 105,
+   "def": 60,
+   "spd": 95,
+   "spc": 60,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 75,
+   "base_exp": 149
+  },
+  "58": {
+   "hp": 55,
+   "atk": 70,
+   "def": 45,
+   "spd": 60,
+   "spc": 50,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 190,
+   "base_exp": 91
+  },
+  "59": {
+   "hp": 90,
+   "atk": 110,
+   "def": 80,
+   "spd": 95,
+   "spc": 80,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 75,
+   "base_exp": 213
+  },
+  "60": {
+   "hp": 40,
+   "atk": 50,
+   "def": 40,
+   "spd": 90,
+   "spc": 40,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 255,
+   "base_exp": 77
+  },
+  "61": {
+   "hp": 65,
+   "atk": 65,
+   "def": 65,
+   "spd": 90,
+   "spc": 50,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 120,
+   "base_exp": 131
+  },
+  "62": {
+   "hp": 90,
+   "atk": 85,
+   "def": 95,
+   "spd": 70,
+   "spc": 70,
+   "type1": "WATER",
+   "type2": "FIGHTING",
+   "catch_rate": 45,
+   "base_exp": 185
+  },
+  "63": {
+   "hp": 25,
+   "atk": 20,
+   "def": 15,
+   "spd": 90,
+   "spc": 105,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 200,
+   "base_exp": 73
+  },
+  "64": {
+   "hp": 40,
+   "atk": 35,
+   "def": 30,
+   "spd": 105,
+   "spc": 120,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 100,
+   "base_exp": 145
+  },
+  "65": {
+   "hp": 55,
+   "atk": 50,
+   "def": 45,
+   "spd": 120,
+   "spc": 135,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 50,
+   "base_exp": 186
+  },
+  "66": {
+   "hp": 70,
+   "atk": 80,
+   "def": 50,
+   "spd": 35,
+   "spc": 35,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 180,
+   "base_exp": 88
+  },
+  "67": {
+   "hp": 80,
+   "atk": 100,
+   "def": 70,
+   "spd": 45,
+   "spc": 50,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 90,
+   "base_exp": 146
+  },
+  "68": {
+   "hp": 90,
+   "atk": 130,
+   "def": 80,
+   "spd": 55,
+   "spc": 65,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 45,
+   "base_exp": 193
+  },
+  "69": {
+   "hp": 50,
+   "atk": 75,
+   "def": 35,
+   "spd": 40,
+   "spc": 70,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 255,
+   "base_exp": 84
+  },
+  "70": {
+   "hp": 65,
+   "atk": 90,
+   "def": 50,
+   "spd": 55,
+   "spc": 85,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 120,
+   "base_exp": 151
+  },
+  "71": {
+   "hp": 80,
+   "atk": 105,
+   "def": 65,
+   "spd": 70,
+   "spc": 100,
+   "type1": "GRASS",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 191
+  },
+  "72": {
+   "hp": 40,
+   "atk": 40,
+   "def": 35,
+   "spd": 70,
+   "spc": 100,
+   "type1": "WATER",
+   "type2": "POISON",
+   "catch_rate": 190,
+   "base_exp": 105
+  },
+  "73": {
+   "hp": 80,
+   "atk": 70,
+   "def": 65,
+   "spd": 100,
+   "spc": 120,
+   "type1": "WATER",
+   "type2": "POISON",
+   "catch_rate": 60,
+   "base_exp": 205
+  },
+  "74": {
+   "hp": 40,
+   "atk": 80,
+   "def": 100,
+   "spd": 20,
+   "spc": 30,
+   "type1": "ROCK",
+   "type2": "GROUND",
+   "catch_rate": 255,
+   "base_exp": 86
+  },
+  "75": {
+   "hp": 55,
+   "atk": 95,
+   "def": 115,
+   "spd": 35,
+   "spc": 45,
+   "type1": "ROCK",
+   "type2": "GROUND",
+   "catch_rate": 120,
+   "base_exp": 134
+  },
+  "76": {
+   "hp": 80,
+   "atk": 110,
+   "def": 130,
+   "spd": 45,
+   "spc": 55,
+   "type1": "ROCK",
+   "type2": "GROUND",
+   "catch_rate": 45,
+   "base_exp": 177
+  },
+  "77": {
+   "hp": 50,
+   "atk": 85,
+   "def": 55,
+   "spd": 90,
+   "spc": 65,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 190,
+   "base_exp": 152
+  },
+  "78": {
+   "hp": 65,
+   "atk": 100,
+   "def": 70,
+   "spd": 105,
+   "spc": 80,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 60,
+   "base_exp": 192
+  },
+  "79": {
+   "hp": 90,
+   "atk": 65,
+   "def": 65,
+   "spd": 15,
+   "spc": 40,
+   "type1": "WATER",
+   "type2": "PSYCHIC",
+   "catch_rate": 190,
+   "base_exp": 99
+  },
+  "80": {
+   "hp": 95,
+   "atk": 75,
+   "def": 110,
+   "spd": 30,
+   "spc": 80,
+   "type1": "WATER",
+   "type2": "PSYCHIC",
+   "catch_rate": 75,
+   "base_exp": 164
+  },
+  "81": {
+   "hp": 25,
+   "atk": 35,
+   "def": 70,
+   "spd": 45,
+   "spc": 95,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 190,
+   "base_exp": 89
+  },
+  "82": {
+   "hp": 50,
+   "atk": 60,
+   "def": 95,
+   "spd": 70,
+   "spc": 120,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 60,
+   "base_exp": 161
+  },
+  "83": {
+   "hp": 52,
+   "atk": 65,
+   "def": 55,
+   "spd": 60,
+   "spc": 58,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 94
+  },
+  "84": {
+   "hp": 35,
+   "atk": 85,
+   "def": 45,
+   "spd": 75,
+   "spc": 35,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 190,
+   "base_exp": 96
+  },
+  "85": {
+   "hp": 60,
+   "atk": 110,
+   "def": 70,
+   "spd": 100,
+   "spc": 60,
+   "type1": "NORMAL",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 158
+  },
+  "86": {
+   "hp": 65,
+   "atk": 45,
+   "def": 55,
+   "spd": 45,
+   "spc": 70,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 190,
+   "base_exp": 100
+  },
+  "87": {
+   "hp": 90,
+   "atk": 70,
+   "def": 80,
+   "spd": 70,
+   "spc": 95,
+   "type1": "WATER",
+   "type2": "ICE",
+   "catch_rate": 75,
+   "base_exp": 176
+  },
+  "88": {
+   "hp": 80,
+   "atk": 80,
+   "def": 50,
+   "spd": 25,
+   "spc": 40,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 190,
+   "base_exp": 90
+  },
+  "89": {
+   "hp": 105,
+   "atk": 105,
+   "def": 75,
+   "spd": 50,
+   "spc": 65,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 75,
+   "base_exp": 157
+  },
+  "90": {
+   "hp": 30,
+   "atk": 65,
+   "def": 100,
+   "spd": 40,
+   "spc": 45,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 190,
+   "base_exp": 97
+  },
+  "91": {
+   "hp": 50,
+   "atk": 95,
+   "def": 180,
+   "spd": 70,
+   "spc": 85,
+   "type1": "WATER",
+   "type2": "ICE",
+   "catch_rate": 60,
+   "base_exp": 203
+  },
+  "92": {
+   "hp": 30,
+   "atk": 35,
+   "def": 30,
+   "spd": 80,
+   "spc": 100,
+   "type1": "GHOST",
+   "type2": "POISON",
+   "catch_rate": 190,
+   "base_exp": 95
+  },
+  "93": {
+   "hp": 45,
+   "atk": 50,
+   "def": 45,
+   "spd": 95,
+   "spc": 115,
+   "type1": "GHOST",
+   "type2": "POISON",
+   "catch_rate": 90,
+   "base_exp": 126
+  },
+  "94": {
+   "hp": 60,
+   "atk": 65,
+   "def": 60,
+   "spd": 110,
+   "spc": 130,
+   "type1": "GHOST",
+   "type2": "POISON",
+   "catch_rate": 45,
+   "base_exp": 190
+  },
+  "95": {
+   "hp": 35,
+   "atk": 45,
+   "def": 160,
+   "spd": 70,
+   "spc": 30,
+   "type1": "ROCK",
+   "type2": "GROUND",
+   "catch_rate": 45,
+   "base_exp": 108
+  },
+  "96": {
+   "hp": 60,
+   "atk": 48,
+   "def": 45,
+   "spd": 42,
+   "spc": 90,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 190,
+   "base_exp": 102
+  },
+  "97": {
+   "hp": 85,
+   "atk": 73,
+   "def": 70,
+   "spd": 67,
+   "spc": 115,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 75,
+   "base_exp": 165
+  },
+  "98": {
+   "hp": 30,
+   "atk": 105,
+   "def": 90,
+   "spd": 50,
+   "spc": 25,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 225,
+   "base_exp": 115
+  },
+  "99": {
+   "hp": 55,
+   "atk": 130,
+   "def": 115,
+   "spd": 75,
+   "spc": 50,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 60,
+   "base_exp": 206
+  },
+  "100": {
+   "hp": 40,
+   "atk": 30,
+   "def": 50,
+   "spd": 100,
+   "spc": 55,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 190,
+   "base_exp": 103
+  },
+  "101": {
+   "hp": 60,
+   "atk": 50,
+   "def": 70,
+   "spd": 140,
+   "spc": 80,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 60,
+   "base_exp": 150
+  },
+  "102": {
+   "hp": 60,
+   "atk": 40,
+   "def": 80,
+   "spd": 40,
+   "spc": 60,
+   "type1": "GRASS",
+   "type2": "PSYCHIC",
+   "catch_rate": 90,
+   "base_exp": 98
+  },
+  "103": {
+   "hp": 95,
+   "atk": 95,
+   "def": 85,
+   "spd": 55,
+   "spc": 125,
+   "type1": "GRASS",
+   "type2": "PSYCHIC",
+   "catch_rate": 45,
+   "base_exp": 212
+  },
+  "104": {
+   "hp": 50,
+   "atk": 50,
+   "def": 95,
+   "spd": 35,
+   "spc": 40,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 190,
+   "base_exp": 87
+  },
+  "105": {
+   "hp": 60,
+   "atk": 80,
+   "def": 110,
+   "spd": 45,
+   "spc": 50,
+   "type1": "GROUND",
+   "type2": "GROUND",
+   "catch_rate": 75,
+   "base_exp": 124
+  },
+  "106": {
+   "hp": 50,
+   "atk": 120,
+   "def": 53,
+   "spd": 87,
+   "spc": 35,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 45,
+   "base_exp": 139
+  },
+  "107": {
+   "hp": 50,
+   "atk": 105,
+   "def": 79,
+   "spd": 76,
+   "spc": 35,
+   "type1": "FIGHTING",
+   "type2": "FIGHTING",
+   "catch_rate": 45,
+   "base_exp": 140
+  },
+  "108": {
+   "hp": 90,
+   "atk": 55,
+   "def": 75,
+   "spd": 30,
+   "spc": 60,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 45,
+   "base_exp": 127
+  },
+  "109": {
+   "hp": 40,
+   "atk": 65,
+   "def": 95,
+   "spd": 35,
+   "spc": 60,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 190,
+   "base_exp": 114
+  },
+  "110": {
+   "hp": 65,
+   "atk": 90,
+   "def": 120,
+   "spd": 60,
+   "spc": 85,
+   "type1": "POISON",
+   "type2": "POISON",
+   "catch_rate": 60,
+   "base_exp": 173
+  },
+  "111": {
+   "hp": 80,
+   "atk": 85,
+   "def": 95,
+   "spd": 25,
+   "spc": 30,
+   "type1": "GROUND",
+   "type2": "ROCK",
+   "catch_rate": 120,
+   "base_exp": 135
+  },
+  "112": {
+   "hp": 105,
+   "atk": 130,
+   "def": 120,
+   "spd": 40,
+   "spc": 45,
+   "type1": "GROUND",
+   "type2": "ROCK",
+   "catch_rate": 60,
+   "base_exp": 204
+  },
+  "113": {
+   "hp": 250,
+   "atk": 5,
+   "def": 5,
+   "spd": 50,
+   "spc": 105,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 30,
+   "base_exp": 255
+  },
+  "114": {
+   "hp": 65,
+   "atk": 55,
+   "def": 115,
+   "spd": 60,
+   "spc": 100,
+   "type1": "GRASS",
+   "type2": "GRASS",
+   "catch_rate": 45,
+   "base_exp": 166
+  },
+  "115": {
+   "hp": 105,
+   "atk": 95,
+   "def": 80,
+   "spd": 90,
+   "spc": 40,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 45,
+   "base_exp": 175
+  },
+  "116": {
+   "hp": 30,
+   "atk": 40,
+   "def": 70,
+   "spd": 60,
+   "spc": 70,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 225,
+   "base_exp": 83
+  },
+  "117": {
+   "hp": 55,
+   "atk": 65,
+   "def": 95,
+   "spd": 85,
+   "spc": 95,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 75,
+   "base_exp": 155
+  },
+  "118": {
+   "hp": 45,
+   "atk": 67,
+   "def": 60,
+   "spd": 63,
+   "spc": 50,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 225,
+   "base_exp": 111
+  },
+  "119": {
+   "hp": 80,
+   "atk": 92,
+   "def": 65,
+   "spd": 68,
+   "spc": 80,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 60,
+   "base_exp": 170
+  },
+  "120": {
+   "hp": 30,
+   "atk": 45,
+   "def": 55,
+   "spd": 85,
+   "spc": 70,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 225,
+   "base_exp": 106
+  },
+  "121": {
+   "hp": 60,
+   "atk": 75,
+   "def": 85,
+   "spd": 115,
+   "spc": 100,
+   "type1": "WATER",
+   "type2": "PSYCHIC",
+   "catch_rate": 60,
+   "base_exp": 207
+  },
+  "122": {
+   "hp": 40,
+   "atk": 45,
+   "def": 65,
+   "spd": 90,
+   "spc": 100,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 45,
+   "base_exp": 136
+  },
+  "123": {
+   "hp": 70,
+   "atk": 110,
+   "def": 80,
+   "spd": 105,
+   "spc": 55,
+   "type1": "BUG",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 187
+  },
+  "124": {
+   "hp": 65,
+   "atk": 50,
+   "def": 35,
+   "spd": 95,
+   "spc": 95,
+   "type1": "ICE",
+   "type2": "PSYCHIC",
+   "catch_rate": 45,
+   "base_exp": 137
+  },
+  "125": {
+   "hp": 65,
+   "atk": 83,
+   "def": 57,
+   "spd": 105,
+   "spc": 85,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 45,
+   "base_exp": 156
+  },
+  "126": {
+   "hp": 65,
+   "atk": 95,
+   "def": 57,
+   "spd": 93,
+   "spc": 85,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 45,
+   "base_exp": 167
+  },
+  "127": {
+   "hp": 65,
+   "atk": 125,
+   "def": 100,
+   "spd": 85,
+   "spc": 55,
+   "type1": "BUG",
+   "type2": "BUG",
+   "catch_rate": 45,
+   "base_exp": 200
+  },
+  "128": {
+   "hp": 75,
+   "atk": 100,
+   "def": 95,
+   "spd": 110,
+   "spc": 70,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 45,
+   "base_exp": 211
+  },
+  "129": {
+   "hp": 20,
+   "atk": 10,
+   "def": 55,
+   "spd": 80,
+   "spc": 20,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 255,
+   "base_exp": 20
+  },
+  "130": {
+   "hp": 95,
+   "atk": 125,
+   "def": 79,
+   "spd": 81,
+   "spc": 100,
+   "type1": "WATER",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 214
+  },
+  "131": {
+   "hp": 130,
+   "atk": 85,
+   "def": 80,
+   "spd": 60,
+   "spc": 95,
+   "type1": "WATER",
+   "type2": "ICE",
+   "catch_rate": 45,
+   "base_exp": 219
+  },
+  "132": {
+   "hp": 48,
+   "atk": 48,
+   "def": 48,
+   "spd": 48,
+   "spc": 48,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 35,
+   "base_exp": 61
+  },
+  "133": {
+   "hp": 55,
+   "atk": 55,
+   "def": 50,
+   "spd": 55,
+   "spc": 65,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 45,
+   "base_exp": 92
+  },
+  "134": {
+   "hp": 130,
+   "atk": 65,
+   "def": 60,
+   "spd": 65,
+   "spc": 110,
+   "type1": "WATER",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 196
+  },
+  "135": {
+   "hp": 65,
+   "atk": 65,
+   "def": 60,
+   "spd": 130,
+   "spc": 110,
+   "type1": "ELECTRIC",
+   "type2": "ELECTRIC",
+   "catch_rate": 45,
+   "base_exp": 197
+  },
+  "136": {
+   "hp": 65,
+   "atk": 130,
+   "def": 60,
+   "spd": 65,
+   "spc": 110,
+   "type1": "FIRE",
+   "type2": "FIRE",
+   "catch_rate": 45,
+   "base_exp": 198
+  },
+  "137": {
+   "hp": 65,
+   "atk": 60,
+   "def": 70,
+   "spd": 40,
+   "spc": 75,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 45,
+   "base_exp": 130
+  },
+  "138": {
+   "hp": 35,
+   "atk": 40,
+   "def": 100,
+   "spd": 35,
+   "spc": 90,
+   "type1": "ROCK",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 120
+  },
+  "139": {
+   "hp": 70,
+   "atk": 60,
+   "def": 125,
+   "spd": 55,
+   "spc": 115,
+   "type1": "ROCK",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 199
+  },
+  "140": {
+   "hp": 30,
+   "atk": 80,
+   "def": 90,
+   "spd": 55,
+   "spc": 45,
+   "type1": "ROCK",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 119
+  },
+  "141": {
+   "hp": 60,
+   "atk": 115,
+   "def": 105,
+   "spd": 80,
+   "spc": 70,
+   "type1": "ROCK",
+   "type2": "WATER",
+   "catch_rate": 45,
+   "base_exp": 201
+  },
+  "142": {
+   "hp": 80,
+   "atk": 105,
+   "def": 65,
+   "spd": 130,
+   "spc": 60,
+   "type1": "ROCK",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 202
+  },
+  "143": {
+   "hp": 160,
+   "atk": 110,
+   "def": 65,
+   "spd": 30,
+   "spc": 65,
+   "type1": "NORMAL",
+   "type2": "NORMAL",
+   "catch_rate": 25,
+   "base_exp": 154
+  },
+  "144": {
+   "hp": 90,
+   "atk": 85,
+   "def": 100,
+   "spd": 85,
+   "spc": 125,
+   "type1": "ICE",
+   "type2": "FLYING",
+   "catch_rate": 3,
+   "base_exp": 215
+  },
+  "145": {
+   "hp": 90,
+   "atk": 90,
+   "def": 85,
+   "spd": 100,
+   "spc": 125,
+   "type1": "ELECTRIC",
+   "type2": "FLYING",
+   "catch_rate": 3,
+   "base_exp": 216
+  },
+  "146": {
+   "hp": 90,
+   "atk": 100,
+   "def": 90,
+   "spd": 90,
+   "spc": 125,
+   "type1": "FIRE",
+   "type2": "FLYING",
+   "catch_rate": 3,
+   "base_exp": 217
+  },
+  "147": {
+   "hp": 41,
+   "atk": 64,
+   "def": 45,
+   "spd": 50,
+   "spc": 50,
+   "type1": "DRAGON",
+   "type2": "DRAGON",
+   "catch_rate": 45,
+   "base_exp": 67
+  },
+  "148": {
+   "hp": 61,
+   "atk": 84,
+   "def": 65,
+   "spd": 70,
+   "spc": 70,
+   "type1": "DRAGON",
+   "type2": "DRAGON",
+   "catch_rate": 45,
+   "base_exp": 144
+  },
+  "149": {
+   "hp": 91,
+   "atk": 134,
+   "def": 95,
+   "spd": 80,
+   "spc": 100,
+   "type1": "DRAGON",
+   "type2": "FLYING",
+   "catch_rate": 45,
+   "base_exp": 218
+  },
+  "150": {
+   "hp": 106,
+   "atk": 110,
+   "def": 90,
+   "spd": 130,
+   "spc": 154,
+   "type1": "PSYCHIC",
+   "type2": "PSYCHIC",
+   "catch_rate": 3,
+   "base_exp": 220
+  }
+ },
+ "dex_of_internal": {
+  "1": 112,
+  "2": 115,
+  "3": 32,
+  "4": 35,
+  "5": 21,
+  "6": 100,
+  "7": 34,
+  "8": 80,
+  "9": 2,
+  "10": 103,
+  "11": 108,
+  "12": 102,
+  "13": 88,
+  "14": 94,
+  "15": 29,
+  "16": 31,
+  "17": 104,
+  "18": 111,
+  "19": 131,
+  "20": 59,
+  "21": 151,
+  "22": 130,
+  "23": 90,
+  "24": 72,
+  "25": 92,
+  "26": 123,
+  "27": 120,
+  "28": 9,
+  "29": 127,
+  "30": 114,
+  "31": 0,
+  "32": 0,
+  "33": 58,
+  "34": 95,
+  "35": 22,
+  "36": 16,
+  "37": 79,
+  "38": 64,
+  "39": 75,
+  "40": 113,
+  "41": 67,
+  "42": 122,
+  "43": 106,
+  "44": 107,
+  "45": 24,
+  "46": 47,
+  "47": 54,
+  "48": 96,
+  "49": 76,
+  "50": 0,
+  "51": 126,
+  "52": 0,
+  "53": 125,
+  "54": 82,
+  "55": 109,
+  "56": 0,
+  "57": 56,
+  "58": 86,
+  "59": 50,
+  "60": 128,
+  "61": 0,
+  "62": 0,
+  "63": 0,
+  "64": 83,
+  "65": 48,
+  "66": 149,
+  "67": 0,
+  "68": 0,
+  "69": 0,
+  "70": 84,
+  "71": 60,
+  "72": 124,
+  "73": 146,
+  "74": 144,
+  "75": 145,
+  "76": 132,
+  "77": 52,
+  "78": 98,
+  "79": 0,
+  "80": 0,
+  "81": 0,
+  "82": 37,
+  "83": 38,
+  "84": 25,
+  "85": 26,
+  "86": 0,
+  "87": 0,
+  "88": 147,
+  "89": 148,
+  "90": 140,
+  "91": 141,
+  "92": 116,
+  "93": 117,
+  "94": 0,
+  "95": 0,
+  "96": 27,
+  "97": 28,
+  "98": 138,
+  "99": 139,
+  "100": 39,
+  "101": 40,
+  "102": 133,
+  "103": 136,
+  "104": 135,
+  "105": 134,
+  "106": 66,
+  "107": 41,
+  "108": 23,
+  "109": 46,
+  "110": 61,
+  "111": 62,
+  "112": 13,
+  "113": 14,
+  "114": 15,
+  "115": 0,
+  "116": 85,
+  "117": 57,
+  "118": 51,
+  "119": 49,
+  "120": 87,
+  "121": 0,
+  "122": 0,
+  "123": 10,
+  "124": 11,
+  "125": 12,
+  "126": 68,
+  "127": 0,
+  "128": 55,
+  "129": 97,
+  "130": 42,
+  "131": 150,
+  "132": 143,
+  "133": 129,
+  "134": 0,
+  "135": 0,
+  "136": 89,
+  "137": 0,
+  "138": 99,
+  "139": 91,
+  "140": 0,
+  "141": 101,
+  "142": 36,
+  "143": 110,
+  "144": 53,
+  "145": 105,
+  "146": 0,
+  "147": 93,
+  "148": 63,
+  "149": 65,
+  "150": 17,
+  "151": 18,
+  "152": 121,
+  "153": 1,
+  "154": 3,
+  "155": 73,
+  "156": 0,
+  "157": 118,
+  "158": 119,
+  "159": 0,
+  "160": 0,
+  "161": 0,
+  "162": 0,
+  "163": 77,
+  "164": 78,
+  "165": 19,
+  "166": 20,
+  "167": 33,
+  "168": 30,
+  "169": 74,
+  "170": 137,
+  "171": 142,
+  "172": 0,
+  "173": 81,
+  "174": 0,
+  "175": 0,
+  "176": 4,
+  "177": 7,
+  "178": 5,
+  "179": 8,
+  "180": 6,
+  "181": 0,
+  "182": 0,
+  "183": 0,
+  "184": 0,
+  "185": 43,
+  "186": 44,
+  "187": 45,
+  "188": 69,
+  "189": 70,
+  "190": 71
+ },
+ "name_of_internal": {
+  "1": "RHYDON",
+  "2": "KANGASKHAN",
+  "3": "NIDORAN(M)",
+  "4": "CLEFAIRY",
+  "5": "SPEAROW",
+  "6": "VOLTORB",
+  "7": "NIDOKING",
+  "8": "SLOWBRO",
+  "9": "IVYSAUR",
+  "10": "EXEGGUTOR",
+  "11": "LICKITUNG",
+  "12": "EXEGGCUTE",
+  "13": "GRIMER",
+  "14": "GENGAR",
+  "15": "NIDORAN(F)",
+  "16": "NIDOQUEEN",
+  "17": "CUBONE",
+  "18": "RHYHORN",
+  "19": "LAPRAS",
+  "20": "ARCANINE",
+  "21": "MEW",
+  "22": "GYARADOS",
+  "23": "SHELLDER",
+  "24": "TENTACOOL",
+  "25": "GASTLY",
+  "26": "SCYTHER",
+  "27": "STARYU",
+  "28": "BLASTOISE",
+  "29": "PINSIR",
+  "30": "TANGELA",
+  "31": "MISSINGNO.",
+  "32": "MISSINGNO.",
+  "33": "GROWLITHE",
+  "34": "ONIX",
+  "35": "FEAROW",
+  "36": "PIDGEY",
+  "37": "SLOWPOKE",
+  "38": "KADABRA",
+  "39": "GRAVELER",
+  "40": "CHANSEY",
+  "41": "MACHOKE",
+  "42": "MR.MIME",
+  "43": "HITMONLEE",
+  "44": "HITMONCHAN",
+  "45": "ARBOK",
+  "46": "PARASECT",
+  "47": "PSYDUCK",
+  "48": "DROWZEE",
+  "49": "GOLEM",
+  "50": "MISSINGNO.",
+  "51": "MAGMAR",
+  "52": "MISSINGNO.",
+  "53": "ELECTABUZZ",
+  "54": "MAGNETON",
+  "55": "KOFFING",
+  "56": "MISSINGNO.",
+  "57": "MANKEY",
+  "58": "SEEL",
+  "59": "DIGLETT",
+  "60": "TAUROS",
+  "61": "MISSINGNO.",
+  "62": "MISSINGNO.",
+  "63": "MISSINGNO.",
+  "64": "FARFETCH?D",
+  "65": "VENONAT",
+  "66": "DRAGONITE",
+  "67": "MISSINGNO.",
+  "68": "MISSINGNO.",
+  "69": "MISSINGNO.",
+  "70": "DODUO",
+  "71": "POLIWAG",
+  "72": "JYNX",
+  "73": "MOLTRES",
+  "74": "ARTICUNO",
+  "75": "ZAPDOS",
+  "76": "DITTO",
+  "77": "MEOWTH",
+  "78": "KRABBY",
+  "79": "MISSINGNO.",
+  "80": "MISSINGNO.",
+  "81": "MISSINGNO.",
+  "82": "VULPIX",
+  "83": "NINETALES",
+  "84": "PIKACHU",
+  "85": "RAICHU",
+  "86": "MISSINGNO.",
+  "87": "MISSINGNO.",
+  "88": "DRATINI",
+  "89": "DRAGONAIR",
+  "90": "KABUTO",
+  "91": "KABUTOPS",
+  "92": "HORSEA",
+  "93": "SEADRA",
+  "94": "MISSINGNO.",
+  "95": "MISSINGNO.",
+  "96": "SANDSHREW",
+  "97": "SANDSLASH",
+  "98": "OMANYTE",
+  "99": "OMASTAR",
+  "100": "JIGGLYPUFF",
+  "101": "WIGGLYTUFF",
+  "102": "EEVEE",
+  "103": "FLAREON",
+  "104": "JOLTEON",
+  "105": "VAPOREON",
+  "106": "MACHOP",
+  "107": "ZUBAT",
+  "108": "EKANS",
+  "109": "PARAS",
+  "110": "POLIWHIRL",
+  "111": "POLIWRATH",
+  "112": "WEEDLE",
+  "113": "KAKUNA",
+  "114": "BEEDRILL",
+  "115": "MISSINGNO.",
+  "116": "DODRIO",
+  "117": "PRIMEAPE",
+  "118": "DUGTRIO",
+  "119": "VENOMOTH",
+  "120": "DEWGONG",
+  "121": "MISSINGNO.",
+  "122": "MISSINGNO.",
+  "123": "CATERPIE",
+  "124": "METAPOD",
+  "125": "BUTTERFREE",
+  "126": "MACHAMP",
+  "127": "MISSINGNO.",
+  "128": "GOLDUCK",
+  "129": "HYPNO",
+  "130": "GOLBAT",
+  "131": "MEWTWO",
+  "132": "SNORLAX",
+  "133": "MAGIKARP",
+  "134": "MISSINGNO.",
+  "135": "MISSINGNO.",
+  "136": "MUK",
+  "137": "MISSINGNO.",
+  "138": "KINGLER",
+  "139": "CLOYSTER",
+  "140": "MISSINGNO.",
+  "141": "ELECTRODE",
+  "142": "CLEFABLE",
+  "143": "WEEZING",
+  "144": "PERSIAN",
+  "145": "MAROWAK",
+  "146": "MISSINGNO.",
+  "147": "HAUNTER",
+  "148": "ABRA",
+  "149": "ALAKAZAM",
+  "150": "PIDGEOTTO",
+  "151": "PIDGEOT",
+  "152": "STARMIE",
+  "153": "BULBASAUR",
+  "154": "VENUSAUR",
+  "155": "TENTACRUEL",
+  "156": "MISSINGNO.",
+  "157": "GOLDEEN",
+  "158": "SEAKING",
+  "159": "MISSINGNO.",
+  "160": "MISSINGNO.",
+  "161": "MISSINGNO.",
+  "162": "MISSINGNO.",
+  "163": "PONYTA",
+  "164": "RAPIDASH",
+  "165": "RATTATA",
+  "166": "RATICATE",
+  "167": "NIDORINO",
+  "168": "NIDORINA",
+  "169": "GEODUDE",
+  "170": "PORYGON",
+  "171": "AERODACTYL",
+  "172": "MISSINGNO.",
+  "173": "MAGNEMITE",
+  "174": "MISSINGNO.",
+  "175": "MISSINGNO.",
+  "176": "CHARMANDER",
+  "177": "SQUIRTLE",
+  "178": "CHARMELEON",
+  "179": "WARTORTLE",
+  "180": "CHARIZARD",
+  "181": "MISSINGNO.",
+  "182": "MISSINGNO.",
+  "183": "MISSINGNO.",
+  "184": "MISSINGNO.",
+  "185": "ODDISH",
+  "186": "GLOOM",
+  "187": "VILEPLUME",
+  "188": "BELLSPROUT",
+  "189": "WEEPINBELL",
+  "190": "VICTREEBEL"
+ }
+}

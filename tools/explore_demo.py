@@ -76,6 +76,36 @@ AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11,
          "LEFT": [(8, 6), (8, 7), (9, 6), (9, 7)], "RIGHT": [(8, 10), (8, 11), (9, 10), (9, 11)]}
 EFFECT_WINDOW = (0xD000, 0x900)  # bag, money, map, party, event flags: diffed around every interaction
 REGISTRY = load_registry()
+_KB = Path(__file__).resolve().parents[1] / "kb" / "rom_tables.json"
+ROM_KB = json.loads(_KB.read_text(encoding="utf-8")) if _KB.exists() else None  # tools/rom_tables.py drains it from the cartridge
+
+
+def move_scores(emu) -> dict[str, tuple[float, str]]:
+    """Knowledge-based move values for the current battle: power x type effectiveness (ROM type chart) x STAB x
+    accuracy, from the cartridge's own tables; moves with 0 PP score 0. Returns {MOVE NAME: (score, reason)}."""
+    if not ROM_KB:
+        return {}
+    chart = {(a, d): e for a, d, e in ROM_KB["type_chart"]}
+    enemy_types = {ROM_KB["moves"]["1"]["type"]} if False else set()
+    et1, et2 = emu.read(0xCFEA), emu.read(0xCFEB)
+    names = {"NORMAL": 0, "FIGHTING": 1, "FLYING": 2, "POISON": 3, "GROUND": 4, "ROCK": 5, "BUG": 7, "GHOST": 8, "FIRE": 20,
+             "WATER": 21, "GRASS": 22, "ELECTRIC": 23, "PSYCHIC": 24, "ICE": 25, "DRAGON": 26}
+    inv = {v: k for k, v in names.items()}
+    enemy_types = {inv.get(et1, "?"), inv.get(et2, "?")}
+    my_types = {inv.get(emu.read(0xD170), "?"), inv.get(emu.read(0xD171), "?")}
+    out = {}
+    for slot in range(4):
+        mid, pp = emu.read(0xD01C + slot), emu.read(0xD02D + slot) & 0x3F
+        mv = ROM_KB["moves"].get(str(mid))
+        if not mv or not mid:
+            continue
+        eff = 1.0
+        for t in enemy_types:
+            eff *= chart.get((mv["type"], t), 1.0)
+        stab = 1.5 if mv["type"] in my_types else 1.0
+        score = mv["power"] * eff * stab * mv["accuracy"] if pp > 0 else 0.0
+        out[mv["name"]] = (score, f"pow {mv['power']} x{eff:g} type{' STAB' if stab > 1 else ''} pp {pp}")
+    return out
 
 
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]  # goals.json order
@@ -841,16 +871,23 @@ def main(argv=None) -> int:
                     d = mem.data.get("move_damage", {}).get(f"{species}:{mv}")
                     return (0, 0) if not d else (1, sum(d) / len(d))
                 tried = [mv for mv in moves if score(mv)[0]]
-                target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
+                ks = move_scores(emu)  # cartridge knowledge: power x type chart x STAB x accuracy, 0 when out of PP
+                norm0 = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
+                known = {norm0(k): v for k, v in ks.items()}
+                if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in moves):
+                    target = max(moves, key=lambda mv: (known.get(norm0(mv), (0, ""))[0], score(mv)[1]))
+                    st["move_reason"] = known.get(norm0(target), (0, ""))[1]
+                else:  # no knowledge (or all out of PP): variety first, then the best observed damage
+                    target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
+                    st["move_reason"] = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
                 norm = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
                 st["move_nav"] = st.get("move_nav", 0) + 1
                 if norm(cursor_mv) == norm(target) or st["move_nav"] > 5:  # never bounce: after 5 moves take what is under the cursor
                     chosen = cursor_mv if st["move_nav"] > 5 else target
                     st["move_nav"] = 0
                     st["pending_move"] = {"species": species, "move": chosen, "enemy_hp": enemy_hp}
-                    why = (f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {chosen} (untried)" if chosen not in tried
-                           else f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {chosen} (best avg {score(chosen)[1]:.1f} dmg)")
-                    do_press("A", "agent", why); return
+                    ename = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), f"#{species}")
+                    do_press("A", "agent", f"BATTLE vs {ename} L{emu.read(0xCFF3)}: {chosen} ({st.get('move_reason', '')})"); return
                 do_press("DOWN", "agent", f"move menu: cursor to {target} (now on {cursor_mv})"); return
             if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
                 do_press("UP", "agent", "battle menu: back up to FIGHT"); return
@@ -988,6 +1025,7 @@ def main(argv=None) -> int:
                             mem.data["maps"], (m, x, y), st["facing"])
         if planned and "at Mom, talking" in planned[1]:
             st["mom_talk_step"] = st["step"]; st["mom_talk_hp"] = hp_now
+            st["slow_until"] = st["step"] + 12  # healing has a fade: slow down so completion is recognised
         if planned and not (st["explore_run"] and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             do_press(planned[0], "agent", planned[1]); return
         weak = mx_now and hp_now / mx_now < 0.4
@@ -1119,6 +1157,8 @@ def main(argv=None) -> int:
         st["last_hash"] = h
         try:
             pace = a.box_pace if (a.box_pace and st.get("box_open_now")) else a.frames_per_step
+            if st.get("slow_until", 0) > st["step"]:
+                pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
             if not st["paused"] and st["frame"] % pace == 0:
                 agent_step()
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
