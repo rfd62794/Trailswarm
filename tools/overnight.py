@@ -34,16 +34,24 @@ def consistency(last_n: int = 16) -> dict[str, float]:
     runs = [p for p in sorted((ROOT / "runs").glob("explore-*"), key=lambda p: p.stat().st_mtime)
             if (p / "transitions.jsonl").exists() and sum(1 for _ in open(p / "transitions.jsonl", encoding="utf-8")) >= 5]
     out = {}
+    def start_idx(p):
+        try:
+            meta = json.loads((p / "meta.json").read_text())
+        except Exception:
+            return None, None
+        st = meta.get("start", "baseline")
+        si = -1 if st in ("baseline", "bedroom") else GOALS.index(st) if st in GOALS else GOALS.index("to_route1") if st == "team_best" else None
+        stop = GOALS.index(meta["stop_at_goal"]) if meta.get("stop_at_goal") in GOALS else len(GOALS)
+        return si, stop
     for i, g in enumerate(GOALS):
-        # attempting runs: those that never started past this goal = their first press map is not downstream.
-        order_maps = {0: [0x26, 0x25], 1: [0x26, 0x25], 2: [0x00, 0x28], 3: [0x28], 4: [0x00, 0x28, 0x0C], 5: [0x0C], 6: [0x01], 7: [0x01]}
+        # an ATTEMPT at goal i: the run started upstream of it (start index < i) and was not stopped before it
         tries = []
-        for p in runs[-60:]:
-            first = json.loads(next(open(p / "transitions.jsonl", encoding="utf-8")))
-            if first["from"][0] in order_maps.get(i, []) or i == 0:
+        for p in runs[-80:]:
+            si, stop = start_idx(p)
+            if si is not None and si < i and stop >= i:
                 tries.append(p.name)
         tries = tries[-last_n:]
-        out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None  # None = not enough attempts to judge
+        out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None
     return out
 
 
