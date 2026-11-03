@@ -105,3 +105,17 @@ import from `emulator.py` (directive 1 may not have landed).
 ## 8. Report
 
 Test tail, line counts per new file, and any decision not written in the design.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 2 of 3; independent of step 1, runs in parallel
+<!-- queue:end -->
