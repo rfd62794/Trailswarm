@@ -39,6 +39,14 @@ import queue  # noqa: E402
 from concurrent.futures import Future  # noqa: E402
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
+# Procedures: (button, regex the screen must show afterwards | None). START menu order at game start:
+# POKeMON, ITEM, <name>, SAVE, OPTION, EXIT (POKeMON appears once you have one). READ records the screen.
+PROCEDURES = {
+    "check_health": [("START", r"POK.MON|ITEM"), ("A", r"\d+/\s*\d+|L\d+"), ("READ", None), ("B", None), ("B", None)],
+    "open_bag": [("START", r"ITEM"), ("DOWN", r">ITEM"), ("A", r"CANCEL"), ("READ", None), ("B", None), ("B", None)],
+    "save_game": [("START", r"SAVE"), ("DOWN", r">ITEM"), ("DOWN", None), ("DOWN", r">SAVE"), ("A", r"save|SAVE"),
+                  ("A", r"YES|Saving|saved"), ("A", r"saved|SAVE"), ("A", None), ("B", None), ("B", None)],
+}
 # YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
 YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
                ("give up", "NO"), (" run ", "NO"), ("", "YES")]  # spaced needles = whole words
@@ -979,19 +987,48 @@ def main(argv=None) -> int:
                     do_press("DOWN", "agent", f"menu open, '{cursor}' already tried - moving the cursor down"); return
                 do_press("B", "agent", "menu open, every option tried here - backing out"); return
             do_press("A", "agent", "a text box is open - finishing the interaction before moving"); return
-        # Menu literacy (Robert): once per run, after the first heal, open START -> POKeMON, read the party screen,
-        # compare its HP text with RAM, remember the menu layout, and back out. (HP decisions use RAM directly.)
-        if st.get("menu_check") == "due" and not box_open(tm_now) and emu.read(0xD057) == 0:
-            st["menu_check"] = ["START", "A", "READ", "B", "B"]
-        if isinstance(st.get("menu_check"), list) and st["menu_check"]:
-            stepname = st["menu_check"].pop(0)
-            if stepname == "READ":
+        # Procedures (Robert): named button sequences for menu tasks - check health, open the bag, save - each step
+        # verified against the screen text it should produce; a step that does not register is retried slower, and the
+        # pace that works is remembered per procedure (maps.json procedures), so they become consistent over runs.
+        proc = st.get("proc")
+        if proc is None and st.get("proc_due") and not box_open(tm_now) and emu.read(0xD057) == 0:
+            name = st["proc_due"].pop(0)
+            if name in PROCEDURES:
+                rec = mem.data.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": a.box_pace or 12})
+                st["proc"] = proc = {"name": name, "steps": list(PROCEDURES[name]), "i": 0, "retries": 0, "pace": rec["pace"], "wait": 0}
+                log(f"[procedure {name}: start, pace {proc['pace']} frames]", "res")
+        if proc:
+            if proc["wait"] > 0:
+                proc["wait"] -= a.frames_per_step; return  # pacing between steps (the per-procedure learned pace)
+            if proc["i"] >= len(proc["steps"]):
+                rec = mem.data["procedures"][proc["name"]]; rec["ok"] += 1; rec["pace"] = proc["pace"]
+                log(f"[procedure {proc['name']}: done in {len(proc['steps'])} steps at pace {proc['pace']} ({rec['ok']} ok / {rec['fail']} fail)]", "res")
+                st["proc"] = None; return
+            btn, expect = proc["steps"][proc["i"]]
+            if btn == "READ":
                 lines = frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN))
-                mem.data.setdefault("menus", {})["pokemon_screen"] = lines[:8]
-                hp_now2, mx_now2 = party_hp(emu)
-                log(f"[START menu > POKeMON reads: {' | '.join(lines[:4])[:90]}  (RAM says HP {hp_now2}/{mx_now2})]", "res")
-                stepname = st["menu_check"].pop(0) if st["menu_check"] else "B"
-            do_press(stepname, "agent", "menu literacy: START > POKeMON, read the party screen, back out"); return
+                mem.data.setdefault("menus", {})[proc["name"]] = lines[:10]
+                hp_r, mx_r = party_hp(emu)
+                log(f"[procedure {proc['name']}: screen reads {' | '.join(lines[:4])[:90]} (RAM HP {hp_r}/{mx_r}, bag {bag_contents(emu)})]", "res")
+                proc["i"] += 1; return
+            if expect and proc.get("checking"):  # did the previous press produce what we expected?
+                lines = frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN))
+                if any(re.search(expect, ln) for ln in lines):
+                    proc["checking"] = False; proc["i"] += 1; proc["wait"] = proc["pace"]; return
+                proc["retries"] += 1
+                if proc["retries"] > 3:
+                    rec = mem.data["procedures"][proc["name"]]; rec["fail"] += 1
+                    log(f"[procedure {proc['name']}: step {proc['i']} ({btn}) never showed /{expect}/ - abandoning, pace raised]", "res")
+                    rec["pace"] = min(60, proc["pace"] * 2); st["proc"] = None
+                    do_press("B", "agent", "procedure failed: backing out"); return
+                proc["pace"] = min(60, proc["pace"] * 2); proc["wait"] = proc["pace"]
+                do_press(btn, "agent", f"procedure {proc['name']}: retry {btn} slower (pace {proc['pace']})"); return
+            do_press(btn, "agent", f"procedure {proc['name']}: step {proc['i'] + 1}/{len(proc['steps'])} {btn}")
+            if expect:
+                proc["checking"] = True; proc["wait"] = proc["pace"]
+            else:
+                proc["i"] += 1; proc["wait"] = proc["pace"]
+            return
         if st.get("goto"):  # a human/Claude asked for a destination: route there over the learned world
             target = tuple(st["goto"])
             if (m, x, y) == target:
@@ -1033,8 +1070,8 @@ def main(argv=None) -> int:
                 log(f"[Mom did not heal us (HP {hp_now}/{mx_now}); not retrying for 150 steps]", "res")
             else:
                 log(f"[healed at Mom: HP {hp_now}/{mx_now}]", "res")
-                if not st.get("menu_check"):
-                    st["menu_check"] = "due"  # verify the heal the way a player would: START > POKeMON
+                st.setdefault("proc_due", []).extend(n for n in ("check_health", "open_bag", "save_game") if n not in st.get("proc_done", set()))
+                st.setdefault("proc_done", set()).update({"check_health", "open_bag", "save_game"})
             st["mom_talk_step"] = None
         goals_now_all = check_goals(emu, st)
         planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
