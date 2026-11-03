@@ -124,12 +124,14 @@ Test tail, line counts per new file, and anything in the design you had to decid
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-emulator-layer-directive |
 | Base branch | - |
+| Base commit | 01b72355c910c20f489dd16244d8c5af24891605 |
 
 **Status log**
 - 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 1 of 3; design at docs/superpowers/specs/2026-11-02-pokeagent-design.md; independent of step 2
 - 2026-11-02 21:54 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates (section 2 says Create), not files it reads; dispatch-path-missing is a false positive here
+- 2026-11-02 21:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-emulator-layer-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FN98WF45MCE64TMC94KFQB
 <!-- queue:end -->
