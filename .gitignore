@@ -6,3 +6,4 @@ __pycache__/
 runs/
 .devin-scratch/
 
+kb/rom_tables.json

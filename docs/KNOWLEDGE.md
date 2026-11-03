@@ -38,3 +38,13 @@ Item id 0x14 = POTION (the one item in the PC at a new game). Still UNVERIFIED: 
 - The PC: stand at (0,2) upstairs facing UP, press A -> "BCN turned on the PC." Menu: WITHDRAW ITEM /
   DEPOSIT ITEM / TOSS ITEM / LOG OFF. WITHDRAW ITEM -> list "POTION x1 / CANCEL" -> A -> "How many?" -> A.
   Sequence that worked: A (turn on), A (WITHDRAW), A (POTION), A (quantity), A... then B until closed.
+
+## Viridian City (found by headless swarm agents, 2026-11-03)
+
+- Viridian City is map 0x01 (reached from Route 1 0x0C). Map 0x2A (42) is the Poke Mart: stand at (2,5) in front of the
+  clerk and press A: "BCN got OAK PARCEL!" adds item 0x46 (bag count 0xD31D goes up). Door tile from Viridian: (29,20) DOWN
+  warps out; the mart warp lands inside at (3,7) facing the counter. VERIFIED in two agent runs.
+- A free POTION lies on the ground in Viridian at (13,4): "BCN found POTION!" (VERIFIED).
+- Map 0x2B (43) is a small house with one NPC ("Whew! I..."); map 0x2C (44) is a house where a child talks about nicknames.
+- Map 0x21 (33) is Route 22, west of Viridian (its east edge warps to Viridian (0,15)/(0,16)).
+- Viridian has one-way ledges (a press that moves two tiles); the plaza around (18-19, 26-28) loops if ledges are treated as two-way.

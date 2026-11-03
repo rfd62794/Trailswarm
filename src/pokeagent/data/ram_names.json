@@ -1,120 +1,13 @@
 [
  {
-  "name": "wTileMap",
-  "addr": "0xC3A0",
-  "size": 360,
-  "encoding": "text",
-  "verified": true,
-  "note": "20x18 visible screen tiles",
-  "evidence": "START menu text decoded 2026-11-02"
- },
- {
-  "name": "wPlayerName",
-  "addr": "0xD158",
-  "size": 11,
-  "encoding": "text",
-  "verified": false,
-  "note": "0x50-terminated"
- },
- {
-  "name": "wPartyCount",
-  "addr": "0xD163",
-  "size": 1,
-  "encoding": "u8",
-  "verified": false,
-  "note": ""
- },
- {
-  "name": "wPartySpecies",
-  "addr": "0xD164",
-  "size": 7,
+  "name": "wSpriteStateData1",
+  "addr": "0xC100",
+  "size": 256,
   "encoding": "bytes",
   "verified": false,
-  "note": "0xFF-terminated"
- },
- {
-  "name": "wPlayerMoney",
-  "addr": "0xD347",
-  "size": 3,
-  "encoding": "bcd",
-  "verified": true,
-  "evidence": "make_baseline 2026-11-02",
-  "note": ""
- },
- {
-  "name": "wObtainedBadges",
-  "addr": "0xD356",
-  "size": 1,
-  "encoding": "bitmask",
-  "verified": false,
-  "note": "bit0 Boulder ... bit7 Earth"
- },
- {
-  "name": "wCurMap",
-  "addr": "0xD35E",
-  "size": 1,
-  "encoding": "u8",
-  "verified": true,
-  "evidence": "make_baseline 2026-11-02",
-  "note": ""
- },
- {
-  "name": "wYCoord",
-  "addr": "0xD361",
-  "size": 1,
-  "encoding": "u8",
-  "verified": true,
-  "evidence": "make_baseline 2026-11-02",
-  "note": ""
- },
- {
-  "name": "wXCoord",
-  "addr": "0xD362",
-  "size": 1,
-  "encoding": "u8",
-  "verified": true,
-  "evidence": "make_baseline 2026-11-02",
-  "note": "player X on current map"
- },
- {
-  "name": "wIsInBattle",
-  "addr": "0xD057",
-  "size": 1,
-  "encoding": "u8",
-  "verified": false,
-  "note": "0 none, 1 wild, 2 trainer"
- },
- {
-  "name": "wCurOpponent",
-  "addr": "0xD059",
-  "size": 1,
-  "encoding": "u8",
-  "verified": false,
-  "note": ""
- },
- {
-  "name": "wCurrentMenuItem",
-  "addr": "0xCC26",
-  "size": 1,
-  "encoding": "u8",
-  "verified": false,
-  "note": ""
- },
- {
-  "name": "wMaxMenuItem",
-  "addr": "0xCC28",
-  "size": 1,
-  "encoding": "u8",
-  "verified": false,
-  "note": ""
- },
- {
-  "name": "wJoyIgnore",
-  "addr": "0xCD6B",
-  "size": 1,
-  "encoding": "bitmask",
-  "verified": false,
-  "note": "buttons the game is ignoring"
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "16 sprites x 16: +0 picture id, +1 movement status, +9 facing",
+  "sym": "wSpriteDataStart"
  },
  {
   "name": "wSpritePlayerFacing",
@@ -122,7 +15,406 @@
   "size": 1,
   "encoding": "u8",
   "verified": false,
-  "note": "0 down 4 up 8 left 0xC right"
+  "note": "0 down 4 up 8 left 0xC right",
+  "sym": "wSpritePlayerStateData1FacingDirection"
+ },
+ {
+  "name": "wSpriteStateData2",
+  "addr": "0xC200",
+  "size": 256,
+  "encoding": "bytes",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "16 sprites x 16: +4 map y+4, +5 map x+4 (slot 0 = player, unused)",
+  "evidence": "NPC positions matched Pallet Town/lab/house",
+  "sym": "wSprite15StateData1End"
+ },
+ {
+  "name": "wTileMap",
+  "addr": "0xC3A0",
+  "size": 360,
+  "encoding": "text",
+  "verified": true,
+  "note": "20x18 visible screen tiles",
+  "evidence": "START menu text decoded 2026-11-02",
+  "sym": "wShadowOAMEnd",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wCurrentMenuItem",
+  "addr": "0xCC26",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "note": "",
+  "sym": "wCurrentMenuItem",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wMaxMenuItem",
+  "addr": "0xCC28",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "note": "",
+  "sym": "wMaxMenuItem",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPlayerMonNumber",
+  "addr": "0xCC2F",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "party index in battle",
+  "sym": "wPlayerMonNumber"
+ },
+ {
+  "name": "wJoyIgnore",
+  "addr": "0xCD6B",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "note": "buttons the game is ignoring",
+  "sym": "wJoyIgnore",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wBattleResult",
+  "addr": "0xCF0B",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "0 win 1 lose 2 draw/ran",
+  "sym": "wBattleResult"
+ },
+ {
+  "name": "wWalkCounter",
+  "addr": "0xCFC5",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "nonzero while a step animates",
+  "sym": "wWalkCounter"
+ },
+ {
+  "name": "wEnemyMonSpecies",
+  "addr": "0xCFE5",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wEnemyMon"
+ },
+ {
+  "name": "wEnemyMonHP",
+  "addr": "0xCFE6",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "battle log 16->12->8",
+  "sym": "wEnemyMonHP"
+ },
+ {
+  "name": "wEnemyMonType1",
+  "addr": "0xCFEA",
+  "size": 2,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "type1,type2",
+  "sym": "wEnemyMonType"
+ },
+ {
+  "name": "wEnemyMonCatchRate",
+  "addr": "0xCFEC",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wEnemyMonCatchRate"
+ },
+ {
+  "name": "wEnemyMonMoves",
+  "addr": "0xCFED",
+  "size": 4,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wEnemyMonMoves"
+ },
+ {
+  "name": "wEnemyMonLevel",
+  "addr": "0xCFF3",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wEnemyMonLevel"
+ },
+ {
+  "name": "wEnemyMonMaxHP",
+  "addr": "0xCFF4",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wEnemyMonMaxHP"
+ },
+ {
+  "name": "wBattleMonSpecies",
+  "addr": "0xD014",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wBattleMon"
+ },
+ {
+  "name": "wBattleMonHP",
+  "addr": "0xD015",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "battle log 10->7->4",
+  "sym": "wBattleMonHP"
+ },
+ {
+  "name": "wBattleMonMoves",
+  "addr": "0xD01C",
+  "size": 4,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wBattleMonMoves"
+ },
+ {
+  "name": "wBattleMonLevel",
+  "addr": "0xD022",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wBattleMonLevel"
+ },
+ {
+  "name": "wBattleMonMaxHP",
+  "addr": "0xD023",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wBattleMonMaxHP"
+ },
+ {
+  "name": "wBattleMonPP",
+  "addr": "0xD02D",
+  "size": 4,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wBattleMonPP"
+ },
+ {
+  "name": "wIsInBattle",
+  "addr": "0xD057",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "note": "0 none, 1 wild, 2 trainer",
+  "sym": "wIsInBattle",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wCurOpponent",
+  "addr": "0xD059",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "note": "",
+  "sym": "wCurOpponent",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wBattleType",
+  "addr": "0xD05A",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "0 normal 1 old man 2 safari",
+  "sym": "wBattleType"
+ },
+ {
+  "name": "wRepelRemainingSteps",
+  "addr": "0xD0DB",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wRepelRemainingSteps"
+ },
+ {
+  "name": "wTextBoxID",
+  "addr": "0xD125",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wTextBoxID"
+ },
+ {
+  "name": "wCurrentMapScriptFlags",
+  "addr": "0xD126",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wCurrentMapScriptFlags"
+ },
+ {
+  "name": "wPlayerName",
+  "addr": "0xD158",
+  "size": 11,
+  "encoding": "text",
+  "verified": false,
+  "note": "0x50-terminated",
+  "sym": "wPlayerName",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPartyCount",
+  "addr": "0xD163",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "note": "",
+  "sym": "wPartyCount",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPartySpecies",
+  "addr": "0xD164",
+  "size": 7,
+  "encoding": "bytes",
+  "verified": false,
+  "note": "0xFF-terminated",
+  "sym": "wPartySpecies",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPartyMon1",
+  "addr": "0xD16B",
+  "size": 44,
+  "encoding": "bytes",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "party_struct: species,HP(2),boxlevel,status,type1,type2,catch,moves(4),OTID(2),exp(3),HPexp..,PP(4) at +29,level at +33,maxHP(2) at +34",
+  "evidence": "species 0x99 live",
+  "sym": "wPartyMon1"
+ },
+ {
+  "name": "wPartyMon1HP",
+  "addr": "0xD16C",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "11/20 live 2026-11-03",
+  "sym": "wPartyMon1HP"
+ },
+ {
+  "name": "wPartyMon1Status",
+  "addr": "0xD16F",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPartyMon1Status"
+ },
+ {
+  "name": "wPartyMon1Moves",
+  "addr": "0xD173",
+  "size": 4,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "move ids",
+  "sym": "wPartyMon1Moves"
+ },
+ {
+  "name": "wPartyMon1PP",
+  "addr": "0xD188",
+  "size": 4,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPartyMon1PP"
+ },
+ {
+  "name": "wPartyMon1Level",
+  "addr": "0xD18C",
+  "size": 1,
+  "encoding": "u8",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "5 live",
+  "sym": "wPartyMon1Level"
+ },
+ {
+  "name": "wPartyMon1MaxHP",
+  "addr": "0xD18D",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "20 live",
+  "sym": "wPartyMon1MaxHP"
+ },
+ {
+  "name": "wPokedexOwned",
+  "addr": "0xD2F7",
+  "size": 19,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "bit per species",
+  "sym": "wMainDataStart"
+ },
+ {
+  "name": "wPokedexSeen",
+  "addr": "0xD30A",
+  "size": 19,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPokedexOwnedEnd"
  },
  {
   "name": "wNumBagItems",
@@ -131,7 +423,9 @@
   "encoding": "u8",
   "verified": true,
   "evidence": "probe_pc 2026-11-02: 0->1 after withdrawing the POTION",
-  "note": "items in the bag"
+  "note": "items in the bag",
+  "sym": "wNumBagItems",
+  "source": "pokered.sym (pret, symbols branch)"
  },
  {
   "name": "wBagItems",
@@ -140,7 +434,164 @@
   "encoding": "bytes",
   "verified": true,
   "evidence": "probe_pc 2026-11-02: FF->14 01 FF",
-  "note": "(item id, qty) pairs, 0xFF terminator; 0x14 = POTION"
+  "note": "(item id, qty) pairs, 0xFF terminator; 0x14 = POTION",
+  "sym": "wBagItems",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPlayerMoney",
+  "addr": "0xD347",
+  "size": 3,
+  "encoding": "bcd",
+  "verified": true,
+  "evidence": "make_baseline 2026-11-02",
+  "note": "",
+  "sym": "wPlayerMoney",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wRivalName",
+  "addr": "0xD34A",
+  "size": 11,
+  "encoding": "text",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wRivalName"
+ },
+ {
+  "name": "wOptions",
+  "addr": "0xD355",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "text speed/battle anim/style",
+  "sym": "wOptions"
+ },
+ {
+  "name": "wObtainedBadges",
+  "addr": "0xD356",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "note": "bit0 Boulder ... bit7 Earth",
+  "sym": "wObtainedBadges",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wPlayerID",
+  "addr": "0xD359",
+  "size": 2,
+  "encoding": "u16be",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPlayerID"
+ },
+ {
+  "name": "wCurMap",
+  "addr": "0xD35E",
+  "size": 1,
+  "encoding": "u8",
+  "verified": true,
+  "evidence": "make_baseline 2026-11-02",
+  "note": "",
+  "sym": "wCurMap",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wYCoord",
+  "addr": "0xD361",
+  "size": 1,
+  "encoding": "u8",
+  "verified": true,
+  "evidence": "make_baseline 2026-11-02",
+  "note": "",
+  "sym": "wYCoord",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wXCoord",
+  "addr": "0xD362",
+  "size": 1,
+  "encoding": "u8",
+  "verified": true,
+  "evidence": "make_baseline 2026-11-02",
+  "note": "player X on current map",
+  "sym": "wXCoord",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wCurMapTileset",
+  "addr": "0xD367",
+  "size": 1,
+  "encoding": "u8",
+  "verified": true,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "evidence": "reads 4 in houses, used as the tile-type key",
+  "sym": "wCurMapHeader"
+ },
+ {
+  "name": "wCurMapHeight",
+  "addr": "0xD368",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "in blocks",
+  "sym": "wCurMapHeight"
+ },
+ {
+  "name": "wCurMapWidth",
+  "addr": "0xD369",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "in blocks",
+  "sym": "wCurMapWidth"
+ },
+ {
+  "name": "wNumberOfWarps",
+  "addr": "0xD3AE",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wNumberOfWarps"
+ },
+ {
+  "name": "wWarpEntries",
+  "addr": "0xD3AF",
+  "size": 128,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "y,x,dest warp id,dest map x32",
+  "sym": "wWarpEntries"
+ },
+ {
+  "name": "wNumSprites",
+  "addr": "0xD4E1",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wNumSprites"
+ },
+ {
+  "name": "wPlayerDirection",
+  "addr": "0xD52A",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPlayerDirection"
  },
  {
   "name": "wNumBoxItems",
@@ -149,7 +600,9 @@
   "encoding": "u8",
   "verified": true,
   "evidence": "probe_pc 2026-11-02: 1->0",
-  "note": "items stored in the PC"
+  "note": "items stored in the PC",
+  "sym": "wNumBoxItems",
+  "source": "pokered.sym (pret, symbols branch)"
  },
  {
   "name": "wBoxItems",
@@ -158,6 +611,128 @@
   "encoding": "bytes",
   "verified": true,
   "evidence": "probe_pc 2026-11-02: 14 01 FF -> FF",
-  "note": "(item id, qty) pairs, 0xFF terminator"
+  "note": "(item id, qty) pairs, 0xFF terminator",
+  "sym": "wBoxItems",
+  "source": "pokered.sym (pret, symbols branch)"
+ },
+ {
+  "name": "wLastBlackoutMap",
+  "addr": "0xD719",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wLastBlackoutMap"
+ },
+ {
+  "name": "wStatusFlags1",
+  "addr": "0xD728",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d728",
+  "sym": "wStatusFlags1"
+ },
+ {
+  "name": "wStatusFlags2",
+  "addr": "0xD72C",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d72c",
+  "sym": "wStatusFlags2"
+ },
+ {
+  "name": "wStatusFlags3",
+  "addr": "0xD72D",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d72d",
+  "sym": "wCableClubDestinationMap"
+ },
+ {
+  "name": "wStatusFlags4",
+  "addr": "0xD72E",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d72e",
+  "sym": "wStatusFlags4"
+ },
+ {
+  "name": "wStatusFlags5",
+  "addr": "0xD730",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d730 (bit 7 = no joypad input / scripted walk)",
+  "sym": "wStatusFlags5"
+ },
+ {
+  "name": "wStatusFlags6",
+  "addr": "0xD732",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d732",
+  "sym": "wStatusFlags6"
+ },
+ {
+  "name": "wStatusFlags7",
+  "addr": "0xD733",
+  "size": 1,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "d733",
+  "sym": "wStatusFlags7"
+ },
+ {
+  "name": "wEventFlags",
+  "addr": "0xD747",
+  "size": 320,
+  "encoding": "bitmask",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "story flags d747-d886; one-time triggers flip bits here",
+  "sym": "wEventFlags"
+ },
+ {
+  "name": "wGrassRate",
+  "addr": "0xD887",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "encounter rate",
+  "sym": "wGrassRate"
+ },
+ {
+  "name": "wGrassMons",
+  "addr": "0xD888",
+  "size": 20,
+  "encoding": "bytes",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "level,species x10",
+  "sym": "wGrassMons"
+ },
+ {
+  "name": "wPlayTimeHours",
+  "addr": "0xDA41",
+  "size": 1,
+  "encoding": "u8",
+  "verified": false,
+  "source": "pokered.sym (pret, symbols branch)",
+  "note": "",
+  "sym": "wPlayTimeHours"
  }
 ]

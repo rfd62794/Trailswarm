@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
+STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
 
 
 class WorldGraph:
@@ -26,6 +27,8 @@ class WorldGraph:
 
     def __init__(self, maps: dict):
         self.maps = maps
+
+    strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
 
     def neighbours(self, node):
         m, x, y = node
@@ -38,13 +41,29 @@ class WorldGraph:
             if warp:
                 yield (warp[0], warp[1], warp[2]), name
                 continue
-            if key in d.get("blocked", []):
+            jump = d.get("jumps", {}).get(key)
+            if jump:  # a learned ledge: one-way hop to a tile more than one step away
+                yield (m, jump[0], jump[1]), name
+                continue
+            if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy
             if f"{nx},{ny}" in d.get("visited", {}):
                 yield (m, nx, ny), name
 
     def path(self, start, goal_fn: Callable[[tuple], bool], limit: int = 5000) -> list[str] | None:
+        """Strict BFS first; if no route, an optimistic one (walls ignored): a false wall gets re-tested and
+        cleared on the way instead of leaving the agent with no plan (seen 2026-11-03: stuck at Mom)."""
+        p = self._bfs(start, goal_fn, limit)
+        if p is None and self.strict:
+            self.strict = False
+            try:
+                p = self._bfs(start, goal_fn, limit)
+            finally:
+                self.strict = True
+        return p
+
+    def _bfs(self, start, goal_fn, limit):
         prev = {start: None}
         q = deque([start])
         while q and len(prev) < limit:
@@ -77,6 +96,18 @@ def interaction_spots(maps: dict, needle: str) -> list[tuple[int, int, int, str]
 def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, str] | None:
     """Next button toward the first unmet goal that the learned world already knows how to reach, else None."""
     g = WorldGraph(maps)
+    hp, mx = goals.get("_hp", (0, 0))
+    if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C) and not goals.get("_mom_failed"):
+        # Weak and near home: Mom heals the party when talked to. She is the one static sprite downstairs
+        # (learned in maps.json npcs; fallback (5,4)); stand below her facing UP and press A.
+        mom = next((e for e in maps.get(str(0x25), {}).get("npcs", {}).values() if not e.get("moves") and e.get("last")), None)
+        mx_, my_ = (mom["last"][0], mom["last"][1]) if mom else (5, 4)
+        spot = (0x25, mx_, my_ + 1)
+        if pos == spot:
+            return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at Mom, {'talking' if facing == 'UP' else 'facing her'} to heal"
+        p = g.path(pos, lambda n: n == spot)
+        if p:
+            return p[0], f"HP {hp}/{mx}: going home to Mom to heal ({len(p)} steps)"
     if not goals.get("potion"):
         for (m, x, y, f) in interaction_spots(maps, "PC"):
             if pos == (m, x, y):
@@ -92,15 +123,42 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         # In Oak's lab: go to the ball that offers the wanted starter (learned from earlier "Do you want X?" boxes).
         if pos[0] == 0x28:
             want = (goals.get("_starter") or "any").upper()
-            spots = interaction_spots(maps, want if want != "ANY" else "want")
-            for (m, x, y, f) in sorted(spots, key=lambda s: s != (pos[0], pos[1], pos[2], facing)):
-                if m != 0x28:
-                    continue
+
+            def spot_text(m, x, y, f):
+                e = maps.get(str(m), {}).get("interactions", {}).get(f"{x},{y},{f}", {})
+                return ((e.get("text") or "") + " " + " ".join(e.get("choices", []) or [])).upper()
+
+            # Balls = spots in the lab whose dialog named a starter. The wanted one may be an untried neighbour
+            # on the same table row, so try those too. NEVER fall through to the Pallet Town OAK spot from here:
+            # that is what walked the agent back out of the lab.
+            # A ball spot is one whose dialog had the OFFER phrase ("So! You want the water POKeMON, SQUIRTLE?").
+            # Plain "want" also matches the nickname question, which contaminated a spot where the agent merely
+            # stood while that dialog ran (5,5,DOWN "received a BULBASAUR"); the offer phrase does not.
+            OFFER = "YOU WANT THE"
+            ELEMENT = {"FIRE": "CHARMANDER", "WATER": "SQUIRTLE", "PLANT": "BULBASAUR", "GRASS": "BULBASAUR"}
+
+            def ball_species(s):
+                """Which starter THIS ball offers, read from its own offer text ('You want the fire POKeMON, CHARMANDER?'),
+                never from later dialog that may mention another starter (that contamination sent a Bulbasaur run to the
+                Charmander ball forever)."""
+                import re as _re
+                m = _re.search(r"YOU WANT THE\W*(FIRE|WATER|PLANT|GRASS)\W*POK", spot_text(*s))
+                return ELEMENT[m.group(1)] if m else None
+            balls = [s for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and ball_species(s)]
+            targets = [s for s in balls if want == "ANY" or ball_species(s) == want]
+            if not targets and balls:
+                tried = {(s[1], s[2], s[3]) for s in balls}
+                for (m, x, y, f) in balls:
+                    for dx in (-1, 1):
+                        if (x + dx, y, f) not in tried and not any(n in spot_text(m, x + dx, y, f) for n in STARTERS if n != want):
+                            targets.append((m, x + dx, y, f))
+            for (m, x, y, f) in sorted(targets, key=lambda s: abs(s[1] - pos[1]) + abs(s[2] - pos[2])):
                 if pos == (m, x, y):
-                    return ("A" if facing == f else f), f"goal first pokemon: at the ball for {want}, {'taking it' if facing == f else 'facing it'}"
+                    return ("A" if facing == f else f), f"goal first pokemon: at a ball spot for {want}, {'taking it' if facing == f else 'facing it'}"
                 p = g.path(pos, lambda n: n == (m, x, y))
                 if p:
-                    return p[0], f"goal first pokemon: {len(p)} steps to the ball for {want} at ({x},{y})"
+                    return p[0], f"goal first pokemon: {len(p)} steps to the ball spot ({x},{y}) for {want}"
+            return None  # unknown table so far: explore the lab (the caller's exploration prefers untested walls)
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
@@ -122,6 +180,68 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 if p:
                     return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
+    level = goals.get("_level", 0)
+    if goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5:
+        # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
+        if pos[0] != 0x0C:
+            p = g.path(pos, lambda n: n[0] == 0x0C)
+            if p:
+                return p[0], f"goal train to L8 (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
+        return None  # on Route 1: let exploration roam (grass encounters happen on their own)
+    if goals.get("to_viridian") and not goals.get("oaks_parcel"):
+        # The parcel is at the Viridian Mart: explore Viridian's buildings - take warps on map 0x01 never taken yet.
+        if pos[0] == 0x01:
+            d = maps.get("1", {})
+            fresh = [k for k in d.get("warps", {}) if d.get("warp_taken", {}).get(k, 0) == 0]
+            for k in fresh:
+                wx, wy, wd = k.split(",")
+                target = (0x01, int(wx), int(wy))
+                if pos == target:
+                    return wd, f"goal parcel: trying an unexplored door at ({wx},{wy})"
+                p = g.path(pos, lambda n: n == target)
+                if p:
+                    return p[0], f"goal parcel: {len(p)} steps to an unexplored door at ({wx},{wy})"
+        elif pos[0] not in (0x00, 0x0C, 0x25, 0x26, 0x28):
+            return None  # inside a Viridian building: explore it (talk to the clerk - the parcel is a bag change)
+        else:
+            p = g.path(pos, lambda n: n[0] == 0x01)
+            if p:
+                return p[0], f"goal parcel: {len(p)} steps back to Viridian City"
+    if goals.get("oaks_parcel") and not goals.get("deliver_parcel"):
+        if pos[0] == 0x28:
+            return None  # in the lab: exploration talks to Oak (interaction probing of NPCs)
+        p = g.path(pos, lambda n: n[0] == 0x28)
+        if p:
+            return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
+    if goals.get("first_pokemon") and not goals.get("to_viridian"):  # also before won_battle: outside the lab the way on is north (a wild fight on Route 1 counts)
+        # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
+        # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).
+        target_map = 0x01 if goals.get("to_route1") else 0x0C
+        p = g.path(pos, lambda n: n[0] == target_map)
+        if p:
+            return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
+        if pos[0] not in (0x00, 0x0C):  # indoors (house, lab): get outside first - never probe house walls for a road
+            p = g.path(pos, lambda n: n[0] in (0x0C, 0x00))
+            if p:
+                return p[0], f"goal road north: leaving map 0x{pos[0]:02X} for the outdoors ({len(p)} steps)"
+            return None
+        if pos[0] == 0x00:  # in Pallet Town: Route 1 is the known way north
+            p = g.path(pos, lambda n: n[0] == 0x0C)
+            if p:
+                return p[0], f"goal road north: {len(p)} steps to Route 1"
+        d = maps.get(str(pos[0]), {})
+        blocked = set(d.get("blocked", []))
+        # candidate frontier tiles: northernmost first, but never one whose UP is a confirmed wall (that was the
+        # 'keeps pushing up into a wall' loop); a tile only counts if UP from it is still unknown
+        tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
+        tiles = [t for t in tiles if f"{t[0]},{t[1]},UP" not in blocked and f"{t[0]},{t[1] - 1}" not in d.get("visited", {})]
+        if tiles:
+            tx, ty = min(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))
+            if (pos[1], pos[2]) == (tx, ty):
+                return "UP", "goal road north: at the northernmost open tile, pushing UP for the map edge"
+            p = g.path(pos, lambda n: n == (pos[0], tx, ty))
+            if p:
+                return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
     return None
 
 
