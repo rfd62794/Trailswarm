@@ -136,3 +136,10 @@ error`, test layout.
   pillow, pytest, `.gitignore`, smoke test) is committed before any directive runs.
 - **`screenshot()`** returns a PIL `Image` (160x144 RGB); `FakeEmulator` returns a blank one.
   Pillow is already a dependency (PyBoy needs it for screen images).
+
+## Demo integration rule (Robert, 2026-11-02)
+
+`tools/explore_demo.py` is the living spike. It imports framework modules as they land (`screentext`, `names`,
+`hexmap`, `textbox`, `mapmem`, `kb`, `viewer`) instead of keeping local copies. The framework reads the demo's data:
+`runs/maps.json` and `runs/explore-*/transitions.jsonl`. Every directive carries a "Demo integration" item in its
+Scope. The controller runs the demo after each merge, and Robert watches it.

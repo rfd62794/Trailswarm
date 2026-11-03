@@ -34,6 +34,7 @@ Create, in order:
 3. Edits: `prompt.py` (`map_view`), `agent.py` (feed memory, write `maps.json` and `transitions.jsonl`).
 4. `docs/KNOWLEDGE.md` (new, short, see below).
 5. `tests/test_mapmem.py`, `tests/test_transitions.py`, additions to the prompt and agent tests.
+6. Demo integration: `tools/explore_demo.py` replaces its local `MapMemory` class with `pokeagent.mapmem.MapMemory` (same runs/maps.json file, same schema); the demo's extra fields (interactions presses/menus/choices) must survive a load/save round-trip.
 
 ## 3. The work
 
@@ -145,6 +146,7 @@ charmap and border tiles (section 1 here and in `Text_Box_Awareness_Directive.md
 - [ ] `prompt.py`, `agent.py`, `cli.py` (`--maps`) edits; `maps.json` and `transitions.jsonl` written per run
 - [ ] `docs/KNOWLEDGE.md` created with the ground-truth facts
 - [ ] Tests in section 5 pass; `uv run pytest -q` green (paste the tail)
+- [ ] Demo integration (section 2 item 6): `tools/explore_demo.py` uses `pokeagent.mapmem.MapMemory`; interaction fields survive a load/save round-trip
 - [ ] Status row moved to Review with the branch name
 
 ## 8. Report
