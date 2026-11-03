@@ -20,6 +20,7 @@ from typing import Callable
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
+POKECENTER_MAPS = (41, 58)  # Viridian (41) and Pewter (58, "Welcome... JIGGLY") Pokecenters
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 
@@ -129,18 +130,18 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # stays 50% (a trek back is long).
     # (the Pokecenter itself must use the same 90%: with 50% inside, an agent at 70% HP walked in at Viridian, walked
     # straight back out, and ping-ponged through the door for 220 presses - 07:14 round)
-    heal_below = 0.9 if pos[0] in (0x01, 0x0D, POKECENTER_MAP) else 0.5
+    heal_below = 0.9 if pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
     if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed")
-            and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33) or pos[0] == POKECENTER_MAP)):
+            and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33, 0x02, 0x36) or pos[0] in POKECENTER_MAPS)):
         # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
         # every Pokecenter has the same shape: door (3,7), a clear column x=3 up to the counter, nurse at (3,1).
-        if pos[0] == POKECENTER_MAP:
+        if pos[0] in POKECENTER_MAPS:
             if pos[1] != 3:
                 return ("RIGHT" if pos[1] < 3 else "LEFT"), f"HP {hp}/{mx}: crossing the Pokecenter to the counter"
             if pos[2] > 2:
                 return "UP", f"HP {hp}/{mx}: walking up to the nurse"
             return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
-        p = g.path(pos, lambda n: n[0] == POKECENTER_MAP)
+        p = g.path(pos, lambda n: n[0] in POKECENTER_MAPS)
         if p and len(p) <= 120:
             return p[0], f"HP {hp}/{mx}: to the Pokecenter to heal ({len(p)} steps)"
     if not goals.get("potion"):
@@ -222,7 +223,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     carrying_parcel = goals.get("oaks_parcel") and not goals.get("deliver_parcel")
     # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
     # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
-    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02)
+    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36)
     if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5
             and not carrying_parcel and not beyond_viridian):
         # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
@@ -275,18 +276,26 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         p = g.path(pos, lambda n: n[0] == 0x28)
         if p:
             return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
-    after_parcel = goals.get("deliver_parcel") and not goals.get("to_pewter")
+    after_parcel = goals.get("deliver_parcel") and not goals.get("beat_brock")
     if (goals.get("first_pokemon") and not goals.get("to_viridian")) or after_parcel:
         # The road north: Route 1 (0x0C), Viridian (0x01), then (parcel delivered, the old man steps aside) Route 2 (0x0D)
         # and Pewter City (0x02). Use known transitions if any; otherwise push to the northernmost explored tile of the
         # current outdoor map and keep going UP (map edges are connections).
         if after_parcel:
-            target_map = 0x02 if goals.get("to_route2") else 0x0D
+            target_map = (0x36 if goals.get("to_pewter") else 0x02) if goals.get("to_route2") else 0x0D
         else:
             target_map = 0x01 if goals.get("to_route1") else 0x0C
         p = g.path(pos, lambda n: n[0] == target_map)
         if p:
             return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
+        if target_map == 0x36 and pos[0] != 0x36:
+            # The gym door is not mapped yet: get to Pewter (a blackout respawns at the Viridian Pokecenter), then let
+            # exploration find the gym - the 'northernmost tile' fallback below is for unmapped ROADS, not a city.
+            p = g.path(pos, lambda n: n[0] == 0x02)
+            if p:
+                return p[0], f"goal gym: {len(p)} steps to Pewter City"
+            if pos[0] == 0x02:
+                return None
         outdoors = (0x00, 0x0C, 0x01, 0x0D, 0x02)
         passage = after_parcel and 0x2F <= pos[0] <= 0x34  # Route 2 gates and Viridian Forest are on the road: do not leave them
         if passage:
