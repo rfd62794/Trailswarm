@@ -462,7 +462,16 @@ def main(argv=None) -> int:
         extra: dict = {}
         flag = emu.read(0xD057)
         if flag or st.get("in_battle"):
-            extra["battle_flag"] = flag  # wIsInBattle 0xD057 (unverified): logged every battle step to verify it
+            extra["battle_flag"] = flag  # wIsInBattle 0xD057 (verified = 2 for trainer battles)
+            u16 = lambda a: (emu.read(a) << 8) | emu.read(a + 1)
+            bl = st.setdefault("battle_log", {"start": st["step"], "kind": flag, "turns": [],
+                                              "you": [emu.read(0xD014), emu.read(0xD022)], "enemy": [emu.read(0xCFE5), emu.read(0xCFF3)]})
+            lines_b = frame_lines(tm)
+            cursor_b = next((ln.replace(">", "").strip() for ln in lines_b if ">" in ln), "")
+            if name == "A" and cursor_b:  # a battle choice: what was chosen and the HP situation at that moment
+                bl["turns"].append({"step": st["step"], "chose": cursor_b, "menu": [ln for ln in lines_b if ln.isupper() or ">" in ln][:6],
+                                    "hp_you": u16(0xD015), "hp_enemy": u16(0xCFE6)})
+            extra["battle_turn"] = len(bl["turns"])
         if name in DIRS and not box_before:
             extra["ahead_tiles"] = ahead_tiles(tm, name)  # lets the KB learn which tile ids are walls
         if name not in DIRS or box_before:
@@ -645,6 +654,12 @@ def main(argv=None) -> int:
             won = emu.read(0xD163) > 0 and (m, x, y) == st.get("battle_pos")  # a blackout warps you away
             st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
             log(f"[battle over - {'WON' if won else 'lost?'}; {st['battles']} battles this run]", "res")
+            bl = st.pop("battle_log", None)
+            if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy
+                bl.update({"end": st["step"], "won": won, "run": run_dir.name, "map": m, "presses": st["step"] - bl["start"],
+                           "hp_addrs_unverified": True})
+                with Path("runs/battles.jsonl").open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(bl) + "\n")
         if box_open(tm_now):
             # Text-triggered beat: a known good sequence for this box text runs automatically (and gets graded).
             sig = " | ".join(lines_now[:2])[:80]
