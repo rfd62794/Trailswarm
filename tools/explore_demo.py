@@ -314,9 +314,15 @@ def main(argv=None) -> int:
     ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
+    ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
     ap.add_argument("--explore-rate", type=float, default=0.2,
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     a = ap.parse_args(argv)
+    if a.seed is not None:
+        random.seed(a.seed)
+    if a.headless:
+        a.frames_per_step = 4  # the readiness check still paces presses; nobody is watching
     if a.starter == "random":
         a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
     explore_run = random.random() < a.explore_rate
@@ -381,17 +387,31 @@ def main(argv=None) -> int:
             fh.write(json.dumps(ep) + "\n")
         demos = mem.m(ep["start"][0]).setdefault("demos", [])
         demos.append({"at": ep["start"][1:], "facing": ep["facing"], "screen": ep["screen"], "buttons": ep["buttons"],
-                      "achieved": ep["achieved"], "source": ep["source"], "end": ep["end"]})
+                      "achieved": ep["achieved"], "source": ep["source"], "end": ep["end"], "grade": 0, "replays": 0})
         del demos[:-20]
         log(f"[learned a {ep['source']} demonstration: {len(ep['buttons'])} presses from {tuple(ep['start'])}"
             f"{' -> ' + ', '.join(ep['achieved']) if ep['achieved'] else ''}]", "res")
 
     def matching_demo(m, x, y, tm):
+        """A demonstration is a hypothesis, not an order: it is replayed only while its grade is >= 0, and only
+        if it achieved a goal when recorded. Every replay is graded afterwards (see grade_replay)."""
         screen = frame_lines(tm)[:3] if box_open(tm) else []
-        for d in reversed(mem.m(m).get("demos", [])):  # newest first; prefer ones that achieved a goal
-            if d["at"] == [x, y] and d["screen"] == screen and (d["achieved"] or d["end"] != [m, x, y]):
-                return d
-        return None
+        cands = [d for d in mem.m(m).get("demos", []) if d["at"] == [x, y] and d["screen"] == screen
+                 and d.get("achieved") and d.get("grade", 0) >= 0]
+        return max(cands, key=lambda d: (d.get("grade", 0), len(d["achieved"]))) if cands else None
+
+    def grade_replay():
+        """Called when a replay finishes: did it make progress (a goal, a new map, a new tile)? Grade it."""
+        rp = st.pop("replay_ctx", None)
+        if not rp:
+            return
+        goals_now = check_goals(emu, st)
+        progressed = any(goals_now[g] and not rp["goals"].get(g) for g in GOALS) or pos()[0] != rp["pos"][0] \
+            or (pos() != rp["pos"] and not box_open(emu.read_range(TILEMAP, TILEMAP_LEN)))
+        rp["demo"]["grade"] = rp["demo"].get("grade", 0) + (1 if progressed else -1)
+        rp["demo"]["replays"] = rp["demo"].get("replays", 0) + 1
+        log(f"[replay graded {'GOOD' if progressed else 'BAD'} -> grade {rp['demo']['grade']}"
+            f"{'; this demonstration will not be used again' if rp['demo']['grade'] < 0 else ''}]", "res")
 
     def do_press(name: str, source: str, why: str):
         before = pos(); st["step"] += 1
@@ -608,16 +628,30 @@ def main(argv=None) -> int:
                 if p:
                     do_press(p[0], "agent", f"goto {target}: {len(p)} steps left"); return
                 st["goto"] = None; log(f"[no known route to {target}; exploring instead]", "res")
-        if st.get("replay"):  # replaying a demonstration you or Claude gave in this exact situation
+        if st.get("replay"):  # replaying a demonstration (graded afterwards, dropped if it does not work)
             btn = st["replay"].pop(0)
-            do_press(btn, "agent", f"replaying your demonstration ({len(st['replay'])} presses left)"); return
+            do_press(btn, "agent", f"testing a {st['replay_ctx']['demo']['source']} demonstration ({len(st['replay'])} presses left)")
+            if not st["replay"]:
+                grade_replay()
+            return
         demo = matching_demo(m, x, y, tm_now)
         if demo and st["explore_run"]:
             demo = None  # this run is an exploration run: ignore known demonstrations and try to beat them
         if demo and not st.get("replayed_here") == (m, x, y, st["step"] // 50):
             st["replay"] = list(demo["buttons"]); st["replayed_here"] = (m, x, y, st["step"] // 50)
-            log(f"[found a {demo['source']} demonstration for this spot: {demo['buttons']}]", "res")
+            st["replay_ctx"] = {"demo": demo, "pos": (m, x, y), "goals": check_goals(emu, st)}
+            log(f"[testing a {demo['source']} demonstration for this spot (grade {demo.get('grade', 0)}): {demo['buttons']}]", "res")
             return
+        # Stall detector: same tile, same screen, no goal for 15 agent steps -> escalate instead of repeating.
+        sig = (m, x, y, hash(tm_now), tuple(sorted(st["goal_steps"])))
+        st["stall"] = st.get("stall", 0) + 1 if sig == st.get("last_sig") else 0
+        st["last_sig"] = sig
+        if st["stall"] >= 15:
+            st["stall"] = 0; st["stalls"] = st.get("stalls", 0) + 1
+            if st.get("replay_ctx"):
+                st["replay"] = []; grade_replay()
+            esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
+            do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
         planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
         if planned and not (st["explore_run"] and random.random() < 0.3):
             do_press(planned[0], "agent", planned[1]); return
@@ -706,10 +740,13 @@ def main(argv=None) -> int:
                 fut.set_result(fn())
             except Exception as e:
                 fut.set_exception(e)
-        img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
-        st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
+        if a.headless:
+            emu.tick(1)  # no rendering at all
+        else:
+            img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
+            st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
-        if st["frame"] % 15 == 0:
+        if st["frame"] % 15 == 0 and not a.headless:
             try:
                 m_, x_, y_ = pos(); npcs = npc_positions(emu)
                 vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
@@ -726,9 +763,13 @@ def main(argv=None) -> int:
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
         finally:
-            root.after(16, frame)
+            if st["done"] and a.headless:
+                shutdown(); trans.close(); emu.close(); root.destroy(); return
+            root.after(1 if a.headless else 16, frame)
 
     root.bind("<Key>", on_key)
+    if a.headless:
+        root.withdraw()  # keep tk's event loop (it drives everything) but show no window
     log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
     log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
     log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
