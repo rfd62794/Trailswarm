@@ -371,12 +371,13 @@ def main(argv=None) -> int:
     ap.add_argument("--state", default="baselines/bedroom.state")
     ap.add_argument("--maps", default="runs/maps.json")
     ap.add_argument("--steps", type=int, default=300)
-    ap.add_argument("--frames-per-step", type=int, default=30)
+    ap.add_argument("--frames-per-step", type=int, default=10, help="frames between agent decisions in the window (was 30: too deliberate)")
     ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
-    ap.add_argument("--box-pace", type=int, default=None,
+    ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
+    ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
     ap.add_argument("--explore-rate", type=float, default=0.2,
@@ -620,6 +621,15 @@ def main(argv=None) -> int:
         for g in GOALS:  # first time each goal is reached: remember the step and persist it
             if goals[g] and g not in st["goal_steps"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
+                try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
+                    cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
+                    tmp = cp / f"{g}.{os.getpid()}.tmp"; emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
+                except Exception as e:
+                    log(f"[checkpoint save failed: {e!r}]", "res")
+                if a.stop_at_goal == g:
+                    st["done"] = True; shutdown(); log(f"segment done: {g} at step {st['step']}", "hdr")
+                    if a.headless:
+                        return
                 gp = Path("runs/milestones.json")
                 try:
                     hist = json.loads(gp.read_text()) if gp.exists() else {}
@@ -662,7 +672,7 @@ def main(argv=None) -> int:
         # Only the OVERWORLD needs the stillness check (forced walks, fades, Oak dragging you to the lab).
         # Boxes and menus are paced by the game itself: pressing while text prints is harmless, and a
         # blinking cursor would otherwise look like "still changing" forever (that stalled the 23:20 run).
-        busy = not box_open(tm_ready) and (st["stable_frames"] < 8 or joy_ignore)
+        busy = not box_open(tm_ready) and (st["stable_frames"] < 4 or joy_ignore)
         if busy:
             if not st.get("waiting"):
                 st["waiting"] = True

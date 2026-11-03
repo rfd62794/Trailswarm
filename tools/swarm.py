@@ -90,7 +90,18 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
+    ap.add_argument("--segment", default=None,
+                    help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
     a = ap.parse_args()
+    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]
+    seg_args: list[str] = []
+    if a.segment:
+        i = GOALS.index(a.segment)
+        start = ROOT / "runs" / "checkpoints" / f"{GOALS[i - 1]}.state" if i > 0 else ROOT / "baselines" / "bedroom.state"
+        if not start.exists():
+            print(f"no checkpoint for the segment start: {start} (reach the previous goal in a run first)"); return 1
+        seg_args = ["--state", str(start), "--stop-at-goal", a.segment]
+        print(f"segment {a.segment}: starting every agent from {start.name}")
     shared = ROOT / a.maps
     swarm_dir = ROOT / "runs" / "swarm"; swarm_dir.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +115,7 @@ def main() -> int:
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
                    "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(8800 + i),
                    "--explore-rate", "0.5" if i % 2 else "0.0",
-                   "--box-pace", str([8, 16, 30][i % 3])]  # agents try different text-skipping paces; review grades them
+                   "--box-pace", str([8, 16, 30][i % 3])] + seg_args  # paces vary; review grades them
             log = (swarm_dir / f"agent{i}.log").open("w")
             procs.append((i, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)))
             print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")
