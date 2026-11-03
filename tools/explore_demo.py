@@ -263,6 +263,21 @@ class MapMemory:
             rows.append(line)
         return rows
 
+    # --- beats: text-triggered button sequences, learned from every agent, graded, replayed when the text recurs ---
+    def beat_for(self, sig: str) -> dict | None:
+        b = self.data.get("beats", {}).get(sig)
+        return b if b and b.get("grade", 0) >= 0 and b.get("buttons") else None
+
+    def learn_beat(self, sig: str, buttons: list[str], progressed: bool, source: str):
+        if not sig or not buttons or len(buttons) > 40:
+            return
+        beats = self.data.setdefault("beats", {})
+        cur = beats.get(sig)
+        if progressed and (cur is None or len(buttons) < len(cur["buttons"]) or cur.get("grade", 0) < 0):
+            beats[sig] = {"buttons": list(buttons), "grade": 1, "replays": 0, "source": source, "seen": 1}
+        elif cur:
+            cur["seen"] = cur.get("seen", 0) + 1
+
     def interact(self, map_id, x, y, facing, text: str) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
         e = d.setdefault(f"{x},{y},{facing}", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
@@ -527,6 +542,19 @@ def main(argv=None) -> int:
                 result += f'; event on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
+        # Beat capture: the presses from a box opening (keyed by its first text) to its closing, graded by progress.
+        if box_after and not box_before:
+            st["beat"] = {"sig": " | ".join(frame_lines(tm2)[:2])[:80], "buttons": [], "goals": goals_before,
+                          "pos": before, "sources": set()}
+        elif st.get("beat") and box_before:
+            st["beat"]["buttons"].append(name); st["beat"]["sources"].add(source)
+            if not box_after:
+                bt = st.pop("beat"); goals_now = check_goals(emu, st)
+                progressed = any(goals_now[g] and not bt["goals"].get(g) for g in GOALS) or bool(extra.get("ram_diff"))
+                src = "human" if "human" in bt["sources"] else "claude" if "claude" in bt["sources"] else "agent"
+                mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
+                if progressed:
+                    log(f"[beat learned for \"{bt['sig'][:40]}\": {len(bt['buttons'])} presses ({src})]", "res")
         trans.write(json.dumps({"step": st["step"], "from": list(before), "button": name, "to": list(after),
                                 "moved": before != after, "textbox": "dialog" if box_before else "none",
                                 "text": text, "facing": st["facing"], "source": source, **extra}) + "\n")
@@ -613,6 +641,17 @@ def main(argv=None) -> int:
             st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
             log(f"[battle over - {'WON' if won else 'lost?'}; {st['battles']} battles this run]", "res")
         if box_open(tm_now):
+            # Text-triggered beat: a known good sequence for this box text runs automatically (and gets graded).
+            sig = " | ".join(lines_now[:2])[:80]
+            beat = mem.beat_for(sig)
+            if beat and not st.get("replay") and st.get("beat_sig_done") != sig and not st["explore_run"]:
+                st["replay"] = list(beat["buttons"]); st["beat_sig_done"] = sig
+                st["replay_ctx"] = {"demo": beat, "pos": (m, x, y), "goals": check_goals(emu, st)}
+                log(f"[recognised \"{sig[:40]}\": running the known {len(beat['buttons'])}-press beat (grade {beat['grade']})]", "res")
+                btn = st["replay"].pop(0); do_press(btn, "agent", "beat replay")
+                if not st["replay"]:
+                    grade_replay()
+                return
             if st["box_streak"] >= 12 and is_menu(tm_now):
                 do_press("B", "agent", "a menu has stayed open for 12 presses - pressing B to back out"); return
             if st["box_streak"] >= 60:

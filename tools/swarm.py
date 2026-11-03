@@ -57,6 +57,13 @@ def merge_memory(dst: dict, src: dict) -> dict:
             else:
                 demos.append(dm)
         d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
+    beats = dst.setdefault("beats", {})
+    for sig, b in src.get("beats", {}).items():
+        cur = beats.get(sig)
+        if cur is None or (b.get("grade", 0) >= 0 and (cur.get("grade", 0) < 0 or len(b["buttons"]) < len(cur["buttons"]))):
+            beats[sig] = b
+        elif cur is not None and b.get("grade", 0) < 0 and b["buttons"] == cur["buttons"]:
+            cur["grade"] = min(cur.get("grade", 0), b["grade"])  # a failed replay anywhere lowers the shared grade
     tt = dst.setdefault("tile_types", {})
     for ts, table in src.get("tile_types", {}).items():
         t = tt.setdefault(ts, {})
