@@ -297,7 +297,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             if pos[0] == 0x02:
                 return None
         outdoors = (0x00, 0x0C, 0x01, 0x0D, 0x02)
-        passage = after_parcel and 0x2F <= pos[0] <= 0x34  # Route 2 gates and Viridian Forest are on the road: do not leave them
+        passage = after_parcel and (0x2F <= pos[0] <= 0x34 or pos[0] == 0x36)  # Route 2 gates and Viridian Forest are on the road: do not leave them
         if passage:
             outdoors = outdoors + (pos[0],)
         if pos[0] not in outdoors:  # indoors (house, lab): get outside first - never probe house walls for a road
@@ -319,6 +319,8 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         # different entry) must not block the next one: that left agents in a ledge loop with no plan
         for tx, ty in sorted(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))[:8]:  # each try is a BFS: bound the cost
             if (pos[1], pos[2]) == (tx, ty):
+                if (tx, ty - 1) in g.static_npc_tiles(pos[0]):  # a person blocks the way (Brock at the top of the gym): talk
+                    return ("A" if facing == "UP" else "UP"), "goal road north: a person stands ahead - facing and talking to them"
                 return "UP", "goal road north: at the northernmost open tile, pushing UP for the map edge"
             p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
             if p:
