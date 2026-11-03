@@ -43,6 +43,8 @@ def main(argv=None) -> int:
     ap.add_argument("--repeat", type=int, default=3)
     ap.add_argument("--idle", type=int, default=3, help="idle snapshots used to learn noisy bytes")
     ap.add_argument("--visible", action="store_true", help="open the PyBoy window while probing")
+    ap.add_argument("--no-reload", dest="reload", action="store_false",
+                    help="with --state: do NOT reload the state before every press (default reloads)")
     ap.add_argument("--runs-dir", default="runs")
     a = ap.parse_args(argv)
 
@@ -70,6 +72,8 @@ def main(argv=None) -> int:
                 consistent: set[int] | None = None
                 deltas: dict[int, list[int]] = {}
                 for _ in range(a.repeat):
+                    if a.state and a.reload:
+                        emu.load_state(Path(a.state))  # same starting point for every press
                     before = snapshot(emu)
                     emu.press(btn)
                     after = snapshot(emu)
@@ -87,9 +91,11 @@ def main(argv=None) -> int:
                 }
                 fh.write(json.dumps(rec) + "\n")
                 shown = ", ".join(
-                    f"{h['addr']}{'=' + h['name'] if h['name'] else ''}{h['deltas']}" for h in rec["consistent"][:12]
+                    f"{h['addr']}{'=' + h['name'] + '?' if h['name'] else ''}{h['deltas']}"
+                    for h in rec["consistent"][:12]
                 )
                 print(f"{btn.name:6} -> {len(hits):3} consistent bytes: {shown}{' ...' if len(hits) > 12 else ''}")
+        print("names with '?' are RAM_MAP guesses (unverified); 0 consistent can mean the press was blocked, not unmapped")
         print(f"end:   {read_state(emu).summary()}\nwrote {out}")
     finally:
         emu.close()
