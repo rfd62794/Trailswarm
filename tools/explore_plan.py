@@ -79,7 +79,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     """Next button toward the first unmet goal that the learned world already knows how to reach, else None."""
     g = WorldGraph(maps)
     hp, mx = goals.get("_hp", (0, 0))
-    if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C):
+    if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C) and not goals.get("_mom_failed"):
         # Weak and near home: Mom heals the party when talked to. She is the one static sprite downstairs
         # (learned in maps.json npcs; fallback (5,4)); stand below her facing UP and press A.
         mom = next((e for e in maps.get(str(0x25), {}).get("npcs", {}).values() if not e.get("moves") and e.get("last")), None)
@@ -153,6 +153,14 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 if p:
                     return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
+    level = goals.get("_level", 0)
+    if goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5:
+        # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
+        if pos[0] != 0x0C:
+            p = g.path(pos, lambda n: n[0] == 0x0C)
+            if p:
+                return p[0], f"goal train to L8 (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
+        return None  # on Route 1: let exploration roam (grass encounters happen on their own)
     if goals.get("won_battle") and not goals.get("to_viridian"):
         # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
         # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).

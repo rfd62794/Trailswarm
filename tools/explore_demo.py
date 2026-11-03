@@ -802,8 +802,19 @@ def main(argv=None) -> int:
             esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
             do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
         hp_now, mx_now = party_hp(emu)
-        planned = plan_step({**check_goals(emu, st), "_starter": a.starter, "_hp": (hp_now, mx_now)},
+        # Mom-heal loop guard: if we talked to her and HP did not rise, stop going back for a while.
+        if st.get("mom_talk_step") and st["step"] - st["mom_talk_step"] > 6:
+            if hp_now <= st.get("mom_talk_hp", 0) and mx_now and hp_now / mx_now < 0.4:
+                st["mom_failed_until"] = st["step"] + 150
+                log(f"[Mom did not heal us (HP {hp_now}/{mx_now}); not retrying for 150 steps]", "res")
+            else:
+                log(f"[healed at Mom: HP {hp_now}/{mx_now}]", "res")
+            st["mom_talk_step"] = None
+        planned = plan_step({**check_goals(emu, st), "_starter": a.starter, "_hp": (hp_now, mx_now),
+                             "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])
+        if planned and "at Mom, talking" in planned[1]:
+            st["mom_talk_step"] = st["step"]; st["mom_talk_hp"] = hp_now
         if planned and not (st["explore_run"] and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
