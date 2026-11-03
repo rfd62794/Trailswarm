@@ -80,6 +80,20 @@ REGISTRY = load_registry()
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]  # goals.json order
 
 
+ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
+              0x0B: "ANTIDOTE", 0x0C: "BURN HEAL", 0x0D: "ICE HEAL", 0x0E: "AWAKENING", 0x0F: "PARLYZ HEAL", 0x10: "FULL RESTORE",
+              0x11: "MAX POTION", 0x12: "HYPER POTION", 0x13: "SUPER POTION", 0x14: "POTION", 0x1D: "ESCAPE ROPE", 0x1E: "REPEL",
+              0x46: "OAK'S PARCEL"}  # pokered item constants; only POTION (0x14) verified so far
+
+
+def bag_contents(emu) -> dict[int, int]:
+    n = emu.read(0xD31D)
+    if not 0 < n < 21:
+        return {}
+    raw = emu.read_range(0xD31E, 2 * n)
+    return {raw[i]: raw[i + 1] for i in range(0, len(raw), 2)}
+
+
 def party_hp(emu) -> tuple[int, int]:
     """Lead pokemon HP and max HP. VERIFIED 2026-11-03: wPartyMon1HP 0xD16C/6D, wPartyMon1MaxHP 0xD18D/8E
     (read 11/20 for a level-5 Bulbasaur; wPartyMon1Level 0xD18C read 5; species at 0xD16B read 0x99)."""
@@ -531,6 +545,7 @@ def main(argv=None) -> int:
         if name not in DIRS or box_before:
             st["last_fail"] = None  # a wall is only 'confirmed' by two consecutive identical move presses
         snap_pre = emu.read_range(*EFFECT_WINDOW) if not box_before else None
+        bag_pre = bag_contents(emu)
         emu.press(Button[name])
         after = settle_position(before)
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
@@ -610,6 +625,17 @@ def main(argv=None) -> int:
                 result += f'; event on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
         mem.observe_npcs(after[0], emu, st["step"])
+        bag_post = bag_contents(emu)
+        if bag_post != bag_pre:  # an item was received, used, bought or sold: remember where and from what
+            for item in set(bag_pre) | set(bag_post):
+                delta = bag_post.get(item, 0) - bag_pre.get(item, 0)
+                if delta:
+                    iname = ITEM_NAMES.get(item, f"item 0x{item:02X}")
+                    rec = {"item": iname, "id": item, "delta": delta, "map": before[0], "at": [before[1], before[2]],
+                           "facing": st["facing"], "text": (st.get("last_text") or text)[:80], "step": st["step"], "run": run_dir.name}
+                    mem.data.setdefault("items", []).append(rec); del mem.data["items"][:-200]
+                    extra["item"] = rec
+                    log(f"*** ITEM {'RECEIVED' if delta > 0 else 'USED/LOST'}: {iname} x{abs(delta)} at map 0x{before[0]:02X} ({before[1]},{before[2]}) ***", "res")
         if name == "A" and box_after and not box_before:  # talked to whatever is in front: tie the text to the NPC there
             dx, dy = DIRS[st["facing"]]
             npc = mem.npc_at(before[0], before[1] + dx, before[2] + dy)
