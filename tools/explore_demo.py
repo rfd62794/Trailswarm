@@ -670,7 +670,10 @@ def main(argv=None) -> int:
                     if cursor.endswith(ans):
                         do_press("A", "agent", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\""); return
                     do_press("DOWN" if ans == "NO" else "UP", "agent", f"YES/NO box: moving the cursor to {ans} ({why})"); return
-                want = goal_menu_choice(check_goals(emu, st), options)
+                goals_now = check_goals(emu, st)
+                want = goal_menu_choice(goals_now, options)
+                if not want and goals_now.get("potion") and any("WITHDRAW" in o or "DEPOSIT" in o for o in options):
+                    do_press("B", "agent", "potion already in the bag: nothing else to do at the PC, backing out"); return
                 if want:  # a goal tells us which option to take here
                     if cursor == want:
                         do_press("A", "agent", f"goal menu choice: '{want}'"); return
