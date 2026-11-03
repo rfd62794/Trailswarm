@@ -124,14 +124,18 @@ Test tail, line counts per new file, and anything in the design you had to decid
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-emulator-layer-directive |
 | Base branch | - |
 | Base commit | 01b72355c910c20f489dd16244d8c5af24891605 |
+| Head commit | 4d3572699d5a6abbc153e318cccfdbe1dc757df1 |
+| Head remote | rfd62794/pokeagent |
 
 **Status log**
 - 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 1 of 3; design at docs/superpowers/specs/2026-11-02-pokeagent-design.md; independent of step 2
 - 2026-11-02 21:54 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates (section 2 says Create), not files it reads; dispatch-path-missing is a false positive here
 - 2026-11-02 21:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-emulator-layer-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FN98WF45MCE64TMC94KFQB
+- 2026-11-02 21:59 · dispatcher · launched pid=13568; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-emulator-layer-directive; provisioned: uv sync --frozen
+- 2026-11-02 22:01 · devin · In progress → Review — 20 passed, 1 skipped (real-ROM test skips without POKEAGENT_ROM). emulator.py 140 lines, ram.py 59, tests 170. [origin] spent: devin 2 min est. n/a
 <!-- queue:end -->

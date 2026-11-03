@@ -26,6 +26,19 @@ Reply protocol the model is asked for (the prompt is directive 3's job; the pars
 {"thinking": "one or two sentences of reasoning", "button": "A", "note": "optional text to remember"}
 ```
 
+**Worktree layout (pasted so you never need to list it; a recursive listing such as
+`Get-ChildItem -Recurse` or `find` is refused by the sandbox and ends the run):**
+
+```
+.gitignore  pyproject.toml  uv.lock  .venv/
+src/pokeagent/__init__.py
+tests/test_smoke.py
+docs/directives/*.md   docs/superpowers/specs/2026-11-02-pokeagent-design.md
+```
+
+`src/pokeagent/emulator.py` and `ram.py` may or may not exist (directive 1 runs in parallel); you do not need
+them. Use `git status`, `git ls-files`, or read a named file; nothing else to discover.
+
 ## 2. Scope
 
 Create, in order:
@@ -121,4 +134,9 @@ Test tail, line counts per new file, and any decision not written in the design.
 - 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 2 of 3; independent of step 1, runs in parallel
 - 2026-11-02 21:56 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates (section 2 says Create), not files it reads; dispatch-path-missing is a false positive here
 - 2026-11-02 21:56 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNCTAN9S6DQA116B87KQJV
+- 2026-11-02 22:00 · dispatcher · launched pid=30568; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; provisioned: uv sync --frozen
+- 2026-11-02 22:00 · dispatcher · In progress → Blocked — dispatch died at spawn: Directive is clear: create `decision.py`, `backend.py`, and their tests. Let me check the worktree layout.warning: rejected a tool call that requires confirmation. Running in non-interactive mode. Use --permission-mode dangerous to auto-approve all tools.
+- 2026-11-02 22:03 · robert-claude-laptop · Blocked → Queued — requeue: first run died at spawn on Get-ChildItem -Recurse (sandbox refusal); directive now pastes the worktree layout and forbids recursive listing (main 6732ce4)
+- 2026-11-02 22:03 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates, not files it reads; dispatch-path-missing is a false positive here
+- 2026-11-02 22:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNWKSDDEMNY0N6MZGZ54RW
 <!-- queue:end -->
