@@ -112,7 +112,9 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # Top off (90%) while Viridian / Route 2's south end are close: 10 of 11 failed to_pewter runs (06:52-06:59) were Forest
     # blackouts, while every run that crossed without one needed only ~800 steps. Inside the gate / Forest the threshold
     # stays 50% (a trek back is long).
-    heal_below = 0.9 if pos[0] in (0x01, 0x0D) else 0.5
+    # (the Pokecenter itself must use the same 90%: with 50% inside, an agent at 70% HP walked in at Viridian, walked
+    # straight back out, and ping-ponged through the door for 220 presses - 07:14 round)
+    heal_below = 0.9 if pos[0] in (0x01, 0x0D, POKECENTER_MAP) else 0.5
     if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed")
             and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33) or pos[0] == POKECENTER_MAP)):
         # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
