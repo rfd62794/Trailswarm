@@ -571,6 +571,8 @@ def main(argv=None) -> int:
             u16 = lambda a: (emu.read(a) << 8) | emu.read(a + 1)
             bl = st.setdefault("battle_log", {"start": st["step"], "kind": flag, "turns": [],
                                               "you": [emu.read(0xD014), emu.read(0xD022)], "enemy": [emu.read(0xCFE5), emu.read(0xCFF3)]})
+            if emu.read(0xCFE5):
+                bl["enemy_species"] = emu.read(0xCFE5); bl["enemy"] = [emu.read(0xCFE5), emu.read(0xCFF3)]  # filled once the battle data loads
             lines_b = frame_lines(tm)
             cursor_b = next((ln.replace(">", "").strip() for ln in lines_b if ">" in ln), "")
             if name == "A" and cursor_b:  # a battle choice: what was chosen and the HP situation at that moment
@@ -902,10 +904,25 @@ def main(argv=None) -> int:
             log(f"[battle over - {'WON' if won else 'lost?'}; {st['battles']} battles this run]", "res")
             bl = st.pop("battle_log", None)
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy
+                hp_end, mx_end = party_hp(emu)
                 bl.update({"end": st["step"], "won": won, "run": run_dir.name, "map": m, "presses": st["step"] - bl["start"],
-                           "hp_addrs_unverified": True})
+                           "hp_end": [hp_end, mx_end], "fled": not won and hp_end > 0})
                 with Path("runs/battles.jsonl").open("a", encoding="utf-8") as fh:
                     fh.write(json.dumps(bl) + "\n")
+                # Every battle is a lesson: per enemy species keep fights/wins/fled, HP lost, turns, and the move that
+                # actually did the most damage. The planner reads these to pick fights and set the flee threshold.
+                sp = str(bl.get("enemy_species") or emu.read(0xCFE5))
+                ls = mem.data.setdefault("battle_lessons", {}).setdefault(sp, {"fights": 0, "wins": 0, "fled": 0, "turns": [], "hp_lost": []})
+                ls["fights"] += 1; ls["wins"] += int(won); ls["fled"] += int(bl["fled"])
+                ls["turns"].append(len(bl["turns"])); del ls["turns"][:-20]
+                first = bl["turns"][0]["hp_you"] if bl["turns"] else hp_end
+                ls["hp_lost"].append(max(0, first - hp_end)); del ls["hp_lost"][:-20]
+                dmg = {k.split(":")[1]: round(sum(v) / len(v), 1) for k, v in mem.data.get("move_damage", {}).items() if k.startswith(sp + ":") and v}
+                if dmg:
+                    ls["best_move"] = max(dmg, key=dmg.get); ls["move_avg_damage"] = dmg
+                ename = (ROM_KB or {}).get("name_of_internal", {}).get(sp, f"#{sp}")
+                log(f"[lesson vs {ename}: {ls['wins']}/{ls['fights']} won, fled {ls['fled']}, avg turns {sum(ls['turns']) / len(ls['turns']):.1f}, "
+                    f"avg HP lost {sum(ls['hp_lost']) / len(ls['hp_lost']):.1f}, best move {ls.get('best_move', '?')}]", "res")
         if box_open(tm_now):
             if any("A B C D E" in ln for ln in lines_now):  # the naming KEYBOARD: START = END (B only deletes letters)
                 if st.get("replay_ctx"):
