@@ -149,3 +149,17 @@ Factor the "build an emulator from args" step into one helper so tests can injec
 ## 8. Report
 
 Test tail, line counts, the exact console block from the 5-step fake run, and any decision not in the design.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Draft |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-02 21:54 · robert-claude-laptop · none → Draft — build step 3 of 3; queue only after Emulator_Layer and Backend_And_Decision are merged to main
+<!-- queue:end -->
