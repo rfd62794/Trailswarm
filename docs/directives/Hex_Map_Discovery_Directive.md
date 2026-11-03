@@ -153,13 +153,15 @@ real-ROM calibration run.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-hex-map-discovery-directive |
 | Base branch | - |
+| Base commit | 2da9f9e8224d29d1251dad0bc848502128b377a9 |
 
 **Status log**
 - 2026-11-02 21:59 · robert-claude-laptop · none → Draft — build step 4; Robert asked for hex mapping 2026-11-02; queue after Agent_Loop_And_CLI merges
 - 2026-11-02 22:37 · robert-claude-laptop · Draft → Queued — prereq Agent_Loop_And_CLI merged (PR #4); tile map 0xC3A0, charmap and border tiles 0x79-0x7E verified on the ROM today
 - 2026-11-02 22:38 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited new paths are files it creates; dispatch-path-missing is a false positive
+- 2026-11-02 22:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-hex-map-discovery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FQS1FQGYQ6ZT9DDNGKB8T9
 <!-- queue:end -->
