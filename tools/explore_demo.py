@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import random
+import re
 import sys
 import time
 import tkinter as tk
@@ -806,22 +807,27 @@ def main(argv=None) -> int:
             if pm and pm["species"] == species and enemy_hp < pm["enemy_hp"]:
                 stats = mem.data.setdefault("move_damage", {}).setdefault(f"{species}:{pm['move']}", [])
                 stats.append(pm["enemy_hp"] - enemy_hp); del stats[:-20]; st["pending_move"] = None
-            skip = ("FIGHT", "PKMN", "ITEM", "RUN", "TYPE", "CANCEL", "POTION")
-            move_lines = [ln for ln in lines_now if not any(s in ln for s in skip) and "/" not in ln and ln.replace(">", "").strip()]
+            # The move menu reads: TYPE/ | NORMAL | 29/30 | TACKLE | >TAIL WHIP  -> moves are the lines AFTER the PP line
+            pp_idx = next((i for i, ln in enumerate(lines_now) if re.fullmatch(r"\d+/\d+", ln.replace(">", "").strip())), None)
+            move_lines = [ln for ln in lines_now[pp_idx + 1:] if ln.replace(">", "").strip() not in ("", "-")] if pp_idx is not None else []
             cursor_mv = next((ln.replace(">", "").strip() for ln in move_lines if ">" in ln), None)
-            if cursor_mv and 2 <= len(move_lines) <= 4 and any("/" in ln for ln in lines_now):  # the move menu (PP line present)
+            if cursor_mv and 1 <= len(move_lines) <= 4:  # the move menu
                 moves = [ln.replace(">", "").strip() for ln in move_lines]
                 def score(mv):
                     d = mem.data.get("move_damage", {}).get(f"{species}:{mv}")
                     return (0, 0) if not d else (1, sum(d) / len(d))
                 tried = [mv for mv in moves if score(mv)[0]]
                 target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
-                if cursor_mv == target:
-                    st["pending_move"] = {"species": species, "move": target, "enemy_hp": enemy_hp}
-                    why = (f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {target} (untried)" if target not in tried
-                           else f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {target} (best avg {score(target)[1]:.1f} dmg)")
+                norm = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
+                st["move_nav"] = st.get("move_nav", 0) + 1
+                if norm(cursor_mv) == norm(target) or st["move_nav"] > 5:  # never bounce: after 5 moves take what is under the cursor
+                    chosen = cursor_mv if st["move_nav"] > 5 else target
+                    st["move_nav"] = 0
+                    st["pending_move"] = {"species": species, "move": chosen, "enemy_hp": enemy_hp}
+                    why = (f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {chosen} (untried)" if chosen not in tried
+                           else f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {chosen} (best avg {score(chosen)[1]:.1f} dmg)")
                     do_press("A", "agent", why); return
-                do_press("DOWN", "agent", f"move menu: cursor to {target}"); return
+                do_press("DOWN", "agent", f"move menu: cursor to {target} (now on {cursor_mv})"); return
             if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
                 do_press("UP", "agent", "battle menu: back up to FIGHT"); return
             if any("CANCEL" in ln and ">" in ln for ln in lines_now):
