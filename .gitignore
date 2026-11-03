@@ -1,0 +1,7 @@
+roms/
+.venv/
+__pycache__/
+.pytest_cache/
+runs/
+.devin-scratch/
+
