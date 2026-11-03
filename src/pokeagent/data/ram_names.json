@@ -1,0 +1,17 @@
+[
+  {"name": "wTileMap", "addr": "0xC3A0", "size": 360, "encoding": "text", "verified": false, "note": "20x18 visible screen tiles"},
+  {"name": "wPlayerName", "addr": "0xD158", "size": 11, "encoding": "text", "verified": false, "note": "0x50-terminated"},
+  {"name": "wPartyCount", "addr": "0xD163", "size": 1, "encoding": "u8", "verified": false, "note": ""},
+  {"name": "wPartySpecies", "addr": "0xD164", "size": 7, "encoding": "bytes", "verified": false, "note": "0xFF-terminated"},
+  {"name": "wPlayerMoney", "addr": "0xD347", "size": 3, "encoding": "bcd", "verified": true, "evidence": "make_baseline 2026-11-02", "note": ""},
+  {"name": "wObtainedBadges", "addr": "0xD356", "size": 1, "encoding": "bitmask", "verified": false, "note": "bit0 Boulder ... bit7 Earth"},
+  {"name": "wCurMap", "addr": "0xD35E", "size": 1, "encoding": "u8", "verified": true, "evidence": "make_baseline 2026-11-02", "note": ""},
+  {"name": "wYCoord", "addr": "0xD361", "size": 1, "encoding": "u8", "verified": true, "evidence": "make_baseline 2026-11-02", "note": ""},
+  {"name": "wXCoord", "addr": "0xD362", "size": 1, "encoding": "u8", "verified": true, "evidence": "make_baseline 2026-11-02", "note": "player X on current map"},
+  {"name": "wIsInBattle", "addr": "0xD057", "size": 1, "encoding": "u8", "verified": false, "note": "0 none, 1 wild, 2 trainer"},
+  {"name": "wCurOpponent", "addr": "0xD059", "size": 1, "encoding": "u8", "verified": false, "note": ""},
+  {"name": "wCurrentMenuItem", "addr": "0xCC26", "size": 1, "encoding": "u8", "verified": false, "note": ""},
+  {"name": "wMaxMenuItem", "addr": "0xCC28", "size": 1, "encoding": "u8", "verified": false, "note": ""},
+  {"name": "wJoyIgnore", "addr": "0xCD6B", "size": 1, "encoding": "bitmask", "verified": false, "note": "buttons the game is ignoring"},
+  {"name": "wSpritePlayerFacing", "addr": "0xC109", "size": 1, "encoding": "u8", "verified": false, "note": "0 down 4 up 8 left 0xC right"}
+]
