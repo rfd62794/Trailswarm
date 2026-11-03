@@ -121,4 +121,5 @@ Test tail, line counts per new file, and any decision not written in the design.
 - 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 2 of 3; independent of step 1, runs in parallel
 - 2026-11-02 21:56 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates (section 2 says Create), not files it reads; dispatch-path-missing is a false positive here
 - 2026-11-02 21:56 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNCTAN9S6DQA116B87KQJV
+- 2026-11-02 22:00 · dispatcher · launched pid=30568; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
