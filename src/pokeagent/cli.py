@@ -20,6 +20,7 @@ import os
 import sys
 from pathlib import Path
 
+from pokeagent import cli_hex
 from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
@@ -161,6 +162,8 @@ def _build_parser() -> argparse.ArgumentParser:
     state.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
     state.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
     state.set_defaults(func=_cmd_state)
+
+    cli_hex.register(sub)
     return parser
 
 
