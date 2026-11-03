@@ -124,7 +124,7 @@ Test tail, line counts per new file, and any decision not written in the design.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-backend-and-decision-directive |
 | Base branch | - |
@@ -138,4 +138,5 @@ Test tail, line counts per new file, and any decision not written in the design.
 - 2026-11-02 22:00 · dispatcher · In progress → Blocked — dispatch died at spawn: Directive is clear: create `decision.py`, `backend.py`, and their tests. Let me check the worktree layout.warning: rejected a tool call that requires confirmation. Running in non-interactive mode. Use --permission-mode dangerous to auto-approve all tools.
 - 2026-11-02 22:03 · robert-claude-laptop · Blocked → Queued — requeue: first run died at spawn on Get-ChildItem -Recurse (sandbox refusal); directive now pastes the worktree layout and forbids recursive listing (main 6732ce4)
 - 2026-11-02 22:03 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates, not files it reads; dispatch-path-missing is a false positive here
+- 2026-11-02 22:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNWKSDDEMNY0N6MZGZ54RW
 <!-- queue:end -->
