@@ -236,15 +236,21 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         p = g.path(pos, lambda n: n[0] == 0x28)
         if p:
             return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
-    if goals.get("first_pokemon") and not goals.get("to_viridian"):  # also before won_battle: outside the lab the way on is north (a wild fight on Route 1 counts)
-        # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
-        # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).
-        target_map = 0x01 if goals.get("to_route1") else 0x0C
+    after_parcel = goals.get("deliver_parcel") and not goals.get("to_pewter")
+    if (goals.get("first_pokemon") and not goals.get("to_viridian")) or after_parcel:
+        # The road north: Route 1 (0x0C), Viridian (0x01), then (parcel delivered, the old man steps aside) Route 2 (0x0D)
+        # and Pewter City (0x02). Use known transitions if any; otherwise push to the northernmost explored tile of the
+        # current outdoor map and keep going UP (map edges are connections).
+        if after_parcel:
+            target_map = 0x02 if goals.get("to_route2") else 0x0D
+        else:
+            target_map = 0x01 if goals.get("to_route1") else 0x0C
         p = g.path(pos, lambda n: n[0] == target_map)
         if p:
             return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
-        if pos[0] not in (0x00, 0x0C):  # indoors (house, lab): get outside first - never probe house walls for a road
-            p = g.path(pos, lambda n: n[0] in (0x0C, 0x00))
+        outdoors = (0x00, 0x0C, 0x01, 0x0D, 0x02)
+        if pos[0] not in outdoors:  # indoors (house, lab): get outside first - never probe house walls for a road
+            p = g.path(pos, lambda n: n[0] in outdoors)
             if p:
                 return p[0], f"goal road north: leaving map 0x{pos[0]:02X} for the outdoors ({len(p)} steps)"
             return None
