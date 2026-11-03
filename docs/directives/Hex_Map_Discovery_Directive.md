@@ -164,4 +164,5 @@ real-ROM calibration run.
 - 2026-11-02 22:37 · robert-claude-laptop · Draft → Queued — prereq Agent_Loop_And_CLI merged (PR #4); tile map 0xC3A0, charmap and border tiles 0x79-0x7E verified on the ROM today
 - 2026-11-02 22:38 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited new paths are files it creates; dispatch-path-missing is a false positive
 - 2026-11-02 22:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-hex-map-discovery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FQS1FQGYQ6ZT9DDNGKB8T9
+- 2026-11-02 22:41 · dispatcher · launched pid=7744; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-hex-map-discovery-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
