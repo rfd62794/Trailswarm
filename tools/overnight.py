@@ -83,7 +83,7 @@ def main() -> int:
     while time.time() < t_end:
         rnd += 1
         cons = consistency()
-        weak = next((g for g in GOALS if cons.get(g) is not None and cons.get(g) < 0.7 and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
+        weak = next((g for g in GOALS if (cons.get(g) is None or cons.get(g) < 0.7) and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
         if rnd % 3 == 0 and (ROOT / "runs" / "checkpoints" / "team_best.state").exists():
             objective, args = "roles (train + explore from the strongest team)", ["--roles"]
         elif weak:
