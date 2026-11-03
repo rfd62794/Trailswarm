@@ -327,7 +327,8 @@ def main(argv=None) -> int:
         a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
     explore_run = random.random() < a.explore_rate
 
-    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
+    run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
     mem = MapMemory(Path(a.maps))
     emu = PyBoyEmulator(Path(a.rom), headless=True)

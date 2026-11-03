@@ -46,6 +46,8 @@ def merge_memory(dst: dict, src: dict) -> dict:
             cur["presses"] = cur.get("presses", [])[-10:]
         demos = d.setdefault("demos", [])
         for dm in s.get("demos", []):
+            if not dm.get("achieved"):
+                continue  # only goal-achieving demonstrations are hypotheses worth keeping
             same = next((x for x in demos if x["at"] == dm["at"] and x["buttons"] == dm["buttons"]), None)
             if same:
                 same["grade"] = same.get("grade", 0) + dm.get("grade", 0); same["replays"] = same.get("replays", 0) + dm.get("replays", 0)
