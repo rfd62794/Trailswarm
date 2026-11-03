@@ -46,9 +46,9 @@ STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
 
 
 def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
-    q = question.lower()
-    offered = next((s for s in STARTERS if s.lower() in q), None)
-    if offered and "want" in q:  # "Do you want CHARMANDER?" on Oak's table
+    q = "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ")  # tolerant of ?,!,é and line breaks
+    offered = next((s for s in STARTERS if s.lower() in q.replace(" ", "")), None)
+    if offered and "want" in q and "nickname" not in q and "name" not in q.split():  # "So! You want CHARMANDER?"
         if starter == "any" or starter.upper() == offered:
             return "YES", f"starter offered: {offered} (wanted {starter})"
         return "NO", f"starter offered: {offered}, but we want {starter}"
@@ -341,6 +341,13 @@ def main(argv=None) -> int:
         text = box_text(tm2) if box_after else ""
         if text and not is_menu(tm2):
             st["last_text"] = text  # the question a YES/NO box will be about
+            # Dialog arrives in fragments ("So! You want | the fire POKeMON," then "CHARMANDER?"): keep the whole
+            # conversation since the box opened, so a YES/NO decision can read the name even if it scrolled off.
+            if not box_before:
+                st["dialog"] = []
+            if not st.get("dialog") or st["dialog"][-1] != text:
+                st.setdefault("dialog", []).append(text)
+                del st["dialog"][:-12]
         if name in DIRS and not box_before:
             st["facing"] = name
         inter = st.get("inter")
@@ -485,7 +492,8 @@ def main(argv=None) -> int:
                 cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
                 if {"YES", "NO"} <= {o.split()[-1] for o in options if o}:  # a YES/NO box
                     question = " ".join(ln for ln in lines if "YES" not in ln and "NO" not in ln) or st.get("last_text", "")
-                    ans, why = yesno_answer(question + " " + st.get("last_text", ""), a.starter)
+                    context = " ".join(st.get("dialog", [])[-4:]) + " " + question
+                    ans, why = yesno_answer(context, a.starter)
                     st["yesno"] = {"question": question[:80], "answer": ans}
                     if cursor.endswith(ans):
                         do_press("A", "agent", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\""); return
