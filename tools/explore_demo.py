@@ -1219,6 +1219,11 @@ def main(argv=None) -> int:
                         do_press("DOWN", "agent", f"move list: cursor to {st['forget_move']}"); return
                 goals_now = check_goals(emu, st)
                 want = goal_menu_choice(goals_now, options)
+                heal_opt = next((o for o in options if o.strip().endswith("HEAL") and "POK" not in o), None)
+                if heal_opt and not want:  # Pokecenter counter 'HEAL / CANCEL': heal whenever any party member is hurt
+                    hp_c, mx_c = party_hp(emu)
+                    if mx_c and hp_c < mx_c:
+                        want = heal_opt
                 if not want and goals_now.get("potion") and any("WITHDRAW" in o or "DEPOSIT" in o for o in options):
                     do_press("B", "agent", "potion already in the bag: nothing else to do at the PC, backing out"); return
                 if want:  # a goal tells us which option to take here
