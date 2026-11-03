@@ -450,7 +450,13 @@ class MapMemory:
             if w and avoid_maps and w[0] in avoid_maps and n not in tried:
                 tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
-        if facing in tried and not self.interaction_known(map_id, x, y, facing) and f"{x},{y},{facing}" not in self.recent_talk:
+        fdx, fdy = DIRS.get(facing, (0, 0))
+        npc_ahead = self.npc_at(map_id, x + fdx, y + fdy)
+        if npc_ahead is not None and facing in tried and not npc_ahead.get("talked") and f"{x},{y},{facing}" not in self.recent_talk:
+            return "A", f"an NPC we have not talked to is in front (pic {npc_ahead['pic']}): pressing A"
+        if npc_ahead is not None:
+            pass  # a person: never treated as an object to probe again, and never learned as a wall tile
+        elif facing in tried and not self.interaction_known(map_id, x, y, facing) and f"{x},{y},{facing}" not in self.recent_talk:
             return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A to see if it talks"
         for name, (dx, dy) in DIRS.items():
             if name in tried:
@@ -672,7 +678,16 @@ def main(argv=None) -> int:
                 result = f"text box: advanced ({'menu' if is_menu(tm2) else 'dialog'})"
         elif name == "A":
             # Record the A press either way, so a silent wall is tested once and never again.
-            entry = mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
+            fdx, fdy = DIRS[st["facing"]]
+            npc_in_front = mem.npc_at(before[0], before[1] + fdx, before[2] + fdy)
+            if npc_in_front is not None:  # people move: their results belong to the NPC record, not to the tile
+                npc_in_front["talked"] = npc_in_front.get("talked", 0) + 1
+                if len(text) > len(npc_in_front.get("text", "")):
+                    npc_in_front["text"] = text[:160]
+                entry = npc_in_front.setdefault("results", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
+                entry["count"] += 1
+            else:
+                entry = mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
             mem.recent_talk.add(f"{before[1]},{before[2]},{st['facing']}")
             if box_after:
                 st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
@@ -1145,9 +1160,11 @@ def main(argv=None) -> int:
                 st.setdefault("proc_done", set()).update({"check_health", "open_bag", "save_game"})
             st["mom_talk_step"] = None
         goals_now_all = check_goals(emu, st)
-        if m not in st.setdefault("burst_maps", set()):  # a NEW MAP: maximal exploration before any plan resumes
+        if "known_maps_at_start" not in st:
+            st["known_maps_at_start"] = {int(k) for k in mem.data["maps"] if len(mem.data["maps"][k].get("visited", {})) >= 5}
+        if m not in st.setdefault("burst_maps", set()):  # a map NEW TO MEMORY: maximal exploration before plans resume
             st["burst_maps"].add(m)
-            if len(st["burst_maps"]) > 1:
+            if m not in st["known_maps_at_start"]:
                 st["explore_burst"] = max(st.get("explore_burst", 0), 120)
                 log(f"[new map 0x{m:02X}: exploration burst, 120 steps before plans resume]", "res")
         if st.get("explore_burst", 0) > 0 and not (mx_now and hp_now / mx_now < 0.4):
