@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import sys
 import time
 import tkinter as tk
@@ -37,14 +38,35 @@ import queue  # noqa: E402
 from concurrent.futures import Future  # noqa: E402
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
+# YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
+YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
+               ("give up", "NO"), (" run ", "NO"), ("", "YES")]  # spaced needles = whole words
+
+
+STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
+
+
+def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
+    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "  # tolerant of ?,!,é and line breaks
+    offered = next((s for s in STARTERS if s.lower() in q.replace(" ", "")), None)
+    if offered and "want" in q and "nickname" not in q and "name" not in q.split():  # "So! You want CHARMANDER?"
+        if starter == "any" or starter.upper() == offered:
+            return "YES", f"starter offered: {offered} (wanted {starter})"
+        return "NO", f"starter offered: {offered}, but we want {starter}"
+    for needle, ans in YESNO_RULES:
+        if needle in q:
+            return ans, (f"'{needle}' in the question" if needle else "default for confirmations")
+    return "YES", "default"
 
 
 def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
     for goal, wanted in GOAL_MENU.items():
         if not goals.get(goal):
             for w in wanted:
-                if any(o.startswith(w) for o in options):
-                    return next(o for o in options if o.startswith(w))
+                # Containment, not prefix: an item list drawn over the PC menu reads "DE POTION", "TO CANCEL".
+                hit = next((o for o in options if w in o and "CANCEL" not in o), None)
+                if hit:
+                    return hit
     return None
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
@@ -80,6 +102,39 @@ def sprite_snapshot(emu) -> list[list[int]]:
         if pic:
             out.append([pic, emu.read(0xC204 + 16 * i), emu.read(0xC205 + 16 * i)])
     return out
+
+
+def npc_positions(emu) -> set:
+    return {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
+
+
+def ascii_vision(emu, mem, tileset: int) -> list[str]:
+    """Cheap vision: the visible 10x9 map tiles as one character each, from RAM, no image model.
+    @ player, N an NPC (sprite table), # tile ids learned solid, . learned walkable, ? never tried,
+    W a learned warp tile; an open text box replaces the bottom rows with its decoded text."""
+    tm = emu.read_range(TILEMAP, TILEMAP_LEN)
+    m, px, py = emu.read(0xD35E), emu.read(0xD362), emu.read(0xD361)
+    d = mem.m(m)
+    npcs = {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
+    warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
+    rows = []
+    for r in range(9):
+        line = ""
+        for c in range(10):
+            mx, my = px + (c - 4), py + (r - 4)
+            block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
+            if (c, r) == (4, 4):
+                ch = "@"
+            elif (mx, my) in npcs:
+                ch = "N"
+            elif (mx, my) in warps:
+                ch = "W"
+            else:
+                e = mem.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in block))
+                ch = "?" if not e else ("#" if e["solid"] > e["walkable"] else ".")
+            line += ch
+        rows.append(line)
+    return rows  # text boxes are NOT part of the map: the dialog pane shows them
 
 
 def effects(before: bytes, after: bytes) -> tuple[list[list[int]], str]:
@@ -162,6 +217,36 @@ class MapMemory:
             return "moved - cleared a false wall"
         return "moved"
 
+    # --- tile types: which 2x2 tile-id blocks are solid, learned per tileset, so a bookshelf is never bumped twice ---
+    def learn_tiles(self, tileset: int, ahead: list[int], walkable: bool):
+        t = self.data.setdefault("tile_types", {}).setdefault(str(tileset), {})
+        key = ",".join(f"{b:02X}" for b in ahead)
+        e = t.setdefault(key, {"solid": 0, "walkable": 0})
+        e["walkable" if walkable else "solid"] += 1
+
+    def known_solid(self, tileset: int, ahead: list[int]) -> bool:
+        e = self.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in ahead))
+        return bool(e) and e["solid"] >= 3 and e["walkable"] == 0
+
+    def render_memory(self, map_id: int, x: int, y: int, npcs: set, radius: int = 6) -> list[str]:
+        """What the agent REMEMBERS around it: . visited, # a wall it confirmed, W warp, i interaction, N NPC, @ you."""
+        d = self.m(map_id)
+        visited = {tuple(map(int, k.split(","))) for k in d.get("visited", {})}
+        warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
+        inter = {tuple(map(int, k.split(",")[:2])) for k, e in d.get("interactions", {}).items() if e.get("text")}
+        walls = set()
+        for k in d.get("blocked", []):
+            bx, by, bd = k.split(","); dx, dy = DIRS[bd]; walls.add((int(bx) + dx, int(by) + dy))
+        rows = []
+        for yy in range(y - radius, y + radius + 1):
+            line = ""
+            for xx in range(x - radius, x + radius + 1):
+                p = (xx, yy)
+                line += ("@" if p == (x, y) else "N" if p in npcs else "W" if p in warps else "i" if p in inter
+                         else "#" if p in walls and p not in visited else "." if p in visited else " ")
+            rows.append(line)
+        return rows
+
     def interact(self, map_id, x, y, facing, text: str) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
         e = d.setdefault(f"{x},{y},{facing}", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
@@ -183,9 +268,13 @@ class MapMemory:
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
 
-    def choose(self, map_id, x, y, facing: str) -> tuple[str, str]:
+    def choose(self, map_id, x, y, facing: str, tilemap: bytes | None = None, tileset: int = 0) -> tuple[str, str]:
         d = self.m(map_id); best = None
         tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
+        if tilemap is not None:  # tile ids ahead already known solid (bookshelf, wall, desk) count as tried
+            for n in DIRS:
+                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
+                    tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
         if facing in tried and not self.interaction_known(map_id, x, y, facing):
             return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A to see if it talks"
@@ -220,9 +309,23 @@ def main(argv=None) -> int:
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--frames-per-step", type=int, default=30)
     ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
+    ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
+                    help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
+    ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
+    ap.add_argument("--explore-rate", type=float, default=0.2,
+                    help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     a = ap.parse_args(argv)
+    if a.seed is not None:
+        random.seed(a.seed)
+    if a.headless:
+        a.frames_per_step = 4  # the readiness check still paces presses; nobody is watching
+    if a.starter == "random":
+        a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
+    explore_run = random.random() < a.explore_rate
 
-    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
+    run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
     mem = MapMemory(Path(a.maps))
     emu = PyBoyEmulator(Path(a.rom), headless=True)
@@ -233,10 +336,18 @@ def main(argv=None) -> int:
     screen = tk.Label(root, bg="#111", bd=0); screen.grid(row=0, column=0, padx=8, pady=8)
     con = tk.Text(root, width=78, height=28, bg="#0b0b0b", fg="#d8d8d8", font=("Consolas", 10), bd=0, padx=10, pady=8, wrap="word")
     con.grid(row=0, column=1, padx=(0, 8), pady=8, sticky="ns")
+    # third pane: what the agent SEES (tile map as text) and what it REMEMBERS (map memory around it)
+    vis = tk.Label(root, bg="#0b0b0b", fg="#9fd8ff", font=("Consolas", 13), justify="left", anchor="nw",
+                   padx=10, pady=8, width=22, height=27)
+    vis.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ns")
+    # fourth pane under the game: the current dialog / menu text, goals, and battle flag (not on the map)
+    dlg = tk.Label(root, bg="#0b0b0b", fg="#ffd9a0", font=("Consolas", 11), justify="left", anchor="nw",
+                   padx=10, pady=6, width=58, height=6)
+    dlg.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0, "explore_run": explore_run}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -278,17 +389,31 @@ def main(argv=None) -> int:
             fh.write(json.dumps(ep) + "\n")
         demos = mem.m(ep["start"][0]).setdefault("demos", [])
         demos.append({"at": ep["start"][1:], "facing": ep["facing"], "screen": ep["screen"], "buttons": ep["buttons"],
-                      "achieved": ep["achieved"], "source": ep["source"], "end": ep["end"]})
+                      "achieved": ep["achieved"], "source": ep["source"], "end": ep["end"], "grade": 0, "replays": 0})
         del demos[:-20]
         log(f"[learned a {ep['source']} demonstration: {len(ep['buttons'])} presses from {tuple(ep['start'])}"
             f"{' -> ' + ', '.join(ep['achieved']) if ep['achieved'] else ''}]", "res")
 
     def matching_demo(m, x, y, tm):
+        """A demonstration is a hypothesis, not an order: it is replayed only while its grade is >= 0, and only
+        if it achieved a goal when recorded. Every replay is graded afterwards (see grade_replay)."""
         screen = frame_lines(tm)[:3] if box_open(tm) else []
-        for d in reversed(mem.m(m).get("demos", [])):  # newest first; prefer ones that achieved a goal
-            if d["at"] == [x, y] and d["screen"] == screen and (d["achieved"] or d["end"] != [m, x, y]):
-                return d
-        return None
+        cands = [d for d in mem.m(m).get("demos", []) if d["at"] == [x, y] and d["screen"] == screen
+                 and d.get("achieved") and d.get("buttons") and d.get("grade", 0) >= 0]
+        return max(cands, key=lambda d: (d.get("grade", 0), len(d["achieved"]))) if cands else None
+
+    def grade_replay():
+        """Called when a replay finishes: did it make progress (a goal, a new map, a new tile)? Grade it."""
+        rp = st.pop("replay_ctx", None)
+        if not rp:
+            return
+        goals_now = check_goals(emu, st)
+        progressed = any(goals_now[g] and not rp["goals"].get(g) for g in GOALS) or pos()[0] != rp["pos"][0] \
+            or (pos() != rp["pos"] and not box_open(emu.read_range(TILEMAP, TILEMAP_LEN)))
+        rp["demo"]["grade"] = rp["demo"].get("grade", 0) + (1 if progressed else -1)
+        rp["demo"]["replays"] = rp["demo"].get("replays", 0) + 1
+        log(f"[replay graded {'GOOD' if progressed else 'BAD'} -> grade {rp['demo']['grade']}"
+            f"{'; this demonstration will not be used again' if rp['demo']['grade'] < 0 else ''}]", "res")
 
     def do_press(name: str, source: str, why: str):
         before = pos(); st["step"] += 1
@@ -313,14 +438,30 @@ def main(argv=None) -> int:
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_after = box_open(tm2)
         text = box_text(tm2) if box_after else ""
+        if text and not is_menu(tm2):
+            st["last_text"] = text  # the question a YES/NO box will be about
+            # Dialog arrives in fragments ("So! You want | the fire POKeMON," then "CHARMANDER?"): keep the whole
+            # conversation since the box opened, so a YES/NO decision can read the name even if it scrolled off.
+            if not box_before:
+                st["dialog"] = []
+            if not st.get("dialog") or st["dialog"][-1] != text:
+                st.setdefault("dialog", []).append(text)
+                del st["dialog"][:-12]
         if name in DIRS and not box_before:
             st["facing"] = name
         inter = st.get("inter")
         if box_before:
             if inter:
                 inter["presses"] += 1
+                # The first capture happens while the text is still printing ("So! Y"): keep the fullest dialog seen.
+                full = " / ".join(st.get("dialog", []))[:400]
+                if len(full) > len(inter["entry"].get("text", "")):
+                    inter["entry"]["text"] = full
                 if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
                     chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
+                    yn = st.pop("yesno", None)
+                    if yn and chosen.endswith(yn["answer"]):
+                        chosen = f"YES/NO '{yn['question']}' -> {yn['answer']}"
                     if chosen:
                         inter["choices"].append(chosen)
                 if box_after and is_menu(tm2):
@@ -351,6 +492,13 @@ def main(argv=None) -> int:
             fail_key = (before, name)
             confirmed = st["last_fail"] == fail_key
             result = mem.learn(before, name, after, confirmed=confirmed)
+            if "ahead_tiles" in extra and after[0] == before[0]:
+                dx, dy = DIRS[name]
+                npc_ahead = (before[1] + dx, before[2] + dy) in npc_positions(emu)
+                if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
+                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person
+                elif result.startswith("moved"):
+                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=True)
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
             if after[0] != before[0]:
                 st["settle"] = 30  # fade already waited out; a short pause so the watcher sees the arrival
@@ -375,15 +523,24 @@ def main(argv=None) -> int:
             if goals[g] and g not in st["goal_steps"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
                 gp = Path("runs/milestones.json")
-                hist = json.loads(gp.read_text()) if gp.exists() else {}
-                hist.setdefault(g, []).append({"run": run_dir.name, "step": st["step"]}); gp.write_text(json.dumps(hist, indent=1))
+                try:
+                    hist = json.loads(gp.read_text()) if gp.exists() else {}
+                except json.JSONDecodeError:
+                    hist = {}
+                rec = {"run": run_dir.name, "step": st["step"]}
+                if g == "first_pokemon":
+                    rec["species_byte"] = emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
+                    rec["wanted"] = a.starter
+                hist.setdefault(g, []).append(rec)
+                tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1)); os.replace(tmp, gp)
         gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
         log(f"--- step {st['step']}/{a.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {st['facing']}  "
             f"party={emu.read(0xD163)} bag={emu.read(0xD31D)}  goals: {gtxt}\n"
             f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
             f"{len(mm.get('interactions', {}))} interactions", "hdr")
         log(f"{'human:   ' if source == 'human' else 'thinking:'} {why}", "human" if source == "human" else "why")
-        log(f"button:   {name:<8} result: {result}\n", "btn")
+        log(f"button:   {name:<8} result: {result}", "btn")
+        log("", None)
         if st["step"] % 10 == 0:
             mem.save()
         if st["step"] >= a.steps and not st["done"]:
@@ -403,13 +560,20 @@ def main(argv=None) -> int:
         # Input readiness: do not press while the screen is still changing on its own (cutscene, forced walk,
         # fade, battle animation) or while the game says it is ignoring the joypad (wJoyIgnore, unverified).
         joy_ignore = emu.read(0xCD6B)
-        if st["stable_frames"] < 12 or joy_ignore:
+        tm_ready = emu.read_range(TILEMAP, TILEMAP_LEN)
+        # Only the OVERWORLD needs the stillness check (forced walks, fades, Oak dragging you to the lab).
+        # Boxes and menus are paced by the game itself: pressing while text prints is harmless, and a
+        # blinking cursor would otherwise look like "still changing" forever (that stalled the 23:20 run).
+        busy = not box_open(tm_ready) and (st["stable_frames"] < 8 or joy_ignore)
+        if busy:
             if not st.get("waiting"):
                 st["waiting"] = True
                 log(f"[waiting: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen still changing'} - cutscene?]", "res")
             st["wait_frames"] = st.get("wait_frames", 0) + a.frames_per_step
-            if st["wait_frames"] < 60 * 20:  # give up waiting after ~20 s of game time and try A
+            extra_wait = {"joy": joy_ignore, "stable": st["stable_frames"], "frames": st["wait_frames"]}
+            if st["wait_frames"] < 60 * 4:  # at most ~4 s of game time, then act anyway and log it
                 return
+            log(f"[waited 4 s, acting anyway: {extra_wait}]", "res")
         if st.get("waiting"):
             st["waiting"] = False
             log(f"[ready after waiting {st.get('wait_frames', 0)} frames]", "res"); st["wait_frames"] = 0
@@ -417,6 +581,8 @@ def main(argv=None) -> int:
         tm_now = emu.read_range(TILEMAP, TILEMAP_LEN)
         lines_now = frame_lines(tm_now) if box_open(tm_now) else []
         in_battle = emu.read(0xD057) != 0 or any(ln.startswith("FIGHT") or "FIGHT" in ln for ln in lines_now)
+        if st.get("replay") and (in_battle or box_open(tm_now)):
+            st["replay"] = []; grade_replay()  # a box or a battle interrupted the demonstration: grade it now
         if in_battle:
             # First battle logic: always FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
             if not st.get("in_battle"):
@@ -441,6 +607,14 @@ def main(argv=None) -> int:
                 inter = st.get("inter"); lines = frame_lines(tm)
                 options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or (ln.isupper() and len(ln.split()) <= 3)]
                 cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
+                if {"YES", "NO"} <= {o.split()[-1] for o in options if o}:  # a YES/NO box
+                    question = " ".join(ln for ln in lines if "YES" not in ln and "NO" not in ln) or st.get("last_text", "")
+                    context = " ".join(st.get("dialog", [])[-4:]) + " " + question
+                    ans, why = yesno_answer(context, a.starter)
+                    st["yesno"] = {"question": question[:80], "answer": ans}
+                    if cursor.endswith(ans):
+                        do_press("A", "agent", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\""); return
+                    do_press("DOWN" if ans == "NO" else "UP", "agent", f"YES/NO box: moving the cursor to {ans} ({why})"); return
                 want = goal_menu_choice(check_goals(emu, st), options)
                 if want:  # a goal tells us which option to take here
                     if cursor == want:
@@ -462,18 +636,34 @@ def main(argv=None) -> int:
                 if p:
                     do_press(p[0], "agent", f"goto {target}: {len(p)} steps left"); return
                 st["goto"] = None; log(f"[no known route to {target}; exploring instead]", "res")
-        if st.get("replay"):  # replaying a demonstration you or Claude gave in this exact situation
+        if st.get("replay"):  # replaying a demonstration (graded afterwards, dropped if it does not work)
             btn = st["replay"].pop(0)
-            do_press(btn, "agent", f"replaying your demonstration ({len(st['replay'])} presses left)"); return
+            do_press(btn, "agent", f"testing a {st['replay_ctx']['demo']['source']} demonstration ({len(st['replay'])} presses left)")
+            if not st["replay"]:
+                grade_replay()
+            return
         demo = matching_demo(m, x, y, tm_now)
+        if demo and st["explore_run"]:
+            demo = None  # this run is an exploration run: ignore known demonstrations and try to beat them
         if demo and not st.get("replayed_here") == (m, x, y, st["step"] // 50):
             st["replay"] = list(demo["buttons"]); st["replayed_here"] = (m, x, y, st["step"] // 50)
-            log(f"[found a {demo['source']} demonstration for this spot: {demo['buttons']}]", "res")
+            st["replay_ctx"] = {"demo": demo, "pos": (m, x, y), "goals": check_goals(emu, st)}
+            log(f"[testing a {demo['source']} demonstration for this spot (grade {demo.get('grade', 0)}): {demo['buttons']}]", "res")
             return
-        planned = plan_step(check_goals(emu, st), mem.data["maps"], (m, x, y), st["facing"])
-        if planned:
+        # Stall detector: same tile, same screen, no goal for 15 agent steps -> escalate instead of repeating.
+        sig = (m, x, y, hash(tm_now), tuple(sorted(st["goal_steps"])))
+        st["stall"] = st.get("stall", 0) + 1 if sig == st.get("last_sig") else 0
+        st["last_sig"] = sig
+        if st["stall"] >= 15:
+            st["stall"] = 0; st["stalls"] = st.get("stalls", 0) + 1
+            if st.get("replay_ctx"):
+                st["replay"] = []; grade_replay()
+            esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
+            do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
+        planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
+        if planned and not (st["explore_run"] and random.random() < 0.3):
             do_press(planned[0], "agent", planned[1]); return
-        name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)
+        name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
 
     def on_key(ev):
         if ev.keysym == "p":
@@ -528,24 +718,59 @@ def main(argv=None) -> int:
         st["goto"] = [int(map if map is not None else pos()[0]), int(x), int(y)]
         log(f"[remote goto {st['goto']}]", "res"); return {"goto": st["goto"]}
 
+    @ctl.route("GET", "/vision")
+    def _vision(**_): return {"rows": ascii_vision(emu, mem, emu.read(0xD367))}
+
+    @ctl.route("GET", "/peek")
+    def _peek(addr="0xD35E", length="1", **_):
+        a0, n = int(str(addr), 16) if str(addr).lower().startswith("0x") else int(addr), min(int(length), 512)
+        data = emu.read_range(a0, n) if n > 1 else bytes([emu.read(a0)])
+        return {"addr": f"0x{a0:04X}", "hex": data.hex(" "), "bytes": list(data)}
+
+    @ctl.route("GET", "/sprites")
+    def _sprites(**_):
+        return {"player": [emu.read(0xD362), emu.read(0xD361)],
+                "slots": [{"slot": i, "pic": emu.read(0xC100 + 16 * i), "c2x4": emu.read(0xC204 + 16 * i),
+                           "c2x5": emu.read(0xC205 + 16 * i), "c1x4": emu.read(0xC104 + 16 * i), "c1x6": emu.read(0xC106 + 16 * i)}
+                          for i in range(16) if emu.read(0xC100 + 16 * i)]}
+
     @ctl.route("POST", "/say")
     def _say(text="", **_): log(f"claude:   {text}", "human"); return {"ok": True}
 
     ctl.start()
 
     def frame():
-        if st["done"]:
-            root.after(100, frame)  # keep draining remote-control jobs so /status still answers after the run
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
             try:
                 fut.set_result(fn())
             except Exception as e:
                 fut.set_exception(e)
-        img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
-        st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
+        if st["done"]:
+            root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
+            return
+        if a.headless:
+            emu.tick(1)  # no rendering at all
+        else:
+            img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
+            st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
-        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN)) ^ hash(emu.read_range(0xC200, 0x100))  # screen + sprites
+        if st["frame"] % 15 == 0 and not a.headless:
+            try:
+                m_, x_, y_ = pos(); npcs = npc_positions(emu)
+                vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
+                              + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
+                              + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
+                tm_d = emu.read_range(TILEMAP, TILEMAP_LEN)
+                lines_d = frame_lines(tm_d) if box_open(tm_d) else []
+                g = check_goals(emu, st)
+                dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
+                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
+                              f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
+            except Exception as e:
+                vis.configure(text=f"vision error: {e!r}")
+        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN))  # screen tiles only; wandering NPCs must not count as a cutscene
         st["stable_frames"] = st["stable_frames"] + 1 if h == st.get("last_hash") else 0
         st["last_hash"] = h
         try:
@@ -554,12 +779,21 @@ def main(argv=None) -> int:
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
         finally:
-            root.after(16, frame)
+            if st["done"] and a.headless:
+                try:
+                    shutdown(); trans.close(); emu.close(); root.destroy()
+                except Exception:
+                    os._exit(0)  # a swarm parent is waiting on us; never hang in mainloop
+            else:
+                root.after(1 if a.headless else 16, frame)
 
     root.bind("<Key>", on_key)
+    if a.headless:
+        root.withdraw()  # keep tk's event loop (it drives everything) but show no window
     log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
     log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
-    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far)\n", "res")
+    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
+        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
     root.after(300, frame)
     root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(), trans.close(), emu.close(), root.destroy()))
     root.mainloop()
