@@ -213,7 +213,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         p = g.path(pos, lambda n: n[0] == 0x28)
         if p:
             return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
-    if goals.get("won_battle") and not goals.get("to_viridian"):
+    if goals.get("first_pokemon") and not goals.get("to_viridian"):  # also before won_battle: outside the lab the way on is north (a wild fight on Route 1 counts)
         # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
         # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).
         target_map = 0x01 if goals.get("to_route1") else 0x0C
