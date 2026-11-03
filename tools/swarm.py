@@ -66,7 +66,52 @@ def merge_memory(dst: dict, src: dict) -> dict:
             if len(e.get("text", "")) > len(cur.get("text", "")):
                 cur["text"] = e["text"]
             cur["last"] = e.get("last", cur.get("last"))
+        for key in ("encounters", "fails"):  # per-tile / per-edge counters: max, never summed (shared base)
+            dd = d.setdefault(key, {})
+            for k, n in s.get(key, {}).items():
+                dd[k] = max(dd.get(k, 0), n)
         d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
+    # --- everything else the agents learn goes into the collective knowledge too ---
+    for key in ("move_damage", "enemy_damage", "damage_dealt", "damage_taken", "item_heal"):  # {key: [samples]}
+        dd = dst.setdefault(key, {})
+        for k, vals in src.get(key, {}).items():
+            cur = dd.setdefault(k, [])
+            for v in vals:
+                if len(cur) < 20 or v not in cur:
+                    cur.append(v)
+            del cur[:-20]
+    for key in ("items", "events", "catches"):  # append-only records: union by content, newest 300
+        cur = dst.setdefault(key, [])
+        for r in src.get(key, []):
+            if r not in cur:
+                cur.append(r)
+        del cur[:-300]
+    for sp, ls in src.get("battle_lessons", {}).items():  # per enemy species: fights/wins/fled are max (shared base)
+        cur = dst.setdefault("battle_lessons", {}).setdefault(sp, {"fights": 0, "wins": 0, "fled": 0, "turns": [], "hp_lost": []})
+        for f in ("fights", "wins", "fled"):
+            cur[f] = max(cur.get(f, 0), ls.get(f, 0))
+        for f in ("turns", "hp_lost"):
+            cur[f] = (cur.get(f, []) + [v for v in ls.get(f, []) if v not in cur.get(f, [])])[-20:]
+        if ls.get("best_move"):
+            cur["best_move"] = ls["best_move"]; cur["move_avg_damage"] = ls.get("move_avg_damage", {})
+    for name, rec in src.get("procedures", {}).items():  # verified menu procedures: keep the successes and the safest pace
+        cur = dst.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": rec.get("pace", 12)})
+        cur["ok"] = max(cur["ok"], rec.get("ok", 0)); cur["fail"] = max(cur["fail"], rec.get("fail", 0))
+        if rec.get("ok", 0) >= cur["ok"]:
+            cur["pace"] = rec.get("pace", cur["pace"])
+    for mid, tr in src.get("training", {}).items():  # XP economics per map
+        cur = dst.setdefault("training", {}).setdefault(mid, {"exp": 0, "steps": 0, "by_level": {}})
+        cur["exp"] = max(cur["exp"], tr.get("exp", 0)); cur["steps"] = max(cur["steps"], tr.get("steps", 0))
+        for lv, n in tr.get("by_level", {}).items():
+            cur["by_level"][lv] = max(cur["by_level"].get(lv, 0), n)
+    for k, v in src.get("menus", {}).items():
+        dst.setdefault("menus", {}).setdefault(k, v)
+    gi = dst.setdefault("grass_ids", {})
+    for ts, table in src.get("grass_ids", {}).items():
+        cur = gi.setdefault(ts, {})
+        for k, n in table.items():
+            cur[k] = max(cur.get(k, 0), n)
+    dst["team_best_level"] = max(dst.get("team_best_level", 0), src.get("team_best_level", 0))
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():
         cur = beats.get(sig)
