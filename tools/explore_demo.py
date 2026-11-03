@@ -639,8 +639,10 @@ def main(argv=None) -> int:
         goals = check_goals(emu, st)
         if goals["left_house"]:
             st["goal_left_house"] = True
-        for g in GOALS:  # first time each goal is reached: remember the step and persist it
-            if goals[g] and g not in st["goal_steps"]:
+        if "initial_goals" not in st:  # goals already true when the run began (segment runs start from a checkpoint)
+            st["initial_goals"] = {g for g in GOALS if goals[g]}
+        for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
+            if goals[g] and g not in st["goal_steps"] and g not in st["initial_goals"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
                 try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                     cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
