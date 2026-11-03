@@ -159,7 +159,7 @@ Test tail, line counts, the exact console block from the 5-step fake run, and an
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-agent-loop-and-cli-directive |
 | Base branch | - |
@@ -174,4 +174,5 @@ Test tail, line counts, the exact console block from the 5-step fake run, and an
 - 2026-11-02 22:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-agent-loop-and-cli-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FPJRBZCACBPAT50M6Z8EJ5
 - 2026-11-02 22:19 · dispatcher · launched pid=14040; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-agent-loop-and-cli-directive; provisioned: uv sync --frozen
 - 2026-11-02 22:37 · robert-claude-laptop · In progress → Review — Devin's run finished the work (80 tests) and died on the sandbox-refused CLI smoke check; controller committed from the worktree (8f2d324) and merged via PR #4 review: branch already merged at 8f2d324c6d40908d4cc305ab9a1026464b50089b spent: claude 11.4K units est. n/a; devin 3 min est. n/a
+- 2026-11-02 22:37 · robert-claude-laptop · Review → Done — note: merged via PR #4 (merge commit 808e5c0); Sonnet review MERGE, 81 passed 1 skipped; real-ROM checks pass; minor follow-ups: notes trim, broader exception catch in cli, close() on early interrupt
 <!-- queue:end -->
