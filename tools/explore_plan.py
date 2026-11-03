@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
+STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
 
 
 class WorldGraph:
@@ -92,15 +93,29 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         # In Oak's lab: go to the ball that offers the wanted starter (learned from earlier "Do you want X?" boxes).
         if pos[0] == 0x28:
             want = (goals.get("_starter") or "any").upper()
-            spots = interaction_spots(maps, want if want != "ANY" else "want")
-            for (m, x, y, f) in sorted(spots, key=lambda s: s != (pos[0], pos[1], pos[2], facing)):
-                if m != 0x28:
-                    continue
+
+            def spot_text(m, x, y, f):
+                e = maps.get(str(m), {}).get("interactions", {}).get(f"{x},{y},{f}", {})
+                return ((e.get("text") or "") + " " + " ".join(e.get("choices", []) or [])).upper()
+
+            # Balls = spots in the lab whose dialog named a starter. The wanted one may be an untried neighbour
+            # on the same table row, so try those too. NEVER fall through to the Pallet Town OAK spot from here:
+            # that is what walked the agent back out of the lab.
+            balls = [s for s in interaction_spots(maps, "want") if s[0] == 0x28 and any(n in spot_text(*s) for n in STARTERS)]
+            targets = [s for s in balls if want == "ANY" or want in spot_text(*s)]
+            if not targets and balls:
+                tried = {(s[1], s[2], s[3]) for s in balls}
+                for (m, x, y, f) in balls:
+                    for dx in (-1, 1):
+                        if (x + dx, y, f) not in tried and not any(n in spot_text(m, x + dx, y, f) for n in STARTERS if n != want):
+                            targets.append((m, x + dx, y, f))
+            for (m, x, y, f) in sorted(targets, key=lambda s: abs(s[1] - pos[1]) + abs(s[2] - pos[2])):
                 if pos == (m, x, y):
-                    return ("A" if facing == f else f), f"goal first pokemon: at the ball for {want}, {'taking it' if facing == f else 'facing it'}"
+                    return ("A" if facing == f else f), f"goal first pokemon: at a ball spot for {want}, {'taking it' if facing == f else 'facing it'}"
                 p = g.path(pos, lambda n: n == (m, x, y))
                 if p:
-                    return p[0], f"goal first pokemon: {len(p)} steps to the ball for {want} at ({x},{y})"
+                    return p[0], f"goal first pokemon: {len(p)} steps to the ball spot ({x},{y}) for {want}"
+            return None  # unknown table so far: explore the lab (the caller's exploration prefers untested walls)
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"

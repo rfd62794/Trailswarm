@@ -661,7 +661,7 @@ def main(argv=None) -> int:
             esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
             do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
         planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
-        if planned and not (st["explore_run"] and random.random() < 0.3):
+        if planned and not (st["explore_run"] and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
 
