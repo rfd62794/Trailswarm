@@ -136,11 +136,12 @@ Test tail, line counts, and any place the mcp 2.x API differed from section 1 (s
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 22:25 · robert-claude-laptop · none → Draft — build step 5 (MCP server), Robert asked 2026-11-02; mcp==2.3.0 already in uv.lock; queue after Agent_Loop_And_CLI merges
+- 2026-11-02 22:37 · robert-claude-laptop · Draft → Queued — prereq Agent_Loop_And_CLI merged (PR #4); mcp 2.3.0 in uv.lock via PR #5
 <!-- queue:end -->
