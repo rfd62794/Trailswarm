@@ -93,7 +93,8 @@ def main() -> int:
             starter = ["bulbasaur", "charmander", "squirtle"][i % 3]
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
                    "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(8800 + i),
-                   "--explore-rate", "0.5" if i % 2 else "0.0"]
+                   "--explore-rate", "0.5" if i % 2 else "0.0",
+                   "--box-pace", str([8, 16, 30][i % 3])]  # agents try different text-skipping paces; review grades them
             log = (swarm_dir / f"agent{i}.log").open("w")
             procs.append((i, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)))
             print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")

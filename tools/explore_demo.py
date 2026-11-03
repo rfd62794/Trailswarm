@@ -343,6 +343,8 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    ap.add_argument("--box-pace", type=int, default=None,
+                    help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
     ap.add_argument("--explore-rate", type=float, default=0.2,
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
@@ -679,6 +681,10 @@ def main(argv=None) -> int:
                         do_press("A", "agent", f"goal menu choice: '{want}'"); return
                     do_press("DOWN", "agent", f"goal menu choice: moving the cursor toward '{want}'"); return
                 tried = (inter or {}).get("entry", {}).get("choices", []) + (inter or {}).get("choices", [])
+                if any(cursor.endswith(w) for w in ("CANCEL", "LOG OFF", "EXIT", "QUIT")):
+                    # Exits are always a fine choice once nothing here is wanted (seen 2026-11-03: the agent sat on
+                    # 'CANCEL' pressing DOWN because CANCEL counted as 'already tried').
+                    do_press("A", "agent", f"menu: cursor on '{cursor}' - leaving this menu"); return
                 if cursor and cursor not in tried:
                     do_press("A", "agent", f"menu open, cursor on '{cursor}' (new) - choosing it"); return
                 if any(o not in tried for o in options):
@@ -838,11 +844,14 @@ def main(argv=None) -> int:
                               f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
                 vis.configure(text=f"vision error: {e!r}")
-        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN))  # screen tiles only; wandering NPCs must not count as a cutscene
+        tm_f = emu.read_range(TILEMAP, TILEMAP_LEN)
+        st["box_open_now"] = box_open(tm_f)
+        h = hash(tm_f)  # screen tiles only; wandering NPCs must not count as a cutscene
         st["stable_frames"] = st["stable_frames"] + 1 if h == st.get("last_hash") else 0
         st["last_hash"] = h
         try:
-            if not st["paused"] and st["frame"] % a.frames_per_step == 0:
+            pace = a.box_pace if (a.box_pace and st.get("box_open_now")) else a.frames_per_step
+            if not st["paused"] and st["frame"] % pace == 0:
                 agent_step()
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
