@@ -829,9 +829,17 @@ def main(argv=None) -> int:
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
             # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
             species = emu.read(0xCFE5)
+            my_sp, my_lvl, e_lvl = emu.read(0xD16B), emu.read(0xD18C), emu.read(0xCFF3)
             if st.get("last_battle_hp") is not None and hp < st["last_battle_hp"]:
+                taken = st["last_battle_hp"] - hp
                 dmg = mem.data.setdefault("enemy_damage", {}).setdefault(str(species), [])
-                dmg.append(st["last_battle_hp"] - hp); del dmg[:-20]
+                dmg.append(taken); del dmg[:-20]
+                # Full-context record (Robert): which enemy move, at which levels, did how much to which of ours.
+                m_used = re.search(r"used ([A-Z][A-Z ]+?)!", " ".join(st.get("dialog", [])[-3:]))
+                emove = m_used.group(1).strip() if m_used else "?"
+                key = f"{species}L{e_lvl}:{emove}->{my_sp}L{my_lvl}"
+                rec = mem.data.setdefault("damage_taken", {}).setdefault(key, [])
+                rec.append(taken); del rec[:-20]
             st["last_battle_hp"] = hp
             expected = max(mem.data.get("enemy_damage", {}).get(str(species), [0]) or [0])
             # --- potion timing: use one when the next expected hit could take us below ~1 hit of safety and the heal
@@ -869,8 +877,12 @@ def main(argv=None) -> int:
             enemy_hp = (emu.read(0xCFE6) << 8) | emu.read(0xCFE7)
             pm = st.get("pending_move")
             if pm and pm["species"] == species and enemy_hp < pm["enemy_hp"]:
+                dealt = pm["enemy_hp"] - enemy_hp
                 stats = mem.data.setdefault("move_damage", {}).setdefault(f"{species}:{pm['move']}", [])
-                stats.append(pm["enemy_hp"] - enemy_hp); del stats[:-20]; st["pending_move"] = None
+                stats.append(dealt); del stats[:-20]; st["pending_move"] = None
+                key = f"{my_sp}L{my_lvl}:{pm['move']}->{species}L{e_lvl}"  # our move, our level, their species and level
+                rec = mem.data.setdefault("damage_dealt", {}).setdefault(key, [])
+                rec.append(dealt); del rec[:-20]
             # The move menu reads: TYPE/ | NORMAL | 29/30 | TACKLE | >TAIL WHIP  -> moves are the lines AFTER the PP line
             pp_idx = next((i for i, ln in enumerate(lines_now) if re.fullmatch(r"\d+/\d+", ln.replace(">", "").strip())), None)
             move_lines = [ln for ln in lines_now[pp_idx + 1:] if ln.replace(">", "").strip() not in ("", "-")] if pp_idx is not None else []
