@@ -447,6 +447,10 @@ class MapMemory:
             for n in DIRS:
                 if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
                     tried.append(n)
+                    # remember it as a wall edge too: the frontier search only knows 'blocked', so without this it kept
+                    # sending agents to a 'frontier' tile whose open side was a known-solid tile (move/A loop at Viridian)
+                    if f"{x},{y},{n}" not in d["blocked"]:
+                        d["blocked"].append(f"{x},{y},{n}")
                 if grass == "avoid" and n not in tried and self.is_grass(tileset, ahead_tiles(tilemap, n)):
                     tried.append(n)
         for n in list(DIRS):  # do not take a connection/warp back to a map we are deliberately done with
