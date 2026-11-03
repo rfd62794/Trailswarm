@@ -331,7 +331,7 @@ def main(argv=None) -> int:
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
 
-    root = tk.Tk(); root.title("PokeAgent explorer demo - click here, arrows/a/s/Enter/Shift steer, p pauses")
+    root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
     root.configure(bg="#111")
     screen = tk.Label(root, bg="#111", bd=0); screen.grid(row=0, column=0, padx=8, pady=8)
     con = tk.Text(root, width=78, height=28, bg="#0b0b0b", fg="#d8d8d8", font=("Consolas", 10), bd=0, padx=10, pady=8, wrap="word")
@@ -347,7 +347,7 @@ def main(argv=None) -> int:
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0, "explore_run": explore_run}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0, "explore_run": explore_run, "speed": 1}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -668,6 +668,10 @@ def main(argv=None) -> int:
     def on_key(ev):
         if ev.keysym == "p":
             st["paused"] = not st["paused"]; log(f"[agent {'paused' if st['paused'] else 'resumed'}]", "res"); return
+        if ev.keysym == "t":  # turbo: 1x -> 2x -> 4x -> 8x -> 1x (frameskip in the window; headless is always unthrottled)
+            st["speed"] = {1: 2, 2: 4, 4: 8}.get(st["speed"], 1)
+            root.title(f"PokeAgent explorer demo - {st['speed']}x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
+            log(f"[turbo {st['speed']}x]", "res"); return
         name = KEYS.get(ev.keysym)
         if name:
             do_press(name, "human", f"you pressed {name}")
@@ -752,6 +756,8 @@ def main(argv=None) -> int:
         if a.headless:
             emu.tick(1)  # no rendering at all
         else:
+            if st["speed"] > 1:
+                emu.tick(st["speed"] - 1)  # turbo: frameskip - run extra frames unrendered, draw one
             img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
             st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
