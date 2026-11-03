@@ -323,7 +323,11 @@ class MapMemory:
             taken[key] = taken.get(key, 0) + 1
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
             return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
-        if m1 == m0 and abs(x1 - x0) + abs(y1 - y0) > 1:
+        ddx, ddy = x1 - x0, y1 - y0
+        exact = (abs(ddx) == 2 and ddy == 0 and button in ("LEFT", "RIGHT")) or (abs(ddy) == 2 and ddx == 0 and button in ("UP", "DOWN"))
+        if m1 == m0 and abs(ddx) + abs(ddy) == 1 and key in self.m(m0).get("jumps", {}):
+            del self.m(m0)["jumps"][key]  # a later press moved one tile: that was not a ledge (forced walk / fade)
+        if m1 == m0 and exact:
             # A LEDGE JUMP (one-way): the press moved us more than one tile. Remember the jump, and that the landing
             # tile cannot go back the way we came - without this the agent looped jump/walk-around forever.
             self.m(m0).setdefault("jumps", {})[key] = [x1, y1]
@@ -778,9 +782,15 @@ def main(argv=None) -> int:
         if lvl > st.get("best_level_seen", 0):
             st["best_level_seen"] = lvl
             best = mem.data.get("team_best_level", 0)
+            side = Path("runs/checkpoints/team_best.level")
+            try:  # another agent may have saved a stronger team than our copy of the memory knows about
+                best = max(best, int(side.read_text())) if side.exists() else best
+            except Exception:
+                pass
             if lvl > best and emu.read(0xD057) == 0 and not box_after:
                 try:
                     cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
+                    side.write_text(str(lvl))
                     tmp = cp / f"team_best.{os.getpid()}.tmp"; emu.save_state(tmp); os.replace(tmp, cp / "team_best.state")
                     mem.data["team_best_level"] = lvl; log(f"*** TEAM CHECKPOINT: level {lvl} saved as team_best.state ***", "res")
                 except Exception as e:
@@ -879,7 +889,12 @@ def main(argv=None) -> int:
                     rec["species_byte"] = emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
                     rec["wanted"] = a.starter
                 hist.setdefault(g, []).append(rec)
-                tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1)); os.replace(tmp, gp)
+                tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1))
+                for _try in range(5):  # Windows: another agent may hold the file for a moment
+                    try:
+                        os.replace(tmp, gp); break
+                    except PermissionError:
+                        time.sleep(0.2)
                 if a.stop_at_goal == g:  # AFTER the milestone is persisted (it used to return before recording it)
                     st["done"] = True; shutdown(); log(f"segment done: {g} at step {st['step']}", "hdr")
                     if a.headless:
@@ -913,8 +928,9 @@ def main(argv=None) -> int:
         pw = pos()
         hist = st.setdefault("pos_hist", [])
         hist.append(pw); del hist[:-150]
-        if len(hist) == 1 or st.get("shake_goals_150") is None:
-            st["shake_goals_150"] = tuple(sorted(st["goal_steps"]))
+        gnow = tuple(sorted(st["goal_steps"]))
+        if st.get("shake_goals_150") != gnow:  # a goal landed: restart the 150-press window (it went dead after goal 1)
+            st["shake_goals_150"] = gnow; hist.clear(); hist.append(pw)
         if st.get("shake", 0) > 0:
             tm_s = emu.read_range(TILEMAP, TILEMAP_LEN)
             st["shake"] -= 1
@@ -1035,8 +1051,8 @@ def main(argv=None) -> int:
             e_hp, e_max = ((emu.read(0xCFE6) << 8) | emu.read(0xCFE7)), ((emu.read(0xCFF4) << 8) | emu.read(0xCFF5))
             if kind == 1 and balls and dex_no and not owned and e_max:
                 ratio = e_hp / e_max
-                if ratio <= 0.35 and run_line is not None:
-                    st["catch_attempt"] = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2), "step": st["step"]}
+                if ratio <= 0.35 and (run_line is not None or any("BALL" in ln for ln in lines_now)):
+                    st["catch_attempt"] = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2), "step": st["step"], "dex": dex_no}
                     cur_c = next((ln for ln in lines_now if ">" in ln), "")
                     if any("BALL" in ln and ">" in ln for ln in lines_now):
                         do_press("A", "agent", f"CATCH {ROM_KB['name_of_internal'].get(str(species), species)} at {ratio:.0%} HP: throwing a POKe BALL"); return
@@ -1051,10 +1067,6 @@ def main(argv=None) -> int:
                 st["catch_mode"] = True  # weaken, do not KO: the move chooser picks the WEAKEST damaging move
             else:
                 st["catch_mode"] = False
-            if st.get("catch_attempt") and st["catch_attempt"]["step"] < st["step"] - 2:
-                ca = st.pop("catch_attempt"); caught = bool(emu.read(0xD2F7 + (dex_no - 1) // 8) >> ((dex_no - 1) % 8) & 1) if dex_no else False
-                mem.data.setdefault("catches", []).append({**ca, "caught": caught}); del mem.data["catches"][:-100]
-                log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
             # --- move choice with memory: damage dealt per (enemy species, move) is learned from the enemy HP drop
             #     after our move; untried moves are tried first (variety), then the best average; 0-PP moves skipped ---
             enemy_hp = (emu.read(0xCFE6) << 8) | emu.read(0xCFE7)
@@ -1109,6 +1121,12 @@ def main(argv=None) -> int:
             do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT"); return
         if st.get("in_battle"):
             st["in_battle"] = False; st["last_battle_hp"] = None; st["potion_hp_before"] = None
+            ca = st.pop("catch_attempt", None)
+            if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
+                dn = ca.get("dex") or 0
+                caught = bool(dn) and bool(emu.read(0xD2F7 + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
+                mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k != "dex"}, "caught": caught}); del mem.data["catches"][:-100]
+                log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             won = emu.read(0xD163) > 0 and (m, x, y) == st.get("battle_pos")  # a blackout warps you away
             st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
@@ -1166,7 +1184,11 @@ def main(argv=None) -> int:
                 if {"YES", "NO"} <= {o.split()[-1] for o in options if o}:  # a YES/NO box
                     question = " ".join(ln for ln in lines if "YES" not in ln and "NO" not in ln) or st.get("last_text", "")
                     context = " ".join(st.get("dialog", [])[-4:]) + " " + question
-                    if "learn" in context.lower() and ("room" in context.lower() or "forget" in context.lower() or "delete" in context.lower()):
+                    ql = question.lower()
+                    if "abandon" in ql:
+                        ans, why, forget = "YES", "abandon learning: only when we chose not to forget a move", None
+                        st["forget_move"] = None
+                    elif "learn" in context.lower() and ("make room" in ql or "delete" in ql):
                         cur_moves = [ROM_KB["moves"].get(str(emu.read(0xD173 + i)), {}).get("name", "?") for i in range(4) if emu.read(0xD173 + i)] if ROM_KB else []
                         ans, why, forget = learn_decision(context, cur_moves)
                         st["forget_move"] = forget
@@ -1391,7 +1413,10 @@ def main(argv=None) -> int:
     @ctl.route("POST", "/say")
     def _say(text="", **_): log(f"claude:   {text}", "human"); return {"ok": True}
 
-    ctl.start()
+    try:
+        ctl.start()
+    except OSError as e:  # port taken (another agent): run without the API rather than crash
+        log(f"[control API unavailable: {e}]", "res")
 
     def frame():
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread

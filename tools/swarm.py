@@ -78,9 +78,12 @@ def merge_memory(dst: dict, src: dict) -> dict:
         dd = dst.setdefault(key, {})
         for k, vals in src.get(key, {}).items():
             cur = dd.setdefault(k, [])
-            for v in vals:
-                if len(cur) < 20 or v not in cur:
-                    cur.append(v)
+            if len(vals) > len(cur) and cur == vals[:len(cur)]:
+                cur[:] = vals  # the agent extended the shared base: take its longer list, never re-append the base
+            else:
+                for v in vals:
+                    if v not in cur:
+                        cur.append(v)
             del cur[:-20]
     for key in ("items", "events", "catches"):  # append-only records: union by content, newest 300
         cur = dst.setdefault(key, [])
@@ -178,12 +181,18 @@ def main() -> int:
             procs.append((i, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)))
             print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")
         t0 = time.time()
-        for i, p in procs:
-            try:
-                rc = p.wait(timeout=max(120, a.steps * 2))  # wall-clock cap: a hung agent must not hang the swarm
-            except subprocess.TimeoutExpired:
-                p.kill(); rc = "killed (timeout)"
-            print(f"agent {i} finished rc={rc} after {time.time() - t0:.0f}s")
+        deadline = t0 + max(240, a.steps * 1.2)  # ONE wall-clock budget for the whole round
+        try:
+            for i, p in procs:
+                try:
+                    rc = p.wait(timeout=max(1, deadline - time.time()))
+                except subprocess.TimeoutExpired:
+                    p.kill(); rc = "killed (timeout)"
+                print(f"agent {i} finished rc={rc} after {time.time() - t0:.0f}s")
+        finally:  # Ctrl+C or any error: never leave agents running (they hold ports 8800+i)
+            for i, p in procs:
+                if p.poll() is None:
+                    p.kill()
 
     dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
     merged = 0

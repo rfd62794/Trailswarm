@@ -25,6 +25,13 @@ GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to
 
 
 def consistency(last_n: int = 16) -> dict[str, float]:
+    try:
+        return _consistency(last_n)
+    except Exception:
+        return {}
+
+
+def _consistency(last_n: int = 16) -> dict[str, float]:
     """Per goal: of the recent runs that STARTED before it (first press map/goal state), the share that reached it.
     A run counts as 'attempting' a goal when it has at least 20 presses and its start was upstream of the goal."""
     ms_path = ROOT / "runs" / "milestones.json"
@@ -96,12 +103,16 @@ def main() -> int:
             far = furthest_checkpoint()
             objective, args = f"explore beyond {far}", (["--segment", GOALS[min(len(GOALS) - 1, GOALS.index(far) + 1)]] if far and GOALS.index(far) + 1 < len(GOALS) else [])
         t0 = time.time()
-        last = run_swarm(["--agents", str(a.agents), "--steps", str(a.steps)] + args, timeout=max(600, a.steps * 3))
-        subprocess.run([sys.executable, str(ROOT / "tools" / "review_runs.py")], cwd=ROOT, capture_output=True, text=True, timeout=300)
-        maps = json.loads((ROOT / "runs" / "maps.json").read_text())
-        tiles = sum(len(m.get("visited", {})) for m in maps["maps"].values())
-        line = (f"{time.strftime('%H:%M')} round {rnd}: {objective}; {a.agents}x{a.steps} in {time.time() - t0:.0f}s; "
-                f"consistency {consistency()}; maps {len(maps['maps'])} tiles {tiles} best level {maps.get('team_best_level', '?')}; {last}")
+        last = run_swarm(["--agents", str(a.agents), "--steps", str(a.steps)] + args, timeout=max(900, int(a.steps * 1.2) + 600))
+        try:
+            subprocess.run([sys.executable, str(ROOT / "tools" / "review_runs.py")], cwd=ROOT, capture_output=True, text=True, timeout=300)
+            maps = json.loads((ROOT / "runs" / "maps.json").read_text())
+            tiles = sum(len(m.get("visited", {})) for m in maps["maps"].values())
+            line = (f"{time.strftime('%H:%M')} round {rnd}: {objective}; {a.agents}x{a.steps} in {time.time() - t0:.0f}s; "
+                    f"consistency {consistency()}; maps {len(maps['maps'])} tiles {tiles} best level {maps.get('team_best_level', '?')}; {last}")
+        except Exception as e:  # one bad read or timeout must never end the overnight loop
+            line = f"{time.strftime('%H:%M')} round {rnd}: {objective}; ERROR after the swarm: {e!r}; {last}"
+            time.sleep(5)
         with log.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
         print(line, flush=True)
