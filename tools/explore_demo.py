@@ -30,6 +30,23 @@ from pokeagent.names import load_registry  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
 from pokeagent.screentext import CHARMAP  # noqa: E402  (verified charmap lives in the framework now)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from explore_plan import ControlServer, WorldGraph, plan_step, png_bytes  # noqa: E402
+
+import queue  # noqa: E402
+from concurrent.futures import Future  # noqa: E402
+
+GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
+
+
+def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
+    for goal, wanted in GOAL_MENU.items():
+        if not goals.get(goal):
+            for w in wanted:
+                if any(o.startswith(w) for o in options):
+                    return next(o for o in options if o.startswith(w))
+    return None
+
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 # Screen-tile offsets of the 2x2 map tile in front of the player (player sprite sits at rows 8-9, cols 8-9).
 AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11, 8), (11, 9)],
@@ -201,6 +218,7 @@ def main(argv=None) -> int:
     ap.add_argument("--maps", default="runs/maps.json")
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--frames-per-step", type=int, default=30)
+    ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
     a = ap.parse_args(argv)
 
     run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
@@ -240,10 +258,46 @@ def main(argv=None) -> int:
             emu.tick(60); prev = pos()
         return prev
 
+    def record_intervention(name: str, source: str, before, tm, goals_before):
+        """Human/Claude presses become demonstrations: a sequence from a situation, with what it achieved."""
+        ep = st.get("episode")
+        if ep is None:
+            ep = st["episode"] = {"source": source, "start": list(before), "facing": st["facing"],
+                                  "screen": frame_lines(tm)[:3] if box_open(tm) else [], "buttons": [],
+                                  "goals_before": goals_before, "step": st["step"]}
+        ep["buttons"].append(name)
+
+    def close_episode(after, goals_after):
+        ep = st.pop("episode", None)
+        if not ep or not ep["buttons"]:
+            return
+        ep["end"] = list(after); ep["goals_after"] = goals_after
+        ep["achieved"] = [g for g in GOALS if goals_after.get(g) and not ep["goals_before"].get(g)]
+        with Path("runs/interventions.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(ep) + "\n")
+        demos = mem.m(ep["start"][0]).setdefault("demos", [])
+        demos.append({"at": ep["start"][1:], "facing": ep["facing"], "screen": ep["screen"], "buttons": ep["buttons"],
+                      "achieved": ep["achieved"], "source": ep["source"], "end": ep["end"]})
+        del demos[:-20]
+        log(f"[learned a {ep['source']} demonstration: {len(ep['buttons'])} presses from {tuple(ep['start'])}"
+            f"{' -> ' + ', '.join(ep['achieved']) if ep['achieved'] else ''}]", "res")
+
+    def matching_demo(m, x, y, tm):
+        screen = frame_lines(tm)[:3] if box_open(tm) else []
+        for d in reversed(mem.m(m).get("demos", [])):  # newest first; prefer ones that achieved a goal
+            if d["at"] == [x, y] and d["screen"] == screen and (d["achieved"] or d["end"] != [m, x, y]):
+                return d
+        return None
+
     def do_press(name: str, source: str, why: str):
         before = pos(); st["step"] += 1
         tm = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_before = box_open(tm)
+        goals_before = check_goals(emu, st)
+        if source in ("human", "claude"):
+            record_intervention(name, source, before, tm, goals_before)
+        elif st.get("episode"):
+            close_episode(before, goals_before)  # the agent is back in control: the demonstration is over
         extra: dict = {}
         flag = emu.read(0xD057)
         if flag or st.get("in_battle"):
@@ -335,6 +389,8 @@ def main(argv=None) -> int:
             st["done"] = True; shutdown(); log(f"done. map memory saved to {a.maps}; transitions in {run_dir}", "hdr")
 
     def shutdown():
+        if st.get("episode"):
+            close_episode(pos(), check_goals(emu, st))
         inter = st.get("inter")
         if inter:  # keep what an unfinished interaction taught us
             mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"]); st["inter"] = None
@@ -367,6 +423,11 @@ def main(argv=None) -> int:
                 inter = st.get("inter"); lines = frame_lines(tm)
                 options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or (ln.isupper() and len(ln.split()) <= 3)]
                 cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
+                want = goal_menu_choice(check_goals(emu, st), options)
+                if want:  # a goal tells us which option to take here
+                    if cursor == want:
+                        do_press("A", "agent", f"goal menu choice: '{want}'"); return
+                    do_press("DOWN", "agent", f"goal menu choice: moving the cursor toward '{want}'"); return
                 tried = (inter or {}).get("entry", {}).get("choices", []) + (inter or {}).get("choices", [])
                 if cursor and cursor not in tried:
                     do_press("A", "agent", f"menu open, cursor on '{cursor}' (new) - choosing it"); return
@@ -374,6 +435,26 @@ def main(argv=None) -> int:
                     do_press("DOWN", "agent", f"menu open, '{cursor}' already tried - moving the cursor down"); return
                 do_press("B", "agent", "menu open, every option tried here - backing out"); return
             do_press("A", "agent", "a text box is open - finishing the interaction before moving"); return
+        if st.get("goto"):  # a human/Claude asked for a destination: route there over the learned world
+            target = tuple(st["goto"])
+            if (m, x, y) == target:
+                st["goto"] = None; log(f"[arrived at {target}]", "res")
+            else:
+                p = WorldGraph(mem.data["maps"]).path((m, x, y), lambda n: n == target)
+                if p:
+                    do_press(p[0], "agent", f"goto {target}: {len(p)} steps left"); return
+                st["goto"] = None; log(f"[no known route to {target}; exploring instead]", "res")
+        if st.get("replay"):  # replaying a demonstration you or Claude gave in this exact situation
+            btn = st["replay"].pop(0)
+            do_press(btn, "agent", f"replaying your demonstration ({len(st['replay'])} presses left)"); return
+        demo = matching_demo(m, x, y, tm_now)
+        if demo and not st.get("replayed_here") == (m, x, y, st["step"] // 50):
+            st["replay"] = list(demo["buttons"]); st["replayed_here"] = (m, x, y, st["step"] // 50)
+            log(f"[found a {demo['source']} demonstration for this spot: {demo['buttons']}]", "res")
+            return
+        planned = plan_step(check_goals(emu, st), mem.data["maps"], (m, x, y), st["facing"])
+        if planned:
+            do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)
 
     def on_key(ev):
@@ -383,9 +464,64 @@ def main(argv=None) -> int:
         if name:
             do_press(name, "human", f"you pressed {name}")
 
+    # --- remote control (Claude via curl now, MCP later): handlers run on this thread between frames ---
+    jobs: queue.Queue = queue.Queue()
+
+    def call(fn):
+        fut: Future = Future(); jobs.put((fn, fut)); return fut.result(timeout=30)
+
+    ctl = ControlServer(call, port=a.control_port)
+
+    @ctl.route("GET", "/status")
+    def _status():
+        m, x, y = pos()
+        return {"step": st["step"], "map": m, "x": x, "y": y, "facing": st["facing"], "paused": st["paused"],
+                "in_battle": bool(st.get("in_battle")), "goals": check_goals(emu, st), "goal_steps": st["goal_steps"],
+                "goto": st.get("goto"), "party": emu.read(0xD163), "bag_items": emu.read(0xD31D),
+                "box_open": box_open(emu.read_range(TILEMAP, TILEMAP_LEN)), "maps_known": sorted(mem.data["maps"])}
+
+    @ctl.route("GET", "/goals")
+    def _goals(): return {"goals": check_goals(emu, st), "first_reached_step": st["goal_steps"]}
+
+    @ctl.route("GET", "/screen")
+    def _screen(): return {"lines": frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN))}
+
+    @ctl.route("GET", "/screenshot.png")
+    def _shot(): return png_bytes(emu.screenshot())
+
+    @ctl.route("GET", "/map")
+    def _map(id=None, **_):
+        mid = str(id if id is not None else pos()[0]); return {"map": mid, **mem.data["maps"].get(mid, {})}
+
+    @ctl.route("POST", "/press")
+    def _press(button="A", **_):
+        do_press(button.upper(), "claude", f"remote press {button.upper()}"); return _status()
+
+    @ctl.route("POST", "/pause")
+    def _pause(**_): st["paused"] = True; log("[agent paused by remote]", "res"); return {"paused": True}
+
+    @ctl.route("POST", "/resume")
+    def _resume(**_): st["paused"] = False; log("[agent resumed by remote]", "res"); return {"paused": False}
+
+    @ctl.route("POST", "/goto")
+    def _goto(map=None, x=None, y=None, **_):
+        st["goto"] = [int(map if map is not None else pos()[0]), int(x), int(y)]
+        log(f"[remote goto {st['goto']}]", "res"); return {"goto": st["goto"]}
+
+    @ctl.route("POST", "/say")
+    def _say(text="", **_): log(f"claude:   {text}", "human"); return {"ok": True}
+
+    ctl.start()
+
     def frame():
         if st["done"]:
             return
+        while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
+            fn, fut = jobs.get()
+            try:
+                fut.set_result(fn())
+            except Exception as e:
+                fut.set_exception(e)
         img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
         st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
@@ -394,7 +530,8 @@ def main(argv=None) -> int:
         root.after(16, frame)
 
     root.bind("<Key>", on_key)
-    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.\n", "hdr")
+    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
+    log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
     log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far)\n", "res")
     root.after(300, frame)
     root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(), trans.close(), emu.close(), root.destroy()))
