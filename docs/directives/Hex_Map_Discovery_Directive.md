@@ -153,11 +153,12 @@ real-ROM calibration run.
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 21:59 · robert-claude-laptop · none → Draft — build step 4; Robert asked for hex mapping 2026-11-02; queue after Agent_Loop_And_CLI merges
+- 2026-11-02 22:37 · robert-claude-laptop · Draft → Queued — prereq Agent_Loop_And_CLI merged (PR #4); tile map 0xC3A0, charmap and border tiles 0x79-0x7E verified on the ROM today
 <!-- queue:end -->
