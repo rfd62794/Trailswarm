@@ -104,6 +104,10 @@ def sprite_snapshot(emu) -> list[list[int]]:
     return out
 
 
+def npc_positions(emu) -> set:
+    return {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
+
+
 def ascii_vision(emu, mem, tileset: int) -> list[str]:
     """Cheap vision: the visible 10x9 map tiles as one character each, from RAM, no image model.
     @ player, N an NPC (sprite table), # tile ids learned solid, . learned walkable, ? never tried,
@@ -225,7 +229,26 @@ class MapMemory:
 
     def known_solid(self, tileset: int, ahead: list[int]) -> bool:
         e = self.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in ahead))
-        return bool(e) and e["solid"] >= 2 and e["walkable"] == 0
+        return bool(e) and e["solid"] >= 3 and e["walkable"] == 0
+
+    def render_memory(self, map_id: int, x: int, y: int, npcs: set, radius: int = 6) -> list[str]:
+        """What the agent REMEMBERS around it: . visited, # a wall it confirmed, W warp, i interaction, N NPC, @ you."""
+        d = self.m(map_id)
+        visited = {tuple(map(int, k.split(","))) for k in d.get("visited", {})}
+        warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
+        inter = {tuple(map(int, k.split(",")[:2])) for k, e in d.get("interactions", {}).items() if e.get("text")}
+        walls = set()
+        for k in d.get("blocked", []):
+            bx, by, bd = k.split(","); dx, dy = DIRS[bd]; walls.add((int(bx) + dx, int(by) + dy))
+        rows = []
+        for yy in range(y - radius, y + radius + 1):
+            line = ""
+            for xx in range(x - radius, x + radius + 1):
+                p = (xx, yy)
+                line += ("@" if p == (x, y) else "N" if p in npcs else "W" if p in warps else "i" if p in inter
+                         else "#" if p in walls and p not in visited else "." if p in visited else " ")
+            rows.append(line)
+        return rows
 
     def interact(self, map_id, x, y, facing, text: str) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
@@ -309,6 +332,10 @@ def main(argv=None) -> int:
     screen = tk.Label(root, bg="#111", bd=0); screen.grid(row=0, column=0, padx=8, pady=8)
     con = tk.Text(root, width=78, height=28, bg="#0b0b0b", fg="#d8d8d8", font=("Consolas", 10), bd=0, padx=10, pady=8, wrap="word")
     con.grid(row=0, column=1, padx=(0, 8), pady=8, sticky="ns")
+    # third pane: what the agent SEES (tile map as text) and what it REMEMBERS (map memory around it)
+    vis = tk.Label(root, bg="#0b0b0b", fg="#9fd8ff", font=("Consolas", 13), justify="left", anchor="nw",
+                   padx=10, pady=8, width=22, height=27)
+    vis.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ns")
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
@@ -444,8 +471,10 @@ def main(argv=None) -> int:
             confirmed = st["last_fail"] == fail_key
             result = mem.learn(before, name, after, confirmed=confirmed)
             if "ahead_tiles" in extra and after[0] == before[0]:
-                if result.startswith("blocked (confirmed)"):
-                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=False)
+                dx, dy = DIRS[name]
+                npc_ahead = (before[1] + dx, before[2] + dy) in npc_positions(emu)
+                if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
+                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person
                 elif result.startswith("moved"):
                     mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=True)
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
@@ -485,10 +514,7 @@ def main(argv=None) -> int:
             f"{len(mm.get('interactions', {}))} interactions", "hdr")
         log(f"{'human:   ' if source == 'human' else 'thinking:'} {why}", "human" if source == "human" else "why")
         log(f"button:   {name:<8} result: {result}", "btn")
-        if st["step"] % 5 == 0:  # cheap vision every 5 steps: what the agent 'sees' as text
-            log("vision:   " + "  ".join(ascii_vision(emu, mem, emu.read(0xD367))) + "\n", "res")
-        else:
-            log("", None)
+        log("", None)
         if st["step"] % 10 == 0:
             mem.save()
         if st["step"] >= a.steps and not st["done"]:
@@ -683,6 +709,14 @@ def main(argv=None) -> int:
         img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
         st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
+        if st["frame"] % 15 == 0:
+            try:
+                m_, x_, y_ = pos(); npcs = npc_positions(emu)
+                vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
+                              + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
+                              + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
+            except Exception as e:
+                vis.configure(text=f"vision error: {e!r}")
         h = hash(emu.read_range(TILEMAP, TILEMAP_LEN))  # screen tiles only; wandering NPCs must not count as a cutscene
         st["stable_frames"] = st["stable_frames"] + 1 if h == st.get("last_hash") else 0
         st["last_hash"] = h
