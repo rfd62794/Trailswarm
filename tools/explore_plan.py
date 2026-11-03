@@ -223,7 +223,16 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 return p[0], f"goal parcel: {len(p)} steps back to Viridian City"
     if goals.get("oaks_parcel") and not goals.get("deliver_parcel"):
         if pos[0] == 0x28:
-            return None  # in the lab: exploration talks to Oak (interaction probing of NPCs)
+            # Talk to PROF. OAK himself: the tile+facing where an interaction's text starts with his speaker tag
+            # ("OAK BCN, raise your young POKeMON...") - NOT the aides or the rival. Oak stands static at (5,2).
+            oak = [s for s in interaction_spots(maps, "RAISE YOUR") + interaction_spots(maps, "OAK B") if s[0] == 0x28]
+            for (m, x, y, f) in oak:
+                if pos == (m, x, y):
+                    return ("A" if facing == f else f), f"goal deliver the parcel: at Oak's spot ({x},{y}), {'talking' if facing == f else 'facing him'}"
+                p = g.path(pos, lambda n: n == (m, x, y))
+                if p:
+                    return p[0], f"goal deliver the parcel: {len(p)} steps to Oak at ({x},{y})"
+            return None  # unknown yet: exploration talks to the NPCs
         p = g.path(pos, lambda n: n[0] == 0x28)
         if p:
             return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
