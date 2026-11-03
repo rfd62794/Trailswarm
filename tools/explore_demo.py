@@ -856,6 +856,11 @@ def main(argv=None) -> int:
                 st["initial_goals"] |= set(GOALS[:GOALS.index("to_route1") + 1])
             if st["initial_goals"]:
                 log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(st['initial_goals'])}]", "res")
+            try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past
+                mp = run_dir / "meta.json"; meta = json.loads(mp.read_text()); meta["initial_goals"] = sorted(st["initial_goals"])
+                mp.write_text(json.dumps(meta))
+            except Exception:
+                pass
         for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
             if goals[g] and g not in st["goal_steps"] and g not in st["initial_goals"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")

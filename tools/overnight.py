@@ -48,7 +48,11 @@ def consistency(last_n: int = 16) -> dict[str, float]:
         tries = []
         for p in runs[-80:]:
             si, stop = start_idx(p)
-            if si is not None and si < i and stop >= i:
+            try:
+                started_done = set(json.loads((p / "meta.json").read_text()).get("initial_goals", []))
+            except Exception:
+                started_done = set()
+            if si is not None and si < i and stop >= i and g not in started_done:
                 tries.append(p.name)
         tries = tries[-last_n:]
         out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None
