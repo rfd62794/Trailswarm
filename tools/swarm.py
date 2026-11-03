@@ -70,6 +70,8 @@ def merge_memory(dst: dict, src: dict) -> dict:
             dd = d.setdefault(key, {})
             for k, n in s.get(key, {}).items():
                 dd[k] = max(dd.get(k, 0), n)
+        jm = d.setdefault("jumps", {})
+        jm.update(s.get("jumps", {}))  # one-way ledge hops are facts: union
         d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
     # --- everything else the agents learn goes into the collective knowledge too ---
     for key in ("move_damage", "enemy_damage", "damage_dealt", "damage_taken", "item_heal"):  # {key: [samples]}

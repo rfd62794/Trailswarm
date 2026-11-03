@@ -903,6 +903,22 @@ def main(argv=None) -> int:
     def agent_step():
         if st["settle"] > 0:
             st["settle"] -= a.frames_per_step; return
+        # Cycle breaker: positions of the last 60 presses; <= 6 unique tiles and no goal/HP/battle change = a loop the
+        # planners cannot see (ledge cycles, frontier ping-pong, sign loops). Shake: ~25 random walks, then back to normal.
+        pw = pos()
+        hist = st.setdefault("pos_hist", [])
+        hist.append(pw); del hist[:-60]
+        if st.get("shake", 0) > 0:
+            tm_s = emu.read_range(TILEMAP, TILEMAP_LEN)
+            st["shake"] -= 1
+            if box_open(tm_s):
+                do_press("B", "agent", f"shake: closing a box ({st['shake']} left)"); return
+            if emu.read(0xD057) == 0:
+                away = random.choice(list(DIRS))
+                do_press(away, "agent", f"SHAKE: breaking a loop with a random walk {away} ({st['shake']} left)"); return
+        elif len(hist) == 60 and len(set(hist)) <= 6 and not box_open(emu.read_range(TILEMAP, TILEMAP_LEN))                 and emu.read(0xD057) == 0 and not st.get("explore_burst"):
+            st["shake"] = 25; st["shakes"] = st.get("shakes", 0) + 1; hist.clear()
+            log(f"[loop detected: 60 presses on {len(set(hist)) or '<=6'} tiles - shaking #{st['shakes']}]", "res")
         # Endless-A guard (runs BEFORE any box handling): 40 presses in a row that are all A while the position has
         # not changed = a sign/looping dialog. Close the box with B, then walk away.
         pos0 = pos()
@@ -915,9 +931,9 @@ def main(argv=None) -> int:
             tm_g = emu.read_range(TILEMAP, TILEMAP_LEN)
             if box_open(tm_g):
                 do_press("B", "agent", "40 A presses at the same tile: closing the box with B"); return
-            st["a_streak"] = 0; st["stalls"] = st.get("stalls", 0) + 1
+            st["a_streak"] = 0; st["stalls"] = st.get("stalls", 0) + 1; st["shake"] = 25
             away = random.choice([d for d in DIRS if d != st["facing"]])
-            do_press(away, "agent", f"40 A presses at ({pos0[1]},{pos0[2]}): walking away {away}"); return
+            do_press(away, "agent", f"40 A presses at ({pos0[1]},{pos0[2]}): walking away {away}, then a shake"); return
         # Input readiness: do not press while the screen is still changing on its own (cutscene, forced walk,
         # fade, battle animation) or while the game says it is ignoring the joypad (wJoyIgnore, unverified).
         joy_ignore = emu.read(0xCD6B)
