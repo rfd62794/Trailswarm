@@ -267,11 +267,12 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         # 'keeps pushing up into a wall' loop); a tile only counts if UP from it is still unknown
         tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
         tiles = [t for t in tiles if f"{t[0]},{t[1]},UP" not in blocked and f"{t[0]},{t[1] - 1}" not in d.get("visited", {})]
-        if tiles:
-            tx, ty = min(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))
+        # northernmost first, but a tile this agent cannot reach (Route 2's far north half, known only from a
+        # different entry) must not block the next one: that left agents in a ledge loop with no plan
+        for tx, ty in sorted(tiles, key=lambda t: (t[1], abs(t[0] - pos[1]))):
             if (pos[1], pos[2]) == (tx, ty):
                 return "UP", "goal road north: at the northernmost open tile, pushing UP for the map edge"
-            p = g.path(pos, lambda n: n == (pos[0], tx, ty))
+            p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
             if p:
                 return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
     return None
