@@ -43,8 +43,10 @@ def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
     for goal, wanted in GOAL_MENU.items():
         if not goals.get(goal):
             for w in wanted:
-                if any(o.startswith(w) for o in options):
-                    return next(o for o in options if o.startswith(w))
+                # Containment, not prefix: an item list drawn over the PC menu reads "DE POTION", "TO CANCEL".
+                hit = next((o for o in options if w in o and "CANCEL" not in o), None)
+                if hit:
+                    return hit
     return None
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
@@ -403,13 +405,20 @@ def main(argv=None) -> int:
         # Input readiness: do not press while the screen is still changing on its own (cutscene, forced walk,
         # fade, battle animation) or while the game says it is ignoring the joypad (wJoyIgnore, unverified).
         joy_ignore = emu.read(0xCD6B)
-        if st["stable_frames"] < 12 or joy_ignore:
+        tm_ready = emu.read_range(TILEMAP, TILEMAP_LEN)
+        # Only the OVERWORLD needs the stillness check (forced walks, fades, Oak dragging you to the lab).
+        # Boxes and menus are paced by the game itself: pressing while text prints is harmless, and a
+        # blinking cursor would otherwise look like "still changing" forever (that stalled the 23:20 run).
+        busy = not box_open(tm_ready) and (st["stable_frames"] < 8 or joy_ignore)
+        if busy:
             if not st.get("waiting"):
                 st["waiting"] = True
                 log(f"[waiting: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen still changing'} - cutscene?]", "res")
             st["wait_frames"] = st.get("wait_frames", 0) + a.frames_per_step
-            if st["wait_frames"] < 60 * 20:  # give up waiting after ~20 s of game time and try A
+            extra_wait = {"joy": joy_ignore, "stable": st["stable_frames"], "frames": st["wait_frames"]}
+            if st["wait_frames"] < 60 * 4:  # at most ~4 s of game time, then act anyway and log it
                 return
+            log(f"[waited 4 s, acting anyway: {extra_wait}]", "res")
         if st.get("waiting"):
             st["waiting"] = False
             log(f"[ready after waiting {st.get('wait_frames', 0)} frames]", "res"); st["wait_frames"] = 0
@@ -545,7 +554,7 @@ def main(argv=None) -> int:
         img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
         st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
-        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN)) ^ hash(emu.read_range(0xC200, 0x100))  # screen + sprites
+        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN))  # screen tiles only; wandering NPCs must not count as a cutscene
         st["stable_frames"] = st["stable_frames"] + 1 if h == st.get("last_hash") else 0
         st["last_hash"] = h
         try:
