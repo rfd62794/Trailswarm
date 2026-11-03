@@ -30,6 +30,9 @@ def merge_memory(dst: dict, src: dict) -> dict:
             if k not in d["blocked"]:
                 d["blocked"].append(k)
         d["warps"].update(s.get("warps", {}))
+        wc = d.setdefault("warp_cand", {})
+        for k, n in s.get("warp_cand", {}).items():
+            wc[k] = max(wc.get(k, 0), n)
         # Every agent started from a copy of the shared memory, so counts are taken as MAX, never summed:
         # summing would add the shared base once per agent and inflate solids, grades and counts.
         wt = d.setdefault("warp_taken", {})
@@ -117,6 +120,13 @@ def merge_memory(dst: dict, src: dict) -> dict:
         for k, n in table.items():
             cur[k] = max(cur.get(k, 0), n)
     dst["team_best_level"] = max(dst.get("team_best_level", 0), src.get("team_best_level", 0))
+    bw = dst.setdefault("bad_warps", [])
+    for ref in src.get("bad_warps", []):
+        if ref not in bw:
+            bw.append(ref)
+    for ref in bw:  # tombstones win over any agent copy that still carries the pollution
+        mid, key = ref.split(":", 1)
+        dst.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():
         cur = beats.get(sig)

@@ -302,6 +302,14 @@ class MapMemory:
         self.path = path
         self.data = json.loads(path.read_text()) if path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
+        self.purge_bad_warps()
+
+    def purge_bad_warps(self):
+        """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
+        actually warp; they are removed on load and never merged back by the swarm."""
+        for ref in self.data.get("bad_warps", []):
+            mid, key = ref.split(":", 1)
+            self.data.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -319,6 +327,10 @@ class MapMemory:
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
             w = self.m(m0)["warps"]
+            cand = self.m(m0).setdefault("warp_cand", {})
+            cand[key] = cand.get(key, 0) + 1
+            if key not in w and cand[key] < 2:  # a map change seen ONCE from this tile+direction may be a forced walk
+                return f"map changed to 0x{m1:02X} (seen once - not recorded as a warp yet)"
             taken = self.m(m0).setdefault("warp_taken", {})
             taken[key] = taken.get(key, 0) + 1
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
