@@ -184,6 +184,17 @@ class MapMemory:
             return "moved - cleared a false wall"
         return "moved"
 
+    # --- tile types: which 2x2 tile-id blocks are solid, learned per tileset, so a bookshelf is never bumped twice ---
+    def learn_tiles(self, tileset: int, ahead: list[int], walkable: bool):
+        t = self.data.setdefault("tile_types", {}).setdefault(str(tileset), {})
+        key = ",".join(f"{b:02X}" for b in ahead)
+        e = t.setdefault(key, {"solid": 0, "walkable": 0})
+        e["walkable" if walkable else "solid"] += 1
+
+    def known_solid(self, tileset: int, ahead: list[int]) -> bool:
+        e = self.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in ahead))
+        return bool(e) and e["solid"] >= 2 and e["walkable"] == 0
+
     def interact(self, map_id, x, y, facing, text: str) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
         e = d.setdefault(f"{x},{y},{facing}", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
@@ -205,9 +216,13 @@ class MapMemory:
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
 
-    def choose(self, map_id, x, y, facing: str) -> tuple[str, str]:
+    def choose(self, map_id, x, y, facing: str, tilemap: bytes | None = None, tileset: int = 0) -> tuple[str, str]:
         d = self.m(map_id); best = None
         tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
+        if tilemap is not None:  # tile ids ahead already known solid (bookshelf, wall, desk) count as tried
+            for n in DIRS:
+                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
+                    tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
         if facing in tried and not self.interaction_known(map_id, x, y, facing):
             return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A to see if it talks"
@@ -392,6 +407,11 @@ def main(argv=None) -> int:
             fail_key = (before, name)
             confirmed = st["last_fail"] == fail_key
             result = mem.learn(before, name, after, confirmed=confirmed)
+            if "ahead_tiles" in extra and after[0] == before[0]:
+                if result.startswith("blocked (confirmed)"):
+                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=False)
+                elif result.startswith("moved"):
+                    mem.learn_tiles(emu.read(0xD367), extra["ahead_tiles"], walkable=True)
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
             if after[0] != before[0]:
                 st["settle"] = 30  # fade already waited out; a short pause so the watcher sees the arrival
@@ -535,7 +555,7 @@ def main(argv=None) -> int:
         planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
         if planned and not (st["explore_run"] and random.random() < 0.3):
             do_press(planned[0], "agent", planned[1]); return
-        name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)
+        name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
 
     def on_key(ev):
         if ev.keysym == "p":
@@ -589,6 +609,19 @@ def main(argv=None) -> int:
     def _goto(map=None, x=None, y=None, **_):
         st["goto"] = [int(map if map is not None else pos()[0]), int(x), int(y)]
         log(f"[remote goto {st['goto']}]", "res"); return {"goto": st["goto"]}
+
+    @ctl.route("GET", "/peek")
+    def _peek(addr="0xD35E", length="1", **_):
+        a0, n = int(str(addr), 16) if str(addr).lower().startswith("0x") else int(addr), min(int(length), 512)
+        data = emu.read_range(a0, n) if n > 1 else bytes([emu.read(a0)])
+        return {"addr": f"0x{a0:04X}", "hex": data.hex(" "), "bytes": list(data)}
+
+    @ctl.route("GET", "/sprites")
+    def _sprites(**_):
+        return {"player": [emu.read(0xD362), emu.read(0xD361)],
+                "slots": [{"slot": i, "pic": emu.read(0xC100 + 16 * i), "c2x4": emu.read(0xC204 + 16 * i),
+                           "c2x5": emu.read(0xC205 + 16 * i), "c1x4": emu.read(0xC104 + 16 * i), "c1x6": emu.read(0xC106 + 16 * i)}
+                          for i in range(16) if emu.read(0xC100 + 16 * i)]}
 
     @ctl.route("POST", "/say")
     def _say(text="", **_): log(f"claude:   {text}", "human"); return {"ok": True}
