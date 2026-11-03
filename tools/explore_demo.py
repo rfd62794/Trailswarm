@@ -109,9 +109,15 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
     potion = any(bag[i] == 0x14 for i in range(0, len(bag), 2))
     m = emu.read(0xD35E)
     seen = st.setdefault("seen_maps", set()); seen.add(m)
-    return {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
-            "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
-            "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen}
+    g = {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
+         "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
+         "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen}
+    # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
+    # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
+    for k in g:
+        if k in st.get("goal_steps", {}) or k in st.get("initial_goals", set()):
+            g[k] = True
+    return g
 
 
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:
