@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import tkinter as tk
@@ -144,7 +145,9 @@ class MapMemory:
     def save(self):
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.data, indent=1))
+        tmp = self.path.with_suffix(".json.tmp")  # atomic replace: a kill mid-write cannot corrupt the memory
+        tmp.write_text(json.dumps(self.data, indent=1))
+        os.replace(tmp, self.path)
 
 
 def main(argv=None) -> int:
@@ -156,7 +159,7 @@ def main(argv=None) -> int:
     ap.add_argument("--frames-per-step", type=int, default=30)
     a = ap.parse_args(argv)
 
-    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True)
+    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
     mem = MapMemory(Path(a.maps))
     emu = PyBoyEmulator(Path(a.rom), headless=True)
@@ -178,15 +181,29 @@ def main(argv=None) -> int:
     def pos():
         s = read_state(emu); return (s.map_id, s.x, s.y)
 
+    def settle_position(before, max_frames=600):
+        """Tick in 8-frame slices until the position has been stable for 3 reads; a map change (warp fade)
+        gets 60 more frames and a re-read, so the recorded arrival is the real one, not a mid-fade value."""
+        prev, stable, waited = pos(), 0, 0
+        while waited < max_frames:
+            emu.tick(8); waited += 8
+            cur = pos()
+            stable = stable + 1 if cur == prev else 0
+            prev = cur
+            if stable >= 3:
+                break
+        if prev[0] != before[0]:
+            emu.tick(60); prev = pos()
+        return prev
+
     def do_press(name: str, source: str, why: str):
         before = pos(); st["step"] += 1
         tm = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_before = box_open(tm)
-        emu.press(Button[name]); emu.tick(8)
-        after = pos()
-        if after[0] != before[0]:
-            emu.tick(90)   # map changed: wait out the fade so the destination coordinates are real
-            after = pos()
+        if name not in DIRS or box_before:
+            st["last_fail"] = None  # a wall is only 'confirmed' by two consecutive identical move presses
+        emu.press(Button[name])
+        after = settle_position(before)
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_after = box_open(tm2)
         text = box_text(tm2) if box_after else ""
@@ -197,8 +214,9 @@ def main(argv=None) -> int:
             if inter:
                 inter["presses"] += 1
                 if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
-                    chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "")
-                    inter["choices"].append(chosen.replace(">", "").strip())
+                    chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
+                    if chosen:
+                        inter["choices"].append(chosen)
                 if box_after and is_menu(tm2):
                     menu = box_text(tm2)
                     if menu not in inter["menus"]:
@@ -223,7 +241,11 @@ def main(argv=None) -> int:
             result = mem.learn(before, name, after, confirmed=confirmed)
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
             if after[0] != before[0]:
-                st["settle"] = 30  # already waited out the fade; a short pause so the watcher sees the arrival
+                st["settle"] = 30  # fade already waited out; a short pause so the watcher sees the arrival
+            if box_after and not st.get("inter"):  # walked into an NPC or a sign that talks on contact
+                entry = mem.interact(before[0], before[1], before[2], st["facing"], text)
+                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [], "choices": []}
+                result += f'; opened a box on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
         trans.write(json.dumps({"step": st["step"], "from": list(before), "button": name, "to": list(after),
@@ -238,8 +260,14 @@ def main(argv=None) -> int:
         log(f"button:   {name:<8} result: {result}\n", "btn")
         if st["step"] % 10 == 0:
             mem.save()
-        if st["step"] >= a.steps:
-            st["done"] = True; mem.save(); log(f"done. map memory saved to {a.maps}; transitions in {run_dir}", "hdr")
+        if st["step"] >= a.steps and not st["done"]:
+            st["done"] = True; shutdown(); log(f"done. map memory saved to {a.maps}; transitions in {run_dir}", "hdr")
+
+    def shutdown():
+        inter = st.get("inter")
+        if inter:  # keep what an unfinished interaction taught us
+            mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"]); st["inter"] = None
+        mem.save()
 
     def agent_step():
         if st["settle"] > 0:
@@ -252,7 +280,7 @@ def main(argv=None) -> int:
             if is_menu(tm):
                 # Explore menus: pick the first option we have not chosen at this interaction point yet.
                 inter = st.get("inter"); lines = frame_lines(tm)
-                options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or ln.isupper()]
+                options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or (ln.isupper() and len(ln.split()) <= 3)]
                 cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
                 tried = (inter or {}).get("entry", {}).get("choices", []) + (inter or {}).get("choices", [])
                 if cursor and cursor not in tried:
@@ -284,7 +312,7 @@ def main(argv=None) -> int:
     log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.\n", "hdr")
     log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far)\n", "res")
     root.after(300, frame)
-    root.protocol("WM_DELETE_WINDOW", lambda: (mem.save(), trans.close(), emu.close(), root.destroy()))
+    root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(), trans.close(), emu.close(), root.destroy()))
     root.mainloop()
     return 0
 
