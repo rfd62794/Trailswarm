@@ -58,13 +58,13 @@ exists). Then, only when `button` is a direction: if `after` differs in map id, 
 `warps[(m, x, y, dir)] = after`; else if `after == before` and `textbox_kind == "none"`, add `(m, x, y, dir)` to
 `blocked`; else (moved) remove `(m, x, y, dir)` from `blocked` if present (a blocked guess that proved wrong, for
 example a turn-in-place press). With a text box open, nothing is learned except visits. Non-direction buttons learn
-nothing. If `textbox.py` is not on `main`, the agent passes `"none"`.
+nothing. If `textbox.py` is not on `main`, the agent passes `"none"`. Human presses (from the viewer) reach `record_step` through the same hook as agent presses, so human moves are learned too.
 
 `render_ascii` returns `2*radius+1` lines of `2*radius+1` characters (no trailing strip), joined by `"\n"`, rows
 `y-radius..y+radius`, columns `x-radius..x+radius`. Priority per cell: `@` the player; `W` a tile that has any warp
 leaving it; `.` visited; `#` the tile you could not enter (the neighbour of a blocked `(x,y,dir)`), only if not
 visited; space unknown. `view()` returns that block, then two lines: `Tiles visited on this map: N` and
-`Unexplored directions from here: UP, LEFT` (directions whose neighbour is neither visited nor blocked-from-here;
+`Unexplored directions from here: UP, DOWN` (directions whose neighbour is neither visited nor blocked-from-here;
 `none` when empty).
 
 JSON shape, EXACT (a demo being written elsewhere reads this file with the real module; map ids are decimal
@@ -74,7 +74,7 @@ strings, tuples are comma strings):
 `"<x>,<y>,<DIR>"`; `warps` maps `"<x>,<y>,<DIR>"` to `[new_map, new_x, new_y]` and lives inside its map (keyed by the
 map you left); `last_seen` is the step of the latest visit to that map; `updated` is an ISO timestamp set on every
 `to_json`. In memory, `last_seen` is per map (drop any per-tile last_seen). Round-trip must be lossless apart from
-`updated`. `load` must tolerate a missing file (empty memory).
+`updated`. `load` must tolerate a missing file (empty memory). Per map, an optional `"interactions": {"<x>,<y>,<DIR>": {"count": n, "text": "<first dialog text or empty when nothing happened>"}}` is recorded when an A press is made facing DIR: a text box opened stores its text; nothing opened stores an empty text, so a silent wall is tested once. The explorer demo (`tools/explore_demo.py`) already writes this key, and the module must load it.
 
 ### `--maps PATH`
 
@@ -86,7 +86,7 @@ accumulates across runs. `Agent.__init__` gains `map_memory: MapMemory | None = 
 
 ### `transitions.py` and the agent
 
-`transition_record(step, before, button, after, textbox_kind) -> dict` returns exactly
+`transition_record(step, before, button, after, textbox_kind) -> dict` returns at least these keys:
 `{"step": 12, "from": [38, 4, 6], "button": "RIGHT", "to": [38, 5, 6], "moved": true, "textbox": "none"}`
 (`moved` is `before != after`; `textbox` is the kind detected BEFORE the press). `TransitionWriter(path)` has
 `write(record)` appending one JSON line to `runs/<ts>/transitions.jsonl`. In `Agent`, per step: read the position
@@ -125,7 +125,7 @@ charmap and border tiles (section 1 here and in `Text_Box_Awareness_Directive.md
   `"     \n #   \n W@# \n     \n     "`; `view()` counts and the `Unexplored directions` line; `to_json`/`from_json` and
   `save`/`load` round-trip in `tmp_path`; `to_json` for a scripted memory equals the section 3 example exactly (except
 `updated`); a missing path loads as empty memory; `--maps` accumulates across two runs; `transition_record` has
-  exactly the six keys of section 3; `TransitionWriter` writes valid JSON lines; an `Agent` run on a `FakeEmulator` (scripted `StubBackend`) leaves `maps.json` and a
+  at least the six keys of section 3 (the demo adds `text`, `facing` and `source`); `TransitionWriter` writes valid JSON lines; an `Agent` run on a `FakeEmulator` (scripted `StubBackend`) leaves `maps.json` and a
   `transitions.jsonl` with one line per step; `build_prompt` with `map_view` contains the heading and legend, and
   without it is identical to the old output; `docs/KNOWLEDGE.md` exists and mentions `0x26` and `upper-RIGHT`.
 

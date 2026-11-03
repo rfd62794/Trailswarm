@@ -20,6 +20,8 @@ one window: game on the left, the agent console on the right, and the ability to
 - A run already logs every step to `runs/<ts>/log.jsonl` through `RunLog.append(entry: dict)`; the prompt already
   shows recent entries to the model. Human presses must appear in both so the agent knows the world was moved.
 
+Merge order: this directive, then Text_Box_Awareness, then Map_Memory; all three touch `prompt.build_prompt` and `Agent`, so they are built in sequence, each rebased on `main`.
+
 ## 2. Scope
 
 Create, in order:
@@ -41,8 +43,10 @@ reaches the emulator only through `ViewerEmulator`, a proxy implementing the `Em
 `root.after(16, self._pump)` callback, executing each `fn(real_emu)` and resolving its future (exceptions travel
 back through the future). When the queue is empty the pump calls `real_emu.tick(1)` and redraws the frame via
 `ImageTk.PhotoImage(real_emu.screenshot().resize((480, 432), Image.NEAREST))`, so the game idles at about 60 fps.
-Commands run at full speed (headless emulation), then the frame is redrawn. Closing the window sets a stop flag;
-the pump fails pending futures so the worker unblocks, and `Agent.run()` ends via its normal `finally`.
+Commands run at full speed (headless emulation), then the frame is redrawn. Closing the window sets a stop flag. Once it is set, the emulator proxy used by the worker thread raises
+`RuntimeError("viewer stopped")` or no-ops immediately for every call (including `save_state` and `close` in
+`Agent.run`'s `finally`); the worker never blocks on the queue after stop. The tk thread closes the real emulator
+itself after `mainloop` returns, and `Agent.run()` ends via its normal `finally`.
 
 ### `steering.py`
 
@@ -64,7 +68,7 @@ class SteeringController:
 `human_record` shape (exact keys): `{"step": <int>, "source": "human", "button": "RIGHT", "state": <GameState.as_dict()
 read after the press>, "thinking": "", "note": "", "error": "", "backend_ms": 0}`. `step` is the number of the most
 recent agent step (0 before the first). Agent entries gain `"source": "agent"`. `press_human` runs on the tk thread
-and calls the real emulator directly; append through `RunLog.append`, which gets a `threading.Lock`.
+and calls the real emulator directly; append through `RunLog.append`, which gets a `threading.Lock`. A human press must go through the same record path the agent uses (the hook that the Map_Memory directive later attaches), so human-made moves, warps and interactions are learned too; the log entry keeps `"source": "human"`.
 
 ### Prompt, console, agent
 
@@ -79,15 +83,14 @@ and calls the real emulator directly; append through `RunLog.append`, which gets
 
 Layout: left `Label` holding the 480x432 frame; right a read-only `Text` (about 60 columns) with tags `header`
 (`--- step` lines), `thinking`, `button`, `error`, `human`. `ConsoleWriter` has `write(s)`/`flush()` and is passed as
-`out` to `Agent` and the controller; it picks the tag from the line prefix and inserts via `root.after(0, ...)`
-so worker-thread prints are tk-safe. `<Key>` events go to `controller.handle_key(event.keysym)`. A status label
+`out` to `Agent` and the controller; it picks the tag from the line prefix and console text from the worker goes into a thread-safe queue that the tk pump drains every frame; the worker never calls tkinter, so worker-thread prints are tk-safe. `<Key>` events go to `controller.handle_key(event.keysym)`. A status label
 shows `RUNNING` or `PAUSED (press p)`. `run_viewer(emu_factory, backend, log, max_steps, ...) -> RunResult` builds
 everything, starts the worker thread, runs `root.mainloop()`, joins, returns the result.
 
 ### `cli.py`
 
-`pokeagent run` (not `--headless`) opens the viewer, replacing the SDL2 window mode: PyBoy is created headless and
-the viewer draws it. New flag `--sdl` keeps the old PyBoy SDL2 window as a fallback. `--headless` is unchanged
+`pokeagent run` (not `--headless`) opens the viewer, replacing the SDL2 window mode: The viewer path constructs the emulator
+with `headless=True` explicitly (`cli._build_emulator` uses `getattr(args, "headless", True)`); the viewer draws frames itself. New flag `--sdl` keeps the old PyBoy SDL2 window as a fallback. `--headless` is unchanged
 (no window, no tkinter import). Keep the injectable `_build_emulator` helper working for tests.
 
 ## 4. What NOT to do
@@ -108,7 +111,7 @@ the viewer draws it. New flag `--sdl` keeps the old PyBoy SDL2 window as a fallb
   `wait_if_paused` returns immediately when not paused and blocks (test with a thread and an event) when paused;
   `build_prompt` renders `step 4: HUMAN pressed RIGHT` for a human entry and the old line for an agent entry;
   `print_human("RIGHT", out)` writes exactly `human:    RIGHT\n`; `Agent` entries carry `"source": "agent"` and
-  `before_step` is called once per step; `RunLog.append` from two threads yields only valid JSON lines.
+  `before_step` is called once per step; `RunLog.append` from two threads yields only valid JSON lines. `stop()` returns within 2 s with a worker that is mid-step.
 - `uv run pokeagent run --help` lists `--sdl` and `--headless`; `uv run pokeagent run --backend claude` still
   refuses with exit 2.
 - Controller check (not yours): open the viewer on the real ROM, press arrows, see `human:    RIGHT` and the

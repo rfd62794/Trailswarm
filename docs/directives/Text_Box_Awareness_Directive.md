@@ -52,7 +52,7 @@ class TextBoxInfo:
 def detect_text_box(tilemap: bytes) -> TextBoxInfo: ...   # raises ValueError if len != 360
 ```
 
-Algorithm: find frames. A frame starts at a `0x79` whose row continues with one or more `0x7A` then a `0x7B`; the
+Algorithm: find frames. Frame presence is a two-byte check: a `0x79` immediately followed by `0x7A` in the tile map, never a one-byte scan for `0x79`. A dialog is a frame whose `0x79` is at column 0 of row 12 (or 11). A frame starts at a `0x79` whose row continues with one or more `0x7A` then a `0x7B`; the
 left column below it is `0x7C` down to a `0x7D` whose row continues `0x7A...0x7E`. Record `(top, left, bottom, right)`
 for every complete frame; incomplete ones are ignored. Decode each interior row with `screentext.decode_text` after
 replacing `0xED` with `0x7F` (cursor) and `0xEE` with `0x7F`; strip rows; drop empty ones.

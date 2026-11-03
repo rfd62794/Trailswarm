@@ -39,11 +39,26 @@ def box_open(tilemap: bytes) -> bool:
     return i >= 0
 
 
+def frame_lines(tilemap: bytes) -> list[str]:
+    """Readable text lines anywhere on screen (dialog rows, menus, lists); '>' marks the menu cursor."""
+    out = []
+    for r in range(18):
+        row = tilemap[r * 20:(r + 1) * 20]
+        if row.count(0x7C) < 2:  # only rows inside a frame (left and right edge tiles present)
+            continue
+        inner = row[row.index(0x7C) + 1:len(row) - row[::-1].index(0x7C) - 1]
+        line = "".join(">" if b == 0xED else CHARMAP.get(b, " ") for b in inner).strip()
+        if any(ch.isalnum() for ch in line):
+            out.append(" ".join(line.split()))
+    return out
+
+
 def box_text(tilemap: bytes) -> str:
-    """Readable text of an open dialog box (rows 13-16 between the 0x7C borders), or ''."""
-    rows = [tilemap[r * 20:(r + 1) * 20] for r in range(13, 17)]
-    words = " ".join("".join(CHARMAP.get(b, "") for b in r[1:19]).strip() for r in rows)
-    return " ".join(words.split())
+    return " | ".join(frame_lines(tilemap))
+
+
+def is_menu(tilemap: bytes) -> bool:
+    return 0xED in tilemap  # the ▶ cursor tile (verified)
 KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", "s": "B",
         "Return": "START", "Shift_L": "SELECT", "Shift_R": "SELECT"}
 TILEMAP, TILEMAP_LEN, BORDER_TL = 0xC3A0, 360, 0x79
@@ -69,7 +84,10 @@ class MapMemory:
         key = f"{x0},{y0},{button}"
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
-            self.m(m0)["warps"][key] = [m1, x1, y1]; return f"WARP to map 0x{m1:02X} ({x1},{y1})"
+            w = self.m(m0)["warps"]
+            taken = (w[key][3] if key in w and len(w[key]) > 3 else 0) + 1
+            w[key] = [m1, x1, y1, taken]
+            return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken}x"
         if (x1, y1) == (x0, y0):
             if not confirmed:
                 return "no move (turned? fading?) - will retry once before calling it blocked"
@@ -81,12 +99,23 @@ class MapMemory:
             return "moved - cleared a false wall"
         return "moved"
 
-    def interact(self, map_id, x, y, facing, text: str):
+    def interact(self, map_id, x, y, facing, text: str) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
-        e = d.setdefault(f"{x},{y},{facing}", {"count": 0, "text": ""})
+        e = d.setdefault(f"{x},{y},{facing}", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
         e["count"] += 1
         if text and not e["text"]:
-            e["text"] = text[:120]
+            e["text"] = text[:160]
+        return e
+
+    def finish_interaction(self, e: dict, presses: int, menus: list, choices: list):
+        """Remember how many presses the whole interaction took and what menus/choices appeared."""
+        e["presses"] = (e.get("presses", []) + [presses])[-10:]
+        for m in menus:
+            if m not in e.setdefault("menus", []):
+                e["menus"].append(m)
+        for c in choices:
+            if c not in e.setdefault("choices", []):
+                e["choices"].append(c)
 
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
@@ -100,7 +129,11 @@ class MapMemory:
         for name, (dx, dy) in DIRS.items():
             if name in tried:
                 continue
-            visits = d["visited"].get(f"{x + dx},{y + dy}", 0)
+            warp = d["warps"].get(f"{x},{y},{name}")
+            if warp:  # a warp leads off this map: score it by how often we already took it, not by an off-map tile
+                visits = (warp[3] if len(warp) > 3 else 1) * 3
+            else:
+                visits = d["visited"].get(f"{x + dx},{y + dy}", 0)
             if best is None or visits < best[0]:
                 best = (visits, name)
         if best is None:
@@ -137,7 +170,7 @@ def main(argv=None) -> int:
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -151,16 +184,37 @@ def main(argv=None) -> int:
         box_before = box_open(tm)
         emu.press(Button[name]); emu.tick(8)
         after = pos()
+        if after[0] != before[0]:
+            emu.tick(90)   # map changed: wait out the fade so the destination coordinates are real
+            after = pos()
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_after = box_open(tm2)
         text = box_text(tm2) if box_after else ""
-        if name in DIRS:
+        if name in DIRS and not box_before:
             st["facing"] = name
+        inter = st.get("inter")
         if box_before:
-            result = f"text box: advanced{' -> closed' if not box_after else ''}"
+            if inter:
+                inter["presses"] += 1
+                if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
+                    chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "")
+                    inter["choices"].append(chosen.replace(">", "").strip())
+                if box_after and is_menu(tm2):
+                    menu = box_text(tm2)
+                    if menu not in inter["menus"]:
+                        inter["menus"].append(menu)
+            if not box_after and inter:
+                mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
+                result = (f"interaction closed after {inter['presses']} presses; menus seen: {len(inter['menus'])}, "
+                          f"choices: {inter['choices'] or 'none'}")
+                st["inter"] = None
+            else:
+                result = f"text box: advanced ({'menu' if is_menu(tm2) else 'dialog'})"
         elif name == "A":
             # Record the A press either way, so a silent wall is tested once and never again.
-            mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
+            entry = mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
+            if box_after:
+                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [], "choices": []}
             result = (f"INTERACTION at ({before[1]},{before[2]}) facing {st['facing']}: \"{text[:60]}\""
                       if box_after else f"nothing to interact with facing {st['facing']} (remembered)")
         else:
@@ -169,7 +223,7 @@ def main(argv=None) -> int:
             result = mem.learn(before, name, after, confirmed=confirmed)
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
             if after[0] != before[0]:
-                st["settle"] = 90  # map changed: let the fade finish before the next press
+                st["settle"] = 30  # already waited out the fade; a short pause so the watcher sees the arrival
         mem.visit(after[0], after[1], after[2], st["step"])
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
         trans.write(json.dumps({"step": st["step"], "from": list(before), "button": name, "to": list(after),
@@ -192,8 +246,20 @@ def main(argv=None) -> int:
             st["settle"] -= a.frames_per_step; return
         m, x, y = pos()
         if box_open(emu.read_range(TILEMAP, TILEMAP_LEN)):
-            if st["box_streak"] >= 8:
-                do_press("B", "agent", "a box has stayed open for 8 presses (a menu?) - pressing B to back out"); return
+            if st["box_streak"] >= 12:
+                do_press("B", "agent", "a box has stayed open for 12 presses - pressing B to back out"); return
+            tm = emu.read_range(TILEMAP, TILEMAP_LEN)
+            if is_menu(tm):
+                # Explore menus: pick the first option we have not chosen at this interaction point yet.
+                inter = st.get("inter"); lines = frame_lines(tm)
+                options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or ln.isupper()]
+                cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
+                tried = (inter or {}).get("entry", {}).get("choices", []) + (inter or {}).get("choices", [])
+                if cursor and cursor not in tried:
+                    do_press("A", "agent", f"menu open, cursor on '{cursor}' (new) - choosing it"); return
+                if any(o not in tried for o in options):
+                    do_press("DOWN", "agent", f"menu open, '{cursor}' already tried - moving the cursor down"); return
+                do_press("B", "agent", "menu open, every option tried here - backing out"); return
             do_press("A", "agent", "a text box is open - finishing the interaction before moving"); return
         name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)
 
