@@ -43,6 +43,27 @@ snapshots every 10 steps and at the end, and `summary.json`.
 Exit codes: 0 = step cap reached, 2 = three backend failures in a row,
 130 = interrupted with Ctrl+C.
 
+## Play it from Claude Code
+
+The repo ships `.mcp.json`, so opening a Claude Code session in this repo
+offers a `pokeagent` MCP server: it runs `uv run pokeagent mcp --state
+baselines/bedroom.state`, which boots the emulator (PyBoy window, so you can
+watch) and serves the game as tools over stdio. The same works for any MCP
+client - the command is the server.
+
+Tools: `press` / `wait` / `state` / `screenshot` drive and read the game,
+`peek` reads RAM, `snapshot` + `diff` compare WRAM between two moments,
+`save_state` / `load_state` manage snapshots under `runs/mcp/`, `pause` /
+`resume` toggle idle ticking, `note` appends to `runs/mcp/notes.txt`, and
+`explore(steps)` hands control to the rule-based explorer for N presses and
+returns what it learned (`runs/maps.json`).
+
+The emulator lives on its own thread that idle-ticks at `--idle-fps` (default
+60) so the window stays responsive; every tool call runs on that thread. Use
+`--headless` for no window. The `claude -p` loop above stays the cheap
+unattended option; the MCP server is for sessions that keep their own
+reasoning and memory while playing.
+
 ## Cost warning
 
 A `--backend claude` run makes **one `claude -p` call per step**. There is no
