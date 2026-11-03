@@ -96,7 +96,11 @@ def main() -> int:
         rnd += 1
         cons = consistency()
         skip = {g for g, until in skipped.items() if until > rnd}  # goals whose segment produced no attempts: back off
-        weak = next((g for g in GOALS if g not in skip and (cons.get(g) is None or cons.get(g) < 0.7) and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
+        ready = [g for g in GOALS if g not in skip and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
+        # known-failing goals first, FURTHEST first (the frontier of the campaign), then goals never sampled
+        failing = [g for g in reversed(ready) if cons.get(g) is not None and cons.get(g) < 0.7]
+        unsampled = [g for g in ready if cons.get(g) is None]
+        weak = (failing + unsampled + [None])[0]
         if rnd % 3 == 0 and (ROOT / "runs" / "checkpoints" / "team_best.state").exists():
             objective, args = "roles (train + explore from the strongest team)", ["--roles"]
         elif weak:
