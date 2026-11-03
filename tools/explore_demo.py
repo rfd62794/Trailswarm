@@ -324,6 +324,10 @@ class MapMemory:
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
             return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
         if (x1, y1) == (x0, y0):
+            fails = self.m(m0).setdefault("fails", {})  # failures NOT required to be consecutive: alternating
+            fails[key] = fails.get(key, 0) + 1          # presses at a map edge never confirmed a wall before
+            if fails[key] >= 2:
+                confirmed = True
             if not confirmed:
                 return "no move (turned? fading?) - will retry once before calling it blocked"
             if key not in blocked:
