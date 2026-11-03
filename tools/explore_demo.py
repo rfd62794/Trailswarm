@@ -1065,7 +1065,12 @@ def main(argv=None) -> int:
             if st.get("potion_hp_before") is not None and hp > st["potion_hp_before"]:
                 mem.data.setdefault("item_heal", {}).setdefault("20", []).append(hp - st["potion_hp_before"])
                 log(f"[POTION healed {hp - st['potion_hp_before']} HP: learned]", "res"); st["potion_hp_before"] = None
-            if kind == 1 and weak and run_line is not None:  # wild battle and too weak: flee
+            # On the road to Pewter after the parcel, wild fights cost 25+ presses each and a to_pewter run only has 1800
+            # (2026-11-03: 30-50% of the Forest presses were battle text): run unless a ball could catch it.
+            gn = check_goals(emu, st)
+            hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and emu.read(0xD35E) in (0x0D, 0x33)
+                     and not (bag_contents(emu).get(0x04, 0) and emu.read(0xCFE5)))
+            if kind == 1 and (weak or hurry) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 if ">RUN" in run_line:
                     do_press("A", "agent", f"BATTLE wild, HP {hp}/{mx}: RUN"); return
                 cur = next((ln for ln in lines_now if ">" in ln), "")
