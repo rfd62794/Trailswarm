@@ -8,6 +8,7 @@ patching ``cli._build_emulator`` like the other command tests.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from pokeagent.emulator import Button, Emulator
@@ -123,6 +124,8 @@ def _cmd_find(args: argparse.Namespace) -> int:
 
 
 def _cmd_screen(args: argparse.Namespace) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # é and friends on a cp1252 console
     reg = load_registry()
     emu = _boot(args)
     try:

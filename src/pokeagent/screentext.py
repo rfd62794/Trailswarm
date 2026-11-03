@@ -1,6 +1,7 @@
 """Decode Pokemon Red text bytes and the visible 20x18 tile-map mirror.
 
-The charmap below is seeded from memory of pret/pokered and is UNVERIFIED:
+The charmap below was VERIFIED on the real ROM on 2026-11-02 for A-Z, a-z, 0-9, space, 0xBA (é)
+and 0xED (the menu cursor); the remaining punctuation entries are from memory of pret/pokered:
 unknown bytes decode to ``?`` in text, and non-glyph tile ids decode to ``.``
 on screen so overworld graphics show as dots while dialog shows as words.
 """
@@ -32,12 +33,14 @@ CHARMAP: dict[int, str] = {
     0xE6: "?",
     0xE7: "!",
     0xE8: ".",
-    0xEF: "♂",
+    0xEF: "(M)",  # male sign; ASCII so cp1252 consoles never crash on print
     0xF0: "¥",
     0xF1: "x",
     0xF3: "/",
     0xF4: ",",
-    0xF5: "♀",
+    0xF5: "(F)",  # female sign
+    0xBA: "é",    # verified: POKéMON in the START menu
+    0xED: ">",    # verified: the menu cursor
 }
 CHARMAP.update({0x80 + i: chr(ord("A") + i) for i in range(26)})
 CHARMAP.update({0xA0 + i: chr(ord("a") + i) for i in range(26)})

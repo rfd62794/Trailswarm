@@ -104,7 +104,7 @@ Register `mcp` with the arguments above; ROM default as in `run`. The subcommand
   unknown button and missing state return `error` dicts, `note` appends.
 - Tool invocation in tests: call the registered tool functions directly (the decorator returns the
   function unchanged), or use the SDK's in-memory client if it is simple; do not spawn a subprocess.
-- `uv run pokeagent mcp --help` lists the arguments.
+- Do NOT run `uv run pokeagent ...` yourself: the sandbox refuses the console entry point and the run dies (it killed two earlier runs at exactly this step). Test the argparse wiring with `uv run python -c "from pokeagent.cli import main; main(['mcp', '--help'])"` instead; the controller runs the real command.
 - Controller check (not yours): open Claude Code in the repo; the `pokeagent` server appears; `state` returns
   the bedroom; `press RIGHT` changes x.
 
