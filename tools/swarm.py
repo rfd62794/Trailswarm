@@ -125,8 +125,14 @@ def merge_memory(dst: dict, src: dict) -> dict:
         if ref not in bw:
             bw.append(ref)
     for ref in bw:  # tombstones win over any agent copy that still carries the pollution
-        mid, key = ref.split(":", 1)
-        dst.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
+        mid, sep, key = ref.partition(":")
+        if sep:
+            dst.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
+    # whiteout respawns (Pokecenter door / home) are never doors from other maps (see explore_demo.WHITEOUT_LANDINGS)
+    for mid, d in dst.get("maps", {}).items():
+        for key, dest in list(d.get("warps", {}).items()):
+            if tuple(dest) in {(1, 23, 26): 41, (0, 5, 6): 37} and int(mid) != {(1, 23, 26): 41, (0, 5, 6): 37}[tuple(dest)]:
+                d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():
         cur = beats.get(sig)

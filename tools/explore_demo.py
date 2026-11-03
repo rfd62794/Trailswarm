@@ -105,6 +105,11 @@ def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
     return None
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
+# After a blackout the game drops us at the last Pokecenter's door (Viridian (23,26) once we healed there) or at home
+# (Pallet (5,6)). Arriving there from any other map is a respawn, never a door: it made a ghost 3-step 'warp' from the
+# Forest to the Pokecenter that the heal planner oscillated on for 1000+ steps (2026-11-03 06:12). value = the only
+# map those landings are legitimately reached from.
+WHITEOUT_LANDINGS = {(1, 23, 26): 41, (0, 5, 6): 37}
 # Screen-tile offsets of the 2x2 map tile in front of the player (player sprite sits at rows 8-9, cols 8-9).
 AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11, 8), (11, 9)],
          "LEFT": [(8, 6), (8, 7), (9, 6), (9, 7)], "RIGHT": [(8, 10), (8, 11), (9, 10), (9, 11)]}
@@ -308,6 +313,10 @@ class MapMemory:
     def purge_bad_warps(self):
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
         actually warp; they are removed on load and never merged back by the swarm."""
+        for mid, d in self.data.get("maps", {}).items():  # whiteout respawns recorded as doors (see WHITEOUT_LANDINGS)
+            for key, dest in list(d.get("warps", {}).items()):
+                if tuple(dest) in WHITEOUT_LANDINGS and int(mid) != WHITEOUT_LANDINGS[tuple(dest)]:
+                    d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
         for ref in self.data.get("bad_warps", []):
             mid, sep, key = ref.partition(":")
             if not sep:
@@ -332,6 +341,8 @@ class MapMemory:
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
             w = self.m(m0)["warps"]
+            if WHITEOUT_LANDINGS.get((m1, x1, y1), m0) != m0:
+                return f"map changed to 0x{m1:02X} (a whiteout respawn, not a door)"
             if f"{m0}:{key}" in self.data.get("bad_warps", []):
                 return f"map changed to 0x{m1:02X} (known forced walk - not a warp)"
             cand = self.m(m0).setdefault("warp_cand", {})
