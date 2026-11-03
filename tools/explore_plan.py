@@ -249,6 +249,9 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         if p:
             return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
         outdoors = (0x00, 0x0C, 0x01, 0x0D, 0x02)
+        passage = after_parcel and 0x2F <= pos[0] <= 0x34  # Route 2 gates and Viridian Forest are on the road: do not leave them
+        if passage:
+            outdoors = outdoors + (pos[0],)
         if pos[0] not in outdoors:  # indoors (house, lab): get outside first - never probe house walls for a road
             p = g.path(pos, lambda n: n[0] in outdoors)
             if p:
