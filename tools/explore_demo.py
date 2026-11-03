@@ -55,6 +55,29 @@ YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit",
 STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
 
 
+def move_value(name: str) -> float:
+    """Cartridge value of a move by name (power x accuracy, status moves 0); used when learning/forgetting moves."""
+    if not ROM_KB:
+        return 0.0
+    n = "".join(ch for ch in name.upper() if ch.isalnum())
+    for mv in ROM_KB["moves"].values():
+        if "".join(ch for ch in mv["name"].upper() if ch.isalnum()) == n:
+            return mv["power"] * mv["accuracy"]
+    return 0.0
+
+
+def learn_decision(question: str, current_moves: list[str]) -> tuple[str, str, str | None]:
+    """'X is trying to learn Y! ... Delete a move to make room for Y?' -> (YES/NO, why, move to forget)."""
+    m = re.search(r"learn ([A-Z][A-Z ]+?)[!?]", question.upper())
+    new = m.group(1).strip() if m else None
+    if not new or not current_moves:
+        return "YES", "new move: default accept", None
+    worst = min(current_moves, key=move_value)
+    if move_value(new) > move_value(worst) or (move_value(new) == 0 and sum(1 for mv in current_moves if move_value(mv) == 0) == 0):
+        return "YES", f"{new} ({move_value(new):.0f}) beats {worst} ({move_value(worst):.0f})", worst
+    return "NO", f"{new} ({move_value(new):.0f}) is not better than our weakest {worst} ({move_value(worst):.0f})", None
+
+
 def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
     q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "  # tolerant of ?,!,é and line breaks
     offered = next((s for s in STARTERS if s.lower() in q.replace(" ", "")), None)
@@ -897,8 +920,12 @@ def main(argv=None) -> int:
                 norm0 = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
                 known = {norm0(k): v for k, v in ks.items()}
                 if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in moves):
-                    target = max(moves, key=lambda mv: (known.get(norm0(mv), (0, ""))[0], score(mv)[1]))
-                    st["move_reason"] = known.get(norm0(target), (0, ""))[1]
+                    # Willing to try: a damaging move never used against this species gets one trial (x1.3 bonus)
+                    def kscore(mv):
+                        base = known.get(norm0(mv), (0, ""))[0]
+                        return base * (1.3 if base > 0 and mv not in tried else 1.0)
+                    target = max(moves, key=lambda mv: (kscore(mv), score(mv)[1]))
+                    st["move_reason"] = known.get(norm0(target), (0, ""))[1] + ("" if target in tried else " first try")
                 else:  # no knowledge (or all out of PP): variety first, then the best observed damage
                     target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
                     st["move_reason"] = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
@@ -975,11 +1002,22 @@ def main(argv=None) -> int:
                 if {"YES", "NO"} <= {o.split()[-1] for o in options if o}:  # a YES/NO box
                     question = " ".join(ln for ln in lines if "YES" not in ln and "NO" not in ln) or st.get("last_text", "")
                     context = " ".join(st.get("dialog", [])[-4:]) + " " + question
-                    ans, why = yesno_answer(context, a.starter)
+                    if "learn" in context.lower() and ("room" in context.lower() or "forget" in context.lower() or "delete" in context.lower()):
+                        cur_moves = [ROM_KB["moves"].get(str(emu.read(0xD173 + i)), {}).get("name", "?") for i in range(4) if emu.read(0xD173 + i)] if ROM_KB else []
+                        ans, why, forget = learn_decision(context, cur_moves)
+                        st["forget_move"] = forget
+                    else:
+                        ans, why = yesno_answer(context, a.starter)
                     st["yesno"] = {"question": question[:80], "answer": ans}
                     if cursor.endswith(ans):
                         do_press("A", "agent", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\""); return
                     do_press("DOWN" if ans == "NO" else "UP", "agent", f"YES/NO box: moving the cursor to {ans} ({why})"); return
+                if st.get("forget_move"):  # the 'which move to forget' list: pick the weakest by cartridge value
+                    normf = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
+                    if normf(cursor) == normf(st["forget_move"]):
+                        fm = st.pop("forget_move"); do_press("A", "agent", f"forgetting {fm} for the new move"); return
+                    if any(normf(o) == normf(st["forget_move"]) for o in options):
+                        do_press("DOWN", "agent", f"move list: cursor to {st['forget_move']}"); return
                 goals_now = check_goals(emu, st)
                 want = goal_menu_choice(goals_now, options)
                 if not want and goals_now.get("potion") and any("WITHDRAW" in o or "DEPOSIT" in o for o in options):
