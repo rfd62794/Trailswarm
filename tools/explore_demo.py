@@ -137,6 +137,22 @@ def ascii_vision(emu, mem, tileset: int) -> list[str]:
     return rows  # text boxes are NOT part of the map: the dialog pane shows them
 
 
+def battle_view(emu) -> list[str]:
+    """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
+    we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
+    wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu."""
+    def u16(a): return (emu.read(a) << 8) | emu.read(a + 1)
+    tm = emu.read_range(TILEMAP, TILEMAP_LEN)
+    lines = frame_lines(tm)
+    rows = [f"BATTLE kind=0x{emu.read(0xD057):02X}",
+            f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
+            f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
+            "(hp addrs unverified)", ""]
+    menu = [ln for ln in lines if ">" in ln or ln.isupper()]
+    rows += ["MENU/TEXT:"] + [ln[:20] for ln in (menu or lines)[:6]]
+    return rows
+
+
 def effects(before: bytes, after: bytes) -> tuple[list[list[int]], str]:
     """RAM deltas around an interaction, capped, plus a one-line human summary using the registry's names."""
     changes = ram_diff(before, after, base=EFFECT_WINDOW[0])[:64]
@@ -723,7 +739,8 @@ def main(argv=None) -> int:
         log(f"[remote goto {st['goto']}]", "res"); return {"goto": st["goto"]}
 
     @ctl.route("GET", "/vision")
-    def _vision(**_): return {"rows": ascii_vision(emu, mem, emu.read(0xD367))}
+    def _vision(**_):
+        return {"rows": battle_view(emu) if emu.read(0xD057) else ascii_vision(emu, mem, emu.read(0xD367))}
 
     @ctl.route("GET", "/peek")
     def _peek(addr="0xD35E", length="1", **_):
@@ -764,9 +781,12 @@ def main(argv=None) -> int:
         if st["frame"] % 15 == 0 and not a.headless:
             try:
                 m_, x_, y_ = pos(); npcs = npc_positions(emu)
-                vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
-                              + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
-                              + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
+                if emu.read(0xD057):
+                    vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu)))
+                else:
+                    vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
+                                  + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
+                                  + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
                 tm_d = emu.read_range(TILEMAP, TILEMAP_LEN)
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, st)
