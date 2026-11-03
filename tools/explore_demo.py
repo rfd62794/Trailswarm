@@ -848,10 +848,6 @@ def main(argv=None) -> int:
                     tmp = cp / f"{g}.{os.getpid()}.tmp"; emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
                 except Exception as e:
                     log(f"[checkpoint save failed: {e!r}]", "res")
-                if a.stop_at_goal == g:
-                    st["done"] = True; shutdown(); log(f"segment done: {g} at step {st['step']}", "hdr")
-                    if a.headless:
-                        return
                 gp = Path("runs/milestones.json")
                 try:
                     hist = json.loads(gp.read_text()) if gp.exists() else {}
@@ -863,6 +859,10 @@ def main(argv=None) -> int:
                     rec["wanted"] = a.starter
                 hist.setdefault(g, []).append(rec)
                 tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1)); os.replace(tmp, gp)
+                if a.stop_at_goal == g:  # AFTER the milestone is persisted (it used to return before recording it)
+                    st["done"] = True; shutdown(); log(f"segment done: {g} at step {st['step']}", "hdr")
+                    if a.headless:
+                        return
         gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
         log(f"--- step {st['step']}/{a.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {st['facing']}  "
             f"party={emu.read(0xD163)} bag={emu.read(0xD31D)}  goals: {gtxt}\n"

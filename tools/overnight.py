@@ -32,7 +32,7 @@ def consistency(last_n: int = 16) -> dict[str, float]:
         return {}
     ms = json.loads(ms_path.read_text())
     runs = [p for p in sorted((ROOT / "runs").glob("explore-*"), key=lambda p: p.stat().st_mtime)
-            if (p / "transitions.jsonl").exists() and sum(1 for _ in open(p / "transitions.jsonl", encoding="utf-8")) >= 20]
+            if (p / "transitions.jsonl").exists() and sum(1 for _ in open(p / "transitions.jsonl", encoding="utf-8")) >= 5]
     out = {}
     for i, g in enumerate(GOALS):
         # attempting runs: those that never started past this goal = their first press map is not downstream.
@@ -43,7 +43,7 @@ def consistency(last_n: int = 16) -> dict[str, float]:
             if first["from"][0] in order_maps.get(i, []) or i == 0:
                 tries.append(p.name)
         tries = tries[-last_n:]
-        out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if tries else 0.0
+        out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None  # None = not enough attempts to judge
     return out
 
 
@@ -75,7 +75,7 @@ def main() -> int:
     while time.time() < t_end:
         rnd += 1
         cons = consistency()
-        weak = next((g for g in GOALS if cons.get(g, 0) < 0.7 and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
+        weak = next((g for g in GOALS if cons.get(g) is not None and cons.get(g) < 0.7 and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
         if rnd % 3 == 0 and (ROOT / "runs" / "checkpoints" / "team_best.state").exists():
             objective, args = "roles (train + explore from the strongest team)", ["--roles"]
         elif weak:
