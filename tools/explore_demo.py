@@ -632,6 +632,30 @@ def main(argv=None) -> int:
                 result += f'; event on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
         mem.observe_npcs(after[0], emu, st["step"])
+        # Event/completion tracking: the story flags (wEventFlags 0xD747-0xD886, from pokered.sym) are the game's own
+        # record of what has been done once. Any bit that flips is remembered with where, when and what was on screen.
+        ev = emu.read_range(0xD747, 0x140)
+        if st.get("events_prev") is not None and ev != st["events_prev"]:
+            flips = [(i, (st["events_prev"][i], ev[i])) for i in range(len(ev)) if ev[i] != st["events_prev"][i]]
+            rec = {"step": st["step"], "map": before[0], "at": [before[1], before[2]], "text": (st.get("last_text") or text)[:80],
+                   "flags": [[f"0x{0xD747 + i:04X}", o, n] for i, (o, n) in flips[:8]], "run": run_dir.name}
+            mem.data.setdefault("events", []).append(rec); del mem.data["events"][:-300]
+            extra["event_flags"] = rec["flags"]
+            log(f"*** EVENT: {len(flips)} story flag byte(s) changed at map 0x{before[0]:02X} ({before[1]},{before[2]}): {rec['flags'][:3]} ***", "res")
+        st["events_prev"] = ev
+        # Team checkpoint: whenever the lead pokemon's level beats the best ever, save a 'team_best' state the
+        # explorer agents start from (Robert: trainer agents feed the stronger team to the map-clearing agents).
+        lvl = emu.read(0xD18C)
+        if lvl > st.get("best_level_seen", 0):
+            st["best_level_seen"] = lvl
+            best = mem.data.get("team_best_level", 0)
+            if lvl > best and emu.read(0xD057) == 0 and not box_after:
+                try:
+                    cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
+                    tmp = cp / f"team_best.{os.getpid()}.tmp"; emu.save_state(tmp); os.replace(tmp, cp / "team_best.state")
+                    mem.data["team_best_level"] = lvl; log(f"*** TEAM CHECKPOINT: level {lvl} saved as team_best.state ***", "res")
+                except Exception as e:
+                    log(f"[team checkpoint failed: {e!r}]", "res")
         bag_post = bag_contents(emu)
         if bag_post != bag_pre:  # an item was received, used, bought or sold: remember where and from what
             for item in set(bag_pre) | set(bag_post):

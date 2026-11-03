@@ -92,6 +92,8 @@ def main() -> int:
     ap.add_argument("--maps", default="runs/maps.json")
     ap.add_argument("--segment", default=None,
                     help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
+    ap.add_argument("--roles", action="store_true",
+                    help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     a = ap.parse_args()
     GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]
     seg_args: list[str] = []
@@ -112,10 +114,19 @@ def main() -> int:
             if shared.exists():
                 shutil.copy(shared, own)
             starter = ["bulbasaur", "charmander", "squirtle"][i % 3]
+            role_args: list[str] = []
+            role = ""
+            if a.roles:
+                team = ROOT / "runs" / "checkpoints" / "team_best.state"
+                start = team if team.exists() else ROOT / "runs" / "checkpoints" / "to_route1.state"
+                if start.exists():
+                    role = "trainer" if i % 2 == 0 else "explorer"
+                    role_args = ["--state", str(start), "--explore-rate", "0.0" if role == "trainer" else "0.3"]
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
                    "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(8800 + i),
-                   "--explore-rate", "0.5" if i % 2 else "0.0",
-                   "--box-pace", str([8, 16, 30][i % 3])] + seg_args  # paces vary; review grades them
+                   "--box-pace", str([8, 16, 30][i % 3])] + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
+            if role:
+                print(f"agent {i}: role {role}, starting from {Path(role_args[1]).name}")
             log = (swarm_dir / f"agent{i}.log").open("w")
             procs.append((i, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)))
             print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")
