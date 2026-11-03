@@ -192,11 +192,15 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             if p:
                 return p[0], f"goal road north: {len(p)} steps to Route 1"
         d = maps.get(str(pos[0]), {})
+        blocked = set(d.get("blocked", []))
+        # candidate frontier tiles: northernmost first, but never one whose UP is a confirmed wall (that was the
+        # 'keeps pushing up into a wall' loop); a tile only counts if UP from it is still unknown
         tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
+        tiles = [t for t in tiles if f"{t[0]},{t[1]},UP" not in blocked and f"{t[0]},{t[1] - 1}" not in d.get("visited", {})]
         if tiles:
             tx, ty = min(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))
             if (pos[1], pos[2]) == (tx, ty):
-                return "UP", "goal road north: at the northernmost known tile, pushing UP for the map edge"
+                return "UP", "goal road north: at the northernmost open tile, pushing UP for the map edge"
             p = g.path(pos, lambda n: n == (pos[0], tx, ty))
             if p:
                 return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
