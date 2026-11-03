@@ -181,7 +181,10 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                     return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
     level = goals.get("_level", 0)
-    if goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5:
+    carrying_parcel = goals.get("oaks_parcel") and not goals.get("deliver_parcel")
+    if goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5 and not carrying_parcel:
+        # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
+        #  sent the agent back to Route 1 to train - they spent 600+ presses there and never reached the lab)
         # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
         if pos[0] != 0x0C:
             p = g.path(pos, lambda n: n[0] == 0x0C)
