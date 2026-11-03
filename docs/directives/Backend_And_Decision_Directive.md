@@ -124,7 +124,7 @@ Test tail, line counts per new file, and any decision not written in the design.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-backend-and-decision-directive |
 | Base branch | - |
@@ -143,4 +143,5 @@ Test tail, line counts per new file, and any decision not written in the design.
 - 2026-11-02 22:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNWKSDDEMNY0N6MZGZ54RW
 - 2026-11-02 22:09 · dispatcher · launched pid=22100; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; resynced: merged main into directive/pokeagent-backend-and-decision-directive (8 commit(s), clean); provisioned: uv sync --frozen
 - 2026-11-02 22:11 · devin-overseer (delegated) · In progress → Review — Built decision.py + backend.py and tests. Test tail: 26 passed, 1 warning in 0.88s (uv run pytest -q). Lines: decision.py 104, backend.py 98, test_decision.py 100, test_backend.py 117. Skipped the `uv run python -c` verify step - interpreter one-liners are refused by the sandbox; equivalent covered by test_json_inside_prose/test_lowercase_button. Builder decisions: (1) parse_reply scans past a balanced-but-invalid {...} span to the next one instead of failing on the first bad brace pair; (2) Decision.__post_init__ coerces a direct-constructed invalid button to NONE with error set; (3) on success raw stays empty (spec only requires raw on failure).; under delegate.envelope [origin] spent: devin 2 min est. n/a
+- 2026-11-02 22:16 · robert-claude-laptop · Review → Done — note: merged via PR #2 (merge commit f2ec63d); Sonnet review MERGE, 25 passed; nits: unreachable not-an-object branch, stray '{' in prose stops the scan, bad-json error lacks detail
 <!-- queue:end -->
