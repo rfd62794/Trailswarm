@@ -894,6 +894,21 @@ def main(argv=None) -> int:
     def agent_step():
         if st["settle"] > 0:
             st["settle"] -= a.frames_per_step; return
+        # Endless-A guard (runs BEFORE any box handling): 40 presses in a row that are all A while the position has
+        # not changed = a sign/looping dialog. Close the box with B, then walk away.
+        pos0 = pos()
+        if st.get("a_pos") != pos0 or st.get("last_press") != "A":
+            st["a_streak"] = 0
+        st["a_pos"] = pos0
+        if st.get("last_press") == "A":
+            st["a_streak"] = st.get("a_streak", 0) + 1
+        if st.get("a_streak", 0) >= 40:
+            tm_g = emu.read_range(TILEMAP, TILEMAP_LEN)
+            if box_open(tm_g):
+                do_press("B", "agent", "40 A presses at the same tile: closing the box with B"); return
+            st["a_streak"] = 0; st["stalls"] = st.get("stalls", 0) + 1
+            away = random.choice([d for d in DIRS if d != st["facing"]])
+            do_press(away, "agent", f"40 A presses at ({pos0[1]},{pos0[2]}): walking away {away}"); return
         # Input readiness: do not press while the screen is still changing on its own (cutscene, forced walk,
         # fade, battle animation) or while the game says it is ignoring the joypad (wJoyIgnore, unverified).
         joy_ignore = emu.read(0xCD6B)
@@ -1215,14 +1230,9 @@ def main(argv=None) -> int:
             log(f"[testing a {demo['source']} demonstration for this spot (grade {demo.get('grade', 0)}): {demo['buttons']}]", "res")
             return
         # Stall detector: same tile, same screen, no goal for 15 agent steps -> escalate instead of repeating.
-        sig = (m, x, y, box_open(tm_now), tuple(sorted(st["goal_steps"])))  # NOT the screen hash: printing text changes it every press
+        sig = (m, x, y, tuple(sorted(st["goal_steps"])))  # NOT the screen hash: printing text changes it every press
         st["stall"] = st.get("stall", 0) + 1 if sig == st.get("last_sig") else 0
         st["last_sig"] = sig
-        st["a_streak"] = st.get("a_streak", 0) + 1 if st.get("last_press") == "A" else 0
-        if st["a_streak"] >= 40:  # 40 A presses in a row with no move: a sign/endless dialog - walk away from it
-            st["a_streak"] = 0; st["stalls"] = st.get("stalls", 0) + 1
-            away = random.choice([d for d in DIRS if d != st["facing"]])
-            do_press(away, "agent", f"40 A presses in a row at ({x},{y}): walking away {away}"); return
         if st["stall"] >= 15:
             st["stall"] = 0; st["stalls"] = st.get("stalls", 0) + 1
             if st.get("replay_ctx"):
