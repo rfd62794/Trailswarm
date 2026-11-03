@@ -37,6 +37,25 @@ import queue  # noqa: E402
 from concurrent.futures import Future  # noqa: E402
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
+# YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
+YESNO_RULES = [("nickname", "NO"), ("name", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
+               ("give up", "NO"), ("run", "NO"), ("", "YES")]
+
+
+STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
+
+
+def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
+    q = question.lower()
+    offered = next((s for s in STARTERS if s.lower() in q), None)
+    if offered and "want" in q:  # "Do you want CHARMANDER?" on Oak's table
+        if starter == "any" or starter.upper() == offered:
+            return "YES", f"starter offered: {offered} (wanted {starter})"
+        return "NO", f"starter offered: {offered}, but we want {starter}"
+    for needle, ans in YESNO_RULES:
+        if needle in q:
+            return ans, (f"'{needle}' in the question" if needle else "default for confirmations")
+    return "YES", "default"
 
 
 def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
@@ -222,7 +241,12 @@ def main(argv=None) -> int:
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--frames-per-step", type=int, default=30)
     ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
+    ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
+                    help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     a = ap.parse_args(argv)
+    if a.starter == "random":
+        import random
+        a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
 
     run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
@@ -315,6 +339,8 @@ def main(argv=None) -> int:
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_after = box_open(tm2)
         text = box_text(tm2) if box_after else ""
+        if text and not is_menu(tm2):
+            st["last_text"] = text  # the question a YES/NO box will be about
         if name in DIRS and not box_before:
             st["facing"] = name
         inter = st.get("inter")
@@ -323,6 +349,9 @@ def main(argv=None) -> int:
                 inter["presses"] += 1
                 if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
                     chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
+                    yn = st.pop("yesno", None)
+                    if yn and chosen.endswith(yn["answer"]):
+                        chosen = f"YES/NO '{yn['question']}' -> {yn['answer']}"
                     if chosen:
                         inter["choices"].append(chosen)
                 if box_after and is_menu(tm2):
@@ -378,7 +407,11 @@ def main(argv=None) -> int:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
                 gp = Path("runs/milestones.json")
                 hist = json.loads(gp.read_text()) if gp.exists() else {}
-                hist.setdefault(g, []).append({"run": run_dir.name, "step": st["step"]}); gp.write_text(json.dumps(hist, indent=1))
+                rec = {"run": run_dir.name, "step": st["step"]}
+                if g == "first_pokemon":
+                    rec["species_byte"] = emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
+                    rec["wanted"] = a.starter
+                hist.setdefault(g, []).append(rec); gp.write_text(json.dumps(hist, indent=1))
         gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
         log(f"--- step {st['step']}/{a.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {st['facing']}  "
             f"party={emu.read(0xD163)} bag={emu.read(0xD31D)}  goals: {gtxt}\n"
@@ -450,6 +483,13 @@ def main(argv=None) -> int:
                 inter = st.get("inter"); lines = frame_lines(tm)
                 options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or (ln.isupper() and len(ln.split()) <= 3)]
                 cursor = next((ln.replace(">", "").strip() for ln in lines if ">" in ln), "")
+                if {"YES", "NO"} <= {o.split()[-1] for o in options if o}:  # a YES/NO box
+                    question = " ".join(ln for ln in lines if "YES" not in ln and "NO" not in ln) or st.get("last_text", "")
+                    ans, why = yesno_answer(question + " " + st.get("last_text", ""), a.starter)
+                    st["yesno"] = {"question": question[:80], "answer": ans}
+                    if cursor.endswith(ans):
+                        do_press("A", "agent", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\""); return
+                    do_press("DOWN" if ans == "NO" else "UP", "agent", f"YES/NO box: moving the cursor to {ans} ({why})"); return
                 want = goal_menu_choice(check_goals(emu, st), options)
                 if want:  # a goal tells us which option to take here
                     if cursor == want:
@@ -479,7 +519,7 @@ def main(argv=None) -> int:
             st["replay"] = list(demo["buttons"]); st["replayed_here"] = (m, x, y, st["step"] // 50)
             log(f"[found a {demo['source']} demonstration for this spot: {demo['buttons']}]", "res")
             return
-        planned = plan_step(check_goals(emu, st), mem.data["maps"], (m, x, y), st["facing"])
+        planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
         if planned:
             do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)

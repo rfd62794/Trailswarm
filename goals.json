@@ -1,0 +1,41 @@
+{
+ "_about": "The campaign plan, in order. Each goal has a RAM-detectable 'done' so runs can be scored without a human. 'verified' marks addresses confirmed on the real ROM; the rest are pret/pokered claims to confirm with `pokeagent hex find` or a probe before the planner relies on them. The explorer demo currently hardcodes the first four; a later directive makes it read this file.",
+ "goals": [
+  {"id": "potion", "name": "Withdraw the POTION from the bedroom PC", "done": {"bag_has_item": "0x14"}, "verified": true,
+   "where": {"map": "0x26", "spot": [0, 2, "UP"]}, "method": ["A", "WITHDRAW ITEM", "POTION", "A", "B until closed"], "best_steps": 14},
+  {"id": "left_house", "name": "Leave the house", "done": {"map_not_in": ["0x25", "0x26"]}, "verified": true,
+   "where": {"stairs": [["0x26", 7, 2, "UP"]], "door": [["0x25", 3, 7, "DOWN"]]}, "best_steps": 42},
+  {"id": "first_pokemon", "name": "Get the starter from Oak's table", "done": {"party_count_gt": 0}, "verified": true,
+   "where": {"trigger": "grass at the top edge of PALLET_TOWN 0x00 (one-time: Oak walks you to the lab 0x28)", "balls": "three balls on the table in 0x28; the YES/NO box names the pokemon"},
+   "options": ["BULBASAUR", "CHARMANDER", "SQUIRTLE"], "notes": "nickname prompt -> NO; sweep all three starters and keep per-starter stats", "best_steps": 132},
+  {"id": "won_rival_1", "name": "Win the first rival battle in the lab", "done": {"battle_ended_same_tile": true, "party_count_gt": 0}, "verified": "partial",
+   "notes": "wIsInBattle 0xD057 read 2 (trainer) for the whole fight; a loss warps you home. Rules so far: FIGHT, move 1.", "best_steps": 264},
+  {"id": "to_viridian", "name": "Walk Route 1 north to Viridian City", "done": {"map_is": "0x01"}, "verified": false,
+   "where": {"exit": "north edge of PALLET_TOWN 0x00 -> ROUTE_1 0x0C -> VIRIDIAN_CITY 0x01"}, "notes": "first wild battles in the grass; RUN or FIGHT"},
+  {"id": "oaks_parcel", "name": "Pick up OAK'S PARCEL at the Viridian Mart clerk", "done": {"bag_has_item": "0x46"}, "verified": false,
+   "where": {"map": "VIRIDIAN_MART (id to learn)", "spot": "the clerk; talking to him hands over the parcel the first time"}, "notes": "item id 0x46 = OAKS_PARCEL (pokered, unverified)"},
+  {"id": "deliver_parcel", "name": "Bring the parcel back to Oak, receive the POKeDEX", "done": {"bag_lacks_item": "0x46", "start_menu_has": "POKeDEX"}, "verified": false,
+   "where": {"map": "0x28", "spot": "Oak"}, "notes": "pokedex flag believed in wd74b bit 5 (unverified); START menu text is the reliable check"},
+  {"id": "poke_balls", "name": "Buy POKe BALLs at the Viridian Mart", "done": {"bag_has_item": "0x04"}, "verified": false,
+   "method": ["talk to clerk", "BUY", "POKe BALL", "quantity", "YES"], "notes": "money 0xD347 decreases (verified address); item 0x04 = POKE_BALL (unverified)"},
+  {"id": "catch_first", "name": "Catch a wild pokemon on Route 1 or 22", "done": {"party_count_gt": 1}, "verified": "party count verified",
+   "method": ["wild battle", "ITEM", "POKe BALL", "repeat"], "notes": "needs battle menu reading: enemy HP low first helps"},
+  {"id": "heal_viridian", "name": "Heal at the Viridian Pokemon Center", "done": {"party_hp_full": true}, "verified": false,
+   "where": {"map": "VIRIDIAN_POKECENTER (id to learn)", "spot": "nurse behind the counter"}, "notes": "party HP/max HP addresses to learn (pokered: wPartyMon1HP 0xD16C, wPartyMon1MaxHP 0xD18D, unverified)"},
+  {"id": "level_up", "name": "Train the starter to level 8+", "done": {"party_mon1_level_gte": 8}, "verified": false,
+   "notes": "wPartyMon1Level believed 0xD18C (unverified); measure XP per minute in Route 1 grass vs Route 22"},
+  {"id": "viridian_forest", "name": "Cross Route 2 and Viridian Forest to Pewter City", "done": {"map_is": "0x02"}, "verified": false,
+   "notes": "trainers in the forest are forced battles when they see you; Bug Catchers; Pikachu is here"},
+  {"id": "beat_brock", "name": "Beat Brock for the Boulder Badge", "done": {"badge_bit": 0}, "verified": false,
+   "where": {"map": "PEWTER_GYM (id to learn)"}, "notes": "wObtainedBadges 0xD356 bit 0 (unverified); Charmander needs level ~12 or a Butterfree; this is where move choice matters"}
+ ],
+ "detectors": {
+  "bag_has_item": "0xD31D count, then (id, qty) pairs from 0xD31E - VERIFIED",
+  "map_is / map_not_in": "0xD35E - VERIFIED",
+  "party_count_gt": "0xD163 - VERIFIED (0 -> 1 when the starter arrived)",
+  "battle": "0xD057 - VERIFIED as nonzero (2) during the trainer battle",
+  "money": "0xD347 3-byte BCD - VERIFIED",
+  "start_menu_has": "decode the START menu from the tile map 0xC3A0 - VERIFIED charmap",
+  "badge_bit": "0xD356 - UNVERIFIED", "party_hp_full / level": "party struct 0xD16B.. - UNVERIFIED"
+ }
+}

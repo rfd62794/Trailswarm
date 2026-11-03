@@ -88,6 +88,18 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         if p:
             return p[0], f"goal leave the house: {len(p)} steps to the door"
     if not goals.get("first_pokemon"):
+        # In Oak's lab: go to the ball that offers the wanted starter (learned from earlier "Do you want X?" boxes).
+        if pos[0] == 0x28:
+            want = (goals.get("_starter") or "any").upper()
+            spots = interaction_spots(maps, want if want != "ANY" else "want")
+            for (m, x, y, f) in sorted(spots, key=lambda s: s != (pos[0], pos[1], pos[2], facing)):
+                if m != 0x28:
+                    continue
+                if pos == (m, x, y):
+                    return ("A" if facing == f else f), f"goal first pokemon: at the ball for {want}, {'taking it' if facing == f else 'facing it'}"
+                p = g.path(pos, lambda n: n == (m, x, y))
+                if p:
+                    return p[0], f"goal first pokemon: {len(p)} steps to the ball for {want} at ({x},{y})"
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
