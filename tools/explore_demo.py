@@ -634,6 +634,7 @@ def main(argv=None) -> int:
             f"{'; this demonstration will not be used again' if rp['demo']['grade'] < 0 else ''}]", "res")
 
     def do_press(name: str, source: str, why: str):
+        st["last_press"] = name
         before = pos(); st["step"] += 1
         tm = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_before = box_open(tm)
@@ -1214,9 +1215,14 @@ def main(argv=None) -> int:
             log(f"[testing a {demo['source']} demonstration for this spot (grade {demo.get('grade', 0)}): {demo['buttons']}]", "res")
             return
         # Stall detector: same tile, same screen, no goal for 15 agent steps -> escalate instead of repeating.
-        sig = (m, x, y, hash(tm_now), tuple(sorted(st["goal_steps"])))
+        sig = (m, x, y, box_open(tm_now), tuple(sorted(st["goal_steps"])))  # NOT the screen hash: printing text changes it every press
         st["stall"] = st.get("stall", 0) + 1 if sig == st.get("last_sig") else 0
         st["last_sig"] = sig
+        st["a_streak"] = st.get("a_streak", 0) + 1 if st.get("last_press") == "A" else 0
+        if st["a_streak"] >= 40:  # 40 A presses in a row with no move: a sign/endless dialog - walk away from it
+            st["a_streak"] = 0; st["stalls"] = st.get("stalls", 0) + 1
+            away = random.choice([d for d in DIRS if d != st["facing"]])
+            do_press(away, "agent", f"40 A presses in a row at ({x},{y}): walking away {away}"); return
         if st["stall"] >= 15:
             st["stall"] = 0; st["stalls"] = st.get("stalls", 0) + 1
             if st.get("replay_ctx"):
