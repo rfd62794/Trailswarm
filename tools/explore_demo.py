@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import sys
 import time
 import tkinter as tk
@@ -243,10 +244,12 @@ def main(argv=None) -> int:
     ap.add_argument("--control-port", type=int, default=8765, help="localhost HTTP control API for Claude/MCP")
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
+    ap.add_argument("--explore-rate", type=float, default=0.2,
+                    help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     a = ap.parse_args(argv)
     if a.starter == "random":
-        import random
         a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
+    explore_run = random.random() < a.explore_rate
 
     run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}"; run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
@@ -262,7 +265,7 @@ def main(argv=None) -> int:
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0, "explore_run": explore_run}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -523,12 +526,14 @@ def main(argv=None) -> int:
             btn = st["replay"].pop(0)
             do_press(btn, "agent", f"replaying your demonstration ({len(st['replay'])} presses left)"); return
         demo = matching_demo(m, x, y, tm_now)
+        if demo and st["explore_run"]:
+            demo = None  # this run is an exploration run: ignore known demonstrations and try to beat them
         if demo and not st.get("replayed_here") == (m, x, y, st["step"] // 50):
             st["replay"] = list(demo["buttons"]); st["replayed_here"] = (m, x, y, st["step"] // 50)
             log(f"[found a {demo['source']} demonstration for this spot: {demo['buttons']}]", "res")
             return
         planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
-        if planned:
+        if planned and not (st["explore_run"] and random.random() < 0.3):
             do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"]); do_press(name, "agent", why)
 
@@ -616,7 +621,8 @@ def main(argv=None) -> int:
     root.bind("<Key>", on_key)
     log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
     log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
-    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far)\n", "res")
+    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
+        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
     root.after(300, frame)
     root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(), trans.close(), emu.close(), root.destroy()))
     root.mainloop()

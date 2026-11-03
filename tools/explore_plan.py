@@ -103,6 +103,21 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
+    if goals.get("first_pokemon") and not goals.get("won_battle") and pos[0] == 0x28:
+        # The rival only challenges you when you try to leave the lab: head for the exit (a learned warp out of
+        # 0x28 if we have one, else the lowest visited tile - the door is on the bottom edge).
+        p = g.path(pos, lambda n: n[0] != 0x28)
+        if p is not None and p:
+            return p[0], f"goal first battle: walking to the lab exit so the rival challenges us ({len(p)} steps)"
+        d = maps.get(str(0x28), {})
+        tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
+        if tiles:
+            tx, ty = max(tiles, key=lambda t: (t[1], -abs(t[0] - 4)))
+            if (pos[1], pos[2]) != (tx, ty):
+                p = g.path(pos, lambda n: n == (0x28, tx, ty))
+                if p:
+                    return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
+            return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
             p = g.path(pos, lambda n: n == (m, x, y))
             if p:
                 return p[0], f"goal first pokemon: {len(p)} steps to where OAK appeared ({x},{y}) on map 0x{m:02X}"
