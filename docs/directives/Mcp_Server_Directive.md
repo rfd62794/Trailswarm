@@ -42,6 +42,7 @@ Create, in order:
    ```
 
 5. `tests/test_emu_thread.py`, `tests/test_mcp_server.py`; a short "Play it from Claude Code" section in `README.md`.
+6. Demo integration: expose the rule-based explorer policy (tools/explore_demo.py) as an MCP tool `explore(steps: int)` that runs N explorer steps on the emulator thread and returns the map-memory summary, so a Claude session can hand control to the explorer and take it back.
 
 ## 3. The work
 
@@ -125,6 +126,7 @@ Register `mcp` with the arguments above; ROM default as in `run`. The subcommand
 - [ ] `.mcp.json` at the repo root
 - [ ] Tests in section 5 pass; `uv run pytest -q` green (paste the tail)
 - [ ] README section "Play it from Claude Code"
+- [ ] Demo integration (section 2 item 6): MCP tool `explore(steps: int)` runs explorer steps on the emulator thread and returns the map-memory summary
 - [ ] Status row moved to Review with the branch name
 
 ## 8. Report

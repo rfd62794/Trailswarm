@@ -31,6 +31,7 @@ Create, in order:
 3. Small edits: `prompt.py` (human-line rendering), `console.py` (`print_human`), `runlog.py` (a lock in `append`),
    `agent.py` (optional `before_step` hook and `"source": "agent"` on its log entries), `cli.py` (`--sdl`).
 4. `tests/test_steering.py`, and additions to the existing prompt/console/agent tests.
+5. Demo integration: the tkinter window, key bindings and console widget of `tools/explore_demo.py` move into `pokeagent.viewer` and the demo becomes a thin script that supplies its rule-based policy to the viewer; `pokeagent run` and the demo share one window implementation.
 
 ## 3. The work
 
@@ -133,6 +134,7 @@ with `headless=True` explicitly (`cli._build_emulator` uses `getattr(args, "head
 - [ ] `viewer.py` (`Viewer`, `ViewerEmulator`, `ConsoleWriter`, `run_viewer`) under 250 lines
 - [ ] `prompt.py`, `console.py`, `runlog.py`, `agent.py`, `cli.py` edits as in section 3
 - [ ] Tests in section 5 pass; `uv run pytest -q` green (paste the tail)
+- [ ] Demo integration (section 2 item 5): `pokeagent.viewer` holds the window, keys and console; the demo is a thin script that supplies its policy; `pokeagent run` and the demo share it
 - [ ] Status row moved to Review with the branch name
 
 ## 8. Report

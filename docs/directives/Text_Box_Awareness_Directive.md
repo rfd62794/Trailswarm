@@ -36,6 +36,7 @@ Create, in order:
 2. Edits: `prompt.py` (optional `textbox`), `console.py` (textbox line), `agent.py` (read tile map, pass it in, log it,
    optional auto-advance), `cli.py` (`--auto-advance-dialog` on `run`).
 3. `tests/test_textbox.py`, plus additions to the prompt, console and agent tests.
+4. Demo integration: replace the local `box_open`/`frame_lines`/`box_text`/`is_menu` helpers in `tools/explore_demo.py` with imports from `pokeagent.textbox` (and `pokeagent.screentext`); the demo must still run (`uv run python -m py_compile tools/explore_demo.py` passes; do not run the demo itself, it opens a window).
 
 ## 3. The work
 
@@ -136,6 +137,7 @@ Everything else is unchanged; with `None` or `"none"` the prompt is byte-identic
 - [ ] `textbox.py` (`TextBoxInfo`, `detect_text_box`) under 250 lines, unverified bytes marked
 - [ ] `prompt.py`, `console.py`, `agent.py`, `cli.py` edits as in section 3
 - [ ] Tests in section 5 pass; `uv run pytest -q` green (paste the tail)
+- [ ] Demo integration (section 2 item 4): `tools/explore_demo.py` imports from `pokeagent.textbox`; `uv run python -m py_compile tools/explore_demo.py` passes
 - [ ] Status row moved to Review with the branch name
 
 ## 8. Report

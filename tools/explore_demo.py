@@ -25,13 +25,57 @@ from PIL import Image, ImageTk
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pokeagent.emulator import Button, PyBoyEmulator  # noqa: E402
+from pokeagent.hexmap import diff as ram_diff  # noqa: E402  (framework module, landed in directive 4)
+from pokeagent.names import load_registry  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
+from pokeagent.screentext import CHARMAP  # noqa: E402  (verified charmap lives in the framework now)
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
-CHARMAP = {0x7F: " ", 0xBA: "é", 0xE3: "-", 0xE6: "?", 0xE7: "!", 0xE8: ".", 0xF4: ","}  # verified on the ROM
-CHARMAP.update({0x80 + i: chr(65 + i) for i in range(26)})
-CHARMAP.update({0xA0 + i: chr(97 + i) for i in range(26)})
-CHARMAP.update({0xF6 + i: str(i) for i in range(10)})
+# Screen-tile offsets of the 2x2 map tile in front of the player (player sprite sits at rows 8-9, cols 8-9).
+AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11, 8), (11, 9)],
+         "LEFT": [(8, 6), (8, 7), (9, 6), (9, 7)], "RIGHT": [(8, 10), (8, 11), (9, 10), (9, 11)]}
+EFFECT_WINDOW = (0xD000, 0x900)  # bag, money, map, party, event flags: diffed around every interaction
+REGISTRY = load_registry()
+
+
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle"]  # Robert's first optimisation targets (2026-11-02)
+
+
+def check_goals(emu, st: dict) -> dict[str, bool]:
+    """Milestones read straight from RAM (bag 0xD31D/E verified; party 0xD163 and battle 0xD057 unverified)."""
+    bag_n = emu.read(0xD31D)
+    bag = emu.read_range(0xD31E, 2 * bag_n) if 0 < bag_n < 21 else b""  # PyBoy rejects empty slices
+    potion = any(bag[i] == 0x14 for i in range(0, len(bag), 2))
+    m = emu.read(0xD35E)
+    return {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
+            "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0}
+
+
+def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:
+    return [tilemap[r * 20 + c] for r, c in AHEAD[direction]]
+
+
+def sprite_snapshot(emu) -> list[list[int]]:
+    """[picture id, map y, map x] for NPC sprite slots 1-15 (wSpriteStateData, UNVERIFIED addresses)."""
+    out = []
+    for i in range(1, 16):
+        pic = emu.read(0xC100 + 16 * i)
+        if pic:
+            out.append([pic, emu.read(0xC204 + 16 * i), emu.read(0xC205 + 16 * i)])
+    return out
+
+
+def effects(before: bytes, after: bytes) -> tuple[list[list[int]], str]:
+    """RAM deltas around an interaction, capped, plus a one-line human summary using the registry's names."""
+    changes = ram_diff(before, after, base=EFFECT_WINDOW[0])[:64]
+    raw = [[c.addr, c.old, c.new] for c in changes]
+    named = []
+    for c in changes:
+        e = REGISTRY.by_addr(c.addr)
+        if e:
+            named.append(f"{e.name} {c.old}->{c.new}")
+    summary = ", ".join(named[:6]) if named else (f"{len(raw)} unnamed bytes changed" if raw else "no RAM change")
+    return raw, summary
 
 
 def box_open(tilemap: bytes) -> bool:
@@ -48,7 +92,7 @@ def frame_lines(tilemap: bytes) -> list[str]:
         if row.count(0x7C) < 2:  # only rows inside a frame (left and right edge tiles present)
             continue
         inner = row[row.index(0x7C) + 1:len(row) - row[::-1].index(0x7C) - 1]
-        line = "".join(">" if b == 0xED else CHARMAP.get(b, " ") for b in inner).strip()
+        line = "".join(ch if ch.isprintable() else " " for ch in (CHARMAP.get(b, " ") or " " for b in inner)).strip()
         if any(ch.isalnum() for ch in line):
             out.append(" ".join(line.split()))
     return out
@@ -173,7 +217,7 @@ def main(argv=None) -> int:
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -200,8 +244,15 @@ def main(argv=None) -> int:
         before = pos(); st["step"] += 1
         tm = emu.read_range(TILEMAP, TILEMAP_LEN)
         box_before = box_open(tm)
+        extra: dict = {}
+        flag = emu.read(0xD057)
+        if flag or st.get("in_battle"):
+            extra["battle_flag"] = flag  # wIsInBattle 0xD057 (unverified): logged every battle step to verify it
+        if name in DIRS and not box_before:
+            extra["ahead_tiles"] = ahead_tiles(tm, name)  # lets the KB learn which tile ids are walls
         if name not in DIRS or box_before:
             st["last_fail"] = None  # a wall is only 'confirmed' by two consecutive identical move presses
+        snap_pre = emu.read_range(*EFFECT_WINDOW) if not box_before else None
         emu.press(Button[name])
         after = settle_position(before)
         tm2 = emu.read_range(TILEMAP, TILEMAP_LEN)
@@ -223,8 +274,12 @@ def main(argv=None) -> int:
                         inter["menus"].append(menu)
             if not box_after and inter:
                 mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
+                extra["ram_diff"], fx = effects(inter["snap"], emu.read_range(*EFFECT_WINDOW))
+                inter["entry"].setdefault("effects", [])
+                if fx not in inter["entry"]["effects"]:
+                    inter["entry"]["effects"].append(fx)
                 result = (f"interaction closed after {inter['presses']} presses; menus seen: {len(inter['menus'])}, "
-                          f"choices: {inter['choices'] or 'none'}")
+                          f"choices: {inter['choices'] or 'none'}; effects: {fx}")
                 st["inter"] = None
             else:
                 result = f"text box: advanced ({'menu' if is_menu(tm2) else 'dialog'})"
@@ -232,7 +287,9 @@ def main(argv=None) -> int:
             # Record the A press either way, so a silent wall is tested once and never again.
             entry = mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
             if box_after:
-                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [], "choices": []}
+                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
+                               "choices": [], "snap": snap_pre}
+                extra["sprites"] = sprite_snapshot(emu)
             result = (f"INTERACTION at ({before[1]},{before[2]}) facing {st['facing']}: \"{text[:60]}\""
                       if box_after else f"nothing to interact with facing {st['facing']} (remembered)")
         else:
@@ -242,19 +299,33 @@ def main(argv=None) -> int:
             st["last_fail"] = fail_key if (name in DIRS and after == before) else None
             if after[0] != before[0]:
                 st["settle"] = 30  # fade already waited out; a short pause so the watcher sees the arrival
-            if box_after and not st.get("inter"):  # walked into an NPC or a sign that talks on contact
+            if box_after and not st.get("inter"):  # walked into an NPC, or a scripted event fired (Oak!)
                 entry = mem.interact(before[0], before[1], before[2], st["facing"], text)
-                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [], "choices": []}
-                result += f'; opened a box on contact: "{text[:50]}"'
+                st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
+                               "choices": [], "snap": snap_pre}
+                extra["sprites"] = sprite_snapshot(emu)
+                extra["trigger"] = True  # a box with no A press is a contact/scripted event, not an interaction
+                result += f'; event on contact: "{text[:50]}"'
         mem.visit(after[0], after[1], after[2], st["step"])
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
         trans.write(json.dumps({"step": st["step"], "from": list(before), "button": name, "to": list(after),
                                 "moved": before != after, "textbox": "dialog" if box_before else "none",
-                                "text": text, "facing": st["facing"], "source": source}) + "\n")
+                                "text": text, "facing": st["facing"], "source": source, **extra}) + "\n")
         trans.flush()  # the later process reads this file while the demo is still running
         mm = mem.m(after[0])
+        goals = check_goals(emu, st)
+        if goals["left_house"]:
+            st["goal_left_house"] = True
+        for g in GOALS:  # first time each goal is reached: remember the step and persist it
+            if goals[g] and g not in st["goal_steps"]:
+                st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
+                gp = Path("runs/milestones.json")
+                hist = json.loads(gp.read_text()) if gp.exists() else {}
+                hist.setdefault(g, []).append({"run": run_dir.name, "step": st["step"]}); gp.write_text(json.dumps(hist, indent=1))
+        gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
         log(f"--- step {st['step']}/{a.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {st['facing']}  "
-            f"learned: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
+            f"party={emu.read(0xD163)} bag={emu.read(0xD31D)}  goals: {gtxt}\n"
+            f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
             f"{len(mm.get('interactions', {}))} interactions", "hdr")
         log(f"{'human:   ' if source == 'human' else 'thinking:'} {why}", "human" if source == "human" else "why")
         log(f"button:   {name:<8} result: {result}\n", "btn")
@@ -273,7 +344,21 @@ def main(argv=None) -> int:
         if st["settle"] > 0:
             st["settle"] -= a.frames_per_step; return
         m, x, y = pos()
-        if box_open(emu.read_range(TILEMAP, TILEMAP_LEN)):
+        tm_now = emu.read_range(TILEMAP, TILEMAP_LEN)
+        lines_now = frame_lines(tm_now) if box_open(tm_now) else []
+        in_battle = emu.read(0xD057) != 0 or any(ln.startswith("FIGHT") or "FIGHT" in ln for ln in lines_now)
+        if in_battle:
+            # First battle logic: always FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
+            st["battles"] = st.get("battles", 0) + (0 if st.get("in_battle") else 1); st["in_battle"] = True
+            st["box_streak"] = 0
+            do_press("A", "agent", f"BATTLE (wIsInBattle=0x{emu.read(0xD057):02X}): FIGHT with the first move"); return
+        if st.get("in_battle"):
+            st["in_battle"] = False
+            # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
+            won = emu.read(0xD163) > 0 and emu.read(0xD35E) not in (0x25, 0x26)
+            st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
+            log(f"[battle over - {'WON' if won else 'lost?'}; {st['battles']} battles this run]", "res")
+        if box_open(tm_now):
             if st["box_streak"] >= 12:
                 do_press("B", "agent", "a box has stayed open for 12 presses - pressing B to back out"); return
             tm = emu.read_range(TILEMAP, TILEMAP_LEN)

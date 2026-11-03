@@ -4,9 +4,9 @@ from pokeagent.emulator import FakeEmulator
 from pokeagent.names import Entry, Registry, load_registry
 
 
-def test_registry_loads_15_entries():
+def test_registry_loads_19_entries():
     reg = load_registry()
-    assert len(reg.entries) == 15
+    assert len(reg.entries) == 19
     e = reg.by_name["wXCoord"]
     assert e.addr == 0xD362
     assert e.size == 1
