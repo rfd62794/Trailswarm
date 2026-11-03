@@ -104,6 +104,38 @@ def sprite_snapshot(emu) -> list[list[int]]:
     return out
 
 
+def ascii_vision(emu, mem, tileset: int) -> list[str]:
+    """Cheap vision: the visible 10x9 map tiles as one character each, from RAM, no image model.
+    @ player, N an NPC (sprite table), # tile ids learned solid, . learned walkable, ? never tried,
+    W a learned warp tile; an open text box replaces the bottom rows with its decoded text."""
+    tm = emu.read_range(TILEMAP, TILEMAP_LEN)
+    m, px, py = emu.read(0xD35E), emu.read(0xD362), emu.read(0xD361)
+    d = mem.m(m)
+    npcs = {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
+    warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
+    rows = []
+    for r in range(9):
+        line = ""
+        for c in range(10):
+            mx, my = px + (c - 4), py + (r - 4)
+            block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
+            if (c, r) == (4, 4):
+                ch = "@"
+            elif (mx, my) in npcs:
+                ch = "N"
+            elif (mx, my) in warps:
+                ch = "W"
+            else:
+                e = mem.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in block))
+                ch = "?" if not e else ("#" if e["solid"] > e["walkable"] else ".")
+            line += ch
+        rows.append(line)
+    if box_open(tm):
+        text = frame_lines(tm)
+        rows = rows[:5] + [f"[{ln[:18]:18}]" for ln in text[:4]]
+    return rows
+
+
 def effects(before: bytes, after: bytes) -> tuple[list[list[int]], str]:
     """RAM deltas around an interaction, capped, plus a one-line human summary using the registry's names."""
     changes = ram_diff(before, after, base=EFFECT_WINDOW[0])[:64]
@@ -452,7 +484,11 @@ def main(argv=None) -> int:
             f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
             f"{len(mm.get('interactions', {}))} interactions", "hdr")
         log(f"{'human:   ' if source == 'human' else 'thinking:'} {why}", "human" if source == "human" else "why")
-        log(f"button:   {name:<8} result: {result}\n", "btn")
+        log(f"button:   {name:<8} result: {result}", "btn")
+        if st["step"] % 5 == 0:  # cheap vision every 5 steps: what the agent 'sees' as text
+            log("vision:   " + "  ".join(ascii_vision(emu, mem, emu.read(0xD367))) + "\n", "res")
+        else:
+            log("", None)
         if st["step"] % 10 == 0:
             mem.save()
         if st["step"] >= a.steps and not st["done"]:
@@ -613,6 +649,9 @@ def main(argv=None) -> int:
     def _goto(map=None, x=None, y=None, **_):
         st["goto"] = [int(map if map is not None else pos()[0]), int(x), int(y)]
         log(f"[remote goto {st['goto']}]", "res"); return {"goto": st["goto"]}
+
+    @ctl.route("GET", "/vision")
+    def _vision(**_): return {"rows": ascii_vision(emu, mem, emu.read(0xD367))}
 
     @ctl.route("GET", "/peek")
     def _peek(addr="0xD35E", length="1", **_):
