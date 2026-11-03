@@ -747,6 +747,11 @@ def main(argv=None) -> int:
                 with Path("runs/battles.jsonl").open("a", encoding="utf-8") as fh:
                     fh.write(json.dumps(bl) + "\n")
         if box_open(tm_now):
+            if any("A B C D E" in ln for ln in lines_now):  # the naming KEYBOARD: START = END (B only deletes letters)
+                if st.get("replay_ctx"):
+                    st["replay"] = []; rp = st["replay_ctx"]; rp["demo"]["grade"] = -1; st.pop("replay_ctx", None)
+                    log("[the replayed beat led into the keyboard: graded BAD]", "res")
+                do_press("START", "agent", "naming keyboard open: START ends it (default name)"); return
             # Text-triggered beat: a known good sequence for this box text runs automatically (and gets graded).
             sig = " | ".join(lines_now[:2])[:80]
             beat = mem.beat_for(sig)
@@ -826,7 +831,7 @@ def main(argv=None) -> int:
             st["stall"] = 0; st["stalls"] = st.get("stalls", 0) + 1
             if st.get("replay_ctx"):
                 st["replay"] = []; grade_replay()
-            esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
+            esc = ["B", "START", random.choice(list(DIRS)), "A", "B", random.choice(list(DIRS))][st["stalls"] % 6]
             do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
         hp_now, mx_now = party_hp(emu)
         # Mom-heal loop guard: if we talked to her and HP did not rise, stop going back for a while.
