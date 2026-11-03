@@ -101,7 +101,11 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             # Balls = spots in the lab whose dialog named a starter. The wanted one may be an untried neighbour
             # on the same table row, so try those too. NEVER fall through to the Pallet Town OAK spot from here:
             # that is what walked the agent back out of the lab.
-            balls = [s for s in interaction_spots(maps, "want") if s[0] == 0x28 and any(n in spot_text(*s) for n in STARTERS)]
+            # A ball spot is one whose dialog had the OFFER phrase ("So! You want the water POKeMON, SQUIRTLE?").
+            # Plain "want" also matches the nickname question, which contaminated a spot where the agent merely
+            # stood while that dialog ran (5,5,DOWN "received a BULBASAUR"); the offer phrase does not.
+            OFFER = "YOU WANT THE"
+            balls = [s for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and any(n in spot_text(*s) for n in STARTERS)]
             targets = [s for s in balls if want == "ANY" or want in spot_text(*s)]
             if not targets and balls:
                 tried = {(s[1], s[2], s[3]) for s in balls}
