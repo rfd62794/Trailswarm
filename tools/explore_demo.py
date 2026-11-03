@@ -46,6 +46,9 @@ PROCEDURES = {
     "open_bag": [("START", r"ITEM"), ("DOWN", r">ITEM"), ("A", r"CANCEL"), ("READ", None), ("B", None), ("B", None)],
     "save_game": [("START", r"SAVE"), ("DOWN", r">ITEM"), ("DOWN", None), ("DOWN", r">SAVE"), ("A", r"save|SAVE"),
                   ("A", r"YES|Saving|saved"), ("A", r"saved|SAVE"), ("A", None), ("B", None), ("B", None)],
+    # A new discovery gets maximal exploration (Robert): the TOWN MAP is opened and read the moment we get it.
+    "use_town_map": [("START", r"ITEM"), ("DOWN", r">ITEM"), ("A", r"TOWN MAP|CANCEL"), ("A", r"USE|TOSS"), ("A", None),
+                     ("READ", None), ("B", None), ("B", None), ("B", None)],
 }
 # YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
 YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
@@ -734,6 +737,10 @@ def main(argv=None) -> int:
                            "facing": st["facing"], "text": (st.get("last_text") or text)[:80], "step": st["step"], "run": run_dir.name}
                     mem.data.setdefault("items", []).append(rec); del mem.data["items"][:-200]
                     extra["item"] = rec
+                    if delta > 0 and item == 0x05 and "use_town_map" not in st.get("proc_done", set()):
+                        st.setdefault("proc_due", []).append("use_town_map"); st.setdefault("proc_done", set()).add("use_town_map")
+                    if delta > 0:
+                        st["explore_burst"] = 60  # something new: look around properly before moving on
                     log(f"*** ITEM {'RECEIVED' if delta > 0 else 'USED/LOST'}: {iname} x{abs(delta)} at map 0x{before[0]:02X} ({before[1]},{before[2]}) ***", "res")
         if name == "A" and box_after and not box_before:  # talked to whatever is in front: tie the text to the NPC there
             dx, dy = DIRS[st["facing"]]
@@ -1138,6 +1145,15 @@ def main(argv=None) -> int:
                 st.setdefault("proc_done", set()).update({"check_health", "open_bag", "save_game"})
             st["mom_talk_step"] = None
         goals_now_all = check_goals(emu, st)
+        if m not in st.setdefault("burst_maps", set()):  # a NEW MAP: maximal exploration before any plan resumes
+            st["burst_maps"].add(m)
+            if len(st["burst_maps"]) > 1:
+                st["explore_burst"] = max(st.get("explore_burst", 0), 120)
+                log(f"[new map 0x{m:02X}: exploration burst, 120 steps before plans resume]", "res")
+        if st.get("explore_burst", 0) > 0 and not (mx_now and hp_now / mx_now < 0.4):
+            st["explore_burst"] -= 1
+            name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367), grass="neutral")
+            do_press(name, "agent", f"exploring a new discovery ({st['explore_burst']} left): {why}"); return
         planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
                              "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])

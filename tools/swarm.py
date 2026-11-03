@@ -95,7 +95,7 @@ def main() -> int:
     ap.add_argument("--roles", action="store_true",
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     a = ap.parse_args()
-    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]
+    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]
     seg_args: list[str] = []
     if a.segment:
         i = GOALS.index(a.segment)
