@@ -756,6 +756,35 @@ def main(argv=None) -> int:
             hp, mx = party_hp(emu)
             weak = mx > 0 and hp / mx < 0.4
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
+            # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
+            species = emu.read(0xCFE5)
+            if st.get("last_battle_hp") is not None and hp < st["last_battle_hp"]:
+                dmg = mem.data.setdefault("enemy_damage", {}).setdefault(str(species), [])
+                dmg.append(st["last_battle_hp"] - hp); del dmg[:-20]
+            st["last_battle_hp"] = hp
+            expected = max(mem.data.get("enemy_damage", {}).get(str(species), [0]) or [0])
+            # --- potion timing: use one when the next expected hit could take us below ~1 hit of safety and the heal
+            #     is not wasted (POTION restores 20 HP in Gen 1; the observed heal is learned into item_heal) ---
+            heal = max(mem.data.get("item_heal", {}).get("20", [20]) or [20])
+            has_potion = bag_contents(emu).get(0x14, 0) > 0
+            want_potion = has_potion and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
+            cur = next((ln for ln in lines_now if ">" in ln), "")
+            if want_potion and (run_line is not None or any("POTION" in ln for ln in lines_now) or "which" in " ".join(lines_now).lower()):
+                st["potion_hp_before"] = hp
+                if any("POTION" in ln and ">" in ln for ln in lines_now):
+                    do_press("A", "agent", f"BATTLE HP {hp}/{mx}, enemy hits up to {expected}: using POTION (+{heal})"); return
+                if any("POTION" in ln for ln in lines_now):
+                    do_press("DOWN", "agent", "item list: moving to POTION"); return
+                if ">ITEM" in cur:
+                    do_press("A", "agent", f"BATTLE HP {hp}/{mx}: opening ITEM for a POTION"); return
+                if "FIGHT" in cur or "PKMN" in cur:
+                    do_press("DOWN", "agent", "battle menu: down to ITEM"); return
+                if "RUN" in cur:
+                    do_press("LEFT", "agent", "battle menu: left to ITEM"); return
+                do_press("A", "agent", "item use: confirming"); return
+            if st.get("potion_hp_before") is not None and hp > st["potion_hp_before"]:
+                mem.data.setdefault("item_heal", {}).setdefault("20", []).append(hp - st["potion_hp_before"])
+                log(f"[POTION healed {hp - st['potion_hp_before']} HP: learned]", "res"); st["potion_hp_before"] = None
             if kind == 1 and weak and run_line is not None:  # wild battle and too weak: flee
                 if ">RUN" in run_line:
                     do_press("A", "agent", f"BATTLE wild, HP {hp}/{mx}: RUN"); return
@@ -767,7 +796,7 @@ def main(argv=None) -> int:
             # Default battle logic: FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
             do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT with the first move"); return
         if st.get("in_battle"):
-            st["in_battle"] = False
+            st["in_battle"] = False; st["last_battle_hp"] = None; st["potion_hp_before"] = None
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             won = emu.read(0xD163) > 0 and (m, x, y) == st.get("battle_pos")  # a blackout warps you away
             st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
