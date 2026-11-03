@@ -118,3 +118,17 @@ in_battle:bool, money:int`. `badge_count = bin(badges).count("1")`. `in_battle =
 ## 8. Report
 
 Test tail, line counts per new file, and anything in the design you had to decide that is not written down.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-02 21:54 · robert-claude-laptop · none → Queued — build step 1 of 3; design at docs/superpowers/specs/2026-11-02-pokeagent-design.md; independent of step 2
+<!-- queue:end -->
