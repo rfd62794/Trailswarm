@@ -85,7 +85,9 @@ class PyBoyEmulator:
         return bytes(self._pyboy.memory[start : start + length])
 
     def screenshot(self) -> Image.Image:
-        return self._pyboy.screen.image
+        # Headless ticks never render, so the screen buffer would be stale/blank: render one frame first.
+        self._pyboy.tick(1, True)
+        return self._pyboy.screen.image.convert("RGB")
 
     def save_state(self, path: Path) -> None:
         with Path(path).open("wb") as f:

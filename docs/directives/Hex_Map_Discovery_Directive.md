@@ -47,8 +47,11 @@ Create, in order:
 
 Entry shape: `{"name": "wXCoord", "addr": "0xD362", "size": 1, "encoding": "u8", "verified": false,
 "note": "player X on current map"}`. Encodings: `u8`, `u16le`, `u16be`, `bcd` (size N, big-endian digits),
-`bitmask`, `bool`, `text` (charmap-decoded, size N), `bytes`. Seed the file with exactly these claims (all
-`verified: false`):
+`bitmask`, `bool`, `text` (charmap-decoded, size N), `bytes`. Seed the file with exactly these claims. All
+`verified: false` EXCEPT four that the controller confirmed on the real ROM on 2026-11-02 with
+`tools/make_baseline.py` (a fresh game read `map=0x26 pos=(3,6) money=3000`, i.e. REDS_HOUSE_2F at the
+spawn tile with the starting 3000, and a RIGHT press in the bedroom changed `0xD362` 4->5): mark `wCurMap`, `wYCoord`, `wXCoord`, `wPlayerMoney` as
+`"verified": true, "evidence": "make_baseline 2026-11-02"`.
 
 | name | addr | size | encoding | note |
 |---|---|---|---|---|
