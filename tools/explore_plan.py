@@ -199,7 +199,11 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
     level = goals.get("_level", 0)
     carrying_parcel = goals.get("oaks_parcel") and not goals.get("deliver_parcel")
-    if goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5 and not carrying_parcel:
+    # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
+    # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
+    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02)
+    if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5
+            and not carrying_parcel and not beyond_viridian):
         # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
         #  sent the agent back to Route 1 to train - they spent 600+ presses there and never reached the lab)
         # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
