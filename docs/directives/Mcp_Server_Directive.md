@@ -138,13 +138,15 @@ Test tail, line counts, and any place the mcp 2.x API differed from section 1 (s
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-mcp-server-directive |
 | Base branch | - |
+| Base commit | d2184fc4a4b66d6a3e3b4c0ae01dc3048eb8ff5f |
 
 **Status log**
 - 2026-11-02 22:25 · robert-claude-laptop · none → Draft — build step 5 (MCP server), Robert asked 2026-11-02; mcp==2.3.0 already in uv.lock; queue after Agent_Loop_And_CLI merges
 - 2026-11-02 22:37 · robert-claude-laptop · Draft → Queued — prereq Agent_Loop_And_CLI merged (PR #4); mcp 2.3.0 in uv.lock via PR #5
 - 2026-11-02 23:15 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited new paths are files it creates; dispatch-path-missing is a false positive
+- 2026-11-02 23:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-mcp-server-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FSXVCY8FDNF0BCCTF8YW9T
 <!-- queue:end -->
