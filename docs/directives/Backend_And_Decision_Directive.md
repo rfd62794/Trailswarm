@@ -139,4 +139,5 @@ Test tail, line counts per new file, and any decision not written in the design.
 - 2026-11-02 22:03 · robert-claude-laptop · Blocked → Queued — requeue: first run died at spawn on Get-ChildItem -Recurse (sandbox refusal); directive now pastes the worktree layout and forbids recursive listing (main 6732ce4)
 - 2026-11-02 22:03 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited paths are the files it creates, not files it reads; dispatch-path-missing is a false positive here
 - 2026-11-02 22:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FNWKSDDEMNY0N6MZGZ54RW
+- 2026-11-02 22:09 · dispatcher · launched pid=22100; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-backend-and-decision-directive; resynced: merged main into directive/pokeagent-backend-and-decision-directive (8 commit(s), clean); provisioned: uv sync --frozen
 <!-- queue:end -->
