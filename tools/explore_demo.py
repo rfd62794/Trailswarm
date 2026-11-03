@@ -372,6 +372,10 @@ def main(argv=None) -> int:
         if box_before:
             if inter:
                 inter["presses"] += 1
+                # The first capture happens while the text is still printing ("So! Y"): keep the fullest dialog seen.
+                full = " / ".join(st.get("dialog", []))[:400]
+                if len(full) > len(inter["entry"].get("text", "")):
+                    inter["entry"]["text"] = full
                 if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
                     chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
                     yn = st.pop("yesno", None)

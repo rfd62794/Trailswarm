@@ -67,7 +67,8 @@ def interaction_spots(maps: dict, needle: str) -> list[tuple[int, int, int, str]
     out = []
     for mid, d in maps.items():
         for key, e in d.get("interactions", {}).items():
-            if needle.lower() in (e.get("text") or "").lower():
+            hay = ((e.get("text") or "") + " " + " ".join(e.get("choices", []) or [])).lower()
+            if needle.lower() in hay:
                 x, y, f = key.split(",")
                 out.append((int(mid), int(x), int(y), f))
     return out
