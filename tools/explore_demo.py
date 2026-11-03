@@ -134,10 +134,7 @@ def ascii_vision(emu, mem, tileset: int) -> list[str]:
                 ch = "?" if not e else ("#" if e["solid"] > e["walkable"] else ".")
             line += ch
         rows.append(line)
-    if box_open(tm):
-        text = frame_lines(tm)
-        rows = rows[:5] + [f"[{ln[:18]:18}]" for ln in text[:4]]
-    return rows
+    return rows  # text boxes are NOT part of the map: the dialog pane shows them
 
 
 def effects(before: bytes, after: bytes) -> tuple[list[list[int]], str]:
@@ -343,6 +340,10 @@ def main(argv=None) -> int:
     vis = tk.Label(root, bg="#0b0b0b", fg="#9fd8ff", font=("Consolas", 13), justify="left", anchor="nw",
                    padx=10, pady=8, width=22, height=27)
     vis.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ns")
+    # fourth pane under the game: the current dialog / menu text, goals, and battle flag (not on the map)
+    dlg = tk.Label(root, bg="#0b0b0b", fg="#ffd9a0", font=("Consolas", 11), justify="left", anchor="nw",
+                   padx=10, pady=6, width=58, height=6)
+    dlg.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
@@ -760,6 +761,13 @@ def main(argv=None) -> int:
                 vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
                               + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
                               + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
+                tm_d = emu.read_range(TILEMAP, TILEMAP_LEN)
+                lines_d = frame_lines(tm_d) if box_open(tm_d) else []
+                g = check_goals(emu, st)
+                dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
+                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
+                              f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
                 vis.configure(text=f"vision error: {e!r}")
         h = hash(emu.read_range(TILEMAP, TILEMAP_LEN))  # screen tiles only; wandering NPCs must not count as a cutscene
