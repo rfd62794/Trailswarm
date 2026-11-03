@@ -863,6 +863,19 @@ def main(argv=None) -> int:
                     do_press("DOWN", "agent", f"menu open, '{cursor}' already tried - moving the cursor down"); return
                 do_press("B", "agent", "menu open, every option tried here - backing out"); return
             do_press("A", "agent", "a text box is open - finishing the interaction before moving"); return
+        # Menu literacy (Robert): once per run, after the first heal, open START -> POKeMON, read the party screen,
+        # compare its HP text with RAM, remember the menu layout, and back out. (HP decisions use RAM directly.)
+        if st.get("menu_check") == "due" and not box_open(tm_now) and emu.read(0xD057) == 0:
+            st["menu_check"] = ["START", "A", "READ", "B", "B"]
+        if isinstance(st.get("menu_check"), list) and st["menu_check"]:
+            stepname = st["menu_check"].pop(0)
+            if stepname == "READ":
+                lines = frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN))
+                mem.data.setdefault("menus", {})["pokemon_screen"] = lines[:8]
+                hp_now2, mx_now2 = party_hp(emu)
+                log(f"[START menu > POKeMON reads: {' | '.join(lines[:4])[:90]}  (RAM says HP {hp_now2}/{mx_now2})]", "res")
+                stepname = st["menu_check"].pop(0) if st["menu_check"] else "B"
+            do_press(stepname, "agent", "menu literacy: START > POKeMON, read the party screen, back out"); return
         if st.get("goto"):  # a human/Claude asked for a destination: route there over the learned world
             target = tuple(st["goto"])
             if (m, x, y) == target:
@@ -904,6 +917,8 @@ def main(argv=None) -> int:
                 log(f"[Mom did not heal us (HP {hp_now}/{mx_now}); not retrying for 150 steps]", "res")
             else:
                 log(f"[healed at Mom: HP {hp_now}/{mx_now}]", "res")
+                if not st.get("menu_check"):
+                    st["menu_check"] = "due"  # verify the heal the way a player would: START > POKeMON
             st["mom_talk_step"] = None
         goals_now_all = check_goals(emu, st)
         planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
