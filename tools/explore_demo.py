@@ -621,12 +621,16 @@ def main(argv=None) -> int:
         if box_after and not box_before:
             st["beat"] = {"sig": None, "buttons": [], "goals": goals_before, "pos": before, "sources": set()}
         elif st.get("beat") and box_before:
-            if st["beat"]["sig"] is None:  # key by the text as it reads at the FIRST press, after it has printed
-                st["beat"]["sig"] = " | ".join(frame_lines(tm)[:2])[:80]
+            lines_b = frame_lines(tm)
+            if st["beat"]["sig"] is None and len(lines_b) >= 2:  # first line is complete once a second line exists
+                st["beat"]["sig"] = lines_b[0][:60]
+            if is_menu(tm):  # a beat must never carry a decision (YES/NO, menu): rules decide those, not replays
+                st["beat"]["choice"] = True
             st["beat"]["buttons"].append(name); st["beat"]["sources"].add(source)
             if not box_after:
                 bt = st.pop("beat"); goals_now = check_goals(emu, st)
-                progressed = any(goals_now[g] and not bt["goals"].get(g) for g in GOALS) or bool(extra.get("ram_diff"))
+                progressed = (any(goals_now[g] and not bt["goals"].get(g) for g in GOALS) or bool(extra.get("ram_diff"))) \
+                    and not bt.get("choice")
                 src = "human" if "human" in bt["sources"] else "claude" if "claude" in bt["sources"] else "agent"
                 mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
                 if progressed:
@@ -753,9 +757,11 @@ def main(argv=None) -> int:
                     log("[the replayed beat led into the keyboard: graded BAD]", "res")
                 do_press("START", "agent", "naming keyboard open: START ends it (default name)"); return
             # Text-triggered beat: a known good sequence for this box text runs automatically (and gets graded).
-            sig = " | ".join(lines_now[:2])[:80]
-            beat = mem.beat_for(sig)
-            if beat and not st.get("replay") and st.get("beat_sig_done") != sig and not st["explore_run"]:
+            sig = lines_now[0][:60] if len(lines_now) >= 2 else None
+            beat = mem.beat_for(sig) if sig else None
+            if is_menu(tm_now) and st.get("replay"):  # a menu/YES-NO appeared mid-replay: stop, let the rules decide
+                st["replay"] = []; st.pop("replay_ctx", None)
+            if beat and not st.get("replay") and not is_menu(tm_now) and st.get("beat_sig_done") != sig and not st["explore_run"]:
                 st["replay"] = list(beat["buttons"]); st["beat_sig_done"] = sig
                 st["replay_ctx"] = {"demo": beat, "pos": (m, x, y), "goals": check_goals(emu, st)}
                 log(f"[recognised \"{sig[:40]}\": running the known {len(beat['buttons'])}-press beat (grade {beat['grade']})]", "res")
