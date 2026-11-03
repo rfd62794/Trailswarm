@@ -159,7 +159,10 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 if p:
                     return p[0], f"goal first pokemon: {len(p)} steps to the ball spot ({x},{y}) for {want}"
             return None  # unknown table so far: explore the lab (the caller's exploration prefers untested walls)
-        for (m, x, y, f) in interaction_spots(maps, "OAK"):
+        # Oak's trigger is the outdoor "Hey! Wait!" event in Pallet Town (map 0). Any spot whose text merely mentions OAK
+        # also matched Mom's line "...Oak is looking for you", which sent every starter-segment agent into its own
+        # house to talk to Mom for 1800 steps.
+        for (m, x, y, f) in [s for s in interaction_spots(maps, "WAIT") if s[0] == 0x00]:
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
             p = g.path(pos, lambda n: n == (m, x, y))
