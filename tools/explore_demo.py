@@ -332,13 +332,32 @@ class MapMemory:
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
 
-    def choose(self, map_id, x, y, facing: str, tilemap: bytes | None = None, tileset: int = 0) -> tuple[str, str]:
+    # --- wild grass: where encounters happened (per tile) and which tile ids are grass (per tileset) ---
+    def learn_encounter(self, map_id, x, y, tileset: int, under: list[int]):
+        enc = self.m(map_id).setdefault("encounters", {})
+        enc[f"{x},{y}"] = enc.get(f"{x},{y}", 0) + 1
+        g = self.data.setdefault("grass_ids", {}).setdefault(str(tileset), {})
+        key = ",".join(f"{b:02X}" for b in under)
+        g[key] = g.get(key, 0) + 1
+
+    def is_grass(self, tileset: int, block: list[int]) -> bool:
+        return ",".join(f"{b:02X}" for b in block) in self.data.get("grass_ids", {}).get(str(tileset), {})
+
+    def choose(self, map_id, x, y, facing: str, tilemap: bytes | None = None, tileset: int = 0,
+               avoid_maps: set | None = None, grass: str = "neutral") -> tuple[str, str]:
+        """grass: 'seek' (training: prefer grass ahead), 'avoid' (weak: never step into known grass), 'neutral'."""
         d = self.m(map_id); best = None
         tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
         if tilemap is not None:  # tile ids ahead already known solid (bookshelf, wall, desk) count as tried
             for n in DIRS:
                 if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
                     tried.append(n)
+                if grass == "avoid" and n not in tried and self.is_grass(tileset, ahead_tiles(tilemap, n)):
+                    tried.append(n)
+        for n in list(DIRS):  # do not take a connection/warp back to a map we are deliberately done with
+            w = d["warps"].get(f"{x},{y},{n}")
+            if w and avoid_maps and w[0] in avoid_maps and n not in tried:
+                tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
         if facing in tried and not self.interaction_known(map_id, x, y, facing):
             return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A to see if it talks"
@@ -350,6 +369,8 @@ class MapMemory:
                 visits = d.get("warp_taken", {}).get(f"{x},{y},{name}", 1) * 3
             else:
                 visits = d["visited"].get(f"{x + dx},{y + dy}", 0)
+                if grass == "seek" and tilemap is not None and self.is_grass(tileset, ahead_tiles(tilemap, name)):
+                    visits = -1  # training: grass first
             if best is None or visits < best[0]:
                 best = (visits, name)
         if best is None:
@@ -691,6 +712,10 @@ def main(argv=None) -> int:
         if in_battle:
             if not st.get("in_battle"):
                 st["battles"] = st.get("battles", 0) + 1; st["battle_pos"] = (m, x, y)
+                if emu.read(0xD057) == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
+                    under = [tm_now[8 * 20 + 8], tm_now[8 * 20 + 9], tm_now[9 * 20 + 8], tm_now[9 * 20 + 9]]
+                    mem.learn_encounter(m, x, y, emu.read(0xD367), under)
+                    log(f"[wild encounter at ({x},{y}): grass tile learned]", "res")
             st["in_battle"] = True
             st["box_streak"] = 0
             kind = emu.read(0xD057)
@@ -810,14 +835,20 @@ def main(argv=None) -> int:
             else:
                 log(f"[healed at Mom: HP {hp_now}/{mx_now}]", "res")
             st["mom_talk_step"] = None
-        planned = plan_step({**check_goals(emu, st), "_starter": a.starter, "_hp": (hp_now, mx_now),
+        goals_now_all = check_goals(emu, st)
+        planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
                              "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])
         if planned and "at Mom, talking" in planned[1]:
             st["mom_talk_step"] = st["step"]; st["mom_talk_hp"] = hp_now
         if planned and not (st["explore_run"] and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             do_press(planned[0], "agent", planned[1]); return
-        name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
+        weak = mx_now and hp_now / mx_now < 0.4
+        training = goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < emu.read(0xD18C) < 8 and not weak
+        name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367),
+                               avoid_maps={0x00} if (training and m == 0x0C) else None,
+                               grass="seek" if training else "avoid" if weak else "neutral")
+        do_press(name, "agent", why)
 
     def on_key(ev):
         if ev.keysym == "p":
