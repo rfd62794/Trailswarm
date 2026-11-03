@@ -767,6 +767,15 @@ def main(argv=None) -> int:
             st["goal_left_house"] = True
         if "initial_goals" not in st:  # goals already true when the run began (segment runs start from a checkpoint)
             st["initial_goals"] = {g for g in GOALS if goals[g]}
+            # A checkpoint named after a goal implies every earlier goal too (a used potion must not send a run that
+            # starts in Viridian City all the way home to the PC - seen 2026-11-03 06:00).
+            stem = Path(a.state).stem if a.state else ""
+            if stem in GOALS:
+                st["initial_goals"] |= set(GOALS[:GOALS.index(stem) + 1])
+            elif stem == "team_best":
+                st["initial_goals"] |= set(GOALS[:GOALS.index("to_route1") + 1])
+            if st["initial_goals"]:
+                log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(st['initial_goals'])}]", "res")
         for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
             if goals[g] and g not in st["goal_steps"] and g not in st["initial_goals"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
