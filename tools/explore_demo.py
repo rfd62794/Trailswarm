@@ -472,8 +472,31 @@ class MapMemory:
                 best = (visits, name)
         if best is None:
             return "A", "every direction known blocked: pressing A to look around"
+        if best[0] > 0:  # every neighbour already seen: go to the nearest FRONTIER tile instead of wandering locally
+            step = self.frontier_step(map_id, x, y)
+            if step:
+                return step
         why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[0]}x"
         return best[1], why
+
+    def frontier_step(self, map_id, x, y) -> tuple[str, str] | None:
+        """First step of the shortest known route to a tile that still has an unexplored side (big towns need
+        this: local least-visited wandering never reaches the far side of Viridian)."""
+        d = self.m(map_id); visited, blocked = d["visited"], set(d["blocked"])
+        def frontier(n):
+            if n[0] != map_id:
+                return False
+            for name, (dx, dy) in DIRS.items():
+                if f"{n[1]},{n[2]},{name}" not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited \
+                        and f"{n[1]},{n[2]},{name}" not in d.get("warps", {}):
+                    return True
+            return False
+        from explore_plan import WorldGraph
+        g = WorldGraph(self.data["maps"]); g.strict = True
+        p = g._bfs((map_id, x, y), frontier, 4000)
+        if p:
+            return p[0], f"frontier: {len(p)} steps to the nearest tile with an unexplored side"
+        return None
 
     def save(self):
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
