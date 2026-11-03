@@ -765,6 +765,16 @@ def main(argv=None) -> int:
                     mem.data["team_best_level"] = lvl; log(f"*** TEAM CHECKPOINT: level {lvl} saved as team_best.state ***", "res")
                 except Exception as e:
                     log(f"[team checkpoint failed: {e!r}]", "res")
+        # Training economics: experience gained per map (wPartyMon1Exp 0xD179, 3 bytes) so the trainer can pick the
+        # grass with the best XP per step for its level - the 'optimized training strategy' data.
+        exp_now = (emu.read(0xD179) << 16) | (emu.read(0xD17A) << 8) | emu.read(0xD17B)
+        if st.get("exp_prev") is not None and exp_now > st["exp_prev"]:
+            tr = mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})
+            tr["exp"] += exp_now - st["exp_prev"]
+            lv = str(emu.read(0xD18C)); tr["by_level"][lv] = tr["by_level"].get(lv, 0) + (exp_now - st["exp_prev"])
+        if st.get("exp_prev") is not None:
+            mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})["steps"] += 1
+        st["exp_prev"] = exp_now
         bag_post = bag_contents(emu)
         if bag_post != bag_pre:  # an item was received, used, bought or sold: remember where and from what
             for item in set(bag_pre) | set(bag_post):
@@ -954,6 +964,34 @@ def main(argv=None) -> int:
                     do_press("DOWN", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor down toward RUN"); return
                 if "ITEM" in cur:
                     do_press("RIGHT", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor right to RUN"); return
+            # --- catching: a wild species we do not own yet, with a POKe BALL in the bag -> weaken to <=35% HP, then
+            #     ITEM -> POKe BALL. Attempts and results (per species, level, HP%) are recorded to learn catch odds.
+            balls = bag_contents(emu).get(0x04, 0)
+            dex_no = int((ROM_KB or {}).get("dex_of_internal", {}).get(str(species), 0) or 0)
+            owned = bool(dex_no) and bool(emu.read(0xD2F7 + (dex_no - 1) // 8) >> ((dex_no - 1) % 8) & 1)
+            e_hp, e_max = ((emu.read(0xCFE6) << 8) | emu.read(0xCFE7)), ((emu.read(0xCFF4) << 8) | emu.read(0xCFF5))
+            if kind == 1 and balls and dex_no and not owned and e_max:
+                ratio = e_hp / e_max
+                if ratio <= 0.35 and run_line is not None:
+                    st["catch_attempt"] = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2), "step": st["step"]}
+                    cur_c = next((ln for ln in lines_now if ">" in ln), "")
+                    if any("BALL" in ln and ">" in ln for ln in lines_now):
+                        do_press("A", "agent", f"CATCH {ROM_KB['name_of_internal'].get(str(species), species)} at {ratio:.0%} HP: throwing a POKe BALL"); return
+                    if any("BALL" in ln for ln in lines_now):
+                        do_press("DOWN", "agent", "item list: moving to POKe BALL"); return
+                    if ">ITEM" in cur_c:
+                        do_press("A", "agent", "opening ITEM for a POKe BALL"); return
+                    if "FIGHT" in cur_c or "PKMN" in cur_c:
+                        do_press("DOWN", "agent", "battle menu: down to ITEM (catching)"); return
+                    if "RUN" in cur_c:
+                        do_press("LEFT", "agent", "battle menu: left to ITEM (catching)"); return
+                st["catch_mode"] = True  # weaken, do not KO: the move chooser picks the WEAKEST damaging move
+            else:
+                st["catch_mode"] = False
+            if st.get("catch_attempt") and st["catch_attempt"]["step"] < st["step"] - 2:
+                ca = st.pop("catch_attempt"); caught = bool(emu.read(0xD2F7 + (dex_no - 1) // 8) >> ((dex_no - 1) % 8) & 1) if dex_no else False
+                mem.data.setdefault("catches", []).append({**ca, "caught": caught}); del mem.data["catches"][:-100]
+                log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
             # --- move choice with memory: damage dealt per (enemy species, move) is learned from the enemy HP drop
             #     after our move; untried moves are tried first (variety), then the best average; 0-PP moves skipped ---
             enemy_hp = (emu.read(0xCFE6) << 8) | emu.read(0xCFE7)
@@ -983,8 +1021,12 @@ def main(argv=None) -> int:
                     def kscore(mv):
                         base = known.get(norm0(mv), (0, ""))[0]
                         return base * (1.3 if base > 0 and mv not in tried else 1.0)
-                    target = max(moves, key=lambda mv: (kscore(mv), score(mv)[1]))
-                    st["move_reason"] = known.get(norm0(target), (0, ""))[1] + ("" if target in tried else " first try")
+                    if st.get("catch_mode"):  # weaken without a KO: the weakest move that still does damage
+                        target = min((mv for mv in moves if kscore(mv) > 0), key=kscore)
+                        st["move_reason"] = "weakest hit, catching"
+                    else:
+                        target = max(moves, key=lambda mv: (kscore(mv), score(mv)[1]))
+                        st["move_reason"] = known.get(norm0(target), (0, ""))[1] + ("" if target in tried else " first try")
                 else:  # no knowledge (or all out of PP): variety first, then the best observed damage
                     target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
                     st["move_reason"] = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
