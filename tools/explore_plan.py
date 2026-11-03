@@ -304,6 +304,10 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             p = g.path(pos, lambda n: n[0] in outdoors)
             if p:
                 return p[0], f"goal road north: leaving map 0x{pos[0]:02X} for the outdoors ({len(p)} steps)"
+            if pos[0] in POKECENTER_MAPS:  # exit warp never recorded ('seen once' gate): every center's door is straight down x=3
+                if pos[1] != 3:
+                    return ("RIGHT" if pos[1] < 3 else "LEFT"), "goal road north: crossing the Pokecenter to its door column"
+                return "DOWN", "goal road north: walking out of the Pokecenter by its door"
             return None
         if pos[0] == 0x00:  # in Pallet Town: Route 1 is the known way north
             p = g.path(pos, lambda n: n[0] == 0x0C)
