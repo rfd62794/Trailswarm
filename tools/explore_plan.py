@@ -175,6 +175,31 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             if p:
                 return p[0], f"goal train to L8 (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
         return None  # on Route 1: let exploration roam (grass encounters happen on their own)
+    if goals.get("to_viridian") and not goals.get("oaks_parcel"):
+        # The parcel is at the Viridian Mart: explore Viridian's buildings - take warps on map 0x01 never taken yet.
+        if pos[0] == 0x01:
+            d = maps.get("1", {})
+            fresh = [k for k in d.get("warps", {}) if d.get("warp_taken", {}).get(k, 0) == 0]
+            for k in fresh:
+                wx, wy, wd = k.split(",")
+                target = (0x01, int(wx), int(wy))
+                if pos == target:
+                    return wd, f"goal parcel: trying an unexplored door at ({wx},{wy})"
+                p = g.path(pos, lambda n: n == target)
+                if p:
+                    return p[0], f"goal parcel: {len(p)} steps to an unexplored door at ({wx},{wy})"
+        elif pos[0] not in (0x00, 0x0C, 0x25, 0x26, 0x28):
+            return None  # inside a Viridian building: explore it (talk to the clerk - the parcel is a bag change)
+        else:
+            p = g.path(pos, lambda n: n[0] == 0x01)
+            if p:
+                return p[0], f"goal parcel: {len(p)} steps back to Viridian City"
+    if goals.get("oaks_parcel") and not goals.get("deliver_parcel"):
+        if pos[0] == 0x28:
+            return None  # in the lab: exploration talks to Oak (interaction probing of NPCs)
+        p = g.path(pos, lambda n: n[0] == 0x28)
+        if p:
+            return p[0], f"goal deliver the parcel: {len(p)} steps to Oak's lab"
     if goals.get("won_battle") and not goals.get("to_viridian"):
         # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
         # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).

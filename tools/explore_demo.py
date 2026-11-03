@@ -139,7 +139,7 @@ def move_scores(emu) -> dict[str, tuple[float, str]]:
     return out
 
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]  # goals.json order
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]  # goals.json order
 
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
@@ -171,9 +171,14 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
     potion = any(bag[i] == 0x14 for i in range(0, len(bag), 2))
     m = emu.read(0xD35E)
     seen = st.setdefault("seen_maps", set()); seen.add(m)
+    has_parcel = 0x46 in bag_contents(emu)
+    if has_parcel:
+        st["had_parcel"] = True
     g = {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
          "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
-         "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen}
+         "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen,
+         "oaks_parcel": has_parcel or st.get("had_parcel", False),
+         "deliver_parcel": st.get("had_parcel", False) and not has_parcel}
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:
