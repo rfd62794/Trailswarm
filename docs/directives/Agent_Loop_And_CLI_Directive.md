@@ -170,4 +170,5 @@ Test tail, line counts, the exact console block from the 5-step fake run, and an
 - 2026-11-02 22:16 · robert-claude-laptop · Draft → Queued — prereqs merged: Emulator_Layer (PR #1) and Backend_And_Decision (PR #2) both on main
 - 2026-11-02 22:17 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: the cited new paths are files it creates; dispatch-path-missing is a false positive
 - 2026-11-02 22:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-agent-loop-and-cli-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6FPJRBZCACBPAT50M6Z8EJ5
+- 2026-11-02 22:19 · dispatcher · launched pid=14040; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-agent-loop-and-cli-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
