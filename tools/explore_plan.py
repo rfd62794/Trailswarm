@@ -78,6 +78,18 @@ def interaction_spots(maps: dict, needle: str) -> list[tuple[int, int, int, str]
 def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, str] | None:
     """Next button toward the first unmet goal that the learned world already knows how to reach, else None."""
     g = WorldGraph(maps)
+    hp, mx = goals.get("_hp", (0, 0))
+    if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C):
+        # Weak and near home: Mom heals the party when talked to. She is the one static sprite downstairs
+        # (learned in maps.json npcs; fallback (5,4)); stand below her facing UP and press A.
+        mom = next((e for e in maps.get(str(0x25), {}).get("npcs", {}).values() if not e.get("moves") and e.get("last")), None)
+        mx_, my_ = (mom["last"][0], mom["last"][1]) if mom else (5, 4)
+        spot = (0x25, mx_, my_ + 1)
+        if pos == spot:
+            return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at Mom, {'talking' if facing == 'UP' else 'facing her'} to heal"
+        p = g.path(pos, lambda n: n == spot)
+        if p:
+            return p[0], f"HP {hp}/{mx}: going home to Mom to heal ({len(p)} steps)"
     if not goals.get("potion"):
         for (m, x, y, f) in interaction_spots(maps, "PC"):
             if pos == (m, x, y):

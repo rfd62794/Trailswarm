@@ -80,6 +80,14 @@ REGISTRY = load_registry()
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]  # goals.json order
 
 
+def party_hp(emu) -> tuple[int, int]:
+    """Lead pokemon HP and max HP. VERIFIED 2026-11-03: wPartyMon1HP 0xD16C/6D, wPartyMon1MaxHP 0xD18D/8E
+    (read 11/20 for a level-5 Bulbasaur; wPartyMon1Level 0xD18C read 5; species at 0xD16B read 0x99)."""
+    hp = (emu.read(0xD16C) << 8) | emu.read(0xD16D)
+    mx = (emu.read(0xD18D) << 8) | emu.read(0xD18E)
+    return hp, mx
+
+
 def check_goals(emu, st: dict) -> dict[str, bool]:
     """Milestones read straight from RAM (bag 0xD31D/E verified; party 0xD163 and battle 0xD057 unverified)."""
     bag_n = emu.read(0xD31D)
@@ -674,12 +682,24 @@ def main(argv=None) -> int:
         if st.get("replay") and (in_battle or box_open(tm_now)):
             st["replay"] = []; grade_replay()  # a box or a battle interrupted the demonstration: grade it now
         if in_battle:
-            # First battle logic: always FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
             if not st.get("in_battle"):
                 st["battles"] = st.get("battles", 0) + 1; st["battle_pos"] = (m, x, y)
             st["in_battle"] = True
             st["box_streak"] = 0
-            do_press("A", "agent", f"BATTLE (wIsInBattle=0x{emu.read(0xD057):02X}): FIGHT with the first move"); return
+            kind = emu.read(0xD057)
+            hp, mx = party_hp(emu)
+            weak = mx > 0 and hp / mx < 0.4
+            run_line = next((ln for ln in lines_now if "RUN" in ln), None)
+            if kind == 1 and weak and run_line is not None:  # wild battle and too weak: flee
+                if ">RUN" in run_line:
+                    do_press("A", "agent", f"BATTLE wild, HP {hp}/{mx}: RUN"); return
+                cur = next((ln for ln in lines_now if ">" in ln), "")
+                if "FIGHT" in cur or "PKMN" in cur:
+                    do_press("DOWN", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor down toward RUN"); return
+                if "ITEM" in cur:
+                    do_press("RIGHT", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor right to RUN"); return
+            # Default battle logic: FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
+            do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT with the first move"); return
         if st.get("in_battle"):
             st["in_battle"] = False
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
@@ -774,7 +794,9 @@ def main(argv=None) -> int:
                 st["replay"] = []; grade_replay()
             esc = ["B", "B", random.choice(list(DIRS)), "A", random.choice(list(DIRS))][st["stalls"] % 5]
             do_press(esc, "agent", f"STALL #{st['stalls']} detected here - escalating with {esc}"); return
-        planned = plan_step({**check_goals(emu, st), "_starter": a.starter}, mem.data["maps"], (m, x, y), st["facing"])
+        hp_now, mx_now = party_hp(emu)
+        planned = plan_step({**check_goals(emu, st), "_starter": a.starter, "_hp": (hp_now, mx_now)},
+                            mem.data["maps"], (m, x, y), st["facing"])
         if planned and not (st["explore_run"] and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             do_press(planned[0], "agent", planned[1]); return
         name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367)); do_press(name, "agent", why)
@@ -803,7 +825,7 @@ def main(argv=None) -> int:
         m, x, y = pos()
         return {"step": st["step"], "map": m, "x": x, "y": y, "facing": st["facing"], "paused": st["paused"],
                 "in_battle": bool(st.get("in_battle")), "goals": check_goals(emu, st), "goal_steps": st["goal_steps"],
-                "goto": st.get("goto"), "party": emu.read(0xD163), "bag_items": emu.read(0xD31D),
+                "goto": st.get("goto"), "party": emu.read(0xD163), "bag_items": emu.read(0xD31D), "hp": party_hp(emu),
                 "box_open": box_open(emu.read_range(TILEMAP, TILEMAP_LEN)), "maps_known": sorted(mem.data["maps"])}
 
     @ctl.route("GET", "/goals")
