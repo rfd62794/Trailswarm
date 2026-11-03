@@ -159,11 +159,12 @@ Test tail, line counts, the exact console block from the 5-step fake run, and an
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 21:54 · robert-claude-laptop · none → Draft — build step 3 of 3; queue only after Emulator_Layer and Backend_And_Decision are merged to main
+- 2026-11-02 22:16 · robert-claude-laptop · Draft → Queued — prereqs merged: Emulator_Layer (PR #1) and Backend_And_Decision (PR #2) both on main
 <!-- queue:end -->
