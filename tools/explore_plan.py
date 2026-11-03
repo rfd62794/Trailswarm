@@ -141,6 +141,26 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 if p:
                     return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
+    if goals.get("won_battle") and not goals.get("to_viridian"):
+        # The road north: Route 1 (0x0C) then Viridian (0x01). Use known transitions if any; otherwise push to the
+        # northernmost explored tile of the current outdoor map and keep going UP (map edges are connections).
+        target_map = 0x01 if goals.get("to_route1") else 0x0C
+        p = g.path(pos, lambda n: n[0] == target_map)
+        if p:
+            return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
+        if pos[0] == 0x28:
+            p = g.path(pos, lambda n: n[0] != 0x28)
+            if p:
+                return p[0], f"goal road north: leaving the lab ({len(p)} steps)"
+        d = maps.get(str(pos[0]), {})
+        tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
+        if tiles:
+            tx, ty = min(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))
+            if (pos[1], pos[2]) == (tx, ty):
+                return "UP", "goal road north: at the northernmost known tile, pushing UP for the map edge"
+            p = g.path(pos, lambda n: n == (pos[0], tx, ty))
+            if p:
+                return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
     return None
 
 

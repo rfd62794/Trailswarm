@@ -77,7 +77,7 @@ EFFECT_WINDOW = (0xD000, 0x900)  # bag, money, map, party, event flags: diffed a
 REGISTRY = load_registry()
 
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle"]  # Robert's first optimisation targets (2026-11-02)
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian"]  # goals.json order
 
 
 def check_goals(emu, st: dict) -> dict[str, bool]:
@@ -86,8 +86,10 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
     bag = emu.read_range(0xD31E, 2 * bag_n) if 0 < bag_n < 21 else b""  # PyBoy rejects empty slices
     potion = any(bag[i] == 0x14 for i in range(0, len(bag), 2))
     m = emu.read(0xD35E)
+    seen = st.setdefault("seen_maps", set()); seen.add(m)
     return {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
-            "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0}
+            "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
+            "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen}
 
 
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:
@@ -546,9 +548,10 @@ def main(argv=None) -> int:
         st["box_streak"] = st["box_streak"] + 1 if box_after else 0
         # Beat capture: the presses from a box opening (keyed by its first text) to its closing, graded by progress.
         if box_after and not box_before:
-            st["beat"] = {"sig": " | ".join(frame_lines(tm2)[:2])[:80], "buttons": [], "goals": goals_before,
-                          "pos": before, "sources": set()}
+            st["beat"] = {"sig": None, "buttons": [], "goals": goals_before, "pos": before, "sources": set()}
         elif st.get("beat") and box_before:
+            if st["beat"]["sig"] is None:  # key by the text as it reads at the FIRST press, after it has printed
+                st["beat"]["sig"] = " | ".join(frame_lines(tm)[:2])[:80]
             st["beat"]["buttons"].append(name); st["beat"]["sources"].add(source)
             if not box_after:
                 bt = st.pop("beat"); goals_now = check_goals(emu, st)
