@@ -73,7 +73,7 @@ def learn_decision(question: str, current_moves: list[str]) -> tuple[str, str, s
     if not new or not current_moves:
         return "YES", "new move: default accept", None
     worst = min(current_moves, key=move_value)
-    if move_value(new) > move_value(worst) or (move_value(new) == 0 and sum(1 for mv in current_moves if move_value(mv) == 0) == 0):
+    if move_value(new) > move_value(worst):  # a status move (0) never replaces a damaging one
         return "YES", f"{new} ({move_value(new):.0f}) beats {worst} ({move_value(worst):.0f})", worst
     return "NO", f"{new} ({move_value(new):.0f}) is not better than our weakest {worst} ({move_value(worst):.0f})", None
 

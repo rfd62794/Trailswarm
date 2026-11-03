@@ -182,10 +182,15 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         p = g.path(pos, lambda n: n[0] == target_map)
         if p:
             return p[0], f"goal road north: {len(p)} steps to map 0x{target_map:02X}"
-        if pos[0] == 0x28:
-            p = g.path(pos, lambda n: n[0] != 0x28)
+        if pos[0] not in (0x00, 0x0C):  # indoors (house, lab): get outside first - never probe house walls for a road
+            p = g.path(pos, lambda n: n[0] in (0x0C, 0x00))
             if p:
-                return p[0], f"goal road north: leaving the lab ({len(p)} steps)"
+                return p[0], f"goal road north: leaving map 0x{pos[0]:02X} for the outdoors ({len(p)} steps)"
+            return None
+        if pos[0] == 0x00:  # in Pallet Town: Route 1 is the known way north
+            p = g.path(pos, lambda n: n[0] == 0x0C)
+            if p:
+                return p[0], f"goal road north: {len(p)} steps to Route 1"
         d = maps.get(str(pos[0]), {})
         tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
         if tiles:
