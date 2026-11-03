@@ -799,8 +799,34 @@ def main(argv=None) -> int:
                     do_press("DOWN", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor down toward RUN"); return
                 if "ITEM" in cur:
                     do_press("RIGHT", "agent", f"BATTLE wild, HP {hp}/{mx}: moving the cursor right to RUN"); return
-            # Default battle logic: FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
-            do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT with the first move"); return
+            # --- move choice with memory: damage dealt per (enemy species, move) is learned from the enemy HP drop
+            #     after our move; untried moves are tried first (variety), then the best average; 0-PP moves skipped ---
+            enemy_hp = (emu.read(0xCFE6) << 8) | emu.read(0xCFE7)
+            pm = st.get("pending_move")
+            if pm and pm["species"] == species and enemy_hp < pm["enemy_hp"]:
+                stats = mem.data.setdefault("move_damage", {}).setdefault(f"{species}:{pm['move']}", [])
+                stats.append(pm["enemy_hp"] - enemy_hp); del stats[:-20]; st["pending_move"] = None
+            skip = ("FIGHT", "PKMN", "ITEM", "RUN", "TYPE", "CANCEL", "POTION")
+            move_lines = [ln for ln in lines_now if not any(s in ln for s in skip) and "/" not in ln and ln.replace(">", "").strip()]
+            cursor_mv = next((ln.replace(">", "").strip() for ln in move_lines if ">" in ln), None)
+            if cursor_mv and 2 <= len(move_lines) <= 4 and any("/" in ln for ln in lines_now):  # the move menu (PP line present)
+                moves = [ln.replace(">", "").strip() for ln in move_lines]
+                def score(mv):
+                    d = mem.data.get("move_damage", {}).get(f"{species}:{mv}")
+                    return (0, 0) if not d else (1, sum(d) / len(d))
+                tried = [mv for mv in moves if score(mv)[0]]
+                target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
+                if cursor_mv == target:
+                    st["pending_move"] = {"species": species, "move": target, "enemy_hp": enemy_hp}
+                    why = (f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {target} (untried)" if target not in tried
+                           else f"BATTLE vs #{species} L{emu.read(0xCFF3)}: {target} (best avg {score(target)[1]:.1f} dmg)")
+                    do_press("A", "agent", why); return
+                do_press("DOWN", "agent", f"move menu: cursor to {target}"); return
+            if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
+                do_press("UP", "agent", "battle menu: back up to FIGHT"); return
+            if any("CANCEL" in ln and ">" in ln for ln in lines_now):
+                do_press("A", "agent", "battle: closing an empty list"); return
+            do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT"); return
         if st.get("in_battle"):
             st["in_battle"] = False; st["last_battle_hp"] = None; st["potion_hp_before"] = None
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
