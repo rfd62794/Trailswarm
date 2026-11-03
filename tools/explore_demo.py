@@ -1342,6 +1342,12 @@ def main(argv=None) -> int:
             except Exception as e:
                 fut.set_exception(e)
         if st["done"]:
+            if a.headless:  # a finished headless agent must EXIT (swarm rounds wait on it)
+                try:
+                    shutdown(); trans.close(); emu.close(); root.destroy()
+                except Exception:
+                    pass
+                os._exit(0)
             root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
             return
         if a.headless:

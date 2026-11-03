@@ -24,15 +24,27 @@ ROOT = Path(__file__).resolve().parents[1]
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]
 
 
-def consistency(last_n: int = 12) -> dict[str, float]:
-    """Share of the last N runs (that started before the goal) which reached each goal."""
+def consistency(last_n: int = 16) -> dict[str, float]:
+    """Per goal: of the recent runs that STARTED before it (first press map/goal state), the share that reached it.
+    A run counts as 'attempting' a goal when it has at least 20 presses and its start was upstream of the goal."""
     ms_path = ROOT / "runs" / "milestones.json"
     if not ms_path.exists():
         return {}
     ms = json.loads(ms_path.read_text())
-    runs = sorted((p for p in (ROOT / "runs").glob("explore-*") if (p / "transitions.jsonl").exists()), key=lambda p: p.stat().st_mtime)[-last_n:]
-    names = {p.name for p in runs}
-    return {g: round(sum(1 for e in ms.get(g, []) if e["run"] in names) / max(1, len(names)), 2) for g in GOALS}
+    runs = [p for p in sorted((ROOT / "runs").glob("explore-*"), key=lambda p: p.stat().st_mtime)
+            if (p / "transitions.jsonl").exists() and sum(1 for _ in open(p / "transitions.jsonl", encoding="utf-8")) >= 20]
+    out = {}
+    for i, g in enumerate(GOALS):
+        # attempting runs: those that never started past this goal = their first press map is not downstream.
+        order_maps = {0: [0x26, 0x25], 1: [0x26, 0x25], 2: [0x00, 0x28], 3: [0x28], 4: [0x00, 0x28, 0x0C], 5: [0x0C], 6: [0x01], 7: [0x01]}
+        tries = []
+        for p in runs[-60:]:
+            first = json.loads(next(open(p / "transitions.jsonl", encoding="utf-8")))
+            if first["from"][0] in order_maps.get(i, []) or i == 0:
+                tries.append(p.name)
+        tries = tries[-last_n:]
+        out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if tries else 0.0
+    return out
 
 
 def furthest_checkpoint() -> str | None:
