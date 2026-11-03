@@ -31,6 +31,19 @@ class WorldGraph:
 
     strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
 
+    def static_npc_tiles(self, m: int) -> set:
+        """Tiles of NPCs that never move and were always seen on ONE tile (cached per map)."""
+        cache = self.__dict__.setdefault("_npc_cache", {})
+        if m not in cache:
+            tiles = set()
+            for e in self.maps.get(str(m), {}).get("npcs", {}).values():
+                pos = e.get("positions") or {}
+                if not e.get("moves") and len(pos) == 1:
+                    x, y = next(iter(pos)).split(",")
+                    tiles.add((int(x), int(y)))
+            cache[m] = tiles
+        return cache[m]
+
     def neighbours(self, node):
         m, x, y = node
         d = self.maps.get(str(m))
@@ -49,6 +62,8 @@ class WorldGraph:
             if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy
+            if (nx, ny) in self.static_npc_tiles(m):
+                continue  # a person standing there: walking into them only starts a conversation (Forest corridor, 07:34)
             if f"{nx},{ny}" in d.get("visited", {}):
                 yield (m, nx, ny), name
 
