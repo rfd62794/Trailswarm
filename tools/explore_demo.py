@@ -309,8 +309,12 @@ class MapMemory:
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
         actually warp; they are removed on load and never merged back by the swarm."""
         for ref in self.data.get("bad_warps", []):
-            mid, key = ref.split(":", 1)
-            self.data.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
+            mid, sep, key = ref.partition(":")
+            if not sep:
+                continue  # malformed tombstone: ignore it rather than failing every load
+            d = self.data.get("maps", {}).get(mid, {})
+            d.get("warps", {}).pop(key, None)
+            d.get("warp_cand", {}).pop(key, None)  # or learn() would re-add it on the next sighting
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -328,6 +332,8 @@ class MapMemory:
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
             w = self.m(m0)["warps"]
+            if f"{m0}:{key}" in self.data.get("bad_warps", []):
+                return f"map changed to 0x{m1:02X} (known forced walk - not a warp)"
             cand = self.m(m0).setdefault("warp_cand", {})
             cand[key] = cand.get(key, 0) + 1
             if key not in w and cand[key] < 2:  # a map change seen ONCE from this tile+direction may be a forced walk

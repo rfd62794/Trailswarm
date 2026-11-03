@@ -283,7 +283,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         tiles = [t for t in tiles if f"{t[0]},{t[1]},UP" not in blocked and f"{t[0]},{t[1] - 1}" not in d.get("visited", {})]
         # northernmost first, but a tile this agent cannot reach (Route 2's far north half, known only from a
         # different entry) must not block the next one: that left agents in a ledge loop with no plan
-        for tx, ty in sorted(tiles, key=lambda t: (t[1], abs(t[0] - pos[1]))):
+        for tx, ty in sorted(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))[:8]:  # each try is a BFS: bound the cost
             if (pos[1], pos[2]) == (tx, ty):
                 return "UP", "goal road north: at the northernmost open tile, pushing UP for the map edge"
             p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
