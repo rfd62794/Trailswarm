@@ -907,7 +907,9 @@ def main(argv=None) -> int:
         # planners cannot see (ledge cycles, frontier ping-pong, sign loops). Shake: ~25 random walks, then back to normal.
         pw = pos()
         hist = st.setdefault("pos_hist", [])
-        hist.append(pw); del hist[:-60]
+        hist.append(pw); del hist[:-150]
+        if len(hist) == 1 or st.get("shake_goals_150") is None:
+            st["shake_goals_150"] = tuple(sorted(st["goal_steps"]))
         if st.get("shake", 0) > 0:
             tm_s = emu.read_range(TILEMAP, TILEMAP_LEN)
             st["shake"] -= 1
@@ -916,7 +918,12 @@ def main(argv=None) -> int:
             if emu.read(0xD057) == 0:
                 away = random.choice(list(DIRS))
                 do_press(away, "agent", f"SHAKE: breaking a loop with a random walk {away} ({st['shake']} left)"); return
-        elif len(hist) == 60 and len(set(hist)) <= 6 and not box_open(emu.read_range(TILEMAP, TILEMAP_LEN))                 and emu.read(0xD057) == 0 and not st.get("explore_burst"):
+        elif len(hist) >= 150 and len(set(hist[-150:])) <= 2 and emu.read(0xD057) == 0                 and tuple(sorted(st["goal_steps"])) == st.get("shake_goals_150"):
+            # 150 presses on <=2 tiles with no goal progress, EVEN with boxes open: a dialog/answer cycle (A..., DOWN, A,
+            # repeat) that never reaches 40 A in a row (Bulbasaur run re-asking the Charmander ball for 1700 steps).
+            st["shake"] = 25; st["shakes"] = st.get("shakes", 0) + 1; hist.clear()
+            log(f"[dialog cycle detected: 150 presses on <=2 tiles - shaking #{st['shakes']}]", "res")
+        elif len(hist) >= 60 and len(set(hist[-60:])) <= 6 and not box_open(emu.read_range(TILEMAP, TILEMAP_LEN))                 and emu.read(0xD057) == 0 and not st.get("explore_burst"):
             st["shake"] = 25; st["shakes"] = st.get("shakes", 0) + 1; hist.clear()
             log(f"[loop detected: 60 presses on {len(set(hist)) or '<=6'} tiles - shaking #{st['shakes']}]", "res")
         # Endless-A guard (runs BEFORE any box handling): 40 presses in a row that are all A while the position has

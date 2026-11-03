@@ -135,8 +135,17 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             # Plain "want" also matches the nickname question, which contaminated a spot where the agent merely
             # stood while that dialog ran (5,5,DOWN "received a BULBASAUR"); the offer phrase does not.
             OFFER = "YOU WANT THE"
-            balls = [s for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and any(n in spot_text(*s) for n in STARTERS)]
-            targets = [s for s in balls if want == "ANY" or want in spot_text(*s)]
+            ELEMENT = {"FIRE": "CHARMANDER", "WATER": "SQUIRTLE", "PLANT": "BULBASAUR", "GRASS": "BULBASAUR"}
+
+            def ball_species(s):
+                """Which starter THIS ball offers, read from its own offer text ('You want the fire POKeMON, CHARMANDER?'),
+                never from later dialog that may mention another starter (that contamination sent a Bulbasaur run to the
+                Charmander ball forever)."""
+                import re as _re
+                m = _re.search(r"YOU WANT THE\W*(FIRE|WATER|PLANT|GRASS)\W*POK", spot_text(*s))
+                return ELEMENT[m.group(1)] if m else None
+            balls = [s for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and ball_species(s)]
+            targets = [s for s in balls if want == "ANY" or ball_species(s) == want]
             if not targets and balls:
                 tried = {(s[1], s[2], s[3]) for s in balls}
                 for (m, x, y, f) in balls:
