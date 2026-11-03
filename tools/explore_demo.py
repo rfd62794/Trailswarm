@@ -68,7 +68,7 @@ def move_value(name: str) -> float:
 
 def learn_decision(question: str, current_moves: list[str]) -> tuple[str, str, str | None]:
     """'X is trying to learn Y! ... Delete a move to make room for Y?' -> (YES/NO, why, move to forget)."""
-    m = re.search(r"learn ([A-Z][A-Z ]+?)[!?]", question.upper())
+    m = re.search(r"LEARN ([A-Z][A-Z ]+?)[!?]", question.upper())
     new = m.group(1).strip() if m else None
     if not new or not current_moves:
         return "YES", "new move: default accept", None
