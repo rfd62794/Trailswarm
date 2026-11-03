@@ -24,6 +24,10 @@ Interfaces you build on (from directives 1 and 2; read the files, do not change 
   `backend.ClaudeCliBackend(model, timeout_s, cwd)`.
 - `decision.parse_reply(text) -> Decision(button, thinking, note, error, raw)`.
 
+**Do not list the tree recursively** (`Get-ChildItem -Recurse`, `find`, `tree` are refused by the sandbox and
+end the run). Layout: `src/pokeagent/{__init__,emulator,ram,backend,decision}.py`, `tests/test_*.py`,
+`docs/directives/`, `docs/superpowers/specs/`. Use `git ls-files` if you need a list.
+
 ## 2. Scope
 
 Create, in order:

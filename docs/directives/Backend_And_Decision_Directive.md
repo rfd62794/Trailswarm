@@ -26,6 +26,19 @@ Reply protocol the model is asked for (the prompt is directive 3's job; the pars
 {"thinking": "one or two sentences of reasoning", "button": "A", "note": "optional text to remember"}
 ```
 
+**Worktree layout (pasted so you never need to list it; a recursive listing such as
+`Get-ChildItem -Recurse` or `find` is refused by the sandbox and ends the run):**
+
+```
+.gitignore  pyproject.toml  uv.lock  .venv/
+src/pokeagent/__init__.py
+tests/test_smoke.py
+docs/directives/*.md   docs/superpowers/specs/2026-11-02-pokeagent-design.md
+```
+
+`src/pokeagent/emulator.py` and `ram.py` may or may not exist (directive 1 runs in parallel); you do not need
+them. Use `git status`, `git ls-files`, or read a named file; nothing else to discover.
+
 ## 2. Scope
 
 Create, in order:

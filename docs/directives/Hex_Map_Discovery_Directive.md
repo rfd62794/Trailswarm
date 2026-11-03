@@ -27,6 +27,9 @@ each entry `"verified": false` until the controller's calibration run flips it.
 Verified facts: test command `uv run pytest -q` (Python 3.12.12). No ROM in your worktree; every test uses
 `FakeEmulator`. `emulator.Emulator.read_range(start, length) -> bytes` exists (directive 1).
 
+**Do not list the tree recursively** (`Get-ChildItem -Recurse`, `find`, `tree` are refused by the sandbox and
+end the run). Use `git ls-files` if you need a list.
+
 ## 2. Scope
 
 Create, in order:
