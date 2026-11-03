@@ -147,9 +147,10 @@ class MapMemory:
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
             w = self.m(m0)["warps"]
-            taken = (w[key][3] if key in w and len(w[key]) > 3 else 0) + 1
-            w[key] = [m1, x1, y1, taken]
-            return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken}x"
+            taken = self.m(m0).setdefault("warp_taken", {})
+            taken[key] = taken.get(key, 0) + 1
+            w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
+            return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
         if (x1, y1) == (x0, y0):
             if not confirmed:
                 return "no move (turned? fading?) - will retry once before calling it blocked"
@@ -193,7 +194,7 @@ class MapMemory:
                 continue
             warp = d["warps"].get(f"{x},{y},{name}")
             if warp:  # a warp leads off this map: score it by how often we already took it, not by an off-map tile
-                visits = (warp[3] if len(warp) > 3 else 1) * 3
+                visits = d.get("warp_taken", {}).get(f"{x},{y},{name}", 1) * 3
             else:
                 visits = d["visited"].get(f"{x + dx},{y + dy}", 0)
             if best is None or visits < best[0]:
@@ -235,7 +236,7 @@ def main(argv=None) -> int:
     for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
         con.tag_config(tag, foreground=col)
     st = {"step": 0, "frame": 0, "photo": None, "paused": False, "done": False,
-          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}}
+          "facing": "DOWN", "last_fail": None, "box_streak": 0, "settle": 0, "inter": None, "goal_steps": {}, "stable_frames": 0}
 
     def log(t, tag=None):
         con.insert("end", t + "\n", tag); con.see("end")
@@ -399,24 +400,41 @@ def main(argv=None) -> int:
     def agent_step():
         if st["settle"] > 0:
             st["settle"] -= a.frames_per_step; return
+        # Input readiness: do not press while the screen is still changing on its own (cutscene, forced walk,
+        # fade, battle animation) or while the game says it is ignoring the joypad (wJoyIgnore, unverified).
+        joy_ignore = emu.read(0xCD6B)
+        if st["stable_frames"] < 12 or joy_ignore:
+            if not st.get("waiting"):
+                st["waiting"] = True
+                log(f"[waiting: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen still changing'} - cutscene?]", "res")
+            st["wait_frames"] = st.get("wait_frames", 0) + a.frames_per_step
+            if st["wait_frames"] < 60 * 20:  # give up waiting after ~20 s of game time and try A
+                return
+        if st.get("waiting"):
+            st["waiting"] = False
+            log(f"[ready after waiting {st.get('wait_frames', 0)} frames]", "res"); st["wait_frames"] = 0
         m, x, y = pos()
         tm_now = emu.read_range(TILEMAP, TILEMAP_LEN)
         lines_now = frame_lines(tm_now) if box_open(tm_now) else []
         in_battle = emu.read(0xD057) != 0 or any(ln.startswith("FIGHT") or "FIGHT" in ln for ln in lines_now)
         if in_battle:
             # First battle logic: always FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
-            st["battles"] = st.get("battles", 0) + (0 if st.get("in_battle") else 1); st["in_battle"] = True
+            if not st.get("in_battle"):
+                st["battles"] = st.get("battles", 0) + 1; st["battle_pos"] = (m, x, y)
+            st["in_battle"] = True
             st["box_streak"] = 0
             do_press("A", "agent", f"BATTLE (wIsInBattle=0x{emu.read(0xD057):02X}): FIGHT with the first move"); return
         if st.get("in_battle"):
             st["in_battle"] = False
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
-            won = emu.read(0xD163) > 0 and emu.read(0xD35E) not in (0x25, 0x26)
+            won = emu.read(0xD163) > 0 and (m, x, y) == st.get("battle_pos")  # a blackout warps you away
             st["battles_won"] = st.get("battles_won", 0) + (1 if won else 0)
             log(f"[battle over - {'WON' if won else 'lost?'}; {st['battles']} battles this run]", "res")
         if box_open(tm_now):
-            if st["box_streak"] >= 12:
-                do_press("B", "agent", "a box has stayed open for 12 presses - pressing B to back out"); return
+            if st["box_streak"] >= 12 and is_menu(tm_now):
+                do_press("B", "agent", "a menu has stayed open for 12 presses - pressing B to back out"); return
+            if st["box_streak"] >= 60:
+                do_press("B", "agent", "a dialog has run 60 presses - pressing B in case it is a hidden prompt"); return
             tm = emu.read_range(TILEMAP, TILEMAP_LEN)
             if is_menu(tm):
                 # Explore menus: pick the first option we have not chosen at this interaction point yet.
@@ -495,6 +513,8 @@ def main(argv=None) -> int:
 
     @ctl.route("POST", "/press")
     def _press(button="A", **_):
+        if button.upper() not in Button.__members__:
+            raise ValueError(f"unknown button {button!r}; use {sorted(Button.__members__)}")
         do_press(button.upper(), "claude", f"remote press {button.upper()}"); return _status()
 
     @ctl.route("POST", "/pause")
@@ -515,7 +535,7 @@ def main(argv=None) -> int:
 
     def frame():
         if st["done"]:
-            return
+            root.after(100, frame)  # keep draining remote-control jobs so /status still answers after the run
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
             try:
@@ -525,9 +545,16 @@ def main(argv=None) -> int:
         img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
         st["photo"] = ImageTk.PhotoImage(img); screen.configure(image=st["photo"])
         st["frame"] += 1
-        if not st["paused"] and st["frame"] % a.frames_per_step == 0:
-            agent_step()
-        root.after(16, frame)
+        h = hash(emu.read_range(TILEMAP, TILEMAP_LEN)) ^ hash(emu.read_range(0xC200, 0x100))  # screen + sprites
+        st["stable_frames"] = st["stable_frames"] + 1 if h == st.get("last_hash") else 0
+        st["last_hash"] = h
+        try:
+            if not st["paused"] and st["frame"] % a.frames_per_step == 0:
+                agent_step()
+        except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
+            log(f"[agent step error: {e!r}]", "res")
+        finally:
+            root.after(16, frame)
 
     root.bind("<Key>", on_key)
     log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")

@@ -81,7 +81,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             if pos == (m, x, y):
                 return ("A" if facing == f else f), f"goal potion: at the PC, {'using it' if facing == f else 'facing it'}"
             p = g.path(pos, lambda n: n == (m, x, y))
-            if p:
+            if p:  # [] cannot happen here (pos == spot handled above)
                 return p[0], f"goal potion: {len(p)} steps to the PC at ({x},{y}) on map 0x{m:02X}"
     if not goals.get("left_house"):
         p = g.path(pos, lambda n: n[0] not in (0x25, 0x26))
@@ -89,6 +89,8 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             return p[0], f"goal leave the house: {len(p)} steps to the door"
     if not goals.get("first_pokemon"):
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
+            if pos == (m, x, y):
+                return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
             p = g.path(pos, lambda n: n == (m, x, y))
             if p:
                 return p[0], f"goal first pokemon: {len(p)} steps to where OAK appeared ({x},{y}) on map 0x{m:02X}"
@@ -125,13 +127,14 @@ class ControlServer:
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}") if n else {}
                 params = dict(kv.split("=", 1) for kv in query.split("&") if "=" in kv)
+                def job():  # runs on the tk thread: serialise there too, so no live dict is walked concurrently
+                    r = fn(**{**params, **body})
+                    return (r, "image/png") if isinstance(r, bytes) else (json.dumps(r, indent=1).encode(), "application/json")
                 try:
-                    result = srv.call(lambda: fn(**{**params, **body}))
+                    data, ctype = srv.call(job)
                 except Exception as e:  # report, never kill the demo
                     return self._send(500, {"error": repr(e)})
-                if isinstance(result, bytes):
-                    return self._send(200, result, "image/png")
-                self._send(200, result)
+                self._send(200, data, ctype)
             def do_GET(self): self._dispatch("GET")
             def do_POST(self): self._dispatch("POST")
         self.httpd = ThreadingHTTPServer(("127.0.0.1", self.port), H)
