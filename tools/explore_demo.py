@@ -211,6 +211,7 @@ class MapMemory:
     def __init__(self, path: Path):
         self.path = path
         self.data = json.loads(path.read_text()) if path.exists() else {"maps": {}}
+        self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -359,7 +360,7 @@ class MapMemory:
             if w and avoid_maps and w[0] in avoid_maps and n not in tried:
                 tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
-        if facing in tried and not self.interaction_known(map_id, x, y, facing):
+        if facing in tried and not self.interaction_known(map_id, x, y, facing) and f"{x},{y},{facing}" not in self.recent_talk:
             return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A to see if it talks"
         for name, (dx, dy) in DIRS.items():
             if name in tried:
@@ -579,6 +580,7 @@ def main(argv=None) -> int:
         elif name == "A":
             # Record the A press either way, so a silent wall is tested once and never again.
             entry = mem.interact(before[0], before[1], before[2], st["facing"], text if box_after else "")
+            mem.recent_talk.add(f"{before[1]},{before[2]},{st['facing']}")
             if box_after:
                 st["inter"] = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
                                "choices": [], "snap": snap_pre}

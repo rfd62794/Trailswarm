@@ -28,6 +28,8 @@ class WorldGraph:
     def __init__(self, maps: dict):
         self.maps = maps
 
+    strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
+
     def neighbours(self, node):
         m, x, y = node
         d = self.maps.get(str(m))
@@ -39,13 +41,25 @@ class WorldGraph:
             if warp:
                 yield (warp[0], warp[1], warp[2]), name
                 continue
-            if key in d.get("blocked", []):
+            if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy
             if f"{nx},{ny}" in d.get("visited", {}):
                 yield (m, nx, ny), name
 
     def path(self, start, goal_fn: Callable[[tuple], bool], limit: int = 5000) -> list[str] | None:
+        """Strict BFS first; if no route, an optimistic one (walls ignored): a false wall gets re-tested and
+        cleared on the way instead of leaving the agent with no plan (seen 2026-11-03: stuck at Mom)."""
+        p = self._bfs(start, goal_fn, limit)
+        if p is None and self.strict:
+            self.strict = False
+            try:
+                p = self._bfs(start, goal_fn, limit)
+            finally:
+                self.strict = True
+        return p
+
+    def _bfs(self, start, goal_fn, limit):
         prev = {start: None}
         q = deque([start])
         while q and len(prev) < limit:
