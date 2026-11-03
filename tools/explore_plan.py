@@ -104,6 +104,9 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         for (m, x, y, f) in interaction_spots(maps, "OAK"):
             if pos == (m, x, y):
                 return f, f"goal first pokemon: standing where OAK appeared; stepping {f} to fire the event again"
+            p = g.path(pos, lambda n: n == (m, x, y))
+            if p:
+                return p[0], f"goal first pokemon: {len(p)} steps to where OAK appeared ({x},{y}) on map 0x{m:02X}"
     if goals.get("first_pokemon") and not goals.get("won_battle") and pos[0] == 0x28:
         # The rival only challenges you when you try to leave the lab: head for the exit (a learned warp out of
         # 0x28 if we have one, else the lowest visited tile - the door is on the bottom edge).
@@ -119,9 +122,6 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 if p:
                     return p[0], f"goal first battle: heading to the bottom of the lab ({tx},{ty}) to find the door"
             return "DOWN", "goal first battle: at the lowest known tile, trying DOWN for the door"
-            p = g.path(pos, lambda n: n == (m, x, y))
-            if p:
-                return p[0], f"goal first pokemon: {len(p)} steps to where OAK appeared ({x},{y}) on map 0x{m:02X}"
     return None
 
 

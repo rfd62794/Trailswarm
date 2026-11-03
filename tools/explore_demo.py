@@ -39,15 +39,15 @@ from concurrent.futures import Future  # noqa: E402
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
 # YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
-YESNO_RULES = [("nickname", "NO"), ("name", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
-               ("give up", "NO"), ("run", "NO"), ("", "YES")]
+YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
+               ("give up", "NO"), (" run ", "NO"), ("", "YES")]  # spaced needles = whole words
 
 
 STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
 
 
 def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
-    q = "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ")  # tolerant of ?,!,é and line breaks
+    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "  # tolerant of ?,!,é and line breaks
     offered = next((s for s in STARTERS if s.lower() in q.replace(" ", "")), None)
     if offered and "want" in q and "nickname" not in q and "name" not in q.split():  # "So! You want CHARMANDER?"
         if starter == "any" or starter.upper() == offered:
@@ -398,7 +398,7 @@ def main(argv=None) -> int:
         if it achieved a goal when recorded. Every replay is graded afterwards (see grade_replay)."""
         screen = frame_lines(tm)[:3] if box_open(tm) else []
         cands = [d for d in mem.m(m).get("demos", []) if d["at"] == [x, y] and d["screen"] == screen
-                 and d.get("achieved") and d.get("grade", 0) >= 0]
+                 and d.get("achieved") and d.get("buttons") and d.get("grade", 0) >= 0]
         return max(cands, key=lambda d: (d.get("grade", 0), len(d["achieved"]))) if cands else None
 
     def grade_replay():
@@ -522,12 +522,16 @@ def main(argv=None) -> int:
             if goals[g] and g not in st["goal_steps"]:
                 st["goal_steps"][g] = st["step"]; log(f"*** GOAL REACHED: {g} at step {st['step']} ***", "res")
                 gp = Path("runs/milestones.json")
-                hist = json.loads(gp.read_text()) if gp.exists() else {}
+                try:
+                    hist = json.loads(gp.read_text()) if gp.exists() else {}
+                except json.JSONDecodeError:
+                    hist = {}
                 rec = {"run": run_dir.name, "step": st["step"]}
                 if g == "first_pokemon":
                     rec["species_byte"] = emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
                     rec["wanted"] = a.starter
-                hist.setdefault(g, []).append(rec); gp.write_text(json.dumps(hist, indent=1))
+                hist.setdefault(g, []).append(rec)
+                tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1)); os.replace(tmp, gp)
         gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
         log(f"--- step {st['step']}/{a.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {st['facing']}  "
             f"party={emu.read(0xD163)} bag={emu.read(0xD31D)}  goals: {gtxt}\n"
@@ -576,6 +580,8 @@ def main(argv=None) -> int:
         tm_now = emu.read_range(TILEMAP, TILEMAP_LEN)
         lines_now = frame_lines(tm_now) if box_open(tm_now) else []
         in_battle = emu.read(0xD057) != 0 or any(ln.startswith("FIGHT") or "FIGHT" in ln for ln in lines_now)
+        if st.get("replay") and (in_battle or box_open(tm_now)):
+            st["replay"] = []; grade_replay()  # a box or a battle interrupted the demonstration: grade it now
         if in_battle:
             # First battle logic: always FIGHT with the first move. (A on FIGHT, A on move 1, A through text.)
             if not st.get("in_battle"):
@@ -733,14 +739,15 @@ def main(argv=None) -> int:
     ctl.start()
 
     def frame():
-        if st["done"]:
-            root.after(100, frame)  # keep draining remote-control jobs so /status still answers after the run
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
             try:
                 fut.set_result(fn())
             except Exception as e:
                 fut.set_exception(e)
+        if st["done"]:
+            root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
+            return
         if a.headless:
             emu.tick(1)  # no rendering at all
         else:
@@ -765,8 +772,12 @@ def main(argv=None) -> int:
             log(f"[agent step error: {e!r}]", "res")
         finally:
             if st["done"] and a.headless:
-                shutdown(); trans.close(); emu.close(); root.destroy(); return
-            root.after(1 if a.headless else 16, frame)
+                try:
+                    shutdown(); trans.close(); emu.close(); root.destroy()
+                except Exception:
+                    os._exit(0)  # a swarm parent is waiting on us; never hang in mainloop
+            else:
+                root.after(1 if a.headless else 16, frame)
 
     root.bind("<Key>", on_key)
     if a.headless:

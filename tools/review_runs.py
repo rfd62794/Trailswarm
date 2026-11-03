@@ -61,12 +61,14 @@ def main() -> int:
                 seg = [r for r in rows if prev < r["step"] <= gs[g]]
                 length = gs[g] - prev
                 cur = best_paths.get(g)
+                if length <= 0:  # reached out of order (e.g. potion after leaving the house): no segment to record
+                    prev = max(prev, gs[g]); continue
                 if cur is None or length < cur["length"]:
                     best_paths[g] = {"run": run, "length": length, "start": seg[0]["from"] if seg else None,
                                      "end": seg[-1]["to"] if seg else None,
                                      "buttons": [r["button"] for r in seg],
                                      "sources": dict(Counter(r.get("source", "agent") for r in seg))}
-                prev = gs[g]
+                prev = max(prev, gs[g])
 
     for g in GOALS:
         hits = [(run, s[g]) for run, s in ((r, v["goal_steps"]) for r, v in review["runs"].items()) if g in s]

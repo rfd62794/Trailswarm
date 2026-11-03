@@ -30,13 +30,15 @@ def merge_memory(dst: dict, src: dict) -> dict:
             if k not in d["blocked"]:
                 d["blocked"].append(k)
         d["warps"].update(s.get("warps", {}))
+        # Every agent started from a copy of the shared memory, so counts are taken as MAX, never summed:
+        # summing would add the shared base once per agent and inflate solids, grades and counts.
         wt = d.setdefault("warp_taken", {})
         for k, n in s.get("warp_taken", {}).items():
-            wt[k] = wt.get(k, 0) + n
+            wt[k] = max(wt.get(k, 0), n)
         inter = d.setdefault("interactions", {})
         for k, e in s.get("interactions", {}).items():
             cur = inter.setdefault(k, {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
-            cur["count"] = cur.get("count", 0) + e.get("count", 0)
+            cur["count"] = max(cur.get("count", 0), e.get("count", 0))
             if len(e.get("text", "")) > len(cur.get("text", "")):
                 cur["text"] = e["text"]
             for key in ("presses", "menus", "choices", "effects"):
@@ -50,7 +52,8 @@ def merge_memory(dst: dict, src: dict) -> dict:
                 continue  # only goal-achieving demonstrations are hypotheses worth keeping
             same = next((x for x in demos if x["at"] == dm["at"] and x["buttons"] == dm["buttons"]), None)
             if same:
-                same["grade"] = same.get("grade", 0) + dm.get("grade", 0); same["replays"] = same.get("replays", 0) + dm.get("replays", 0)
+                same["grade"] = min(same.get("grade", 0), dm.get("grade", 0))  # a bad grade anywhere sticks
+                same["replays"] = max(same.get("replays", 0), dm.get("replays", 0))
             else:
                 demos.append(dm)
         d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
@@ -59,7 +62,7 @@ def merge_memory(dst: dict, src: dict) -> dict:
         t = tt.setdefault(ts, {})
         for k, e in table.items():
             cur = t.setdefault(k, {"solid": 0, "walkable": 0})
-            cur["solid"] += e.get("solid", 0); cur["walkable"] += e.get("walkable", 0)
+            cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     return dst
 
@@ -89,7 +92,10 @@ def main() -> int:
             print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")
         t0 = time.time()
         for i, p in procs:
-            rc = p.wait()
+            try:
+                rc = p.wait(timeout=max(120, a.steps * 2))  # wall-clock cap: a hung agent must not hang the swarm
+            except subprocess.TimeoutExpired:
+                p.kill(); rc = "killed (timeout)"
             print(f"agent {i} finished rc={rc} after {time.time() - t0:.0f}s")
 
     dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
@@ -100,14 +106,19 @@ def main() -> int:
         except Exception as e:
             print(f"skip {own.name}: {e!r}")
     tmp = shared.with_suffix(".json.tmp"); tmp.write_text(json.dumps(dst, indent=1)); tmp.replace(shared)
+    for own in swarm_dir.glob("agent*.json"):
+        own.unlink()  # merged; a stale file must not be merged again by a later --merge-only
     print(f"merged {merged} agent memories into {shared}: maps={len(dst['maps'])}, "
           f"tiles={sum(len(m['visited']) for m in dst['maps'].values())}, "
           f"interactions={sum(len(m.get('interactions', {})) for m in dst['maps'].values())}, "
           f"demos={sum(len(m.get('demos', [])) for m in dst['maps'].values())}")
     ms = ROOT / "runs" / "milestones.json"
     if ms.exists():
-        hist = json.loads(ms.read_text())
-        print("goal firsts (best step so far):", {g: min(e["step"] for e in v) for g, v in hist.items()})
+        try:
+            hist = json.loads(ms.read_text())
+            print("goal firsts (best step so far):", {g: min(e["step"] for e in v) for g, v in hist.items()})
+        except json.JSONDecodeError as e:
+            print(f"milestones.json unreadable: {e}")
     return 0
 
 
