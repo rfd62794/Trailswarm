@@ -20,6 +20,7 @@ from typing import Callable
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
+POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 
 class WorldGraph:
@@ -108,6 +109,19 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         p = g.path(pos, lambda n: n == spot)
         if p:
             return p[0], f"HP {hp}/{mx}: going home to Mom to heal ({len(p)} steps)"
+    if (goals.get("deliver_parcel") and mx and hp / mx < 0.5 and not goals.get("_mom_failed")
+            and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33) or pos[0] == POKECENTER_MAP)):
+        # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
+        # every Pokecenter has the same shape: door (3,7), a clear column x=3 up to the counter, nurse at (3,1).
+        if pos[0] == POKECENTER_MAP:
+            if pos[1] != 3:
+                return ("RIGHT" if pos[1] < 3 else "LEFT"), f"HP {hp}/{mx}: crossing the Pokecenter to the counter"
+            if pos[2] > 2:
+                return "UP", f"HP {hp}/{mx}: walking up to the nurse"
+            return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
+        p = g.path(pos, lambda n: n[0] == POKECENTER_MAP)
+        if p and len(p) <= 120:
+            return p[0], f"HP {hp}/{mx}: to the Pokecenter to heal ({len(p)} steps)"
     if not goals.get("potion"):
         for (m, x, y, f) in interaction_spots(maps, "PC"):
             if pos == (m, x, y):
