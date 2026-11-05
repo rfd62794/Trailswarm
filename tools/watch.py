@@ -19,6 +19,7 @@ import threading
 import time
 import tkinter as tk
 import urllib.request
+from pathlib import Path
 from typing import Optional
 
 from PIL import Image, ImageTk
@@ -92,6 +93,37 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         time.sleep(max(0.02, period - (time.time() - t0)))
 
 
+_BRAIN_CACHE: dict = {}  # path -> (mtime, table, n_actions)
+
+
+def _brain(a: Agent) -> str:
+    """Model's-eye line for RL seats: latest trace obs + preferred action."""
+    try:
+        import glob
+        from pokeagent.qdecode import brain_line
+        from pokeagent.qmodels import load_model
+        traces = sorted(glob.glob(f"runs/traces/*_{a.port}.jsonl"),
+                        key=lambda p: Path(p).stat().st_mtime)
+        if not traces:
+            return ''
+        last = Path(traces[-1]).read_text().strip().splitlines()[-1]
+        rec = json.loads(last)
+        obs = tuple(rec.get('final_obs') or (rec.get('path') or [[None]])[-1][:-1])
+        qpaths = sorted(glob.glob(f"runs/**/q_{a.port}*.json", recursive=True),
+                        key=lambda p: Path(p).stat().st_mtime)
+        if not qpaths:
+            return ''
+        qp, mt = qpaths[-1], Path(qpaths[-1]).stat().st_mtime
+        if _BRAIN_CACHE.get(qp, (0,))[0] != mt:
+            data = json.loads(Path(qp).read_text())
+            _BRAIN_CACHE[qp] = (mt, load_model(qp, data.get('schema'), data.get('actions', 6)),
+                                data.get('actions', 6))
+        _, table, n = _BRAIN_CACHE[qp]
+        return '\n' + brain_line(table, obs, n)
+    except Exception:
+        return ''
+
+
 def status_line(a: Agent) -> str:
     if not a.ok:
         return f":{a.port}  offline"
@@ -104,7 +136,8 @@ def status_line(a: Agent) -> str:
         exploration = f'{epsilon:.2f}' if isinstance(epsilon, (int, float)) else '?'
         return (f":{a.port} {s.get('tag', '')} {s.get('phase', 'TRAIN')}"
                 f" ep {s.get('generation', '?')} wins {s.get('wins', 0)} eps {exploration}"
-                f" | {grade} | winavg {s.get('win_avg', '?')} steps {s.get('steps_total', '?')}")
+                f" | {grade} | winavg {s.get('win_avg', '?')} steps {s.get('steps_total', '?')}"
+                + _brain(a))
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",

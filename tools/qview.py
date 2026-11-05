@@ -11,31 +11,8 @@ import ast
 import json
 from pathlib import Path
 
+from pokeagent.qdecode import BUTTONS, decode_obs
 from pokeagent.qmodels import load_model, save_model
-from pokeagent.screencontext import MenuKind, ScreenType
-
-BUTTONS = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'START', 'SELECT']
-MAPS = {0: 'pallet', 1: 'viridian', 2: 'pewter', 0x0C: 'route1', 0x0D: 'route2',
-        0x25: 'house_f1', 0x26: 'house_f2', 0x28: 'oaks_lab', 0x36: 'pewter_gym'}
-DIRS = {0: 'DOWN', 1: 'UP', 2: 'LEFT', 3: 'RIGHT'}
-TILES = {0: '?', 1: '.', 2: '#', 3: '~'}  # unknown/walk/solid/grass
-
-
-def decode_obs(obs: tuple) -> dict:
-    out = {'map': MAPS.get(obs[0], hex(obs[0])), 'pos': (obs[1], obs[2]),
-           'box': bool(obs[3]), 'facing': DIRS.get(obs[4], obs[4]),
-           'battle': bool(obs[5]), 'hp_q': obs[6], 'bag_n': obs[7]}
-    if len(obs) >= 14:
-        out.update(screen=ScreenType(obs[8]).name, menu=MenuKind(obs[9]).name,
-                   cursor=(obs[11], obs[12]), option=obs[13])
-    if len(obs) >= 24:
-        cells = [''.join(TILES.get(v, str(v)) for v in obs[14:17]),
-                 ''.join(TILES.get(v, str(v)) for v in obs[17:20]),
-                 ''.join(TILES.get(v, str(v)) for v in obs[20:23])]
-        out.update(tiles=cells, blocked_mask=obs[23])
-    if len(obs) > 24:
-        out['rest'] = list(obs[24:])
-    return out
 
 
 def load(path):
