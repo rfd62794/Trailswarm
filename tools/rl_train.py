@@ -158,7 +158,7 @@ def main() -> int:
         name, _, rest = spec.partition('=')
         path, _, steps = rest.partition(':')
         path = path or f'runs/skills/{name}.json'  # name alone resolves to the skills library
-        opts.append(Option(name, path, GOAL_FNS[name](), int(steps or 100)))
+        opts.append(Option(name, path, make_goal(name), int(steps or 100)))
     env.options = tuple(opts)
     n_total = len(actions) + len(opts)  # buttons + meta-actions size the Q row
     env.render_interval = 1.0 / a.publish_fps
