@@ -45,6 +45,9 @@ def main() -> int:
     ap.add_argument("--settle", type=int, default=8)
     ap.add_argument("--publish-every", type=int, default=8,
                     help="render+publish every Nth step to the frame slot (publish-per-step saturates the CPU)")
+    ap.add_argument("--save-q", default=None, help="write the Q table here every episode (gauntlet picks champions)")
+    ap.add_argument("--load-q", default=None, help="seed the Q table from a saved table (offspring of a champion)")
+    ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
@@ -52,6 +55,12 @@ def main() -> int:
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                      windowed=a.window, speed=a.speed, frame_port=a.frame_port)
     Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * len(ACTIONS))
+    if a.load_q:  # offspring: start from a champion's table
+        try:
+            for k, v in json.load(open(a.load_q)).items():
+                Q[eval(k)] = v  # keys are (map,x,y) tuples serialized as repr strings
+        except Exception as e:
+            print(f"load-q failed: {e}")
     alpha, gamma, eps0 = 0.2, 0.99, 1.0
     try:
         wins = first_ep = None
@@ -59,7 +68,7 @@ def main() -> int:
         steps_log: list[int] = []
         total_steps = 0
         for ep in range(a.episodes):
-            eps = eps0 * (1.0 - ep / max(1, a.episodes))  # linear decay to ~0
+            eps = max(a.eps_floor, eps0 * (1.0 - ep / max(1, a.episodes)))  # decay, but never stop exploring
             obs = env.reset()
             for _ in range(env.max_steps):
                 act = rng.randrange(len(ACTIONS)) if rng.random() < eps else max(range(len(ACTIONS)), key=lambda i: Q[obs][i])
@@ -78,6 +87,8 @@ def main() -> int:
                 if first_ep is None:
                     first_ep = ep
                 print(f"  ep {ep}: SOLVED in {env.steps} steps" + (" (first success!)" if ep == first_ep else ""), flush=True)
+            if a.save_q:
+                json.dump({repr(k): v for k, v in Q.items()}, open(a.save_q, "w"))
             if a.frame_port is not None:
                 best = min(steps_log); worst = max(steps_log)
                 json.dump({"instance": a.frame_port, "generation": ep, "wins": wins,
