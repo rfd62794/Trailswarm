@@ -25,8 +25,11 @@ class FramePublisher:
     def __init__(self, agent_id: int | str, emu) -> None:
         self.emu = emu
         self.seq = 0
-        self.shm = shared_memory.SharedMemory(name=slot_name(agent_id), create=True,
-                                              size=HEADER + FRAME_W * FRAME_H * 3)
+        try:
+            self.shm = shared_memory.SharedMemory(name=slot_name(agent_id), create=True,
+                                                  size=HEADER + FRAME_W * FRAME_H * 3)
+        except FileExistsError:  # a killed publisher left a zombie slot: reclaim it
+            self.shm = shared_memory.SharedMemory(name=slot_name(agent_id))
         self.shm.buf[8:10] = FRAME_W.to_bytes(2, "little")
         self.shm.buf[10:12] = FRAME_H.to_bytes(2, "little")
 
