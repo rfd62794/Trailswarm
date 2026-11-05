@@ -569,6 +569,10 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    ap.add_argument("--frame-share", action="store_true",
+                    help="publish rendered frames to shared memory pokeagent_frames_<control-port> for tools/watch.py")
+    ap.add_argument("--frame-every", type=int, default=2,
+                    help="render+publish every Nth tick when frame-sharing (render cost only, no extra game frames)")
     ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
     ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
@@ -1461,6 +1465,36 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
+    frame_shm = None
+    if a.frame_share:
+        try:
+            from multiprocessing import shared_memory
+            frame_shm = shared_memory.SharedMemory(name=f"pokeagent_frames_{a.control_port}",
+                                                   create=True, size=16 + 160 * 144 * 3)
+            frame_shm.buf[8:10] = (160).to_bytes(2, "little")
+            frame_shm.buf[10:12] = (144).to_bytes(2, "little")
+            log(f"[frame slot: pokeagent_frames_{a.control_port}]", "res")
+        except Exception as e:
+            log(f"[frame share unavailable: {e}]", "res")
+
+    _frame_seq = 0
+
+    def publish_frame() -> None:
+        nonlocal _frame_seq
+        data = emu.frame_rgb()
+        _frame_seq += 1
+        frame_shm.buf[0:8] = (_frame_seq | 1).to_bytes(8, "little")  # odd: write in progress
+        frame_shm.buf[16:16 + len(data)] = data
+        _frame_seq += 1
+        frame_shm.buf[0:8] = _frame_seq.to_bytes(8, "little")  # even: committed
+
+    def close_frame_shm() -> None:
+        if frame_shm is not None:
+            try:
+                frame_shm.close(); frame_shm.unlink()
+            except Exception:
+                pass
+
     def frame():
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
@@ -1471,14 +1505,21 @@ def main(argv=None) -> int:
         if st["done"]:
             if a.headless:  # a finished headless agent must EXIT (swarm rounds wait on it)
                 try:
-                    shutdown(); trans.close(); emu.close(); root.destroy()
+                    close_frame_shm(); shutdown(); trans.close(); emu.close(); root.destroy()
                 except Exception:
                     pass
                 os._exit(0)
             root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
             return
         if a.headless:
-            emu.tick(1)  # no rendering at all
+            if frame_shm is not None and st["frame"] % max(1, a.frame_every) == 0:
+                try:
+                    emu.tick_rendered(1)  # render this tick anyway and publish it (no extra game frame)
+                    publish_frame()
+                except Exception:
+                    emu.tick(1)
+            else:
+                emu.tick(1)  # no rendering at all
         else:
             if st["speed"] > 1:
                 emu.tick(st["speed"] - 1)  # turbo: frameskip - run extra frames unrendered, draw one
@@ -1519,7 +1560,7 @@ def main(argv=None) -> int:
         finally:
             if st["done"] and a.headless:
                 try:
-                    shutdown(); trans.close(); emu.close(); root.destroy()
+                    close_frame_shm(); shutdown(); trans.close(); emu.close(); root.destroy()
                 except Exception:
                     os._exit(0)  # a swarm parent is waiting on us; never hang in mainloop
             else:
