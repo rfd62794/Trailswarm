@@ -105,6 +105,11 @@ def goal_menu_choice(goals: dict, options: list[str]) -> str | None:
     return None
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
+# After a blackout the game drops us at the last Pokecenter's door (Viridian (23,26) once we healed there) or at home
+# (Pallet (5,6)). Arriving there from any other map is a respawn, never a door: it made a ghost 3-step 'warp' from the
+# Forest to the Pokecenter that the heal planner oscillated on for 1000+ steps (2026-11-03 06:12). value = the only
+# map those landings are legitimately reached from.
+WHITEOUT_LANDINGS = {(1, 23, 26): 41, (0, 5, 6): 37}
 # Screen-tile offsets of the 2x2 map tile in front of the player (player sprite sits at rows 8-9, cols 8-9).
 AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11, 8), (11, 9)],
          "LEFT": [(8, 6), (8, 7), (9, 6), (9, 7)], "RIGHT": [(8, 10), (8, 11), (9, 10), (9, 11)]}
@@ -142,7 +147,7 @@ def move_scores(emu) -> dict[str, tuple[float, str]]:
     return out
 
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]  # goals.json order
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]  # goals.json order
 
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
@@ -181,7 +186,9 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
          "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen,
          "oaks_parcel": has_parcel or st.get("had_parcel", False),
-         "deliver_parcel": st.get("had_parcel", False) and not has_parcel}
+         "deliver_parcel": st.get("had_parcel", False) and not has_parcel,
+         "to_route2": 0x0D in seen, "to_pewter": 0x02 in seen,
+         "to_gym": 0x36 in seen, "beat_brock": bool(emu.read(0xD356) & 1)}  # Pewter Gym map 0x36; wObtainedBadges bit0 = BOULDERBADGE (pokered.sym)
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:
@@ -302,6 +309,22 @@ class MapMemory:
         self.path = path
         self.data = json.loads(path.read_text()) if path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
+        self.purge_bad_warps()
+
+    def purge_bad_warps(self):
+        """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
+        actually warp; they are removed on load and never merged back by the swarm."""
+        for mid, d in self.data.get("maps", {}).items():  # whiteout respawns recorded as doors (see WHITEOUT_LANDINGS)
+            for key, dest in list(d.get("warps", {}).items()):
+                if tuple(dest) in WHITEOUT_LANDINGS and int(mid) != WHITEOUT_LANDINGS[tuple(dest)]:
+                    d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
+        for ref in self.data.get("bad_warps", []):
+            mid, sep, key = ref.partition(":")
+            if not sep:
+                continue  # malformed tombstone: ignore it rather than failing every load
+            d = self.data.get("maps", {}).get(mid, {})
+            d.get("warps", {}).pop(key, None)
+            d.get("warp_cand", {}).pop(key, None)  # or learn() would re-add it on the next sighting
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -319,6 +342,14 @@ class MapMemory:
         blocked = self.m(m0)["blocked"]
         if m1 != m0:
             w = self.m(m0)["warps"]
+            if WHITEOUT_LANDINGS.get((m1, x1, y1), m0) != m0:
+                return f"map changed to 0x{m1:02X} (a whiteout respawn, not a door)"
+            if f"{m0}:{key}" in self.data.get("bad_warps", []):
+                return f"map changed to 0x{m1:02X} (known forced walk - not a warp)"
+            cand = self.m(m0).setdefault("warp_cand", {})
+            cand[key] = cand.get(key, 0) + 1
+            if key not in w and cand[key] < 2:  # a map change seen ONCE from this tile+direction may be a forced walk
+                return f"map changed to 0x{m1:02X} (seen once - not recorded as a warp yet)"
             taken = self.m(m0).setdefault("warp_taken", {})
             taken[key] = taken.get(key, 0) + 1
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
@@ -1035,7 +1066,12 @@ def main(argv=None) -> int:
             if st.get("potion_hp_before") is not None and hp > st["potion_hp_before"]:
                 mem.data.setdefault("item_heal", {}).setdefault("20", []).append(hp - st["potion_hp_before"])
                 log(f"[POTION healed {hp - st['potion_hp_before']} HP: learned]", "res"); st["potion_hp_before"] = None
-            if kind == 1 and weak and run_line is not None:  # wild battle and too weak: flee
+            # On the road to Pewter after the parcel, wild fights cost 25+ presses each and a to_pewter run only has 1800
+            # (2026-11-03: 30-50% of the Forest presses were battle text): run unless a ball could catch it.
+            gn = check_goals(emu, st)
+            hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and emu.read(0xD35E) in (0x0D, 0x33)
+                     and not (bag_contents(emu).get(0x04, 0) and emu.read(0xCFE5)))
+            if kind == 1 and (weak or hurry) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 if ">RUN" in run_line:
                     do_press("A", "agent", f"BATTLE wild, HP {hp}/{mx}: RUN"); return
                 cur = next((ln for ln in lines_now if ">" in ln), "")
@@ -1206,6 +1242,11 @@ def main(argv=None) -> int:
                         do_press("DOWN", "agent", f"move list: cursor to {st['forget_move']}"); return
                 goals_now = check_goals(emu, st)
                 want = goal_menu_choice(goals_now, options)
+                heal_opt = next((o for o in options if o.strip().endswith("HEAL") and "POK" not in o), None)
+                if heal_opt and not want:  # Pokecenter counter 'HEAL / CANCEL': heal whenever any party member is hurt
+                    hp_c, mx_c = party_hp(emu)
+                    if mx_c and hp_c < mx_c:
+                        want = heal_opt
                 if not want and goals_now.get("potion") and any("WITHDRAW" in o or "DEPOSIT" in o for o in options):
                     do_press("B", "agent", "potion already in the bag: nothing else to do at the PC, backing out"); return
                 if want:  # a goal tells us which option to take here
@@ -1321,7 +1362,9 @@ def main(argv=None) -> int:
             st["explore_burst"] -= 1
             name, why = mem.choose(m, x, y, st["facing"], tm_now, emu.read(0xD367), grass="neutral")
             do_press(name, "agent", f"exploring a new discovery ({st['explore_burst']} left): {why}"); return
-        planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now),
+        parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in mem.data.get("items", [])
+                       if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
+        planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])
         if planned and "at Mom, talking" in planned[1]:

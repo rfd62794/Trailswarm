@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
 
 
 def consistency(last_n: int = 16) -> dict[str, float]:
@@ -91,10 +91,16 @@ def main() -> int:
     log = ROOT / "runs" / "overnight-status.log"
     t_end = time.time() + a.hours * 3600
     rnd = 0
+    skipped: dict[str, int] = {}
     while time.time() < t_end:
         rnd += 1
         cons = consistency()
-        weak = next((g for g in GOALS if (cons.get(g) is None or cons.get(g) < 0.7) and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())), None)
+        skip = {g for g, until in skipped.items() if until > rnd}  # goals whose segment produced no attempts: back off
+        ready = [g for g in GOALS if g not in skip and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
+        # known-failing goals first, FURTHEST first (the frontier of the campaign), then goals never sampled
+        failing = [g for g in reversed(ready) if cons.get(g) is not None and cons.get(g) < 0.7]
+        unsampled = [g for g in ready if cons.get(g) is None]
+        weak = (failing + unsampled + [None])[0]
         if rnd % 3 == 0 and (ROOT / "runs" / "checkpoints" / "team_best.state").exists():
             objective, args = "roles (train + explore from the strongest team)", ["--roles"]
         elif weak:
@@ -102,6 +108,7 @@ def main() -> int:
         else:
             far = furthest_checkpoint()
             objective, args = f"explore beyond {far}", (["--segment", GOALS[min(len(GOALS) - 1, GOALS.index(far) + 1)]] if far and GOALS.index(far) + 1 < len(GOALS) else [])
+        picked = weak if (weak and "segment" in objective) else None
         t0 = time.time()
         last = run_swarm(["--agents", str(a.agents), "--steps", str(a.steps)] + args, timeout=max(900, int(a.steps * 1.2) + 600))
         try:
@@ -113,6 +120,9 @@ def main() -> int:
         except Exception as e:  # one bad read or timeout must never end the overnight loop
             line = f"{time.strftime('%H:%M')} round {rnd}: {objective}; ERROR after the swarm: {e!r}; {last}"
             time.sleep(5)
+        if picked and consistency().get(picked) is None:
+            skipped[picked] = rnd + 8  # the segment cannot be attempted as set up (checkpoint already past it): try others
+            line += f" [no attempts counted for {picked}: backing off 8 rounds]"
         with log.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
         print(line, flush=True)

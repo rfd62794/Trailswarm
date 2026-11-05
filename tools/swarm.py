@@ -30,6 +30,9 @@ def merge_memory(dst: dict, src: dict) -> dict:
             if k not in d["blocked"]:
                 d["blocked"].append(k)
         d["warps"].update(s.get("warps", {}))
+        wc = d.setdefault("warp_cand", {})
+        for k, n in s.get("warp_cand", {}).items():
+            wc[k] = max(wc.get(k, 0), n)
         # Every agent started from a copy of the shared memory, so counts are taken as MAX, never summed:
         # summing would add the shared base once per agent and inflate solids, grades and counts.
         wt = d.setdefault("warp_taken", {})
@@ -117,6 +120,19 @@ def merge_memory(dst: dict, src: dict) -> dict:
         for k, n in table.items():
             cur[k] = max(cur.get(k, 0), n)
     dst["team_best_level"] = max(dst.get("team_best_level", 0), src.get("team_best_level", 0))
+    bw = dst.setdefault("bad_warps", [])
+    for ref in src.get("bad_warps", []):
+        if ref not in bw:
+            bw.append(ref)
+    for ref in bw:  # tombstones win over any agent copy that still carries the pollution
+        mid, sep, key = ref.partition(":")
+        if sep:
+            dst.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
+    # whiteout respawns (Pokecenter door / home) are never doors from other maps (see explore_demo.WHITEOUT_LANDINGS)
+    for mid, d in dst.get("maps", {}).items():
+        for key, dest in list(d.get("warps", {}).items()):
+            if tuple(dest) in {(1, 23, 26): 41, (0, 5, 6): 37} and int(mid) != {(1, 23, 26): 41, (0, 5, 6): 37}[tuple(dest)]:
+                d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():
         cur = beats.get(sig)
@@ -145,7 +161,7 @@ def main() -> int:
     ap.add_argument("--roles", action="store_true",
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     a = ap.parse_args()
-    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel"]
+    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
     seg_args: list[str] = []
     if a.segment:
         i = GOALS.index(a.segment)
