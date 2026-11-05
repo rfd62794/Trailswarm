@@ -97,7 +97,7 @@ def status_line(a: Agent) -> str:
     if s.get("_rl"):  # RL learner status (runs/rlstatus_<port>.json)
         return (f":{a.port} {s.get('tag', '')}  gen {s.get('generation', '?')}  wins {s.get('wins', 0)}"
                 f"  steps {s.get('steps_total', '?')}  avg {s.get('steps_avg', '?')}"
-                f"  best {s.get('steps_best', '?')}  worst {s.get('steps_worst', '?')}")
+                f"  winavg {s.get('win_avg', '?')}  best {s.get('steps_best', '?')}  worst {s.get('steps_worst', '?')}")
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",

@@ -49,6 +49,7 @@ def main() -> int:
     ap.add_argument("--load-q", default=None, help="seed the Q table from a saved table (offspring of a champion)")
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
     ap.add_argument("--tag", default="", help="lineage tag shown on the tile (gauntlet assigns e.g. a, a1, a1c)")
+    ap.add_argument("--novelty", type=float, default=0.2, help="intrinsic reward beta/sqrt(visits): unexplored states attract")
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
@@ -67,6 +68,8 @@ def main() -> int:
         wins = first_ep = None
         wins = 0
         steps_log: list[int] = []
+        win_steps: list[int] = []  # solved-episode steps only: the number that shows learning
+        visits: dict[tuple, int] = defaultdict(int)
         total_steps = 0
         for ep in range(a.episodes):
             eps = max(a.eps_floor, eps0 * (1.0 - ep / max(1, a.episodes)))  # decay, but never stop exploring
@@ -76,6 +79,8 @@ def main() -> int:
                 nxt, rew, done, _ = env.step(act)
                 if env.steps % a.publish_every == 0:
                     env.publish()  # no-op unless frame_shm is set
+                visits[nxt] += 1
+                rew += a.novelty / (visits[nxt] ** 0.5)  # intrinsic reward: unexplored states pull harder
                 q = Q[obs]
                 q[act] += alpha * (rew + gamma * max(Q[nxt]) - q[act])
                 obs = nxt
@@ -85,6 +90,7 @@ def main() -> int:
             total_steps += env.steps
             if env.goal_fn(env.emu):  # episode ended by reaching the goal, not the step cap
                 wins += 1
+                win_steps.append(env.steps)
                 if first_ep is None:
                     first_ep = ep
                 print(f"  ep {ep}: SOLVED in {env.steps} steps" + (" (first success!)" if ep == first_ep else ""), flush=True)
@@ -94,7 +100,8 @@ def main() -> int:
                 best = min(steps_log); worst = max(steps_log)
                 json.dump({"instance": a.frame_port, "tag": a.tag, "generation": ep, "wins": wins,
                            "steps_total": total_steps, "steps_avg": round(total_steps / len(steps_log), 1),
-                           "steps_best": best, "steps_worst": worst},
+                           "steps_best": best, "steps_worst": worst,
+                           "win_avg": round(sum(win_steps) / len(win_steps), 1) if win_steps else None},
                           open(f"runs/rlstatus_{a.frame_port}.json", "w"))
             if (ep + 1) % 25 == 0:
                 print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
