@@ -101,9 +101,9 @@ def launch(port: int, segment: str, state: str) -> None:
             '--periodic-evals', '2', '--repeat-penalty', '0.01', '--repeat-threshold', '8',
             '--interact-limit', '24', '--save-q', f'runs/ladder/q_{port}.{segment}.json',
             '--tag', f'{segment[:12]}-{port}']
-    if segment != 'menu_tour':
+    if segment != 'menu_tour':  # travel stages: no START/SELECT — save path stays sealed
         args += ['--battle-learning', '--screen-context', '--spatial-context',
-                 '--combat-context', '--menu-controls']
+                 '--combat-context']
     subprocess.Popen(args, cwd=Path(__file__).resolve().parents[1])
 
 
