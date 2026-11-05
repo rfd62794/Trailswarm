@@ -35,9 +35,9 @@ def spawn(port: int, seed: int, sire: Path | None, tag: str, a) -> subprocess.Po
 
 
 def child_tag(parent: str, spawn_count: int) -> str:
-    """a -> a1, a1 -> a1c, a1c -> a1c4: alternate digit and letter suffixes by depth."""
-    suffix = str(spawn_count) if not parent[-1].isdigit() else chr(ord("a") + spawn_count - 1)
-    return parent + suffix
+    """Each character place is a generation; the symbol there is the variant within it.
+    a -> a1 ... a9, aa, ab (36 variants per generation); a1 -> a11, a12; depth = name length."""
+    return parent + "0123456789abcdefghijklmnopqrstuvwxyz"[spawn_count % 36]
 
 
 def main() -> int:
@@ -83,10 +83,11 @@ def main() -> int:
         gen += 1
         champ_tag = tags[champion]
         children[champ_tag] = children.get(champ_tag, 0) + 1
+        dead_tag = tags.get(runt, "?")
         tags[runt] = child_tag(champ_tag, children[champ_tag])
-        print(f"[gen {gen}] cull :{runt} '{tags.get(runt,'')}' dead (wins {stats[runt].get('wins',0)}), "
-              f"new '{tags[runt]}' sired by '{champ_tag}' (wins {stats[champion].get('wins',0)}, "
-              f"best {stats[champion].get('steps_best','-')})", flush=True)
+        print(f"[gen {gen}] cull :{runt} '{dead_tag}' dead (wins {stats[runt].get('wins',0)}), "
+              f"new '{tags[runt]}' (depth {len(tags[runt])}) sired by '{champ_tag}' "
+              f"(wins {stats[champion].get('wins',0)}, best {stats[champion].get('steps_best','-')})", flush=True)
         proc[runt] = spawn(runt, gen * 100 + runt, sire, tags[runt], a)
 
 
