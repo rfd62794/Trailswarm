@@ -365,7 +365,7 @@ class SegmentEnv:
                     return [i for i in range(n) if self.actions[i] == Button.B]
                 return [i for i in range(n) if self.actions[i] not in (Button.A, Button.LEFT, Button.RIGHT)]
             if 'YES' in joined and 'NO' in joined:
-                return [i for i in range(n) if self.actions[i] == Button.B]  # unarmed confirm (save-state start): still can't say YES
+                pass  # unarmed confirms are legitimate (starter, heal, tutorial) — only armed save prompts force B
             try:  # pixel-truth backstop: last rendered frame, no extra tick
                 from pokeagent.pixelsig import match
                 rgb = self.emu.frame_rgb()
