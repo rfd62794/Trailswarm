@@ -36,17 +36,27 @@ def goal_potion_run(emu) -> bool:
     return goal_left_house(emu) and emu.read(0xD31D) > 0
 
 
-GOAL_FNS = {"left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run}
-# which checkpoint each segment resets to (previous goal in the campaign chain)
-SEGMENT_STATES = {"left_house": "baselines/bedroom.state", "potion": "baselines/bedroom.state",
-                  "potion_run": "baselines/bedroom.state"}
+def goal_reach_pc(emu) -> bool:
+    """Standing at the PC with its menu open: a box is open while still inside the house."""
+    return read_state(emu).map_id in (0x25, 0x26) and sub_box_open(emu)
+
+
+GOAL_FNS = {"left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
+            "reach_pc": goal_reach_pc, "exit_potion": goal_left_house}
+# checkpoints per segment, tried in order: a downstream stage starts from the previous
+# stage's saved milestone (auto-written by the first agent to reach it)
+SEGMENT_STATES = {"left_house": ["baselines/bedroom.state"],
+                  "reach_pc": ["baselines/bedroom.state"],
+                  "potion": ["runs/checkpoints/rl_reach_pc.state", "baselines/bedroom.state"],
+                  "exit_potion": ["runs/checkpoints/rl_potion.state", "baselines/bedroom.state"],
+                  "potion_run": ["baselines/bedroom.state"]}
 # shaped sub-goals per segment: first-time detectors each worth a small bonus
 SEGMENT_SUBGOALS = {"potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion]}
 
 
 class SegmentEnv:
-    def __init__(self, rom: str | Path, state: str | Path, goal_fn,
+    def __init__(self, rom: str | Path, state: str | Path, goal_fn, goal_name: str = "",
                  subgoals: tuple = (), sub_bonus: float = 0.4,
                  max_steps: int = 300, hold: int = 8, settle: int = 8, publish_frames: bool = False,
                  windowed: bool = False, speed: int = 1, frame_port: int | None = None) -> None:
@@ -55,6 +65,8 @@ class SegmentEnv:
             self.emu._pyboy.set_emulation_speed(speed)  # 0 = unthrottled, 1 = realtime
         self.state = Path(state)
         self.goal_fn = goal_fn
+        self.goal_name = goal_name
+        self._goal_saved = False
         self.subgoals = subgoals
         self.sub_bonus = sub_bonus
         self._claimed: set = set()
@@ -94,6 +106,12 @@ class SegmentEnv:
                 rew += self.sub_bonus
         if self.goal_fn(self.emu):
             rew += 1.0
+            if not self._goal_saved and self.goal_name:  # milestone checkpoint: downstream stages start here
+                try:
+                    self.emu.save_state(Path(f"runs/checkpoints/rl_{self.goal_name}.state"))
+                    self._goal_saved = True
+                except Exception:
+                    pass
         done = self.goal_fn(self.emu) or self.steps >= self.max_steps
         return self._obs(), rew, done, {}
 

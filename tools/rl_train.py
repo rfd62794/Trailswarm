@@ -14,6 +14,7 @@ import json
 import random
 import time
 from collections import defaultdict
+from pathlib import Path
 
 from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv
 
@@ -63,7 +64,9 @@ def main() -> int:
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
-    env = SegmentEnv(a.rom, a.state or SEGMENT_STATES[a.segment], GOAL_FNS[a.segment],
+    start = a.state or next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
+                            SEGMENT_STATES[a.segment][-1])
+    env = SegmentEnv(a.rom, start, GOAL_FNS[a.segment], goal_name=a.segment,
                      subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())),
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                      windowed=a.window, speed=a.speed, frame_port=a.frame_port,
