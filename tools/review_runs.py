@@ -17,7 +17,7 @@ import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle"]
+GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
 
 
 def load_runs(root: Path):
