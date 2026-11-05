@@ -41,6 +41,24 @@ def goal_reach_pc(emu) -> bool:
     return read_state(emu).map_id in (0x25, 0x26) and sub_box_open(emu)
 
 
+def waypoint_fn(wp):
+    """A mined (map,x,y) milestone becomes a first-time sub-goal detector."""
+    def f(emu) -> bool:
+        s = read_state(emu)
+        return (s.map_id, s.x, s.y) == tuple(wp)
+    return f
+
+
+def curriculum_subgoals(segment: str):
+    """Mined milestones for this segment, if tools/rl_curriculum.py wrote them."""
+    try:
+        import json
+        wps = json.loads(Path("runs/rl_curriculum.json").read_text()).get(segment, [])
+        return [waypoint_fn(w) for w in wps]
+    except Exception:
+        return []
+
+
 GOAL_FNS = {"left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
             "reach_pc": goal_reach_pc, "exit_potion": goal_left_house}
 # checkpoints per segment, tried in order: a downstream stage starts from the previous

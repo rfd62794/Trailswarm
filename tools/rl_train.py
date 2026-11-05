@@ -66,8 +66,9 @@ def main() -> int:
     rng = random.Random(a.seed)
     start = a.state or next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
                             SEGMENT_STATES[a.segment][-1])
+    from rl_env import curriculum_subgoals
     env = SegmentEnv(a.rom, start, GOAL_FNS[a.segment], goal_name=a.segment,
-                     subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())),
+                     subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())) + tuple(curriculum_subgoals(a.segment)),
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                      windowed=a.window, speed=a.speed, frame_port=a.frame_port,
                      publish_frames=a.publish_frames)
