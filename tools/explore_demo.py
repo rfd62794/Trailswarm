@@ -542,6 +542,8 @@ def main(argv=None) -> int:
     ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
+    ap.add_argument("--train-level", type=int, default=8,
+                    help="planner trains on Route 1 until the lead reaches this level (Brock sweep: 8/10/12/14)")
     ap.add_argument("--explore-rate", type=float, default=0.2,
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     a = ap.parse_args(argv)
@@ -557,7 +559,8 @@ def main(argv=None) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
     (run_dir / "meta.json").write_text(json.dumps({"start": Path(a.state).stem if a.state else "baseline",
-                                                    "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed}))
+                                                    "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed,
+                                                    "frame_share": a.frame_share, "train_level": a.train_level}))
     mem = MapMemory(Path(a.maps))
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
@@ -1354,7 +1357,7 @@ def main(argv=None) -> int:
         parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in mem.data.get("items", [])
                        if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
         planned = plan_step({**goals_now_all, "_starter": a.starter, "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
-                             "_level": emu.read(0xD18C), "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
+                             "_level": emu.read(0xD18C), "_train_level": a.train_level, "_mom_failed": st.get("mom_failed_until", 0) > st["step"]},
                             mem.data["maps"], (m, x, y), st["facing"])
         if planned and "at Mom, talking" in planned[1]:
             st["mom_talk_step"] = st["step"]; st["mom_talk_hp"] = hp_now
