@@ -25,7 +25,8 @@ seqlock header: u64 seq at [0:8], u16 w [8:10], u16 h [10:12], RGB from byte 16;
 4. `src/pokeagent/viewer/` package, pure Python (no Dear PyGui import anywhere in this directive):
    `sources.py` (AgentSource protocol, `HttpShmSource`, `FakeSource`), `model.py` (latest snapshot + frame per
    agent, staleness), `layout.py` (grid maths + focus state), `commands.py` (command builders + key map).
-5. Tests for all of the above.
+5. `src/pokeagent/human_hold.py` (section 3.5).
+6. Tests for all of the above.
 
 ## 3. The work
 

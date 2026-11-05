@@ -109,21 +109,21 @@ runs/agents/<id>.json  {id, kind, pid, port, frame_slot, started}   <- discovery
   (running|paused|stopped|done), stop_reason, step, segment {id,name,steps,record}, goals [{id,name,
   status done|current|ahead, steps}], thinking {want, plan, blocker, driver explorer|rl|human|claude,
   rule, button, result, confidence}, drivers {explorer,rl,human,claude} (counts over last 100 presses),
-  recent [{step, driver, text}] (last 20), sees {rows: [str], mode overworld|battle|menu, legend},
+  recent [{step, driver, text}] (last 20), human_hold (bool), sees {rows: [str], mode overworld|battle|menu, legend},
   screen {box_text, in_battle, party [{species, level, hp, max_hp}], money, bag_summary}, frame_slot,
   updated_at`. Unknown fields are ignored; missing fields render as "—".
 - **Commands v1** (`POST /command`, JSON `{"cmd": name, ...}` -> `{"ok": bool, "error"?: str}`):
   `pause, resume, speed{n}, press{button}, steer{on}, hand_to{driver}, save_state{name},
-  load_state{name}`. Supervisor commands: `spawn{kind, args}, stop{id}, restart{id}, remove{id}`.
+  load_state{name}, hold_release`. Supervisor commands: `spawn{kind, args}, stop{id}, restart{id}, remove{id}`.
 - **Agent side:** one small module per job: `snapshot.py` (contract), `status_builder.py` (fills a
   snapshot from RAM/memory/policy state; each agent kind supplies a thin adapter), `control_server.py`
   (stdlib `http.server` on a thread: GET /snapshot, POST /command; replaces the ad-hoc control APIs in
   explore_demo and rl_train), registry write/remove in `agent_registry.py`.
-- **Viewer side (`src/pokeagent/viewer/`, layer 4):** `sources/` (AgentSource protocol: `snapshot()`,
+- **Viewer side (`src/pokeagent/viewer/`, layer 4):** `sources.py` (AgentSource protocol: `snapshot()`,
   `frame()`, `send(cmd)`; HTTP + shm implementation; a fake source for tests), `model.py` (latest snapshot
   per agent, staleness), `layout.py` (grid maths, focus state; pure, testable), `panels/` (render, sees,
-  thinking, progress, focus extras; a registry so a new panel is one file), `controls.py` (bar + key
-  routing -> commands), `ui/` (all Dear PyGui code), `app.py` (wiring + main loop, small).
+  thinking, progress, focus extras; a registry so a new panel is one file), `commands.py` (command builders + key
+  map; the control bar widgets live in `ui/`), `ui/` (all Dear PyGui code), `app.py` (wiring + main loop, small).
 - UI loop at 30 Hz; snapshot polling and frame reads on a background thread; the UI only ever reads the
   latest value (drop stale). A dead agent shows "stale Ns" then "lost", never blocks.
 
@@ -148,7 +148,8 @@ The shape, in build order (each step must leave the demo and the viewer better):
 
 1. **Explorer as behaviours.** Extract the Explorer policy from `tools/explore_demo.py` (1,562 lines) into
    `src/pokeagent/explorer/` as named behaviours, each with an explicit start condition, termination and
-   failure: `advance_dialog, menu, battle, goto, replay_beat, plan_goal, frontier, catch, heal`. The
+   failure: `readiness, advance_dialog, menu, battle, catch, heal, replay_beat, goto, plan_goal, frontier`, plus the
+   existing loop `guards` moved as one behaviour (step 2 replaces them). The
    selector order stays the demo's. This updates the Draft `Explorer_Policy_Module_Directive.md`. Parity
    check: the extracted Explorer reaches S1-S5 from `baselines/bedroom.state` within 25% of the demo's
    recorded steps.
@@ -194,7 +195,7 @@ callable as options where they beat the Explorer behaviour (e.g. menus), decided
 - ROM and save states are gitignored; never committed. RAM addresses verified against the ROM before use
   (`docs/KNOWLEDGE.md`).
 - Devin directives must say: do not list the tree recursively; do not run `uv run pokeagent ...` smoke
-  checks in the sandbox (the entry point is refused) - use `uv run python -m pytest` and module imports.
+  checks in the sandbox (the entry point is refused) - the test command is `uv run pytest -q` (verified 2026-11-05: 178 passed).
 - Commits from Claude go through a scratchpad worktree (the live checkout blocks `git commit`). Merge commit,
   not squash; independent review + green tests before any merge.
 
