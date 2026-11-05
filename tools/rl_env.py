@@ -467,6 +467,8 @@ class SegmentEnv:
             opt = getattr(self, 'options', ())[action - len(getattr(self, 'actions', ACTIONS))]
             total, steps, done, info = opt.run(self)
             self.steps += steps
+            if info.get('option_failed'):
+                total -= 0.1  # invoking a skill that can't move is a wasted decision
             won = bool(info.pop('option_solved', False))
             trunc = not done and self.steps >= self.max_steps
             return self._obs(), total, done or trunc, {
