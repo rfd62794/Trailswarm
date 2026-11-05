@@ -25,7 +25,7 @@ What is missing:
   `@ N W i # .`. Grass, ledges, trainers and objects never appear.
 - `pokeagent.navigation.shortest_path` (BFS used by options/RL) ignores `jumps`: a route down a ledge
   is modelled as a one-tile step onto an unvisited ledge tile and is dropped, so ledge shortcuts are never
-  planned. Current code (lines 41-61):
+  planned. Current code (`src/pokeagent/navigation.py` lines 43-58):
 
 ```python
         visited = set(d.get('visited', {}))
@@ -91,6 +91,9 @@ The ledge glyph is drawn on the **ledge tile itself**: the tile between the jump
 (start + one step in the jump direction), which is where the ledge appears on screen.
 
 ## 4. What NOT to do
+
+- Make every change inside the `pokeagent.explorer` package and `navigation.py`; `tools/explore_demo.py`
+  picks the changes up through its imports and must not grow.
 
 - Do not change how anything is learned (thresholds, confirmations) except adding `trainer`/`beaten` and
   `outcomes`. Do not change existing keys of `maps.json`; only add.
