@@ -167,7 +167,7 @@ def main() -> int:
         cols = cols_for(n)
         rows = math.ceil(n / cols)
         w, h = max(root.winfo_width(), 400), max(root.winfo_height(), 300)
-        return max(1, min(6, min(w // (cols * 164), h // (rows * 168))))
+        return max(1, min(10, min(w // (cols * 164), h // (rows * 168))))
 
     def relayout() -> None:
         # every probed port keeps a tile (dead ones dim to 'offline'), so the grid is stable
@@ -180,12 +180,20 @@ def main() -> int:
     def set_focus(port: Optional[int]) -> None:
         state["focus"] = port
         if port is None:
+            try:
+                root.state("normal")  # back out: restore the grid-sized window
+            except Exception:
+                pass
             focus.pack_forget()
             grid.pack(fill="both", expand=True)
             relayout()
         else:
             grid.pack_forget()
             focus.pack(fill="both", expand=True)
+            try:
+                root.state("zoomed")  # click-in: maximize so the focused agent gets the whole screen
+            except Exception:
+                pass
 
     focus = tk.Frame(root, bg=BG)
     fimg = tk.Label(focus, bg=BG)
@@ -221,7 +229,7 @@ def main() -> int:
         if a.fixed_scale:
             return a.fixed_scale
         w, h = max(root.winfo_width(), 400), max(root.winfo_height(), 300)
-        return max(1, min(8, min(w // 164, h // 200)))
+        return max(1, min(16, min(w // 164, h // 200)))
 
     def redraw() -> None:
         resized = time.time() >= state["resize_at"] > 0
