@@ -366,6 +366,8 @@ class SegmentEnv:
                 return [i for i in range(n) if self.actions[i] not in (Button.A, Button.LEFT, Button.RIGHT)]
             if 'YES' in joined and 'NO' in joined:
                 pass  # unarmed confirms are legitimate (starter, heal, tutorial) — only armed save prompts force B
+            if self.emu.read(0xD057) == 2 and any('>RUN' in ln for ln in lines):
+                return [i for i in range(n) if self.actions[i] != Button.A]  # trainer battles can't be fled
             try:  # pixel-truth backstop: last rendered frame, no extra tick
                 from pokeagent.pixelsig import match
                 rgb = self.emu.frame_rgb()
