@@ -359,8 +359,12 @@ class SegmentEnv:
                 self._save_armed = 10  # next ~10 decisions are inside the save flow
             elif self._save_armed > 0:
                 self._save_armed -= 1
-            if self._save_armed and 'YES' in joined and 'NO' in joined:
-                return [i for i in range(n) if self.actions[i] == Button.B]  # save confirm only: legitimate YES/NO stays free
+            if self._save_armed:
+                if 'YES' in joined and 'NO' in joined:
+                    return [i for i in range(n) if self.actions[i] == Button.B]
+                return [i for i in range(n) if self.actions[i] not in (Button.A, Button.LEFT, Button.RIGHT)]
+            if 'YES' in joined and 'NO' in joined:
+                return [i for i in range(n) if self.actions[i] == Button.B]  # unarmed confirm (save-state start): still can't say YES
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
@@ -498,6 +502,14 @@ class SegmentEnv:
             from pokeagent.explorer import frame_lines
             tm = self.emu.read_range(0xC3A0, 360)
             ctx = classify_screen(tm, self.emu.read(0xD057))
+            flight = getattr(self, '_flight', None)
+            if flight is None:
+                from collections import deque
+                flight = self._flight = deque(maxlen=20)
+            lines_now = frame_lines(tm)
+            flight.append({'step': self.steps, 'act': getattr(self, 'actions', ACTIONS)[action].name,
+                           'screen': ctx.screen.name, 'menu': ctx.menu.name,
+                           'option': ctx.option, 'lines': lines_now})
             if ctx.screen == ScreenType.MENU:
                 self._menu_dwell = getattr(self, '_menu_dwell', 0) + 1 if ctx.menu == getattr(self, '_last_menu', None) else 1
                 self._last_menu = ctx.menu
@@ -509,6 +521,15 @@ class SegmentEnv:
             lines = frame_lines(tm)
             if any('SAVING' in ln.upper() for ln in lines):
                 rew -= 0.3  # a committed save burns many frames for zero campaign value
+                if not getattr(self, '_save_dumped', False):
+                    self._save_dumped = True
+                    try:
+                        import json, os
+                        Path('runs/events').mkdir(parents=True, exist_ok=True)
+                        Path(f'runs/events/save_{self.goal_name}_{os.getpid()}_{self.steps}.json').write_text(
+                            json.dumps({'obs': [list(map(int, self._obs()))], 'flight': list(getattr(self, '_flight', []))}))
+                    except Exception:
+                        pass
             elif (getattr(self, 'actions', ACTIONS)[action] == Button.A
                     and (any(ln.startswith('>SAVE') for ln in lines) or ctx.option == 3)):
                 rew -= 0.05  # selecting SAVE once is cheap to learn; repeating is not
