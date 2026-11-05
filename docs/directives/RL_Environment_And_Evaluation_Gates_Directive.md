@@ -40,3 +40,18 @@ Frame publication adds zero simulation ticks in RL; same actions produce equal t
 ## Report
 
 Findings first; then changed files, exact verification output tails, commit SHA, any unrun checks and remaining risks. State whether invariance was tested with a fake, the ROM, or both. State explicitly that no live seats or controllers were changed. Include any dependencies the next demonstration-assisted/shared-learner phase needs, but do not implement that next phase.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Approved |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | repoman/rl-success-and-context |
+
+**Status log**
+- 2026-11-04 23:15 · devin-overseer (delegated) · none → Queued — Approved by Robert in this session; phase 1/2 of ordered RL recommendations. Base repoman/rl-success-and-context includes committed timing fix and directive.; under delegate.envelope
+- 2026-11-04 23:15 · devin-overseer (delegated) · Queued → Approved — lint override: Lint checked main instead of the requested feature base. Verified with git ls-tree that observations.py, qmodels.py, both named tests and the directive are committed on repoman/rl-success-and-context. baselines/battle.state is deliberately an optional local-only asset; the directive explicitly requires skipping ROM checks when absent and forbids searching outside the worktree.; under delegate.band-normal, delegate.self-drafted, delegate.rate-limit
+<!-- queue:end -->
