@@ -101,6 +101,9 @@ def launch(port: int, segment: str, state: str) -> None:
             '--periodic-evals', '2', '--repeat-penalty', '0.01', '--repeat-threshold', '8',
             '--interact-limit', '24', '--save-q', f'runs/ladder/q_{port}.{segment}.json',
             '--tag', f'{segment[:12]}-{port}']
+    q = Path(f'runs/ladder/q_{port}.{segment}.json')
+    if q.exists():
+        args += ['--load-q', str(q)]  # ported + accumulated knowledge survives every reseat
     if segment != 'menu_tour':  # travel stages: no START/SELECT — save path stays sealed
         args += ['--battle-learning', '--screen-context', '--spatial-context',
                  '--combat-context']

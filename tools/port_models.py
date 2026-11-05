@@ -64,7 +64,7 @@ def main() -> int:
     out = {}
     for key, row in merged.items():
         nk = project(tuple(key), tlen)
-        r = [v * a.discount for v in row] + [0.0] * (a.actions - len(row))
+        r = [v * a.discount for v in row[:a.actions]] + [0.0] * max(0, a.actions - len(row))
         cur = out.get(nk)
         out[nk] = [max(x, y) for x, y in zip(r, cur)] if cur else r
     save_model(a.to, {repr(k): v for k, v in out.items()}, a.schema, a.actions)
