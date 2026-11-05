@@ -76,6 +76,8 @@ def main() -> int:
                     help="bounded penalty per state-action repeat beyond --repeat-threshold")
     ap.add_argument("--repeat-threshold", type=int, default=8,
                     help="free repeats per state-action before repeat-penalty applies")
+    ap.add_argument("--interact-limit", type=int, default=24,
+                    help="shared A-press cap per map/x/y/facing across all workers before repeat-penalty applies")
     ap.add_argument("--publish-frames", action="store_true",
                     help="render+publish every settle frame (frame-for-frame showcase; only with frame-port)")
     ap.add_argument("--full-res", action="store_true",
@@ -106,7 +108,7 @@ def main() -> int:
         a.screen_context = a.menu_controls = True
     if (a.n_step < 1 or a.max_steps < 1 or a.episodes < 1 or a.evals < 0
             or a.publish_fps <= 0 or a.novelty < 0 or a.hold < 1 or a.settle < 1
-            or a.repeat_penalty < 0 or a.repeat_threshold < 1
+            or a.repeat_penalty < 0 or a.repeat_threshold < 1 or a.interact_limit < 1
             or a.eval_every < 0 or a.periodic_evals < 1 or a.eps_decay_episodes < 1
             or not 0 <= a.eps_floor <= 1):
         ap.error('Invalid episode, horizon, FPS, control timing or exploration setting')
@@ -117,6 +119,13 @@ def main() -> int:
             ap.error('Requested model does not exist')
     from pokeagent.emulator import Button
     actions = list(ACTIONS) + ([Button.START, Button.SELECT] if a.menu_controls else [])
+    a_idx = actions.index(Button.A)
+    interact_path = Path('runs/interaction_mem.json')
+    try:
+        shared_interact = json.loads(interact_path.read_text())
+    except (OSError, ValueError):
+        shared_interact = {}
+    interact_delta = {}
     rng = random.Random(a.seed)
     if a.frame_port is not None:  # register for tools/rl_admin.py --reap (stale-learner fix)
         import atexit
@@ -275,6 +284,15 @@ def main() -> int:
                     rew -= penalty  # capped: discourage dwelling without swamping real rewards
                     repeat_budget -= penalty
                     reward_components['repeat_penalty'] -= penalty
+                if act == a_idx and obs[5] == 0 and obs[3] == 0:  # overworld A-press, not dialog advance
+                    ikey = f"{obs[0]},{obs[1]},{obs[2]},{obs[4]},A"
+                    interact_delta[ikey] = interact_delta.get(ikey, 0) + 1
+                    known = shared_interact.get(ikey, 0) + interact_delta[ikey]
+                    if known > a.interact_limit and repeat_budget > 0:
+                        penalty = min(a.repeat_penalty, repeat_budget)
+                        rew -= penalty
+                        repeat_budget -= penalty
+                        reward_components['repeat_penalty'] -= penalty
                 traj.append((obs, act, rew, nxt))
                 terminal = info['terminated']  # goal ends bootstrap to 0; step-cap truncation still bootstraps
                 while traj and (len(traj) >= a.n_step or done):
@@ -320,6 +338,16 @@ def main() -> int:
                     pass
             if a.save_q:
                 save_model(a.save_q, snapshot(), schema, len(actions))
+            if interact_delta and (ep + 1) % max(1, a.share_every) == 0:
+                try:  # shared dead-end ledger: one worker's NES is every worker's NES
+                    disk = json.loads(interact_path.read_text()) if interact_path.exists() else {}
+                    for k, v in interact_delta.items():
+                        disk[k] = disk.get(k, 0) + v
+                    atomic_json(interact_path, disk)
+                    shared_interact = disk
+                    interact_delta.clear()
+                except Exception:
+                    pass
             if a.share_every and (ep + 1) % a.share_every == 0:
                 try:  # collective: publish own table, adopt element-wise max over the per-segment pool
                     sdir = Path('runs/qshare') / schema
