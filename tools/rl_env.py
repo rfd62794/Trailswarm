@@ -354,8 +354,8 @@ class SegmentEnv:
             joined = ' '.join(lines).upper()
             if 'SAVING' in joined:
                 return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
-            if 'YES' in joined and 'NO' in joined and 'SAVE' in joined:
-                return [i for i in range(n) if self.actions[i] == Button.B]  # save prompt: only honest answer is NO
+            if 'YES' in joined and 'NO' in joined:
+                return [i for i in range(n) if self.actions[i] == Button.B]  # any confirm prompt: only honest answer is NO/B
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
