@@ -1485,35 +1485,18 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
-    frame_shm = None
+    frame_pub = None
     if a.frame_share:
         try:
-            from multiprocessing import shared_memory
-            frame_shm = shared_memory.SharedMemory(name=f"pokeagent_frames_{a.control_port}",
-                                                   create=True, size=16 + 160 * 144 * 3)
-            frame_shm.buf[8:10] = (160).to_bytes(2, "little")
-            frame_shm.buf[10:12] = (144).to_bytes(2, "little")
+            from pokeagent.telemetry import FramePublisher
+            frame_pub = FramePublisher(a.control_port, emu)
             log(f"[frame slot: pokeagent_frames_{a.control_port}]", "res")
         except Exception as e:
             log(f"[frame share unavailable: {e}]", "res")
 
-    _frame_seq = 0
-
-    def publish_frame() -> None:
-        nonlocal _frame_seq
-        data = emu.frame_rgb()
-        _frame_seq += 1
-        frame_shm.buf[0:8] = (_frame_seq | 1).to_bytes(8, "little")  # odd: write in progress
-        frame_shm.buf[16:16 + len(data)] = data
-        _frame_seq += 1
-        frame_shm.buf[0:8] = _frame_seq.to_bytes(8, "little")  # even: committed
-
     def close_frame_shm() -> None:
-        if frame_shm is not None:
-            try:
-                frame_shm.close(); frame_shm.unlink()
-            except Exception:
-                pass
+        if frame_pub is not None:
+            frame_pub.close()
 
     def frame():
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
@@ -1532,10 +1515,9 @@ def main(argv=None) -> int:
             root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
             return
         if a.headless:
-            if frame_shm is not None and st["frame"] % max(1, a.frame_every) == 0:
+            if frame_pub is not None and st["frame"] % max(1, a.frame_every) == 0:
                 try:
-                    emu.tick_rendered(1)  # render this tick anyway and publish it (no extra game frame)
-                    publish_frame()
+                    frame_pub.publish()  # render this tick anyway and publish it (no extra game frame)
                 except Exception:
                     emu.tick(1)
             else:
