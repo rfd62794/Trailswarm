@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import time
 from collections import defaultdict
 
 from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv
@@ -50,6 +51,8 @@ def main() -> int:
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
     ap.add_argument("--tag", default="", help="lineage tag shown on the tile (gauntlet assigns e.g. a, a1, a1c)")
     ap.add_argument("--novelty", type=float, default=0.2, help="intrinsic reward beta/sqrt(visits): unexplored states attract")
+    ap.add_argument("--throttle-ms", type=float, default=0.0,
+                    help="sleep this many ms per step (resource management: unthrottled envs eat a core each)")
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
@@ -87,6 +90,8 @@ def main() -> int:
                 obs = nxt
                 if done:
                     break
+                if a.throttle_ms:
+                    time.sleep(a.throttle_ms / 1000)
             steps_log.append(env.steps)
             total_steps += env.steps
             if env.goal_fn(env.emu):  # episode ended by reaching the goal, not the step cap

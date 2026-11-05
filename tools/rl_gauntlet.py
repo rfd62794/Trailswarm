@@ -28,10 +28,13 @@ def spawn(port: int, seed: int, sire: Path | None, tag: str, a) -> subprocess.Po
     cmd = [sys.executable, "tools/rl_train.py", "--segment", a.segment,
            "--episodes", str(a.episodes), "--evals", "0", "--max-steps", str(a.max_steps),
            "--frame-port", str(port), "--seed", str(seed), "--publish-every", str(a.publish_every),
-           "--save-q", f"runs/q_table_{port}.json", "--tag", tag]
+           "--save-q", f"runs/q_table_{port}.json", "--tag", tag,
+           "--throttle-ms", str(a.throttle_ms)]
     if sire:
         cmd += ["--load-q", str(sire)]
-    return subprocess.Popen(cmd, cwd=".", stdout=open(f"runs/rl-{port}.log", "a"), stderr=subprocess.STDOUT)
+    flags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)  # Windows: keep Robert's desktop responsive
+    return subprocess.Popen(cmd, cwd=".", creationflags=flags,
+                            stdout=open(f"runs/rl-{port}.log", "a"), stderr=subprocess.STDOUT)
 
 
 def child_tag(parent: str, spawn_count: int) -> str:
@@ -50,6 +53,8 @@ def main() -> int:
     ap.add_argument("--publish-every", type=int, default=16)
     ap.add_argument("--interval", type=float, default=120.0, help="seconds between culls")
     ap.add_argument("--resume", action="store_true", help="seed all founders from runs/q_champion.json, fresh counts")
+    ap.add_argument("--throttle-ms", type=float, default=3.0,
+                    help="per-step sleep passed to learners (3ms ~ 250 steps/s each, leaves CPU headroom)")
     a = ap.parse_args()
 
     Path("runs").mkdir(exist_ok=True)
