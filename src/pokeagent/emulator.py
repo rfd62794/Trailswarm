@@ -89,6 +89,21 @@ class PyBoyEmulator:
         self._pyboy.tick(1, True)
         return self._pyboy.screen.image.convert("RGB")
 
+    def tick_rendered(self, frames: int) -> None:
+        """Emulate `frames` and update the screen buffer even when headless.
+
+        Used by frame publishing: render the tick the agent was going to run anyway
+        instead of adding extra rendered ticks on top.
+        """
+        self._pyboy.tick(frames, True)
+
+    def frame_rgb(self) -> bytes:
+        """Current screen as 144*160*3 RGB bytes (valid right after a rendered tick)."""
+        try:
+            return self._pyboy.screen.ndarray[:, :, :3].tobytes()
+        except Exception:
+            return self._pyboy.screen.image.convert("RGB").tobytes()
+
     def save_state(self, path: Path) -> None:
         with Path(path).open("wb") as f:
             self._pyboy.save_state(f)

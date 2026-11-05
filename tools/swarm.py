@@ -162,6 +162,8 @@ def main() -> int:
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     ap.add_argument("--starter", choices=["bulbasaur", "charmander", "squirtle"], default=None,
                     help="fix the starter for every agent (default: rotate bulbasaur/charmander/squirtle)")
+    ap.add_argument("--share-frames", action="store_true",
+                    help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
     a = ap.parse_args()
     GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
     seg_args: list[str] = []
@@ -192,7 +194,8 @@ def main() -> int:
                     role_args = ["--state", str(start), "--explore-rate", "0.0" if role == "trainer" else "0.3"]
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
                    "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(8800 + i),
-                   "--box-pace", str([8, 16, 30][i % 3])] + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
+                   "--box-pace", str([8, 16, 30][i % 3])] + (["--frame-share"] if a.share_frames else []) \
+                   + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
             if role:
                 print(f"agent {i}: role {role}, starting from {Path(role_args[1]).name}")
             log = (swarm_dir / f"agent{i}.log").open("w")

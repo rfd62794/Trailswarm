@@ -1,0 +1,286 @@
+"""Live swarm viewer: one window, every running agent's screen + status tiled.
+
+    uv run python tools/watch.py                      # auto-detect: 8765 and 8800-8815
+    uv run python tools/watch.py --ports 8800-8807 --fps 8
+
+Each agent serves /screenshot.png and /status on its --control-port; this GUI polls them
+in per-agent threads and redraws as soon as new frames land. The grid auto-fits the window
+on resize (override with --fixed-scale). Click a tile to focus that agent; click the big
+view, the backdrop or Esc to go back out. No new dependencies (tkinter + PIL + stdlib HTTP).
+"""
+from __future__ import annotations
+
+import argparse
+import ctypes
+import io
+import json
+import math
+import threading
+import time
+import tkinter as tk
+import urllib.request
+from multiprocessing import shared_memory
+from typing import Optional
+
+from PIL import Image, ImageTk
+
+BG = "#101010"
+FG = "#d8d8d8"
+DIM = "#777777"
+BORDER = {"ok": "#3a3a3a", "battle": "#c0392b", "paused": "#b7950b", "dead": "#1d1d1d"}
+TILE_H = 160 + 20  # frame height + status line, at scale 1
+
+
+def fetch(port: int, path: str, timeout: float = 1.0) -> Optional[bytes]:
+    try:
+        with urllib.request.urlopen(f"http://localhost:{port}{path}", timeout=timeout) as r:
+            return r.read()
+    except Exception:
+        return None
+
+
+class Agent:
+    def __init__(self, port: int) -> None:
+        self.port = port
+        self.png: Optional[bytes] = None  # latest frame: PNG bytes or raw RGB (see .raw)
+        self.raw = False                  # True when .png holds 160*144*3 RGB from shared memory
+        self.status: dict = {}
+        self.ok = False
+        self.fails = 0        # consecutive failed polls; a tile only goes offline after several
+        self.seq = 0          # bumped every time a new frame lands (live-update signal)
+        self.photo = None     # keep PhotoImage alive
+        self.shm = None       # shared_memory slot pokeagent_frames_<port>, if the agent publishes
+        self.shm_tried = 0.0
+
+
+def read_shm(a: Agent) -> Optional[bytes]:
+    """Latest published RGB frame from the agent's shared-memory slot (seqlock read)."""
+    if a.shm is None:
+        now = time.time()
+        if now - a.shm_tried < 5.0:  # don't hammer a missing slot; retry every 5s
+            return None
+        a.shm_tried = now
+        try:
+            a.shm = shared_memory.SharedMemory(name=f"pokeagent_frames_{a.port}")
+        except Exception:
+            a.shm = None
+        if a.shm is None:
+            return None
+    try:
+        b = a.shm.buf
+        s1 = int.from_bytes(b[0:8], "little")
+        if s1 == 0 or s1 & 1:
+            return None  # never written, or a write is in progress
+        data = bytes(b[16:16 + 160 * 144 * 3])
+        s2 = int.from_bytes(b[0:8], "little")
+        if s1 != s2:
+            return None  # torn read; the next tick gets a clean one
+        a.seq = s1
+        return data
+    except Exception:
+        try:
+            a.shm.close()
+        except Exception:
+            pass
+        a.shm = None
+        return None
+
+
+def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
+    period = 1.0 / hz
+    n = 0
+    while not stop.is_set():
+        t0 = time.time()
+        n += 1
+        got_any = False
+        if agent.shm is not None or agent.shm_tried == 0.0 or time.time() - agent.shm_tried >= 5.0:
+            frame = read_shm(agent)
+            if frame is not None:
+                agent.png = frame
+                agent.raw = True
+                got_any = True
+        if agent.shm is None:  # no frame slot: fall back to HTTP screenshots
+            png = fetch(agent.port, "/screenshot.png")
+            if png is not None:
+                agent.png = png
+                agent.raw = False
+                agent.seq += 1
+                got_any = True
+        if not agent.status or n % 4 == 0:  # status changes slowly; ~4Hz is plenty
+            raw = fetch(agent.port, "/status")
+            st = json.loads(raw) if raw else None
+            if st is not None:
+                agent.status = st
+                got_any = True
+        agent.fails = 0 if got_any else agent.fails + 1
+        agent.ok = agent.fails < 4   # transient slow polls don't take a tile offline
+        time.sleep(max(0.02, period - (time.time() - t0)))
+
+
+def status_line(a: Agent) -> str:
+    if not a.ok:
+        return f":{a.port}  offline"
+    s = a.status
+    goals = sum(1 for v in s.get("goals", {}).values() if v)
+    bits = [f":{a.port}", f"step {s.get('step', '?')}",
+            f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",
+            f"hp {s.get('hp', '?')}", f"goals {goals}/12"]
+    if s.get("in_battle"):
+        bits.append("BATTLE")
+    if s.get("paused"):
+        bits.append("PAUSED")
+    return "  ".join(bits)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ports", default=None, help="e.g. 8800-8807 or 8765,8800 (default: probe 8765 and 8800-8815)")
+    ap.add_argument("--fps", type=float, default=15.0, help="polls per second per agent")
+    ap.add_argument("--fixed-scale", type=int, default=None, help="pin tile scale; default auto-fits the window")
+    a = ap.parse_args()
+
+    if a.ports:
+        ports = []
+        for part in a.ports.split(","):
+            if "-" in part:
+                lo, hi = part.split("-", 1)
+                ports.extend(range(int(lo), int(hi) + 1))
+            else:
+                ports.append(int(part))
+    else:
+        ports = [8765] + list(range(8800, 8816))
+
+    try:  # Windows DPI awareness, or the window blurs at 125-150% scaling
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
+
+    agents = [Agent(p) for p in ports]
+    stop = threading.Event()
+    for ag in agents:
+        threading.Thread(target=poll, args=(ag, a.fps, stop), daemon=True).start()
+
+    root = tk.Tk()
+    root.title("PokeAgent swarm")
+    root.configure(bg=BG)
+    root.protocol("WM_DELETE_WINDOW", lambda: (stop.set(), root.destroy()))
+
+    state = {"focus": None, "resize_at": 0.0}
+
+    grid = tk.Frame(root, bg=BG)
+    grid.pack(fill="both", expand=True)
+    tiles: dict[int, dict] = {}
+    for ag in agents:
+        outer = tk.Frame(grid, bg=BORDER["dead"], padx=2, pady=2)
+        img = tk.Label(outer, bg=BG)
+        img.pack()
+        txt = tk.Label(outer, text=f":{ag.port}", bg=BG, fg=DIM, font=("Consolas", 9), anchor="w")
+        txt.pack(fill="x")
+        tiles[ag.port] = {"outer": outer, "img": img, "txt": txt, "seq": -1}
+        img.bind("<Button-1>", lambda _e, p=ag.port: set_focus(p))
+        txt.bind("<Button-1>", lambda _e, p=ag.port: set_focus(p))
+
+    def cols_for(n: int) -> int:
+        return max(1, math.ceil(math.sqrt(n)))
+
+    def grid_scale() -> int:
+        if a.fixed_scale:
+            return a.fixed_scale
+        n = len(agents)
+        cols = cols_for(n)
+        rows = math.ceil(n / cols)
+        w, h = max(root.winfo_width(), 400), max(root.winfo_height(), 300)
+        return max(1, min(6, min(w // (cols * 164), h // (rows * 168))))
+
+    def relayout() -> None:
+        # every probed port keeps a tile (dead ones dim to 'offline'), so the grid is stable
+        show = agents
+        cols = cols_for(len(show))
+        for w in grid.winfo_children():
+            w.grid_forget()
+        for i, ag in enumerate(show):
+            tiles[ag.port]["outer"].grid(row=i // cols, column=i % cols, padx=2, pady=2, sticky="n")
+
+    def set_focus(port: Optional[int]) -> None:
+        state["focus"] = port
+        if port is None:
+            focus.pack_forget()
+            grid.pack(fill="both", expand=True)
+            relayout()
+        else:
+            grid.pack_forget()
+            focus.pack(fill="both", expand=True)
+
+    focus = tk.Frame(root, bg=BG)
+    fimg = tk.Label(focus, bg=BG)
+    fimg.pack(expand=True)
+    ftxt = tk.Label(focus, bg=BG, fg=FG, font=("Consolas", 11), anchor="w", justify="left")
+    ftxt.pack(fill="x", padx=8, pady=4)
+    fimg.bind("<Button-1>", lambda _e: set_focus(None))
+    focus.bind("<Button-1>", lambda _e: set_focus(None))
+    ftxt.bind("<Button-1>", lambda _e: set_focus(None))
+    root.bind("<Escape>", lambda _e: set_focus(None))
+    root.bind("<Button-3>", lambda _e: set_focus(None))  # right-click anywhere: back out
+
+    def on_resize(_e) -> None:
+        state["resize_at"] = time.time() + 0.2  # debounce: redraw picks up the new scale
+
+    root.bind("<Configure>", on_resize)
+
+    def draw(ag: Agent, label: tk.Label, scale: int) -> None:
+        try:
+            if ag.png and ag.raw:
+                im = Image.frombytes("RGB", (160, 144), ag.png)
+            elif ag.png:
+                im = Image.open(io.BytesIO(ag.png))
+            else:  # placeholder until the first frame lands: a dark box keeps the grid geometry fixed
+                im = Image.new("RGB", (160, 144), (16, 16, 16))
+            im = im.resize((160 * scale, 144 * scale), Image.NEAREST)
+            ag.photo = ImageTk.PhotoImage(im)
+            label.configure(image=ag.photo)
+        except Exception:
+            pass
+
+    def focus_scale() -> int:
+        if a.fixed_scale:
+            return a.fixed_scale
+        w, h = max(root.winfo_width(), 400), max(root.winfo_height(), 300)
+        return max(1, min(8, min(w // 164, h // 200)))
+
+    def redraw() -> None:
+        resized = time.time() >= state["resize_at"] > 0
+        if resized:
+            state["resize_at"] = 0.0
+        if state["focus"] is not None:
+            ag = next((x for x in agents if x.port == state["focus"]), None)
+            if ag:
+                if ag.seq != tiles[ag.port]["seq"] or resized:
+                    draw(ag, fimg, focus_scale())
+                    tiles[ag.port]["seq"] = ag.seq
+                s = ag.status
+                if ag.ok and s:
+                    ftxt.configure(text=status_line(ag) + "\n" +
+                                   f"goals: {[k for k, v in s.get('goals', {}).items() if v]}\n"
+                                   f"goal_steps: {s.get('goal_steps', {})}  goto: {s.get('goto')}")
+        else:
+            scale = grid_scale()
+            for ag in agents:
+                t = tiles[ag.port]
+                if ag.seq != t["seq"] or resized:
+                    draw(ag, t["img"], scale)
+                    t["seq"] = ag.seq
+                t["txt"].configure(text=status_line(ag), fg=(FG if ag.ok else DIM))
+                border = (BORDER["dead"] if not ag.ok else
+                          BORDER["battle"] if ag.status.get("in_battle") else
+                          BORDER["paused"] if ag.status.get("paused") else BORDER["ok"])
+                t["outer"].configure(bg=border)
+        root.after(30, redraw)  # ~30ms tick: frames appear as soon as a poll lands
+
+    relayout()  # static grid: every probed port gets a tile once, dead ones just dim
+    root.after(200, redraw)
+    root.mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
