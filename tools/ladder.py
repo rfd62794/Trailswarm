@@ -19,10 +19,9 @@ import time
 from pathlib import Path
 
 # Ordered curriculum: (segment, seed checkpoint). rl_<seg>.state gates the next stage.
-LADDER = [
-    ('menu_tour', 'runs/checkpoints/deliver_parcel_closed.state'),
-    ('to_route1', 'baselines/bedroom.state'),
-    ('to_viridian', 'runs/checkpoints/rl_to_route1.state'),
+LADDER = [  # travel chain only; menu_tour stays a specialist skill, not a gate
+    ('left_house', 'baselines/bedroom.state'),
+    ('to_viridian', 'runs/checkpoints/rl_left_house.state'),
     ('to_route2', 'runs/checkpoints/rl_to_viridian.state'),
     ('to_pewter', 'runs/checkpoints/rl_to_route2.state'),
     ('campaign', 'runs/checkpoints/rl_to_pewter.state'),
