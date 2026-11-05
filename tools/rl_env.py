@@ -355,7 +355,8 @@ class SegmentEnv:
             if 'SAVING' in joined:
                 return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
             self._save_armed = getattr(self, '_save_armed', 0)
-            if any(ln.startswith('>SAVE') for ln in lines) or (ctx.menu == MenuKind.START and ctx.option == 3):
+            if any(ln.startswith('>SAVE') or ln.startswith('>OPTION') for ln in lines) \
+                    or (ctx.menu == MenuKind.START and ctx.option in (3, 4)):
                 self._save_armed = 10  # next ~10 decisions are inside the save flow
             elif self._save_armed > 0:
                 self._save_armed -= 1
