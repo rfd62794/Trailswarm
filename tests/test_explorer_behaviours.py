@@ -1,0 +1,253 @@
+"""The explorer as behaviours: start conditions on scripted RAM, selector order, decision log, memory round-trip."""
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from pokeagent.emulator import FakeEmulator
+from pokeagent.explorer.behaviours import (
+    AdvanceDialog, Battle, BattleMoves, Catch, ExploreBurst, Frontier, Goto, Heal, LoopGuard, Menu, NamingKeyboard,
+    PlanGoal, Procedures, Readiness, ReplayBeat, ReplayInterrupt, SettleWait, StallGuard, default_behaviours,
+)
+from pokeagent.explorer.behaviours.base import Decision, no_press
+from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+from pokeagent.explorer.decisions import FIELDS, DecisionLog, classify_outcome, goal_stage, make_record
+from pokeagent.explorer.engine import Engine
+from pokeagent.explorer.memory import MapMemory
+from pokeagent.explorer.selector import Selector
+
+TM = 0xC3A0
+MAP, PX, PY, BATTLE = 0xD35E, 0xD362, 0xD361, 0xD057
+
+
+def make_ctx(tmp_path, memory=None, **fields) -> ExplorerContext:
+    emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6, **(memory or {})})
+    mem = MapMemory(tmp_path / "maps.json")
+    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10, **fields)
+    return ctx
+
+
+def put_box(ctx, menu: bool = False, text_rows=("HELLO THERE",)) -> None:
+    """Draw a frame in the tile map: 0x79 0x7A top edge, then rows between 0x7C edges (CHARMAP letters at 0x80+)."""
+    emu = ctx.emu
+    emu.set(TM + 20 * 10, 0x79)
+    emu.set(TM + 20 * 10 + 1, 0x7A)
+    for r, text in enumerate(text_rows, start=11):
+        emu.set(TM + 20 * r, 0x7C)
+        emu.set(TM + 20 * r + 19, 0x7C)
+        for i, ch in enumerate(text):
+            emu.set(TM + 20 * r + 1 + i, 0x80 + (ord(ch) - ord("A")) if ch.isalpha() else 0x7F)
+    if menu:
+        emu.set(TM + 20 * 11 + 1, 0xED)
+
+
+def applies(behaviour, ctx) -> bool:
+    ctx.refresh()
+    return behaviour.applies(ctx)
+
+
+def test_settle_and_readiness_start_conditions(tmp_path):
+    ctx = make_ctx(tmp_path)
+    assert not applies(SettleWait(), ctx)
+    ctx.settle = 30
+    assert applies(SettleWait(), ctx)
+    ctx.settle = 0
+    assert not applies(Readiness(), ctx)  # the screen has been still for 10 frames
+    ctx.stable_frames = 0
+    assert applies(Readiness(), ctx)  # screen moving on its own: mash A
+    decision = Readiness().step(ctx)
+    assert (decision.button, decision.rule) == ("A", "mash") and ctx.mash == 1
+    ctx.stable_frames = 10
+    ctx.emu.set(0xCD6B, 1)  # the game says it ignores the joypad
+    assert applies(Readiness(), ctx)
+
+
+def test_readiness_ends_the_mash_without_pressing(tmp_path):
+    ctx = make_ctx(tmp_path, mash=3)
+    assert applies(Readiness(), ctx)
+    assert Readiness().step(ctx) is None and ctx.mash == 0
+
+
+def test_dialog_and_menu_start_conditions(tmp_path):
+    ctx = make_ctx(tmp_path)
+    assert not applies(AdvanceDialog(), ctx) and not applies(Menu(), ctx)
+    put_box(ctx)
+    assert applies(AdvanceDialog(), ctx) and not applies(Menu(), ctx)
+    d = AdvanceDialog().step(ctx)
+    assert (d.button, d.rule) == ("A", "advance_a")
+    ctx2 = make_ctx(tmp_path)
+    put_box(ctx2, menu=True)
+    assert applies(Menu(), ctx2)
+    assert AdvanceDialog().step(ctx2) is None  # a menu is the menu behaviour's
+
+
+def test_stuck_dialog_and_menu_backs_out_with_b(tmp_path):
+    ctx = make_ctx(tmp_path, box_streak=60)
+    put_box(ctx)
+    ctx.refresh()
+    assert AdvanceDialog().step(ctx).rule == "dialog_stuck_b"
+    ctx = make_ctx(tmp_path, box_streak=12)
+    put_box(ctx, menu=True)
+    ctx.refresh()
+    assert AdvanceDialog().step(ctx).rule == "menu_stuck_b"
+
+
+def test_naming_keyboard_presses_start(tmp_path):
+    ctx = make_ctx(tmp_path)
+    put_box(ctx, text_rows=("A B C D E F G H I",))
+    assert applies(NamingKeyboard(), ctx)
+    assert NamingKeyboard().step(ctx).button == "START"
+
+
+def test_battle_behaviours_start_conditions(tmp_path):
+    ctx = make_ctx(tmp_path)
+    assert not applies(Battle(), ctx) and not applies(Catch(), ctx) and not applies(BattleMoves(), ctx)
+    ctx.emu.set(BATTLE, 1)
+    assert applies(Battle(), ctx)
+    assert not applies(Catch(), ctx)  # needs the battle behaviour's read first
+    assert Battle().step(ctx) is None and ctx.bv is not None and ctx.in_battle
+    assert applies(Catch(), ctx) and applies(BattleMoves(), ctx)
+    d = BattleMoves().step(ctx)
+    assert (d.button, d.rule) == ("A", "fight")
+    ctx.emu.set(BATTLE, 0)  # the fight ended: only the bookkeeping part of Battle still applies
+    assert applies(Battle(), ctx) and not applies(Catch(), ctx)
+
+
+def test_guards_and_wait_behaviours(tmp_path):
+    ctx = make_ctx(tmp_path)
+    assert applies(LoopGuard(), ctx) and applies(StallGuard(), ctx)
+    assert LoopGuard().step(ctx) is None
+    ctx.last_press, ctx.a_pos, ctx.a_streak = "A", (0x28, 5, 6), 39
+    ctx.refresh()
+    d = LoopGuard().step(ctx)  # the 40th A on one tile with no box: walk away, then shake
+    assert d.rule == "a40_walk_away" and ctx.shake == 25
+    ctx = make_ctx(tmp_path, stall=14, last_sig=(0x28, 5, 6, ()))
+    ctx.refresh()
+    d = StallGuard().step(ctx)
+    assert d.rule == "stall_escalate" and ctx.stalls == 1
+
+
+def test_goto_heal_replay_and_procedure_start_conditions(tmp_path):
+    ctx = make_ctx(tmp_path)
+    assert not applies(Goto(), ctx) and not applies(Heal(), ctx) and not applies(Procedures(), ctx)
+    assert not applies(ReplayBeat(), ctx) and not applies(ReplayInterrupt(), ctx)
+    ctx.goto = [0x28, 5, 5]
+    assert applies(Goto(), ctx)
+    ctx.mom_talk_step = 3
+    assert applies(Heal(), ctx)
+    ctx.proc_due = ["check_health"]
+    assert applies(Procedures(), ctx)
+    ctx.replay = ["A", "B"]
+    assert applies(ReplayBeat(), ctx)
+    assert not applies(ReplayInterrupt(), ctx)
+    put_box(ctx)
+    assert applies(ReplayInterrupt(), ctx)  # a box interrupted the replay
+
+
+def test_replay_runs_buttons_then_grades(tmp_path):
+    ctx = make_ctx(tmp_path, replay=["A", "B"], replay_ctx={"demo": {"source": "human", "grade": 0}, "pos": (0x28, 5, 6), "goals": {}})
+    ctx.refresh()
+    first = ReplayBeat().step(ctx)
+    assert first.button == "A" and first.after is None
+    last = ReplayBeat().step(ctx)
+    assert last.button == "B" and last.after is not None  # graded right after the final press
+
+
+def test_planner_and_frontier_always_apply_and_frontier_presses(tmp_path):
+    ctx = make_ctx(tmp_path)
+    for b in (ExploreBurst(), PlanGoal(), Frontier()):
+        assert applies(b, ctx)
+    ctx.refresh()
+    d = Frontier().step(ctx)
+    assert d.button in ("UP", "DOWN", "LEFT", "RIGHT", "A") and d.rule == "frontier"
+
+
+def test_selector_picks_the_first_applicable_in_order(tmp_path):
+    ran: list[str] = []
+
+    class Stub:
+        def __init__(self, name, ok, press):
+            self.name, self.ok, self.press = name, ok, press
+
+        def applies(self, ctx):
+            return self.ok
+
+        def step(self, ctx):
+            ran.append(self.name)
+            return Decision(self.press, self.name) if self.press else None
+
+        def done(self, ctx):
+            return False
+
+        def failed(self, ctx):
+            return False
+
+    ctx = make_ctx(tmp_path)
+    sel = Selector([Stub("a", False, "UP"), Stub("b", True, ""), Stub("c", True, "LEFT"), Stub("d", True, "DOWN")])
+    d = sel.choose(ctx)
+    assert (d.button, d.behaviour) == ("LEFT", "c")  # a skipped (does not apply), b passed (None), d never asked
+    assert ran == ["b", "c"]
+    assert sel.first_applicable(ctx).name == "b"
+    assert Selector([Stub("x", False, "A")]).choose(ctx) is None
+
+
+def test_default_order_is_the_old_agent_step_order():
+    names = [b.name for b in default_behaviours()]
+    assert names == ["settle", "guards", "readiness", "replay_interrupt", "battle", "catch", "battle_moves",
+                     "naming_keyboard", "beat_start", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
+                     "stall_guard", "heal", "explore_burst", "plan_goal", "frontier"]
+    assert no_press("x").button == ""
+
+
+def test_decision_helpers():
+    assert goal_stage({"potion": True, "left_house": False}) == "left_house"
+    assert goal_stage({}) == "potion"
+    assert classify_outcome((1, 2, 3), (1, 2, 3), "UP", False, False) == "blocked"
+    assert classify_outcome((1, 2, 3), (1, 2, 2), "UP", False, False) == "moved"
+    assert classify_outcome((1, 2, 3), (2, 0, 0), "UP", False, False) == "map_change"
+    assert classify_outcome((1, 2, 3), (1, 2, 3), "A", True, False) == "box"
+    assert classify_outcome((1, 2, 3), (1, 2, 3), "A", False, False) == "none"
+    assert classify_outcome((1, 2, 3), (1, 2, 2), "UP", False, True) == "goal"
+
+
+def test_engine_presses_and_writes_complete_decision_lines(tmp_path):
+    ctx = make_ctx(tmp_path)
+    log_path = tmp_path / "runs" / "x" / "decisions.jsonl"
+    ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
+    engine = Engine(ctx, decision_log=DecisionLog(log_path))
+    for _ in range(4):
+        engine.step()
+    engine.decision_log.close()
+    ctx.trans.close()
+    lines = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines()]
+    assert lines and len(lines) == len(ctx.emu.presses)
+    for rec in lines:
+        assert set(rec) == set(FIELDS)
+        assert rec["outcome"] in {"moved", "blocked", "box", "map_change", "goal", "none"}
+    assert lines[0]["step"] == 1 and lines[0]["map"] == 0x28 and lines[0]["goal_stage"] == "potion"
+    assert make_record(1, "b", "r", "A", (1, 2, 3), "potion", False, False, "none").keys() == set(FIELDS)
+
+
+def test_map_memory_round_trip_is_byte_identical(tmp_path):
+    maps = {"maps": {"1": {"visited": {"3,4": 2}, "blocked": ["3,4,UP"], "warps": {"3,5,DOWN": [2, 0, 0]}, "last_seen": 7,
+                           "interactions": {"3,4,UP": {"count": 1, "text": "HI", "presses": [], "menus": [], "choices": []}}}},
+            "updated": "2026-01-01T00:00:00"}
+    src = tmp_path / "maps.json"
+    src.write_text(json.dumps(maps, indent=1))
+    mem = MapMemory(src)
+    mem.data["updated"] = maps["updated"]  # save() restamps this; everything else must come back untouched
+    out = tmp_path / "out.json"
+    mem.path = out
+    mem.save()
+    # save() writes a fresh "updated" stamp; compare the rest byte for byte by pinning it to the original
+    data = json.loads(out.read_text())
+    data["updated"] = maps["updated"]
+    assert json.dumps(data, indent=1) == src.read_text()
+
+
+@pytest.mark.parametrize("record_paths", [True, False])
+def test_demo_mode_adds_no_paths_key(tmp_path, record_paths):
+    mem = MapMemory(tmp_path / "m.json", record_paths=record_paths)
+    assert mem.learn((1, 10, 10), "UP", (1, 10, 9), confirmed=True) == "moved"
+    assert ("paths" in mem.m(1)) is record_paths
