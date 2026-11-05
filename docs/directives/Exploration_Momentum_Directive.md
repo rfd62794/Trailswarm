@@ -77,3 +77,17 @@ Constants at the top of the frontier behaviour module: `REVERSE_PENALTY = 2`, `T
 ## 8. Report
 
 Test tail, line counts, the corridor/two-frontier test traces, and anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-05 18:43 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; measured 22% immediate reversals; depends on E1 (merged PR #30)
+<!-- queue:end -->
