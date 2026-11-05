@@ -26,6 +26,8 @@ def main() -> int:
     ap.add_argument('--top', type=int, default=0)
     ap.add_argument('--obs')
     ap.add_argument('--set', nargs=3, metavar=('OBS', 'ACTION', 'VALUE'))
+    ap.add_argument('--patch-save', action='store_true',
+                    help='set A <= -2 at every START-menu state whose cursor sits on SAVE')
     ap.add_argument('--schema')
     ap.add_argument('--actions', type=int)
     args = ap.parse_args()
@@ -35,7 +37,15 @@ def main() -> int:
     n_actions = args.actions or n_actions
     table = load_model(args.model, schema, n_actions)
 
-    if args.set:
+    if args.set or args.patch_save:
+        if args.patch_save:
+            a_idx = BUTTONS.index('A')
+            hits = [k for k in table if len(tuple(k)) >= 14 and tuple(k)[9] == 1 and tuple(k)[13] == 3]
+            for k in hits:
+                table[k][a_idx] = min(table[k][a_idx], -2.0)
+            save_model(args.model, {repr(k): list(v) for k, v in table.items()}, schema, n_actions)
+            print(f"patched {len(hits)} SAVE-cursor states in {args.model}")
+            return 0
         obs_s, act_s, val_s = args.set
         obs = ast.literal_eval(obs_s)
         key = tuple(obs) if isinstance(obs, (list, tuple)) else obs
