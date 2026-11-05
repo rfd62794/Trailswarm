@@ -69,6 +69,16 @@ def frontier() -> int:
     return len(LADDER) - 1
 
 
+def promote_skills() -> None:
+    """Completed stages promote their best seat table into runs/skills/ as invocable options."""
+    from skills import best
+    for i, (seg, _) in enumerate(LADDER[:frontier()]):
+        try:
+            best(seg, f'runs/ladder/q_*.{seg}.json')
+        except Exception:
+            continue
+
+
 def seat_plan() -> list[dict]:
     f = frontier()
     plan = []
@@ -115,6 +125,7 @@ def main() -> int:
                     launch(seat['port'], seat['segment'], seat['state'])
                     current[seat['port']] = seat['segment']
                     time.sleep(1)
+        promote_skills()
         write_status(plan)
         if once:
             print(json.dumps({'frontier': frontier(), 'plan': plan}, indent=1))
