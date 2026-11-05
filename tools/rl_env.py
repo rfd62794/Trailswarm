@@ -1,8 +1,9 @@
 """Tiny gym-style env over PyBoyEmulator for segment RL (exploration lane).
 
-Observation = (map_id, x, y) — compact enough for tabular methods; richer state
-(local tile window, textbox, goals) is a later experiment. Actions = the 6
-direction/A/B buttons. Reward = +1 on the goal detector, -0.01 per step.
+Observation = (map_id, x, y, box_open) — compact enough for tabular methods,
+now includes whether a dialog/menu box is open (distinguishes A-to-confirm
+states from free movement). Actions = the 6 direction/A/B buttons.
+Reward = +1 on the goal detector, -0.01 per step.
 """
 from __future__ import annotations
 
@@ -64,7 +65,9 @@ class SegmentEnv:
 
     def _obs(self):
         s = read_state(self.emu)
-        return (s.map_id, s.x, s.y)
+        tm = self.emu.read_range(0xC3A0, 360)  # verified: a box is open when corner+edge tiles appear
+        box = tm.find(bytes([0x79, 0x7A])) >= 0
+        return (s.map_id, s.x, s.y, box)
 
     def close(self) -> None:
         if self.frame_pub is not None:
