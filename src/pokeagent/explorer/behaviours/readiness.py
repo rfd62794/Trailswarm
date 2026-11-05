@@ -41,6 +41,10 @@ class Readiness(BehaviourBase):
             ctx.mash = ctx.mash + 1
             if ctx.mash == 1:
                 ctx.log(f"[cutscene: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen moving on its own'} - mashing A]", "res")
+            if (ctx.view.m, ctx.view.x, ctx.view.y, ctx.facing) in ctx.declined_balls:
+                # The box we declined just closed and the screen is still settling: A would re-open the same ball's
+                # offer (131 times in Oak's lab, 2026-11-05). B is as good at skipping text and touches nothing.
+                return Decision("B", "mash", "settling at a declined starter ball: mashing B so A does not re-open it")
             return Decision("A", "mash", "cutscene/forced walk: mashing A to get through it")
         ctx.log(f"[cutscene over after {ctx.mash} A presses]", "res")
         ctx.mash = 0

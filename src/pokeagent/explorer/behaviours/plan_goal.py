@@ -21,7 +21,7 @@ class PlanGoal(BehaviourBase):
         goals_now_all = ctx.goals()
         parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in ctx.mem.data.get("items", [])
                        if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
-        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
+        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": ctx.emu.read(0xD18C), "_train_level": ctx.opts.train_level, "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         if planned and "at Mom, talking" in planned[1]:

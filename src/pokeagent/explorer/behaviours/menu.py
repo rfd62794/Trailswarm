@@ -35,6 +35,8 @@ class Menu(BehaviourBase):
             else:
                 ans, why = yesno_answer(context, ctx.opts.starter)
             ctx.yesno = {"question": question[:80], "answer": ans}
+            if ans == "NO" and why.startswith("starter offered:"):  # remember THIS ball so we try another one
+                ctx.declined_balls[(ctx.view.m, ctx.view.x, ctx.view.y, ctx.facing)] = why.split(":")[1].split(",")[0].strip()
             if cursor.endswith(ans):
                 return Decision("A", "yesno_answer", f"YES/NO box: answering {ans} ({why}) to \"{question[:50]}\"")
             return Decision("DOWN" if ans == "NO" else "UP", "yesno_cursor", f"YES/NO box: moving the cursor to {ans} ({why})")

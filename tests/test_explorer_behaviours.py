@@ -277,3 +277,40 @@ def test_map_memory_accepts_str_path(tmp_path):
     p = tmp_path / "maps.json"
     p.write_text('{"maps": {}}')
     assert MapMemory(str(p)).data == {"maps": {}}
+
+
+def _lab_maps(*ball_spots, tried=()):
+    inter = {f"{x},{y},UP": {"count": 5, "text": f"So! You want the {el} POKeMON, {sp}?"} for x, y, el, sp in ball_spots}
+    inter.update({f"{x},{y},UP": {"count": 3, "text": ""} for x, y in tried})
+    visited = {f"{x},{y}": 1 for x in range(3, 10) for y in (4, 5)}
+    return {"40": {"visited": visited, "blocked": [], "warps": {}, "interactions": inter}}
+
+
+def test_declined_starter_ball_is_remembered_and_another_is_tried(tmp_path):
+    """After NO at the Charmander ball the agent must stop re-approaching it and walk to an untried neighbour."""
+    from pokeagent.explorer.planner import plan_step
+    maps = _lab_maps((6, 4, "fire", "CHARMANDER"), tried=[(5, 4)])
+    goals = {"potion": 1, "left_house": 1, "_starter": "bulbasaur", "_declined": {(40, 6, 4, "UP")}}
+    move, why = plan_step(goals, maps, (40, 6, 4), "UP")
+    assert move == "RIGHT" and "(7,4)" in why  # (5,4) was already tried and the declined ball is not offered again
+    # at the untried ball, take it; once it names the wrong starter too, the third ball is next
+    assert plan_step(goals, maps, (40, 7, 4), "UP")[0] == "A"
+    maps = _lab_maps((6, 4, "fire", "CHARMANDER"), (7, 4, "water", "SQUIRTLE"), tried=[(5, 4)])
+    goals["_declined"].add((40, 7, 4, "UP"))
+    move, why = plan_step(goals, maps, (40, 7, 4), "UP")
+    assert move == "RIGHT" and "(8,4)" in why
+
+
+def test_no_to_unwanted_starter_records_the_ball_and_readiness_does_not_reopen_it(tmp_path):
+    ctx = make_ctx(tmp_path, memory={PX: 6, PY: 4})
+    ctx.opts.starter = "bulbasaur"
+    ctx.facing = "UP"
+    put_box(ctx, text_rows=("WANT CHARMANDER", " YES", " NO"))
+    ctx.emu.set(TM + 20 * 12 + 1, 0xED)  # the cursor on YES
+    ctx.refresh()
+    assert Menu().step(ctx).rule == "yesno_cursor"
+    assert ctx.declined_balls == {(40, 6, 4, "UP"): "CHARMANDER"}
+    ctx = make_ctx(tmp_path, memory={PX: 6, PY: 4}, declined_balls={(40, 6, 4, "UP"): "CHARMANDER"})
+    ctx.facing, ctx.stable_frames = "UP", 0  # the box just closed; the screen is still settling
+    ctx.refresh()
+    assert Readiness().step(ctx).button == "B"
