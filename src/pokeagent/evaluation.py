@@ -12,7 +12,7 @@ def exploration_rate(episode, decay_episodes, floor):
 
 
 def evaluate_table(env_factory, table, states, episodes, schema, *, seed=0, random_policy=False,
-                   throttle_ms=0):
+                   throttle_ms=0, unseen_random=True):
     if episodes < 1 or not states:
         raise ValueError('Evaluation requires episodes and starting states')
     frozen = {state: tuple(row) for state, row in table.items()}
@@ -34,8 +34,13 @@ def evaluate_table(env_factory, table, states, episodes, schema, *, seed=0, rand
                     raise ValueError('Evaluation received an empty action mask')
                 unseen += int(obs not in frozen)
                 row = frozen.get(obs)
-                action = rng.choice(allowed) if random_policy else max(
-                    allowed, key=lambda index: row[index] if row else 0.0)
+                if random_policy or (row is None and unseen_random):
+                    action = rng.choice(allowed)
+                elif row is None:
+                    action = allowed[0]
+                else:
+                    best = max(row[index] for index in allowed)
+                    action = rng.choice([index for index in allowed if row[index] == best])
                 obs, reward, done, info = env.step(action)
                 reward_total += reward
                 if done:
@@ -56,4 +61,5 @@ def evaluate_table(env_factory, table, states, episodes, schema, *, seed=0, rand
             'model_digest': digest, 'source_digest': rollouts[0]['source_digest'],
             'source_states': list(map(str, states)),
             'evaluation_scope': 'multi_checkpoint' if len(set(states)) > 1 else 'fixed_checkpoint_greedy',
+            'unseen_fallback': 'random' if unseen_random else 'first_action',
             'rollouts': rollouts}

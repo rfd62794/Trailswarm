@@ -56,6 +56,36 @@ def test_evaluation_respects_mask_and_leaves_table_and_rng_unchanged(tmp_path):
     assert random.getstate() == rng_before
 
 
+def test_evaluation_marks_multiple_start_states(tmp_path):
+    states = []
+    for name in ('a', 'b'):
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        states.append(path)
+
+    class Environment:
+        max_steps = 1
+        goal_reached = True
+        steps = 1
+
+        def reset(self):
+            return (1,)
+
+        def allowed_actions(self):
+            return [0]
+
+        def step(self, action):
+            return (2,), 1, True, {'outcome': 'win'}
+
+        def close(self):
+            pass
+
+    result = evaluate_table(lambda state: Environment(), {(1,): [1.0]}, states, 4, 'schema')
+    assert result['evaluation_scope'] == 'multi_checkpoint'
+    assert result['episodes'] == 4
+    assert {row['source_state'] for row in result['rollouts']} == {str(states[0]), str(states[1])}
+
+
 def test_evaluation_closes_environment_on_failure(tmp_path):
     source = tmp_path / 'state'
     source.write_bytes(b'checkpoint')

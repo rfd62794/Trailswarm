@@ -55,7 +55,8 @@ def main() -> int:
     ap.add_argument("--max-steps", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rom", default="roms/Pokemon Red.gb")
-    ap.add_argument("--state", default=None, help="override segment start state")
+    ap.add_argument("--state", action="append", default=None,
+                    help="start checkpoint; repeat to cycle episodes/evaluations across states")
     ap.add_argument("--window", action="store_true", help="SDL window at realtime speed: watch every frame live")
     ap.add_argument("--speed", type=int, default=1, help="emulation speed with --window (0 = unthrottled)")
     ap.add_argument("--frame-port", type=int, default=None,
@@ -123,8 +124,10 @@ def main() -> int:
         except (OSError, ValueError, RuntimeError) as error:
             ap.error(str(error))
         atexit.register(unregister_worker, reg_p, a.frame_port, lease)
-    start = a.state or next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
-                            SEGMENT_STATES[a.segment][-1])
+    default_state = next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
+                         SEGMENT_STATES[a.segment][-1])
+    start_states = [str(s) for s in (a.state or [default_state])]
+    start = start_states[0]
     from rl_env import curriculum_subgoals
     env = SegmentEnv(a.rom, start, make_goal(a.segment), goal_name=a.segment,
                      subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())) + tuple(curriculum_subgoals(a.segment)),
@@ -188,7 +191,7 @@ def main() -> int:
 
     def evaluate(episodes, random_policy=False):
         frozen = {ast.literal_eval(key): tuple(row) for key, row in snapshot().items()}
-        result = evaluate_table(evaluation_env, frozen, a.eval_state or [start], episodes,
+        result = evaluate_table(evaluation_env, frozen, a.eval_state or start_states, episodes,
                                 schema, seed=a.seed + 100003, random_policy=random_policy,
                                 throttle_ms=min(a.throttle_ms, 2))
         result.update(segment=a.segment, git_sha=run_git_sha)
@@ -224,6 +227,7 @@ def main() -> int:
         publish_status(-1, 1.0, 'STARTING')
         for ep in range(a.episodes):
             eps = exploration_rate(ep, a.eps_decay_episodes, a.eps_floor)  # decay, but never stop exploring
+            env.state = Path(start_states[ep % len(start_states)])  # cycle recurring start states
             obs = env.reset()
             last_pub = 0.0
             traj = []  # n-step buffer: (s, a, r, s')
@@ -233,13 +237,12 @@ def main() -> int:
             publish_status(ep, eps, in_episode=True)
             for _ in range(env.max_steps):
                 allowed = env.allowed_actions()
-                if QB is not None:
-                    qs = [x + y for x, y in zip(Q[obs], QB[obs])]
-                    act = (rng.choice(allowed) if rng.random() < eps
-                           else max(allowed, key=lambda i: qs[i]))
+                values = [x + y for x, y in zip(Q[obs], QB[obs])] if QB is not None else Q[obs]
+                if rng.random() < eps:
+                    act = rng.choice(allowed)
                 else:
-                    act = (rng.choice(allowed) if rng.random() < eps
-                           else max(allowed, key=lambda i: Q[obs][i]))
+                    best = max(values[i] for i in allowed)
+                    act = rng.choice([i for i in allowed if values[i] == best])
                 ep_path.append(list(obs) + [act])
                 nxt, rew, done, info = env.step(act)
                 reward_components['extrinsic'] += rew

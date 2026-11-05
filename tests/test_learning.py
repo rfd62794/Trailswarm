@@ -1,12 +1,13 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from pokeagent.learning import BattleOutcome, BattleSample, BattleTracker, battle_reward, potential_reward, retreat_allowed
 from pokeagent.observations import SpatialObserver, schema_id
-from pokeagent.qmodels import load_model, mean_tables, save_model
+from pokeagent.qmodels import atomic_json, load_model, mean_tables, save_model
 from pokeagent.curriculum import mastered
 
 
@@ -74,6 +75,26 @@ def test_models_reject_legacy_and_schema_mismatch(tmp_path):
     assert schema_id('potion') != schema_id('battle')
     assert schema_id('potion') != schema_id('potion', screen=True)
     assert mean_tables([{(1,): [1, 3]}, {(1,): [3, 1]}]) == {(1,): [2, 2]}
+
+
+def test_atomic_json_retries_transient_windows_sharing_errors(tmp_path, monkeypatch):
+    import pokeagent.qmodels as qmodels
+    original = os.replace
+    calls = []
+
+    def flaky_replace(src, dst):
+        calls.append(dst)
+        if len(calls) <= 2:
+            error = PermissionError('sharing violation')
+            error.winerror = 32
+            raise error
+        return original(src, dst)
+
+    monkeypatch.setattr(qmodels.os, 'replace', flaky_replace)
+    target = tmp_path / 'model.json'
+    atomic_json(target, {'ok': True})
+    assert json.loads(target.read_text()) == {'ok': True}
+    assert len(calls) == 3
 
 
 def test_spatial_unknown_and_obscured(tmp_path):

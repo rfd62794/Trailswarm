@@ -3,6 +3,7 @@ import json
 import math
 import os
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -13,7 +14,14 @@ def atomic_json(path, value):
     try:
         with os.fdopen(fd, 'w') as stream:
             json.dump(value, stream)
-        os.replace(name, path)
+        for attempt in range(8):
+            try:
+                os.replace(name, path)
+                break
+            except PermissionError as error:
+                if getattr(error, 'winerror', None) not in (5, 32, 33) or attempt == 7:
+                    raise
+                time.sleep(0.01 * 2 ** attempt)
     finally:
         if os.path.exists(name):
             os.unlink(name)
