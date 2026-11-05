@@ -49,7 +49,8 @@ Goals
   records in `docs/SEGMENTS.md` (S1 14, S2 24, S3 74, S4 89, S5 92).
 
 Non-goals
-- A web viewer, remote viewing, streaming/recording overlays (later, if ever; the snapshot contract
+- A steering web viewer, remote viewing, streaming/recording overlays (a read-only localhost web view on the
+  same model is in scope since 2026-11-05, adapted from `tools/webview.py`; the snapshot contract
   makes them possible without designing for them now).
 - Neural networks / GPU training. Tabular and counting methods only in this design.
 - Rewriting the emulator, RAM, perception or MCP layers.
