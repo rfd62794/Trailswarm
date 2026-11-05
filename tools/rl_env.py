@@ -168,6 +168,28 @@ def make_menu_exit_goal():
     return f
 
 
+def options_correct(emu) -> bool:
+    """Speedrun-safe option values, read from the rendered option rows."""
+    from pokeagent.explorer import frame_lines
+    lines = frame_lines(emu.read_range(0xC3A0, 360))
+    text_speed = any(line.startswith('>FAST') for line in lines)
+    animation = any('>OFF' in line for line in lines if 'ON' in line and 'OFF' in line)
+    style = any('>SET' in line for line in lines if 'SHIFT' in line and 'SET' in line)
+    return text_speed and animation and style
+
+
+def make_options_setup_goal():
+    from pokeagent.screencontext import MenuKind, classify_screen
+    state = {'ready': False}
+    def f(emu):
+        context = classify_screen(emu.read_range(0xC3A0, 360), emu.read(0xD057))
+        if context.menu == MenuKind.OPTIONS and options_correct(emu):
+            state['ready'] = True
+        return state['ready'] and context.menu != MenuKind.OPTIONS
+    f.reset = state.clear
+    return f
+
+
 def goal_map(map_id: int):
     """Reach a campaign map: the RL ladder beyond the house is pure map_id goals."""
     def f(emu) -> bool:
@@ -191,7 +213,7 @@ def goal_boulder(emu) -> bool:
 
 GOAL_FNS = {"menu_start": goal_menu_start, "menu_items": goal_menu_kind('ITEMS'),
             "menu_party": goal_menu_kind('PARTY'), "menu_options": goal_menu_kind('OPTIONS'),
-            "menu_exit": make_menu_exit_goal(),
+            "menu_exit": make_menu_exit_goal(), "options_setup": make_options_setup_goal(),
             "left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
             "buy_balls": goal_balls, "catch_pokemon": goal_team2, "campaign": goal_boulder, "beat_brock": goal_boulder,
             "reach_pc": goal_reach_pc, "exit_potion": goal_potion_run,
@@ -212,7 +234,8 @@ EXTRA_OBS = {"battle": battle_obs_extra, "grind": battle_obs_extra}
 # stage's saved milestone (auto-written by the first agent to reach it)
 SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["baselines/bedroom.state"],
                   "menu_party": ["baselines/bedroom.state"], "menu_options": ["baselines/bedroom.state"],
-                  "menu_exit": ["baselines/bedroom.state"], "left_house": ["baselines/bedroom.state"],
+                  "menu_exit": ["baselines/bedroom.state"], "options_setup": ["baselines/bedroom.state"],
+                  "left_house": ["baselines/bedroom.state"],
                   "reach_pc": ["baselines/bedroom.state"],
                   "potion": ["runs/checkpoints/rl_reach_pc.state", "baselines/bedroom.state"],
                   "exit_potion": ["runs/checkpoints/rl_potion.state", "baselines/bedroom.state"],
@@ -252,6 +275,7 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["bas
 # shaped sub-goals per segment: first-time detectors each worth a small bonus
 SEGMENT_SUBGOALS = {"menu_items": [goal_menu_start], "menu_party": [goal_menu_start],
                     "menu_options": [goal_menu_start], "menu_exit": [goal_menu_start],
+                    "options_setup": [goal_menu_start, goal_menu_kind('OPTIONS')],
                     "potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion],
                     "to_route2": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
