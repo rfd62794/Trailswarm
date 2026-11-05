@@ -50,6 +50,8 @@ def main() -> int:
     Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * len(ACTIONS))
     alpha, gamma, eps0 = 0.2, 0.99, 1.0
     try:
+        wins = first_ep = None
+        wins = 0
         for ep in range(a.episodes):
             eps = eps0 * (1.0 - ep / max(1, a.episodes))  # linear decay to ~0
             obs = env.reset()
@@ -62,6 +64,13 @@ def main() -> int:
                 obs = nxt
                 if done:
                     break
+            if env.goal_fn(env.emu):  # episode ended by reaching the goal, not the step cap
+                wins += 1
+                if first_ep is None:
+                    first_ep = ep
+                print(f"  ep {ep}: SOLVED in {env.steps} steps" + (" (first success!)" if ep == first_ep else ""), flush=True)
+            if (ep + 1) % 25 == 0:
+                print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
         learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng)
                    for _ in range(a.evals)]
         rand = [run_episode(env, lambda o, r: r.randrange(len(ACTIONS)), rng) for _ in range(a.evals)]
