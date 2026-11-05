@@ -63,7 +63,8 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         got_any = False
         res = agent.sub.read()
         if res is not None:
-            agent.png, agent.dims = res
+            agent.png, w, h = res
+            agent.dims = (w, h)
             agent.raw = True
             agent.seq = agent.sub.seq
             got_any = True
