@@ -164,7 +164,7 @@ def make_menu_exit_goal():
         if context.screen == ScreenType.MENU and context.menu == MenuKind.START:
             state['seen'] = True
         return state['seen'] and context.screen == ScreenType.UNKNOWN
-    f.reset = state.clear
+    f.reset = lambda: state.update(seen=False)
     return f
 
 
@@ -186,7 +186,7 @@ def make_options_setup_goal():
         if context.menu == MenuKind.OPTIONS and options_correct(emu):
             state['ready'] = True
         return state['ready'] and context.menu != MenuKind.OPTIONS
-    f.reset = state.clear
+    f.reset = lambda: state.update(ready=False)
     return f
 
 
