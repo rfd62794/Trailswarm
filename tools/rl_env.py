@@ -50,11 +50,12 @@ def waypoint_fn(wp):
 
 
 def curriculum_subgoals(segment: str):
-    """Mined milestones for this segment, if tools/rl_curriculum.py wrote them."""
+    """Mined/hand-corrected milestones for this segment. Entries are {pos:[m,x,y],
+    label?, quality?:silver|gold}; bare [m,x,y] lists still accepted."""
     try:
         import json
-        wps = json.loads(Path("runs/rl_curriculum.json").read_text()).get(segment, [])
-        return [waypoint_fn(w) for w in wps]
+        entries = json.loads(Path("runs/rl_curriculum.json").read_text()).get(segment, [])
+        return [waypoint_fn(e["pos"] if isinstance(e, dict) else e) for e in entries]
     except Exception:
         return []
 

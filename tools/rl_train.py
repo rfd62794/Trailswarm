@@ -64,6 +64,21 @@ def main() -> int:
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
+    if a.frame_port is not None:  # register for tools/rl_admin.py --reap (stale-learner fix)
+        try:
+            import atexit, os
+            reg_p = Path("runs/rl_agents.json")
+            reg = json.loads(reg_p.read_text()) if reg_p.exists() else {}
+            reg[str(a.frame_port)] = {"pid": os.getpid(), "tag": a.tag, "segment": a.segment}
+            reg_p.write_text(json.dumps(reg, indent=1))
+            def _unreg(p=reg_p, port=str(a.frame_port)):
+                try:
+                    r = json.loads(p.read_text()); r.pop(port, None); p.write_text(json.dumps(r, indent=1))
+                except Exception:
+                    pass
+            atexit.register(_unreg)
+        except Exception:
+            pass
     start = a.state or next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
                             SEGMENT_STATES[a.segment][-1])
     from rl_env import curriculum_subgoals

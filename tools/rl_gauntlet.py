@@ -63,10 +63,12 @@ def main() -> int:
     proc: dict[int, subprocess.Popen] = {}
     tags: dict[int, str] = {}
     children: dict[str, int] = {}  # tag -> how many offspring it has sired
+    short = {"reach_pc": "pc", "potion": "pot", "exit_potion": "ex",
+             "left_house": "lh", "potion_run": "pr"}.get(a.segment, a.segment[:2])
     champ = Path("runs/q_champion.json") if a.resume and Path("runs/q_champion.json").exists() else None
     ports = list(range(a.base_port, a.base_port + a.agents))
     for i, p in enumerate(ports):
-        tags[p] = chr(ord("a") + i)  # founders: a, b, c, d, ...
+        tags[p] = f"{short}{chr(ord('a') + i)}"  # founders carry the stage shorthand: pcA, potB, exC, ...
         proc[p] = spawn(p, gen * 100 + p, champ, tags[p], a)  # --resume: everyone starts from the champion, fresh counts
     if champ:
         print(f"[gauntlet] resumed from runs/q_champion.json (counters reset)", flush=True)

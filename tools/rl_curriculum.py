@@ -30,6 +30,7 @@ def main() -> int:
     ap.add_argument("--segment", required=True)
     ap.add_argument("--from-run", required=True, help="run dir with transitions.jsonl of a successful pass")
     ap.add_argument("--waypoints", type=int, default=4)
+    ap.add_argument("--label", default=None, help="human label for the mined steps (marks intent, still silver)")
     a = ap.parse_args()
 
     rows = [json.loads(ln) for ln in open(Path(a.from_run) / "transitions.jsonl")]
@@ -43,7 +44,8 @@ def main() -> int:
         print("path too short to mine"); return 1
     wps = [path[int(i * (len(path) - 1) / a.waypoints)] for i in range(1, a.waypoints + 1)]
     data = load()
-    data[a.segment] = wps
+    data[a.segment] = [{"pos": list(w), "label": a.label or f"step_{i + 1}",
+                        "quality": "silver"} for i, w in enumerate(wps)]  # silver until a human labels/golds it
     save(data)
     print(f"{a.segment}: {len(wps)} milestones mined from {len(path)} distinct positions -> {CURR}")
     for w in wps:
