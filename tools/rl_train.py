@@ -92,7 +92,8 @@ def main() -> int:
                     env.publish()
                     last_pub = now
                 visits[nxt] += 1
-                rew += a.novelty / (visits[nxt] ** 0.5)  # intrinsic reward: unexplored states pull harder
+                if visits[nxt] == 1:
+                    rew += a.novelty  # first-visit bonus only: rewarding every visit paid wandering
                 q = Q[obs]
                 q[act] += alpha * (rew + gamma * max(Q[nxt]) - q[act])
                 obs = nxt
