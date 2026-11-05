@@ -1,0 +1,97 @@
+import time
+
+from pokeagent.control_server import ControlServer
+from pokeagent.snapshot import AgentSnapshot
+from pokeagent.viewer.commands import KEYMAP, next_speed, press_for_key, targets
+from pokeagent.viewer.layout import FocusState, grid
+from pokeagent.viewer.model import ViewerModel
+from pokeagent.viewer.sources import FakeSource, HttpShmSource, discover
+from pokeagent.agent_registry import register
+
+
+def test_http_source_live_and_closed():
+    got = []
+    srv = ControlServer(lambda: AgentSnapshot(agent_id="h", step=3),
+                        {"pause": lambda: got.append("p") or {}})
+    port = srv.start()
+    try:
+        src = HttpShmSource({"id": "h", "port": port, "frame_slot": ""})
+        assert src.snapshot().step == 3
+        assert src.frame() is None
+        assert src.send("pause")["ok"] is True and got == ["p"]
+        assert src.send("nope")["ok"] is False
+    finally:
+        srv.stop()
+    dead = HttpShmSource({"id": "h", "port": port, "frame_slot": "pokeagent_frames_h"})
+    t = time.time()
+    assert dead.snapshot() is None
+    assert time.time() - t < 1.0
+    t = time.time()
+    assert dead.send("pause")["ok"] is False
+    assert time.time() - t < 1.0
+
+
+def test_discover(tmp_path):
+    register(tmp_path, "d1", "rl", 1234, "pokeagent_frames_d1")
+    assert [s.agent_id for s in discover(tmp_path)] == ["d1"]
+
+
+def test_fake_source_records():
+    f = FakeSource("f", [AgentSnapshot(agent_id="f", step=1), AgentSnapshot(agent_id="f", step=2)])
+    assert [f.snapshot().step for _ in range(3)] == [1, 2, 2]
+    f.send("speed", n=2)
+    assert f.sent == [("speed", {"n": 2})]
+
+
+def test_model_staleness():
+    t = [100.0]
+    m = ViewerModel(clock=lambda: t[0])
+    f = FakeSource("a", [AgentSnapshot(agent_id="a")], [(b"x", 1, 1)])
+    assert m.staleness("a") == "lost"
+    m.poll([f])
+    assert m.staleness("a") == "live" and m.frame("a") == (b"x", 1, 1)
+    t[0] = 102.5
+    assert m.staleness("a") == "stale"
+    t[0] = 111.0
+    assert m.staleness("a") == "lost"
+    s = m.snapshot("a")
+    s.step = 99
+    assert m.snapshot("a").step == 0  # copies
+    m.poll([FakeSource("a")])  # failed poll keeps last snapshot, does not refresh
+    assert m.snapshot("a") is not None and m.staleness("a") == "lost"
+    assert m.ids() == ["a"]
+
+
+def test_grid_maximal():
+    ratio = 0.9 + 1.0
+    for n in range(1, 13):
+        cols, rows, w, h = grid(n, 1920, 1000)
+        assert cols * rows >= n and cols * w <= 1920 and rows * h <= 1000
+        for c in range(1, n + 1):
+            r = -(-n // c)
+            cw = int(min(1920 / c, 1000 / (r * ratio)))
+            assert w * h >= cw * int(cw * ratio)
+    assert grid(1, 1920, 1000)[0] == 1
+    assert grid(0, 1920, 1000) == (0, 0, 0, 0)
+
+
+def test_focus_toggle():
+    f = FocusState()
+    assert f.focused is None
+    f.toggle("a")
+    assert f.focused == "a"
+    f.toggle("b")
+    assert f.focused == "b"
+    f.toggle("b")
+    assert f.focused is None
+    f.focus("c")
+    f.back()
+    assert f.focused is None
+
+
+def test_commands():
+    assert press_for_key("Return", True) == "START" and press_for_key("Return", False) is None
+    assert press_for_key("z", True) is None and KEYMAP["s"] == "B"
+    assert targets("a", ["a", "b"], "selected") == ["a"] and targets(None, ["a"], "selected") == []
+    assert targets("a", ["a", "b"], "all") == ["a", "b"]
+    assert [next_speed(x) for x in (1, 2, 4, 8, 3)] == [2, 4, 8, 1, 1]
