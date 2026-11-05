@@ -20,6 +20,7 @@ from pathlib import Path
 from pokeagent.emulator import Button, PyBoyEmulator
 from pokeagent.explorer import frame_lines
 from pokeagent.ram import read_state
+from pokeagent.statemeta import write_state
 
 sys.path.insert(0, str(Path(__file__).parent))
 from explore_plan import WorldGraph  # noqa: E402
@@ -114,6 +115,8 @@ def main() -> int:
     parser.add_argument("--maps", default="runs/maps.json")
     parser.add_argument("--max-presses", type=int, default=1200)
     parser.add_argument("--rom", default="roms/Pokemon Red.gb")
+    parser.add_argument("--segment", default=None, help="curriculum/segment label for metadata")
+    parser.add_argument("--note", default="", help="human-readable provenance note")
     args = parser.parse_args()
 
     def parse_tile(value, flag):
@@ -145,8 +148,9 @@ def main() -> int:
                 raise RuntimeError(f"expected {verify}, got {(state.map_id, state.x, state.y)}")
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
-        emu.save_state(out)
-        print(f"saved {out} at {read_state(emu).summary()}")
+        meta = write_state(emu, out, source=args.src, segment=args.segment,
+                           note=args.note, verified=True)
+        print(f"saved {out} at {read_state(emu).summary()} meta={meta.digest[:12]}")
         return 0
     finally:
         emu.close()

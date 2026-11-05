@@ -325,7 +325,10 @@ class SegmentEnv:
             rew += 1.0
             if not self._goal_saved and self.goal_name:  # milestone checkpoint: downstream stages start here
                 try:
-                    self.emu.save_state(Path(f"runs/checkpoints/rl_{self.goal_name}.state"))
+                    from pokeagent.statemeta import write_state
+                    write_state(self.emu, Path(f"runs/checkpoints/rl_{self.goal_name}.state"),
+                                source=self.state, segment=self.goal_name,
+                                note='RL milestone checkpoint')
                     self._goal_saved = True
                 except Exception:
                     pass
