@@ -55,7 +55,7 @@ def _segment_attempts(goal: str, last_n: int = 24) -> tuple[int, int]:
     ms = _load_json(RUNS / "milestones.json", {})
     reached = {e["run"] for e in ms.get(goal, [])}
     tries: list[str] = []
-    for d in _run_dirs()[-80:]:
+    for d in _run_dirs():
         meta = _meta(d)
         if meta.get("stop_at_goal") != goal:
             continue

@@ -10,9 +10,10 @@ Phase 1 done = all of:
 2. >=50% of 24 consecutive `beat_brock` segment runs succeed.
 3. README + short writeup.
 
-Starter: Charmander, fixed for measurement — it holds the best observed `beat_brock` record
-(17 of 22 milestones; Squirtle has none). `tools/swarm.py --starter charmander` pins it;
-changing it requires a directive that names the metric it moves.
+Starter: segment runs inherit the party from the checkpoint, so `--starter` is cosmetic
+there and the 24-run `beat_brock` condition is starter-agnostic. For the unbroken run the
+starter is chosen for real at Oak's lab — decide it from evidence once merged-SHA runs
+exist (`tools/swarm.py --starter` pins full runs).
 
 Measure: `uv run python tools/status.py` (read-only; reports the numbers above).
 
