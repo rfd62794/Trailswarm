@@ -56,6 +56,8 @@ def main() -> int:
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
     ap.add_argument("--tag", default="", help="lineage tag shown on the tile (gauntlet assigns e.g. a, a1, a1c)")
     ap.add_argument("--novelty", type=float, default=0.2, help="intrinsic reward beta/sqrt(visits): unexplored states attract")
+    ap.add_argument("--publish-frames", action="store_true",
+                    help="render+publish every settle frame (frame-for-frame showcase; only with frame-port)")
     ap.add_argument("--throttle-ms", type=float, default=0.0,
                     help="sleep this many ms per step (resource management: unthrottled envs eat a core each)")
     a = ap.parse_args()
@@ -64,7 +66,8 @@ def main() -> int:
     env = SegmentEnv(a.rom, a.state or SEGMENT_STATES[a.segment], GOAL_FNS[a.segment],
                      subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())),
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
-                     windowed=a.window, speed=a.speed, frame_port=a.frame_port)
+                     windowed=a.window, speed=a.speed, frame_port=a.frame_port,
+                     publish_frames=a.publish_frames)
     Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * len(ACTIONS))
     if a.load_q:  # offspring: start from a champion's table
         try:

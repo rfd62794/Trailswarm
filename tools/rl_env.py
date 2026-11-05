@@ -48,7 +48,7 @@ SEGMENT_SUBGOALS = {"potion": [sub_box_open],
 class SegmentEnv:
     def __init__(self, rom: str | Path, state: str | Path, goal_fn,
                  subgoals: tuple = (), sub_bonus: float = 0.4,
-                 max_steps: int = 300, hold: int = 8, settle: int = 8,
+                 max_steps: int = 300, hold: int = 8, settle: int = 8, publish_frames: bool = False,
                  windowed: bool = False, speed: int = 1, frame_port: int | None = None) -> None:
         self.emu = PyBoyEmulator(Path(rom), headless=not windowed)
         if windowed and speed != 1:
@@ -61,6 +61,7 @@ class SegmentEnv:
         self.max_steps = max_steps
         self.hold, self.settle = hold, settle  # ~8 frames/action: lean but still a real press
         self.steps = 0
+        self.publish_frames = publish_frames  # True: render+publish every settle frame (showcase agents)
         self.facing = 0  # tracked like the explorer does: last direction pressed (0=D,1=U,2=L,3=R)
         self.frame_pub = FramePublisher(frame_port, self.emu, half_res=True) if frame_port is not None else None
 
@@ -80,7 +81,11 @@ class SegmentEnv:
     def step(self, action: int):
         if action < 4:
             self.facing = action  # facing = last direction pressed, same accounting as the explorer
-        self.emu.press(ACTIONS[action], hold_frames=self.hold, settle_frames=self.settle)
+        self.emu.press(ACTIONS[action], hold_frames=self.hold, settle_frames=0)
+        for _ in range(self.settle):  # settle frames ticked one at a time: a showcase agent publishes each one
+            self.emu.tick_rendered(1) if self.publish_frames else self.emu.tick(1)
+            if self.publish_frames and self.frame_pub is not None:
+                self.frame_pub.publish()
         self.steps += 1
         rew = -0.01
         for i, sg in enumerate(self.subgoals):
