@@ -267,6 +267,42 @@ class SegmentEnv:
         return BattleSample(self.emu.read(0xD057), (s.map_id, s.x, s.y),
                             _u16(self.emu, 0xCFE6), _u16(self.emu, 0xCFF4), party_hp)
 
+    def battle_snapshot(self):
+        try:
+            kind = self.emu.read(0xD057)
+        except AttributeError:
+            return {'kind': 0}
+        if not kind:
+            return {'kind': 0}
+        return {'kind': kind, 'enemy_species': self.emu.read(0xCFE5),
+                'enemy_level': self.emu.read(0xCFF3), 'own_level': self.emu.read(0xD022),
+                'own_hp': _u16(self.emu, 0xD015), 'own_max': _u16(self.emu, 0xD023),
+                'enemy_hp': _u16(self.emu, 0xCFE6), 'enemy_max': _u16(self.emu, 0xCFF4),
+                'moves': [self.emu.read(0xD01C + i) for i in range(4)],
+                'pp': [self.emu.read(0xD02D + i) & 0x3F for i in range(4)]}
+
+    def _capture_battle(self):
+        snap = self.battle_snapshot()
+        if snap.get('kind'):
+            if not getattr(self, '_battle_start', None):
+                self._battle_start = snap
+            self._battle_end = snap
+
+    def battle_summary(self):
+        start = getattr(self, '_battle_start', None)
+        end = getattr(self, '_battle_end', None)
+        if not start:
+            return {}
+        moves = {}
+        for i, move in enumerate(start.get('moves', [])):
+            if not move:
+                continue
+            used = max(0, start['pp'][i] - end.get('pp', start['pp'])[i])
+            if used:
+                moves[str(i)] = {'move': move, 'pp_used': used}
+        return {'start': start, 'end': end, 'moves_used': moves,
+                'outcomes': dict(self.battle_outcomes)}
+
     def publish(self) -> None:
         """Render the current frame into the shared-memory slot for tools/watch.py."""
         if self.frame_pub is not None:
@@ -285,6 +321,8 @@ class SegmentEnv:
             raise ValueError(f'Start checkpoint already satisfies {self.goal_name}; refusing a trivial success')
         self.battle_tracker.reset()
         self.battle_tracker.update(self.battle_sample())
+        self._battle_start = self._battle_end = None
+        self._capture_battle()
         self.battle_outcomes = {}
         self._claimed = set()
         return self._obs()
@@ -313,6 +351,7 @@ class SegmentEnv:
         from pokeagent.learning import BattleOutcome, battle_reward
         tracker = getattr(self, 'battle_tracker', None)
         outcome = tracker.update(self.battle_sample()) if tracker else BattleOutcome.NONE
+        self._capture_battle()
         if tracker and outcome != BattleOutcome.NONE:
             self.battle_outcomes[outcome.value] = self.battle_outcomes.get(outcome.value, 0) + 1
         if tracker and self.goal_name in ('battle', 'grind'):
@@ -337,7 +376,8 @@ class SegmentEnv:
         return self._obs(), rew, done, {"goal_reached": self.goal_reached,
                                        "terminated": self.goal_reached or failed,
                                        "outcome": outcome.value,
-                                       "truncated": not (self.goal_reached or failed) and self.steps >= self.max_steps}
+                                       "truncated": not (self.goal_reached or failed) and self.steps >= self.max_steps,
+                                       "battle": self.battle_summary()}
 
     def _obs(self):
         s = read_state(self.emu)

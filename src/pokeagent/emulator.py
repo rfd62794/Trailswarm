@@ -113,6 +113,10 @@ class PyBoyEmulator:
         """PyBoy speed units: 0 unthrottled, 1 realtime."""
         self._pyboy.set_emulation_speed(speed)
 
+    def gen1(self):
+        """Optional PyBoy Pokemon Gen 1 wrapper for fixture/probe tooling."""
+        return getattr(self._pyboy, 'game_wrapper', None)
+
     def frame_rgb(self) -> bytes:
         """Current screen as 144*160*3 RGB bytes (valid right after a rendered tick)."""
         try:

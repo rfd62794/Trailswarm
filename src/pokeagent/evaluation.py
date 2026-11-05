@@ -49,7 +49,8 @@ def evaluate_table(env_factory, table, states, episodes, schema, *, seed=0, rand
                     time.sleep(throttle_ms / 1000)
             rollouts.append({'won': bool(env.goal_reached), 'steps': env.steps,
                              'return': reward_total, 'unseen_states': unseen,
-                             'outcome': info.get('outcome', 'unknown'), 'source_state': state,
+                             'outcome': info.get('outcome', 'unknown'),
+                             'battle': info.get('battle', {}), 'source_state': state,
                              'source_digest': hashlib.sha256(Path(state).read_bytes()).hexdigest()})
         finally:
             env.close()
