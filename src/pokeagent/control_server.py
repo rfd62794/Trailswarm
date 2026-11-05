@@ -1,6 +1,8 @@
 """Agent-side control server: ``GET /snapshot`` and ``POST /command`` on a daemon thread (stdlib).
 
-Commands v1 are listed in ``COMMAND_ARGS`` (name -> {arg: type}). The server validates argument
+Security: every request must carry ``X-PokeAgent-Token`` (``ControlServer.token``), have no
+``Origin`` header and a Host of 127.0.0.1:<port> or localhost:<port>, else 403. POST needs
+Content-Type application/json (415). Commands v1 are listed in ``COMMAND_ARGS`` (name -> {arg: type}). The server validates argument
 presence and type before calling ``handlers[name](**args)``, then returns the handler's dict merged
 with ``{"ok": true}``.
 
@@ -10,7 +12,10 @@ stops deciding while a human steers; ``hold_release`` ends the hold immediately.
 """
 from __future__ import annotations
 
+import hmac
 import json
+import re
+import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
@@ -19,6 +24,8 @@ from pokeagent.snapshot import AgentSnapshot
 
 BUTTONS = ("A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT")
 SPEEDS = (1, 2, 4, 8)
+TOKEN_HEADER = "X-PokeAgent-Token"
+NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 PAUSE, RESUME, SPEED, PRESS, STEER = "pause", "resume", "speed", "press", "steer"
 HAND_TO, SAVE_STATE, LOAD_STATE, HOLD_RELEASE = "hand_to", "save_state", "load_state", "hold_release"
@@ -52,12 +59,15 @@ def _check_args(cmd: str, args: dict) -> str | None:
         return "speed: n must be one of 1, 2, 4, 8"
     if cmd == PRESS and args["button"] not in BUTTONS:
         return f"press: button must be one of {', '.join(BUTTONS)}"
+    if cmd in (SAVE_STATE, LOAD_STATE) and not NAME_RE.match(args["name"]):
+        return f"{cmd}: name must match [A-Za-z0-9_-]{{1,64}}"
     return None
 
 
 class ControlServer:
     def __init__(self, snapshot_fn: Callable[[], AgentSnapshot], handlers: dict[str, Callable[..., dict]],
-                 host: str = "127.0.0.1", port: int = 0) -> None:
+                 host: str = "127.0.0.1", port: int = 0, token: str | None = None) -> None:
+        self.token = token or secrets.token_urlsafe(24)
         self.snapshot_fn, self.handlers = snapshot_fn, handlers
         self.host, self.port = host, port
         self._httpd: ThreadingHTTPServer | None = None
@@ -78,7 +88,19 @@ class ControlServer:
                 self.end_headers()
                 self.wfile.write(raw)
 
+            def _guard(self) -> bool:
+                """403 on Origin header, foreign Host, or bad/missing token."""
+                host = self.headers.get("Host", "")
+                ok = (self.headers.get("Origin") is None
+                      and host in (f"127.0.0.1:{outer.port}", f"localhost:{outer.port}")
+                      and hmac.compare_digest(self.headers.get(TOKEN_HEADER, "").encode(), outer.token.encode()))
+                if not ok:
+                    self._send(403, {"ok": False, "error": "forbidden"})
+                return ok
+
             def do_GET(self) -> None:
+                if not self._guard():
+                    return
                 if self.path.split("?")[0] != "/snapshot":
                     return self._send(404, {"ok": False, "error": "not found"})
                 try:
@@ -87,6 +109,11 @@ class ControlServer:
                     self._send(500, {"ok": False, "error": str(exc)})
 
             def do_POST(self) -> None:
+                if not self._guard():
+                    return
+                ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                if ctype != "application/json":
+                    return self._send(415, {"ok": False, "error": "content-type must be application/json"})
                 if self.path.split("?")[0] != "/command":
                     return self._send(404, {"ok": False, "error": "not found"})
                 try:

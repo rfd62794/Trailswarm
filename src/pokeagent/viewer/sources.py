@@ -28,13 +28,15 @@ class HttpShmSource:
 
     def __init__(self, entry: dict) -> None:
         self.agent_id = str(entry["id"])
+        self._headers = {"X-PokeAgent-Token": str(entry.get("token", ""))}
         self.base = f"http://127.0.0.1:{entry['port']}"
         slot = str(entry.get("frame_slot") or "")
         self._sub = FrameSubscriber(slot[len(_SLOT_PREFIX):] if slot.startswith(_SLOT_PREFIX) else slot) if slot else None
 
     def snapshot(self) -> AgentSnapshot | None:
         try:
-            with urllib.request.urlopen(self.base + "/snapshot", timeout=TIMEOUT_S) as r:
+            with urllib.request.urlopen(urllib.request.Request(self.base + "/snapshot", headers=self._headers),
+                                        timeout=TIMEOUT_S) as r:
                 return AgentSnapshot.from_dict(json.loads(r.read()))
         except Exception:
             return None
@@ -44,7 +46,7 @@ class HttpShmSource:
 
     def send(self, cmd: str, **args) -> dict:
         req = urllib.request.Request(self.base + "/command", data=json.dumps({"cmd": cmd, **args}).encode(),
-                                     headers={"Content-Type": "application/json"}, method="POST")
+                                     headers={**self._headers, "Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
                 return json.loads(r.read())

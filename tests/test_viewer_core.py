@@ -12,10 +12,11 @@ from pokeagent.agent_registry import register
 def test_http_source_live_and_closed():
     got = []
     srv = ControlServer(lambda: AgentSnapshot(agent_id="h", step=3),
-                        {"pause": lambda: got.append("p") or {}})
+                        {"pause": lambda: got.append("p") or {}}, token="tk")
     port = srv.start()
     try:
-        src = HttpShmSource({"id": "h", "port": port, "frame_slot": ""})
+        assert HttpShmSource({"id": "h", "port": port, "frame_slot": "", "token": "bad"}).snapshot() is None
+        src = HttpShmSource({"id": "h", "port": port, "frame_slot": "", "token": "tk"})
         assert src.snapshot().step == 3
         assert src.frame() is None
         assert src.send("pause")["ok"] is True and got == ["p"]

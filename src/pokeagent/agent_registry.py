@@ -13,14 +13,17 @@ def _dir(root: Path) -> Path:
     return Path(root) / "runs" / "agents"
 
 
-def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, pid: int | None = None) -> Path:
+def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, pid: int | None = None,
+             token: str = "") -> Path:
     d = _dir(root)
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{agent_id}.json"
     entry = {"id": agent_id, "kind": kind, "pid": os.getpid() if pid is None else pid, "port": port,
-             "frame_slot": frame_slot, "started": time.time()}
+             "frame_slot": frame_slot, "token": token, "started": time.time()}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(entry), encoding="utf-8")
+    if os.name != "nt":
+        os.chmod(tmp, 0o600)
     os.replace(tmp, path)
     return path
 

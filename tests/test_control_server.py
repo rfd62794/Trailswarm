@@ -8,14 +8,31 @@ from pokeagent.control_server import COMMAND_ARGS, ControlServer
 from pokeagent.snapshot import AgentSnapshot
 
 
-def post(port, body):
+TOKEN = "tok"
+
+
+def post(port, body, headers=None, token=TOKEN):
+    h = {"Content-Type": "application/json", "X-PokeAgent-Token": token}
+    h.update(headers or {})
     req = urllib.request.Request(f"http://127.0.0.1:{port}/command", data=body if isinstance(body, bytes)
-                                 else json.dumps(body).encode(), method="POST")
+                                 else json.dumps(body).encode(), method="POST", headers=h)
     try:
         with urllib.request.urlopen(req, timeout=2) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read())
+
+
+def get_req(port, **headers):
+    return urllib.request.Request(f"http://127.0.0.1:{port}/snapshot", headers={"X-PokeAgent-Token": TOKEN, **headers})
+
+
+def get_code(req):
+    try:
+        with urllib.request.urlopen(req, timeout=2) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
 
 
 @pytest.fixture
@@ -28,7 +45,7 @@ def server():
     def boom(**kw):
         raise RuntimeError("kaboom")
     handlers["load_state"] = boom
-    srv = ControlServer(lambda: AgentSnapshot(agent_id="x", step=7), handlers)
+    srv = ControlServer(lambda: AgentSnapshot(agent_id="x", step=7), handlers, token=TOKEN)
     port = srv.start()
     yield port, calls
     srv.stop()
@@ -36,7 +53,7 @@ def server():
 
 def test_snapshot(server):
     port, _ = server
-    with urllib.request.urlopen(f"http://127.0.0.1:{port}/snapshot", timeout=2) as r:
+    with urllib.request.urlopen(get_req(port), timeout=2) as r:
         d = json.loads(r.read())
     assert d["agent_id"] == "x" and d["step"] == 7
 
@@ -71,3 +88,42 @@ def test_errors(server):
     assert calls == []
     code, out = post(port, {"cmd": "load_state", "name": "s"})
     assert code == 500 and out == {"ok": False, "error": "kaboom"}
+
+
+def test_generated_token():
+    srv = ControlServer(lambda: AgentSnapshot(agent_id="x"), {})
+    assert len(srv.token) >= 24 and srv.token != ControlServer(lambda: None, {}).token
+
+
+def test_token_required(server):
+    port, calls = server
+    assert get_code(urllib.request.Request(f"http://127.0.0.1:{port}/snapshot")) == 403
+    assert get_code(get_req(port, **{"X-PokeAgent-Token": "wrong"})) == 403
+    assert post(port, {"cmd": "pause"}, token="wrong") == (403, {"ok": False, "error": "forbidden"})
+    assert post(port, {"cmd": "pause"}, token="")[0] == 403
+    assert calls == []
+
+
+def test_origin_and_host_rejected(server):
+    port, calls = server
+    assert get_code(get_req(port, Origin="http://evil.example")) == 403
+    assert post(port, {"cmd": "pause"}, headers={"Origin": "http://evil.example"})[0] == 403
+    assert post(port, {"cmd": "pause"}, headers={"Host": "evil.example"})[0] == 403
+    assert post(port, {"cmd": "pause"}, headers={"Host": f"evil.example:{port}"})[0] == 403
+    assert get_code(get_req(port, Host=f"localhost:{port}")) == 200
+    assert calls == []
+
+
+def test_content_type_required(server):
+    port, calls = server
+    assert post(port, {"cmd": "pause"}, headers={"Content-Type": "text/plain"})[0] == 415
+    assert post(port, {"cmd": "pause"}, headers={"Content-Type": "application/json; charset=utf-8"})[0] == 200
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("name", ["../x", "a/b", "a\\b", "", "x" * 65, "a b", "a.b"])
+def test_state_name_validated(server, name):
+    port, calls = server
+    for cmd in ("save_state", "load_state"):
+        assert post(port, {"cmd": cmd, "name": name})[0] == 400
+    assert calls == []

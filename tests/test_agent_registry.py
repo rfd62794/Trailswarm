@@ -25,3 +25,13 @@ def test_dead_pid_and_garbage_dropped(tmp_path):
 
 def test_missing_dir(tmp_path):
     assert list_agents(tmp_path) == []
+
+
+def test_token_written(tmp_path):
+    import json
+    import os
+    p = register(tmp_path, "t", "rl", 1, "s", token="secret")
+    assert json.loads(p.read_text())["token"] == "secret"
+    assert list_agents(tmp_path)[0]["token"] == "secret"
+    if os.name != "nt":
+        assert p.stat().st_mode & 0o777 == 0o600
