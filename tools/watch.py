@@ -19,6 +19,7 @@ import threading
 import time
 import tkinter as tk
 import urllib.request
+from pathlib import Path
 from typing import Optional
 
 from PIL import Image, ImageTk
@@ -44,7 +45,8 @@ class Agent:
     def __init__(self, port: int) -> None:
         self.port = port
         self.png: Optional[bytes] = None  # latest frame: PNG bytes or raw RGB (see .raw)
-        self.raw = False                  # True when .png holds 160*144*3 RGB from shared memory
+        self.dims = (160, 144)            # frame WxH (half-res publishers send 80x72)
+        self.raw = False                  # True when .png holds raw RGB from shared memory
         self.status: dict = {}
         self.ok = False
         self.fails = 0        # consecutive failed polls; a tile only goes offline after several
@@ -60,9 +62,10 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         t0 = time.time()
         n += 1
         got_any = False
-        frame = agent.sub.read()
-        if frame is not None:
-            agent.png = frame
+        res = agent.sub.read()
+        if res is not None:
+            agent.png, w, h = res
+            agent.dims = (w, h)
             agent.raw = True
             agent.seq = agent.sub.seq
             got_any = True
@@ -90,14 +93,51 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         time.sleep(max(0.02, period - (time.time() - t0)))
 
 
+_BRAIN_CACHE: dict = {}  # path -> (mtime, table, n_actions)
+
+
+def _brain(a: Agent) -> str:
+    """Model's-eye line for RL seats: latest trace obs + preferred action."""
+    try:
+        import glob
+        from pokeagent.qdecode import brain_line
+        from pokeagent.qmodels import load_model
+        traces = sorted(glob.glob(f"runs/traces/*_{a.port}.jsonl"),
+                        key=lambda p: Path(p).stat().st_mtime)
+        if not traces:
+            return ''
+        last = Path(traces[-1]).read_text().strip().splitlines()[-1]
+        rec = json.loads(last)
+        obs = tuple(rec.get('final_obs') or (rec.get('path') or [[None]])[-1][:-1])
+        qpaths = sorted(glob.glob(f"runs/**/q_{a.port}*.json", recursive=True),
+                        key=lambda p: Path(p).stat().st_mtime)
+        if not qpaths:
+            return ''
+        qp, mt = qpaths[-1], Path(qpaths[-1]).stat().st_mtime
+        if _BRAIN_CACHE.get(qp, (0,))[0] != mt:
+            data = json.loads(Path(qp).read_text())
+            _BRAIN_CACHE[qp] = (mt, load_model(qp, data.get('schema'), data.get('actions', 6)),
+                                data.get('actions', 6))
+        _, table, n = _BRAIN_CACHE[qp]
+        return '\n' + brain_line(table, obs, n)
+    except Exception:
+        return ''
+
+
 def status_line(a: Agent) -> str:
     if not a.ok:
         return f":{a.port}  offline"
     s = a.status
     if s.get("_rl"):  # RL learner status (runs/rlstatus_<port>.json)
-        return (f":{a.port}  gen {s.get('generation', '?')}  wins {s.get('wins', 0)}"
-                f"  steps {s.get('steps_total', '?')}  avg {s.get('steps_avg', '?')}"
-                f"  best {s.get('steps_best', '?')}  worst {s.get('steps_worst', '?')}")
+        evaluation = s.get('evaluation') or {}
+        grade = (f"EVAL {evaluation.get('wins', 0)}/{evaluation['episodes']} greedy"
+                 if evaluation.get('episodes') else 'EVAL not run')
+        epsilon = s.get('epsilon')
+        exploration = f'{epsilon:.2f}' if isinstance(epsilon, (int, float)) else '?'
+        return (f":{a.port} {s.get('tag', '')} {s.get('phase', 'TRAIN')}"
+                f" ep {s.get('generation', '?')} wins {s.get('wins', 0)} eps {exploration}"
+                f" | {grade} | winavg {s.get('win_avg', '?')} steps {s.get('steps_total', '?')}"
+                + _brain(a))
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",
@@ -214,7 +254,7 @@ def main() -> int:
     def draw(ag: Agent, label: tk.Label, scale: int) -> None:
         try:
             if ag.png and ag.raw:
-                im = Image.frombytes("RGB", (160, 144), ag.png)
+                im = Image.frombytes("RGB", ag.dims, ag.png)
             elif ag.png:
                 im = Image.open(io.BytesIO(ag.png))
             else:  # placeholder until the first frame lands: a dark box keeps the grid geometry fixed
@@ -253,7 +293,8 @@ def main() -> int:
                 if ag.seq != t["seq"] or resized:
                     draw(ag, t["img"], scale)
                     t["seq"] = ag.seq
-                t["txt"].configure(text=status_line(ag), fg=(FG if ag.ok else DIM))
+                t["txt"].configure(text=status_line(ag), fg=(FG if ag.ok else DIM),
+                                   wraplength=160 * scale, justify='left')
                 border = (BORDER["dead"] if not ag.ok else
                           BORDER["battle"] if ag.status.get("in_battle") else
                           BORDER["paused"] if ag.status.get("paused") else BORDER["ok"])

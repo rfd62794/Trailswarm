@@ -51,6 +51,18 @@ class Emulator(Protocol):
         """Current screen as a 160x144 RGB PIL image."""
         ...
 
+    def tick_rendered(self, frames: int) -> None:
+        """Advance emulation while updating the backend frame buffer."""
+        ...
+
+    def frame_rgb(self) -> bytes:
+        """Return the latest rendered frame as RGB bytes."""
+        ...
+
+    def set_speed(self, speed: int) -> None:
+        """Set backend emulation speed (backend-specific units)."""
+        ...
+
     def save_state(self, path: Path) -> None: ...
     def load_state(self, path: Path) -> None: ...
     def close(self) -> None: ...
@@ -96,6 +108,14 @@ class PyBoyEmulator:
         instead of adding extra rendered ticks on top.
         """
         self._pyboy.tick(frames, True)
+
+    def set_speed(self, speed: int) -> None:
+        """PyBoy speed units: 0 unthrottled, 1 realtime."""
+        self._pyboy.set_emulation_speed(speed)
+
+    def gen1(self):
+        """Optional PyBoy Pokemon Gen 1 wrapper for fixture/probe tooling."""
+        return getattr(self._pyboy, 'game_wrapper', None)
 
     def frame_rgb(self) -> bytes:
         """Current screen as 144*160*3 RGB bytes (valid right after a rendered tick)."""
@@ -146,6 +166,15 @@ class FakeEmulator:
 
     def screenshot(self) -> Image.Image:
         return Image.new("RGB", _SCREEN_SIZE)
+
+    def tick_rendered(self, frames: int) -> None:
+        self.frames += frames
+
+    def frame_rgb(self) -> bytes:
+        return bytes(_SCREEN_SIZE[0] * _SCREEN_SIZE[1] * 3)
+
+    def set_speed(self, speed: int) -> None:
+        self.speed = speed
 
     def save_state(self, path: Path) -> None:
         Path(path).write_text(json.dumps(self.memory))
