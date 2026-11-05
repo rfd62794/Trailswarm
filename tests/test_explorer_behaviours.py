@@ -251,3 +251,22 @@ def test_demo_mode_adds_no_paths_key(tmp_path, record_paths):
     mem = MapMemory(tmp_path / "m.json", record_paths=record_paths)
     assert mem.learn((1, 10, 10), "UP", (1, 10, 9), confirmed=True) == "moved"
     assert ("paths" in mem.m(1)) is record_paths
+
+
+def test_explorer_package_layering_and_size():
+    """pokeagent.explorer imports only the allowed framework layers (never tools/), and no module passes 300 lines."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer"}
+    for f in root.rglob("*.py"):
+        assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            mods = [node.module] if isinstance(node, ast.ImportFrom) and node.module else \
+                [a.name for a in node.names] if isinstance(node, ast.Import) else []
+            for mod in mods:
+                top = mod.split(".")
+                assert top[0] not in ("tools", "explore_demo", "explore_plan"), f"{f.name} imports {mod}"
+                if top[0] == "pokeagent":
+                    assert len(top) > 1 and top[1] in allowed, f"{f.name} imports {mod}"
