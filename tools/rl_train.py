@@ -72,6 +72,10 @@ def main() -> int:
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
     ap.add_argument("--tag", default="", help="lineage tag shown on the tile (gauntlet assigns e.g. a, a1, a1c)")
     ap.add_argument("--novelty", type=float, default=0.0, help="first-visit reward, capped at 0.2 total per episode")
+    ap.add_argument("--repeat-penalty", type=float, default=0.0,
+                    help="bounded penalty per state-action repeat beyond --repeat-threshold")
+    ap.add_argument("--repeat-threshold", type=int, default=8,
+                    help="free repeats per state-action before repeat-penalty applies")
     ap.add_argument("--publish-frames", action="store_true",
                     help="render+publish every settle frame (frame-for-frame showcase; only with frame-port)")
     ap.add_argument("--full-res", action="store_true",
@@ -102,6 +106,7 @@ def main() -> int:
         a.screen_context = a.menu_controls = True
     if (a.n_step < 1 or a.max_steps < 1 or a.episodes < 1 or a.evals < 0
             or a.publish_fps <= 0 or a.novelty < 0 or a.hold < 1 or a.settle < 1
+            or a.repeat_penalty < 0 or a.repeat_threshold < 1
             or a.eval_every < 0 or a.periodic_evals < 1 or a.eps_decay_episodes < 1
             or not 0 <= a.eps_floor <= 1):
         ap.error('Invalid episode, horizon, FPS, control timing or exploration setting')
@@ -233,7 +238,10 @@ def main() -> int:
             traj = []  # n-step buffer: (s, a, r, s')
             ep_path = []  # full (obs, act) record for --trace run-level analysis
             novelty_budget = 0.2
-            reward_components = {'extrinsic': 0.0, 'novelty': 0.0, 'potential': 0.0}
+            repeat_budget = 0.5
+            state_action_counts = {}
+            reward_components = {'extrinsic': 0.0, 'novelty': 0.0, 'potential': 0.0,
+                                 'repeat_penalty': 0.0}
             publish_status(ep, eps, in_episode=True)
             for _ in range(env.max_steps):
                 allowed = env.allowed_actions()
@@ -260,6 +268,13 @@ def main() -> int:
                     rew += bonus  # first-visit bonus only: rewarding every visit paid wandering
                     novelty_budget -= bonus
                     reward_components['novelty'] += bonus
+                repeat_key = (obs, act)
+                state_action_counts[repeat_key] = state_action_counts.get(repeat_key, 0) + 1
+                if state_action_counts[repeat_key] > a.repeat_threshold and repeat_budget > 0:
+                    penalty = min(a.repeat_penalty, repeat_budget)
+                    rew -= penalty  # capped: discourage dwelling without swamping real rewards
+                    repeat_budget -= penalty
+                    reward_components['repeat_penalty'] -= penalty
                 traj.append((obs, act, rew, nxt))
                 terminal = info['terminated']  # goal ends bootstrap to 0; step-cap truncation still bootstraps
                 while traj and (len(traj) >= a.n_step or done):
