@@ -351,8 +351,11 @@ class SegmentEnv:
             tm = self.emu.read_range(0xC3A0, 360)
             ctx = classify_screen(tm, self.emu.read(0xD057))
             lines = frame_lines(tm)
-            if any('SAVING' in ln.upper() for ln in lines):
+            joined = ' '.join(lines).upper()
+            if 'SAVING' in joined:
                 return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
+            if 'YES' in joined and 'NO' in joined and 'SAVE' in joined:
+                return [i for i in range(n) if self.actions[i] == Button.B]  # save prompt: only honest answer is NO
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
