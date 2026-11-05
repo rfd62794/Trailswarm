@@ -22,7 +22,7 @@ def load_memory(path: str = 'runs/maps.json') -> dict:
 
 
 def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
-                  tmap: int | None = None):
+                  tmap: int | None = None, nearest: bool = False):
     """BFS over learned memory -> list of action indices, or None if unreachable.
 
     States are (map, x, y): walkable moves inside a map plus warp edges
@@ -36,6 +36,7 @@ def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
     maps = memory.get('maps', {})
     q = deque([start])
     prev = {start: None}
+    found = None
     while q:
         m, cx, cy = q.popleft()
         d = maps.get(str(m), {})
@@ -57,12 +58,23 @@ def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
                 continue  # only learned-walkable tiles; warp landings count as known
             prev[nxt] = (m, cx, cy, name)
             if nxt == goal:
-                path = []
-                cur = nxt
-                while prev[cur] is not None:
-                    pm, px, py, b = prev[cur]
-                    path.append(BUTTON[b])
-                    cur = (pm, px, py)
-                return path[::-1]
+                found = nxt
+                q.clear()
+                break
             q.append(nxt)
+
+    def _path(n):
+        out = []
+        cur = n
+        while prev[cur] is not None:
+            pm, px, py, b = prev[cur]
+            out.append(BUTTON[b])
+            cur = (pm, px, py)
+        return out[::-1]
+
+    if found:
+        return _path(found)
+    if nearest and prev:  # goal beyond known space: ride to the frontier of knowledge
+        best = min(prev, key=lambda n: (n[0] != tmap, abs(n[1] - tx) + abs(n[2] - ty)))
+        return _path(best) if best != start else None
     return None

@@ -92,9 +92,9 @@ class ScriptedNav:
                 done = True
                 info['option_solved'] = True
                 break
-            path = shortest_path(memory, s.map_id, s.x, s.y, *self.target, tmap=tmap)
+            path = shortest_path(memory, s.map_id, s.x, s.y, *self.target, tmap=tmap, nearest=True)
             if not path:
-                info['option_failed'] = 'unreachable'
+                info['option_failed'] = 'max_reach'  # rode to the frontier of known space
                 break
             _, rew, done, info = env.step(path[0])
             total += rew
