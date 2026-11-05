@@ -97,9 +97,14 @@ def status_line(a: Agent) -> str:
         return f":{a.port}  offline"
     s = a.status
     if s.get("_rl"):  # RL learner status (runs/rlstatus_<port>.json)
-        return (f":{a.port} {s.get('tag', '')}  gen {s.get('generation', '?')}  wins {s.get('wins', 0)}"
-                f"  steps {s.get('steps_total', '?')}  avg {s.get('steps_avg', '?')}"
-                f"  winavg {s.get('win_avg', '?')}  best {s.get('steps_best', '?')}  worst {s.get('steps_worst', '?')}")
+        evaluation = s.get('evaluation') or {}
+        grade = (f"EVAL {evaluation.get('wins', 0)}/{evaluation['episodes']} greedy"
+                 if evaluation.get('episodes') else 'EVAL not run')
+        epsilon = s.get('epsilon')
+        exploration = f'{epsilon:.2f}' if isinstance(epsilon, (int, float)) else '?'
+        return (f":{a.port} {s.get('tag', '')} {s.get('phase', 'TRAIN')}"
+                f" ep {s.get('generation', '?')} wins {s.get('wins', 0)} eps {exploration}"
+                f" | {grade} | winavg {s.get('win_avg', '?')} steps {s.get('steps_total', '?')}")
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",
@@ -255,7 +260,8 @@ def main() -> int:
                 if ag.seq != t["seq"] or resized:
                     draw(ag, t["img"], scale)
                     t["seq"] = ag.seq
-                t["txt"].configure(text=status_line(ag), fg=(FG if ag.ok else DIM))
+                t["txt"].configure(text=status_line(ag), fg=(FG if ag.ok else DIM),
+                                   wraplength=160 * scale, justify='left')
                 border = (BORDER["dead"] if not ag.ok else
                           BORDER["battle"] if ag.status.get("in_battle") else
                           BORDER["paused"] if ag.status.get("paused") else BORDER["ok"])

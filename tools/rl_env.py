@@ -8,6 +8,7 @@ Reward = +1 on the goal detector, -0.01 per step.
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 from pokeagent.emulator import Button, PyBoyEmulator
 from pokeagent.ram import read_state
@@ -159,6 +160,14 @@ GOAL_FNS = {"menu_start": goal_menu_start, "left_house": goal_left_house, "potio
             "to_viridian": goal_map(0x01), "to_route2": goal_map(0x0D),
             "to_pewter": goal_map(0x02), "to_gym": goal_map(0x36),
             "battle": make_battle_goal(), "grind": make_grind_goal(3)}
+def make_goal(segment):
+    if segment == 'battle':
+        return make_battle_goal()
+    if segment == 'grind':
+        return make_grind_goal(3)
+    return GOAL_FNS[segment]
+
+
 # per-segment extra observation fields (appended to the base 8-tuple)
 EXTRA_OBS = {"battle": battle_obs_extra, "grind": battle_obs_extra}
 # checkpoints per segment, tried in order: a downstream stage starts from the previous
@@ -224,6 +233,8 @@ class SegmentEnv:
         self.max_steps = max_steps
         self.hold, self.settle = hold, settle  # ~8 frames/action: lean but still a real press
         self.steps = 0
+        self.render_interval = 1.0 / 15
+        self._last_render = 0.0
         self.publish_frames = publish_frames  # True: render+publish every settle frame (showcase agents)
         self.facing = 0  # tracked like the explorer does: last direction pressed (0=D,1=U,2=L,3=R)
         self.frame_pub = FramePublisher(frame_port, self.emu, half_res=half_res) if frame_port is not None else None
@@ -255,7 +266,7 @@ class SegmentEnv:
     def publish(self) -> None:
         """Render the current frame into the shared-memory slot for tools/watch.py."""
         if self.frame_pub is not None:
-            self.frame_pub.publish()
+            self.frame_pub.publish(advance=False)
 
     def reset(self):
         if self.state.exists():
@@ -278,10 +289,17 @@ class SegmentEnv:
         if action < 4:
             self.facing = action  # facing = last direction pressed, same accounting as the explorer
         self.emu.press(getattr(self, 'actions', ACTIONS)[action], hold_frames=self.hold, settle_frames=0)
-        for _ in range(self.hold + self.settle):  # settle frames ticked one at a time: a showcase agent publishes each one
-            self.emu.tick_rendered(1) if self.publish_frames else self.emu.tick(1)
-            if self.publish_frames and self.frame_pub is not None:
-                self.frame_pub.publish()
+        for frame in range(self.hold + self.settle):  # settle frames ticked one at a time: a showcase agent publishes each one
+            publisher = getattr(self, 'frame_pub', None)
+            render_due = (publisher is not None and frame == self.hold + self.settle - 1
+                          and time.monotonic() - self._last_render >= self.render_interval)
+            if self.publish_frames or render_due:
+                self.emu.tick_rendered(1)
+                self._last_render = time.monotonic()
+            else:
+                self.emu.tick(1)
+            if self.publish_frames and publisher is not None:
+                publisher.publish(advance=False)
         self.steps += 1
         rew = -0.01
         for i, sg in enumerate(self.subgoals):

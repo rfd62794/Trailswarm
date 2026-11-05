@@ -10,6 +10,7 @@ A run that lands the goal inside --max-steps counts as a success.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import hashlib
 import subprocess
@@ -23,8 +24,9 @@ from pathlib import Path
 from pokeagent.observations import SpatialObserver, schema_id
 from pokeagent.qmodels import atomic_json, load_model, mean_tables, save_model
 from pokeagent.learning import potential_reward
+from pokeagent.evaluation import evaluate_table, exploration_rate
 
-from rl_env import ACTIONS, EXTRA_OBS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv
+from rl_env import ACTIONS, EXTRA_OBS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv, make_goal
 
 
 def run_episode(env, policy, rng, pub_fps: float = 15.0) -> tuple[bool, int]:
@@ -46,6 +48,10 @@ def main() -> int:
     ap.add_argument("--segment", required=True, choices=sorted(GOAL_FNS))
     ap.add_argument("--episodes", type=int, default=200)
     ap.add_argument("--evals", type=int, default=40)
+    ap.add_argument('--eval-every', type=int, default=10)
+    ap.add_argument('--periodic-evals', type=int, default=3)
+    ap.add_argument('--eval-state', action='append', default=[])
+    ap.add_argument('--eps-decay-episodes', type=int, default=100)
     ap.add_argument("--max-steps", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rom", default="roms/Pokemon Red.gb")
@@ -93,8 +99,13 @@ def main() -> int:
         a.screen_context = a.combat_context = True
     if a.menu_controls or a.segment == 'menu_start':
         a.screen_context = a.menu_controls = True
-    if a.n_step < 1 or a.max_steps < 1 or a.episodes < 1 or a.evals < 0 or a.publish_fps <= 0 or a.novelty < 0:
-        ap.error('Invalid episode, horizon, FPS or novelty setting')
+    if (a.n_step < 1 or a.max_steps < 1 or a.episodes < 1 or a.evals < 0
+            or a.publish_fps <= 0 or a.novelty < 0 or a.hold < 1 or a.settle < 1
+            or a.eval_every < 0 or a.periodic_evals < 1 or a.eps_decay_episodes < 1
+            or not 0 <= a.eps_floor <= 1):
+        ap.error('Invalid episode, horizon, FPS, control timing or exploration setting')
+    if any(not Path(state).is_file() for state in a.eval_state):
+        ap.error('An evaluation starting state does not exist')
     if a.screen_context or a.spatial_context or a.combat_context or a.battle_learning:
         if a.load_q and not Path(a.load_q).exists():
             ap.error('Requested model does not exist')
@@ -102,31 +113,27 @@ def main() -> int:
     actions = list(ACTIONS) + ([Button.START, Button.SELECT] if a.menu_controls else [])
     rng = random.Random(a.seed)
     if a.frame_port is not None:  # register for tools/rl_admin.py --reap (stale-learner fix)
+        import atexit
+        from pokeagent.registry import register_worker, unregister_worker
+        reg_p = Path('runs/rl_agents.json')
+        info = {'tag': a.tag, 'segment': a.segment,
+                'cmd': sys.argv[1:]}  # rl_cull replays this to respawn the learner
         try:
-            import atexit, os
-            reg_p = Path("runs/rl_agents.json")
-            reg = json.loads(reg_p.read_text()) if reg_p.exists() else {}
-            reg[str(a.frame_port)] = {"pid": os.getpid(), "tag": a.tag, "segment": a.segment,
-                                      "cmd": sys.argv[1:]}  # rl_cull replays this to respawn the learner
-            reg_p.write_text(json.dumps(reg, indent=1))
-            def _unreg(p=reg_p, port=str(a.frame_port)):
-                try:
-                    r = json.loads(p.read_text()); r.pop(port, None); p.write_text(json.dumps(r, indent=1))
-                except Exception:
-                    pass
-            atexit.register(_unreg)
-        except Exception:
-            pass
+            lease = register_worker(reg_p, a.frame_port, info)
+        except (OSError, ValueError, RuntimeError) as error:
+            ap.error(str(error))
+        atexit.register(unregister_worker, reg_p, a.frame_port, lease)
     start = a.state or next((s for s in SEGMENT_STATES[a.segment] if Path(s).exists()),
                             SEGMENT_STATES[a.segment][-1])
     from rl_env import curriculum_subgoals
-    env = SegmentEnv(a.rom, start, GOAL_FNS[a.segment], goal_name=a.segment,
+    env = SegmentEnv(a.rom, start, make_goal(a.segment), goal_name=a.segment,
                      subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())) + tuple(curriculum_subgoals(a.segment)),
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                      windowed=a.window, speed=a.speed, frame_port=a.frame_port,
                      publish_frames=a.publish_frames, half_res=not a.full_res,
                      obs_extra=EXTRA_OBS.get(a.segment), screen_context=a.screen_context)
     env.actions = actions
+    env.render_interval = 1.0 / a.publish_fps
     env.battle_learning = a.battle_learning
     env.travel_priority = a.travel_priority
     env.combat_context = a.combat_context
@@ -164,7 +171,31 @@ def main() -> int:
             return {repr(k): v for k, v in Q.items()}
         return {repr(k): [(Q[k][i] + QB[k][i]) / 2 for i in range(len(actions))]
                 for k in set(Q) | set(QB)}
+    def evaluation_env(state):
+        evaluation = SegmentEnv(a.rom, state, make_goal(a.segment), goal_name=a.segment,
+                                max_steps=a.max_steps, hold=a.hold, settle=a.settle,
+                                obs_extra=EXTRA_OBS.get(a.segment), screen_context=a.screen_context)
+        evaluation.actions = list(actions)
+        evaluation.battle_learning = a.battle_learning
+        evaluation.travel_priority = a.travel_priority
+        evaluation.combat_context = a.combat_context
+        evaluation.spatial_observer = observer if a.spatial_context else None
+        evaluation._goal_saved = True
+        return evaluation
+
+    run_git_sha = subprocess.check_output(
+        ['git', 'rev-parse', 'HEAD'], cwd=Path(__file__).resolve().parents[1], text=True).strip()
+
+    def evaluate(episodes, random_policy=False):
+        frozen = {ast.literal_eval(key): tuple(row) for key, row in snapshot().items()}
+        result = evaluate_table(evaluation_env, frozen, a.eval_state or [start], episodes,
+                                schema, seed=a.seed + 100003, random_policy=random_policy,
+                                throttle_ms=min(a.throttle_ms, 2))
+        result.update(segment=a.segment, git_sha=run_git_sha)
+        return result
+
     alpha, gamma, eps0 = 0.2, 0.99, 1.0
+    latest_eval = None
     try:
         wins = first_ep = None
         wins = 0
@@ -172,14 +203,34 @@ def main() -> int:
         win_steps: list[int] = []  # solved-episode steps only: the number that shows learning
         visits: dict[tuple, int] = defaultdict(int)
         total_steps = 0
+
+        def publish_status(episode, epsilon, phase='TRAIN', in_episode=False):
+            if a.frame_port is None:
+                return
+            atomic_json(f'runs/rlstatus_{a.frame_port}.json',
+                        {'instance': a.frame_port, 'pid': os.getpid(), 'tag': a.tag,
+                         'generation': episode, 'episode': episode + 1, 'wins': wins,
+                         'schema': schema, 'git_sha': run_git_sha, 'actions': len(actions), 'phase': phase,
+                         'epsilon': epsilon, 'evaluation': latest_eval, 'updated_at': time.time(),
+                         'outcomes': env.battle_outcomes, 'rewards': reward_components,
+                         'current_steps': env.steps,
+                         'steps_total': total_steps + (env.steps if in_episode else 0),
+                         'steps_avg': round(sum(steps_log)/len(steps_log), 1) if steps_log else None,
+                         'steps_best': min(steps_log) if steps_log else None,
+                         'steps_worst': max(steps_log) if steps_log else None,
+                         'win_avg': round(sum(win_steps)/len(win_steps), 1) if win_steps else None})
+
+        reward_components = {}
+        publish_status(-1, 1.0, 'STARTING')
         for ep in range(a.episodes):
-            eps = max(a.eps_floor, eps0 * (1.0 - ep / max(1, a.episodes)))  # decay, but never stop exploring
+            eps = exploration_rate(ep, a.eps_decay_episodes, a.eps_floor)  # decay, but never stop exploring
             obs = env.reset()
             last_pub = 0.0
             traj = []  # n-step buffer: (s, a, r, s')
             ep_path = []  # full (obs, act) record for --trace run-level analysis
             novelty_budget = 0.2
             reward_components = {'extrinsic': 0.0, 'novelty': 0.0, 'potential': 0.0}
+            publish_status(ep, eps, in_episode=True)
             for _ in range(env.max_steps):
                 allowed = env.allowed_actions()
                 if QB is not None:
@@ -217,13 +268,15 @@ def main() -> int:
                         boot = traj[-1][3]
                         if QB is not None:
                             S = QB if T is Q else Q
-                            a_star = max(range(len(actions)), key=lambda i: T[boot][i])
+                            a_star = max(env.allowed_actions(), key=lambda i: T[boot][i])
                             G += (gamma ** L) * S[boot][a_star]
                         else:
-                            G += (gamma ** L) * max(Q[boot])
+                            G += (gamma ** L) * max(Q[boot][i] for i in env.allowed_actions())
                     T[s0][a0] += alpha * (G - T[s0][a0])
                     traj.pop(0)
                 obs = nxt
+                if env.steps % 50 == 0 or info.get('outcome') != 'none':
+                    publish_status(ep, eps, in_episode=True)
                 if done:
                     break
                 if a.throttle_ms:
@@ -268,32 +321,28 @@ def main() -> int:
                             QB[k] = [(x+y)/2 for x, y in zip(QB[k], v)]
                 except Exception:
                     pass
-            if a.frame_port is not None:
-                best = min(steps_log); worst = max(steps_log)
-                atomic_json(f'runs/rlstatus_{a.frame_port}.json', {"instance": a.frame_port, "tag": a.tag, "generation": ep, "wins": wins,
-                           "schema": schema, "actions": len(actions), "outcomes": env.battle_outcomes, "rewards": reward_components,
-                           "steps_total": total_steps, "steps_avg": round(total_steps / len(steps_log), 1),
-                           "steps_best": best, "steps_worst": worst,
-                           "win_avg": round(sum(win_steps) / len(win_steps), 1) if win_steps else None})
+            if a.eval_every and (ep + 1) % a.eval_every == 0:
+                publish_status(ep, eps, 'EVAL')
+                evaluated = evaluate(a.periodic_evals)
+                evaluated.update(training_episode=ep + 1, training_steps=total_steps)
+                lid = a.frame_port if a.frame_port is not None else a.seed
+                atomic_json(f'runs/evaluations/{schema}/{lid}_{os.getpid()}_{ep + 1}.json', evaluated)
+                latest_eval = {key: evaluated[key] for key in (
+                    'wins', 'episodes', 'win_rate', 'mean_solved_steps', 'model_digest',
+                    'evaluation_scope', 'training_episode', 'training_steps')}
+                print(f"  EVAL ep {ep + 1}: {evaluated['wins']}/{evaluated['episodes']} wins",
+                      flush=True)
+            publish_status(ep, eps)
             if (ep + 1) % 25 == 0:
                 print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
-        def greedy(obs, _r):
-            if QB is not None:
-                return max(env.allowed_actions(), key=lambda i: Q[obs][i] + QB[obs][i])
-            return max(env.allowed_actions(), key=lambda i: Q[obs][i])
-        learned = [run_episode(env, greedy, rng, a.publish_fps) for _ in range(a.evals)]
-        if learned:
-            atomic_json(f'runs/eval_{a.segment}_{schema}.json',
-                        {'version': 2, 'schema': schema, 'segment': a.segment,
-                         'episodes': len(learned), 'wins': sum(w for w, _ in learned),
-                         'source_state': str(start), 'epsilon': 0,
-                         'success_definition': 2,
-                         'git_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-                         'model_digest': hashlib.sha256(json.dumps(snapshot(), sort_keys=True).encode()).hexdigest(),
-                         'source_digest': hashlib.sha256(Path(start).read_bytes()).hexdigest(),
-                         'evaluation_scope': 'fixed_checkpoint_greedy',
-                         'steps': [s for w, s in learned if w]})
-        rand = [run_episode(env, lambda o, r: r.choice(env.allowed_actions()), rng, a.publish_fps) for _ in range(a.evals)]
+        learned, rand = [], []
+        if a.evals:
+            evaluated = evaluate(a.evals)
+            atomic_json(f'runs/eval_{a.segment}_{schema}.json', evaluated)
+            learned = [(row['won'], row['steps']) for row in evaluated['rollouts']]
+            baseline = evaluate(a.evals, random_policy=True)
+            rand = [(row['won'], row['steps']) for row in baseline['rollouts']]
+            atomic_json(f'runs/baseline_{a.segment}_{schema}.json', baseline)
     finally:
         env.close()
 

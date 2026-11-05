@@ -57,3 +57,77 @@ def test_culler_does_not_mix_legacy_or_other_schemas(tmp_path, monkeypatch):
     monkeypatch.setattr(cull.os, 'kill', lambda *args: pytest.fail('Must not kill across schemas'))
     monkeypatch.setattr(cull.subprocess, 'Popen', lambda *args, **kw: pytest.fail('Must not spawn'))
     cull.cull_once()
+
+
+@pytest.mark.skipif(not ROM.exists() or not STATE.exists(), reason='Local ROM and checkpoint required')
+def test_rendering_and_publication_do_not_change_ram():
+    spec = importlib.util.spec_from_file_location('rl_env_render_test', ROOT / 'tools/rl_env.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class Publisher:
+        def publish(self, advance=True):
+            assert advance is False
+
+        def close(self):
+            pass
+
+    environments = [module.SegmentEnv(ROM, STATE, lambda emu: False, max_steps=40)
+                    for _ in range(3)]
+    try:
+        environments[1].frame_pub = Publisher()
+        environments[1].render_interval = 0
+        environments[2].frame_pub = Publisher()
+        environments[2].publish_frames = True
+        for env in environments:
+            env.reset()
+        for action in [4, 4, 0, 1, 2, 3, 5, 4] * 3:
+            for env in environments:
+                env.step(action)
+                env.publish()
+            snapshots = [env.emu.read_range(0xC000, 0x2000) for env in environments]
+            assert snapshots[0] == snapshots[1] == snapshots[2]
+    finally:
+        for env in environments:
+            env.close()
+
+
+@pytest.mark.skipif(not ROM.exists() or not (ROOT / 'baselines/battle.state').exists(),
+                    reason='Local battle checkpoint required')
+def test_default_hold_and_release_can_finish_battle():
+    spec = importlib.util.spec_from_file_location('rl_env_release_test', ROOT / 'tools/rl_env.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    env = module.SegmentEnv(ROM, ROOT / 'baselines/battle.state', lambda emu: False,
+                            goal_name='battle', hold=8, settle=8, max_steps=200)
+    env._goal_saved = True
+    try:
+        env.reset()
+        for _ in range(200):
+            _, _, done, _ = env.step(4)
+            if done:
+                break
+        assert env.goal_reached
+    finally:
+        env.close()
+
+
+@pytest.mark.skipif(not ROM.exists() or not STATE.exists(), reason='Local ROM and checkpoint required')
+def test_periodic_evaluation_does_not_change_training(tmp_path):
+    def run(directory, interval):
+        directory.mkdir()
+        model = directory / 'model.json'
+        command = [sys.executable, str(ROOT / 'tools/rl_train.py'), '--rom', str(ROM),
+                   '--state', str(STATE), '--segment', 'left_house', '--episodes', '2',
+                   '--max-steps', '2', '--evals', '0', '--seed', '17', '--save-q', str(model),
+                   '--eval-every', str(interval), '--periodic-evals', '1']
+        result = subprocess.run(command, cwd=directory, capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(model.read_text())
+
+    without = run(tmp_path / 'without', 0)
+    with_evaluation = run(tmp_path / 'with', 1)
+    assert without == with_evaluation
+    records = list((tmp_path / 'with/runs/evaluations').glob('*/*.json'))
+    assert len(records) == 2
+    assert all(json.loads(path.read_text())['epsilon'] == 0 for path in records)
