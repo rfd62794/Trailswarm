@@ -16,6 +16,7 @@ from pathlib import Path
 
 from pokeagent.emulator import Button, Emulator
 from pokeagent.ram import read_state
+from pokeagent.screencontext import classify_screen
 from pokeagent.screentext import CHARMAP
 
 TILEMAP_ADDR, TILEMAP_LEN, BORDER_TL = 0xC3A0, 360, 0x79
@@ -73,6 +74,11 @@ class MapMemory:
             return "pressed"
         key = f"{x0},{y0},{button}"
         blocked = self.m(m0)["blocked"]
+        if (m1, x1, y1) != (m0, x0, y0):
+            paths = self.m(m0).setdefault("paths", {})
+            edge = paths.setdefault(key, {"to": [m1, x1, y1], "count": 0})
+            edge["to"] = [m1, x1, y1]
+            edge["count"] += 1
         if m1 != m0:
             w = self.m(m0)["warps"]
             taken = self.m(m0).setdefault("warp_taken", {})
@@ -90,16 +96,50 @@ class MapMemory:
             return "moved - cleared a false wall"
         return "moved"
 
-    def interact(self, map_id: int, x: int, y: int, facing: str, text: str) -> dict:
+    def interact(self, map_id: int, x: int, y: int, facing: str, text: str, *,
+                 screen: str | None = None, menu: str | None = None,
+                 outcome: str | None = None, transition: list | None = None,
+                 npc: dict | None = None) -> dict:
         d = self.m(map_id).setdefault("interactions", {})
         e = d.setdefault(
             f"{x},{y},{facing}",
-            {"count": 0, "text": "", "presses": [], "menus": [], "choices": []},
+            {"count": 0, "text": "", "presses": [], "menus": [], "choices": [],
+             "outcomes": {}, "screens": {}, "transitions": []},
         )
         e["count"] += 1
         if text and not e["text"]:
             e["text"] = text[:160]
+        if outcome:
+            e.setdefault("outcomes", {})[outcome] = e.setdefault("outcomes", {}).get(outcome, 0) + 1
+        if screen:
+            e.setdefault("screens", {})[screen] = e.setdefault("screens", {}).get(screen, 0) + 1
+        if menu and menu != "UNKNOWN" and menu not in e.setdefault("menus", []):
+            e["menus"].append(menu)
+        if transition and transition not in e.setdefault("transitions", []):
+            e["transitions"].append(transition)
+        if npc:
+            e["npc"] = {"pic": npc.get("pic"), "slot": npc.get("slot"), "last": npc.get("last")}
         return e
+
+    def observe_npcs(self, map_id: int, emu: Emulator, step: int) -> None:
+        npcs = self.m(map_id).setdefault("npcs", {})
+        for slot in range(1, 16):
+            pic = emu.read(0xC100 + 16 * slot)
+            if not pic:
+                continue
+            x, y = emu.read(0xC205 + 16 * slot) - 4, emu.read(0xC204 + 16 * slot) - 4
+            key = f"slot{slot}:pic{pic}"
+            e = npcs.setdefault(key, {"pic": pic, "slot": slot, "positions": {},
+                                      "first_seen": step, "text": "", "talked": 0})
+            e["positions"][f"{x},{y}"] = e["positions"].get(f"{x},{y}", 0) + 1
+            e["moves"] = len(e["positions"]) > 1
+            e["last"] = [x, y]
+
+    def npc_at(self, map_id: int, x: int, y: int) -> dict | None:
+        for entry in self.m(map_id).get("npcs", {}).values():
+            if entry.get("last") == [x, y]:
+                return entry
+        return None
 
     def interaction_known(self, map_id: int, x: int, y: int, facing: str) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
@@ -202,6 +242,7 @@ class Explorer:
 
     def _press(self, emu: Emulator, name: str, before: tuple, box_before: bool, why: str) -> dict:
         self.step_count += 1
+        self.mem.observe_npcs(before[0], emu, self.step_count)
         emu.press(Button[name])
         after = self._settle(emu, before)
         tm2 = emu.read_range(TILEMAP_ADDR, TILEMAP_LEN)
@@ -217,7 +258,15 @@ class Explorer:
             self.last_fail = (before, name) if (name in DIRS and after == before) else None
             if name == "A":
                 text = " | ".join(frame_lines(tm2)) if box_after else ""
-                self.mem.interact(before[0], before[1], before[2], self.facing, text)
+                context = classify_screen(tm2, emu.read(BATTLE_FLAG))
+                transition = list(after) if after[0] != before[0] else None
+                dx, dy = DIRS[self.facing]
+                npc = self.mem.npc_at(before[0], before[1] + dx, before[2] + dy)
+                outcome = ("map_transition" if transition else "battle" if emu.read(BATTLE_FLAG)
+                           else "menu" if is_menu(tm2) else "dialog" if box_after else "none")
+                self.mem.interact(before[0], before[1], before[2], self.facing, text,
+                                  screen=context.screen.name, menu=context.menu.name,
+                                  outcome=outcome, transition=transition, npc=npc)
                 result = (
                     f'INTERACTION at ({before[1]},{before[2]}) facing {self.facing}: "{text[:60]}"'
                     if box_after
