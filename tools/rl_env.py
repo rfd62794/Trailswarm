@@ -148,6 +148,26 @@ def goal_menu_start(emu):
     return context.screen == ScreenType.MENU and context.menu == MenuKind.START
 
 
+def goal_menu_kind(menu):
+    from pokeagent.screencontext import MenuKind, classify_screen
+    def f(emu):
+        context = classify_screen(emu.read_range(0xC3A0, 360), emu.read(0xD057))
+        return context.menu == getattr(MenuKind, menu)
+    return f
+
+
+def make_menu_exit_goal():
+    from pokeagent.screencontext import MenuKind, ScreenType, classify_screen
+    state = {'seen': False}
+    def f(emu):
+        context = classify_screen(emu.read_range(0xC3A0, 360), emu.read(0xD057))
+        if context.screen == ScreenType.MENU and context.menu == MenuKind.START:
+            state['seen'] = True
+        return state['seen'] and context.screen == ScreenType.UNKNOWN
+    f.reset = state.clear
+    return f
+
+
 def goal_map(map_id: int):
     """Reach a campaign map: the RL ladder beyond the house is pure map_id goals."""
     def f(emu) -> bool:
@@ -169,7 +189,10 @@ def goal_boulder(emu) -> bool:
     return bool(emu.read(0xD356) & 1)
 
 
-GOAL_FNS = {"menu_start": goal_menu_start, "left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
+GOAL_FNS = {"menu_start": goal_menu_start, "menu_items": goal_menu_kind('ITEMS'),
+            "menu_party": goal_menu_kind('PARTY'), "menu_options": goal_menu_kind('OPTIONS'),
+            "menu_exit": make_menu_exit_goal(),
+            "left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
             "buy_balls": goal_balls, "catch_pokemon": goal_team2, "campaign": goal_boulder, "beat_brock": goal_boulder,
             "reach_pc": goal_reach_pc, "exit_potion": goal_potion_run,
             "to_viridian": goal_map(0x01), "to_route2": goal_map(0x0D),
@@ -187,7 +210,9 @@ def make_goal(segment):
 EXTRA_OBS = {"battle": battle_obs_extra, "grind": battle_obs_extra}
 # checkpoints per segment, tried in order: a downstream stage starts from the previous
 # stage's saved milestone (auto-written by the first agent to reach it)
-SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "left_house": ["baselines/bedroom.state"],
+SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["baselines/bedroom.state"],
+                  "menu_party": ["baselines/bedroom.state"], "menu_options": ["baselines/bedroom.state"],
+                  "menu_exit": ["baselines/bedroom.state"], "left_house": ["baselines/bedroom.state"],
                   "reach_pc": ["baselines/bedroom.state"],
                   "potion": ["runs/checkpoints/rl_reach_pc.state", "baselines/bedroom.state"],
                   "exit_potion": ["runs/checkpoints/rl_potion.state", "baselines/bedroom.state"],
@@ -225,7 +250,9 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "left_house": ["bas
                                      "runs/checkpoints/to_viridian.state"],
                   "campaign": ["baselines/bedroom.state"]}
 # shaped sub-goals per segment: first-time detectors each worth a small bonus
-SEGMENT_SUBGOALS = {"potion": [sub_box_open],
+SEGMENT_SUBGOALS = {"menu_items": [goal_menu_start], "menu_party": [goal_menu_start],
+                    "menu_options": [goal_menu_start], "menu_exit": [goal_menu_start],
+                    "potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion],
                     "to_route2": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
                     "buy_balls": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],

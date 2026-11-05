@@ -98,7 +98,7 @@ def main() -> int:
 
     if a.battle_learning:
         a.screen_context = a.combat_context = True
-    if a.menu_controls or a.segment == 'menu_start':
+    if a.menu_controls or a.segment.startswith('menu_'):
         a.screen_context = a.menu_controls = True
     if (a.n_step < 1 or a.max_steps < 1 or a.episodes < 1 or a.evals < 0
             or a.publish_fps <= 0 or a.novelty < 0 or a.hold < 1 or a.settle < 1
