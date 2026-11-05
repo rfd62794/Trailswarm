@@ -27,7 +27,7 @@ class MapMemory(NavMixin):
     def __init__(self, path: Path | str, *, record_paths: bool = True):
         self.path = Path(path)
         self.record_paths = record_paths
-        self.data = json.loads(path.read_text()) if path.exists() else {"maps": {}}
+        self.data = json.loads(self.path.read_text()) if self.path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
         self.purge_bad_warps()
 

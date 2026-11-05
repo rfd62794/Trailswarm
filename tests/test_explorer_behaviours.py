@@ -270,3 +270,10 @@ def test_explorer_package_layering_and_size():
                 assert top[0] not in ("tools", "explore_demo", "explore_plan"), f"{f.name} imports {mod}"
                 if top[0] == "pokeagent":
                     assert len(top) > 1 and top[1] in allowed, f"{f.name} imports {mod}"
+
+
+def test_map_memory_accepts_str_path(tmp_path):
+    from pokeagent.explorer import MapMemory
+    p = tmp_path / "maps.json"
+    p.write_text('{"maps": {}}')
+    assert MapMemory(str(p)).data == {"maps": {}}
