@@ -30,6 +30,7 @@ PORTS = [8890, 8891, 8892, 8893, 8894, 8895]
 FRONTIER_SEATS = 4  # majority push forward; the rest refine the previous stage
 POLL_S = 60
 STATUS = Path('runs/ladder.json')
+SKILLS = Path('runs/skills')
 
 
 def _eval_scores() -> dict:
@@ -87,11 +88,13 @@ def seat_plan() -> list[dict]:
         # frontier starts from the prior stage's best banked checkpoint; seed at the base
         prior = best_checkpoint(LADDER[idx - 1][0]) if idx > 0 else None
         start = prior or LADDER[idx][1]
-        plan.append({'port': port, 'segment': seg, 'state': start})
+        # stack: the previous stage's skill becomes an invocable option for this seat
+        skill = LADDER[idx - 1][0] if idx > 0 and (SKILLS / f'{LADDER[idx-1][0]}.json').exists() else None
+        plan.append({'port': port, 'segment': seg, 'state': start, 'skill': skill})
     return plan
 
 
-def launch(port: int, segment: str, state: str) -> None:
+def launch(port: int, segment: str, state: str, skill: str | None = None) -> None:
     steps = '300' if segment.startswith('menu_') else '5000'
     args = [sys.executable, 'tools/rl_train.py', '--segment', segment, '--state', state,
             '--episodes', '500', '--evals', '12', '--max-steps', steps,
@@ -104,6 +107,8 @@ def launch(port: int, segment: str, state: str) -> None:
     q = Path(f'runs/ladder/q_{port}.{segment}.json')
     if q.exists():
         args += ['--load-q', str(q)]  # ported + accumulated knowledge survives every reseat
+    if skill:
+        args += ['--option', skill]  # previous stage's learned skill, invocable as one action
     if segment != 'menu_tour':  # travel stages: no START/SELECT — save path stays sealed
         args += ['--battle-learning', '--screen-context', '--spatial-context',
                  '--combat-context']
@@ -124,7 +129,7 @@ def main() -> int:
         if not once:
             for seat in plan:
                 if current.get(seat['port']) != seat['segment']:
-                    launch(seat['port'], seat['segment'], seat['state'])
+                    launch(seat['port'], seat['segment'], seat['state'], seat.get('skill'))
                     current[seat['port']] = seat['segment']
                     time.sleep(1)
         promote_skills()

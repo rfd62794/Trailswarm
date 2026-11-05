@@ -52,7 +52,11 @@ class Option:
         total, steps, done, info = 0.0, 0, False, {}
         while steps < self.max_steps and not done:
             obs = env._obs()
-            nxt, rew, done, info = env.step(self.act(obs))
+            idx = self.act(obs)
+            if idx >= len(getattr(env, 'actions', ())):
+                info['option_failed'] = 'action_out_of_range'  # skill trained with more buttons than this env
+                break
+            nxt, rew, done, info = env.step(idx)
             total += rew
             steps += 1
             if self.goal_fn(env.emu):
