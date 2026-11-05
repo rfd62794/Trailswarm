@@ -76,6 +76,12 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         if not agent.status or n % 4 == 0:  # status changes slowly; ~4Hz is plenty
             raw = fetch(agent.port, "/status")
             st = json.loads(raw) if raw else None
+            if st is None:  # RL learners have no HTTP API; they write runs/rlstatus_<port>.json instead
+                try:
+                    st = json.loads(open(f"runs/rlstatus_{agent.port}.json").read())
+                    st["_rl"] = True
+                except Exception:
+                    st = None
             if st is not None:
                 agent.status = st
                 got_any = True
@@ -88,6 +94,10 @@ def status_line(a: Agent) -> str:
     if not a.ok:
         return f":{a.port}  offline"
     s = a.status
+    if s.get("_rl"):  # RL learner status (runs/rlstatus_<port>.json)
+        return (f":{a.port}  gen {s.get('generation', '?')}  wins {s.get('wins', 0)}"
+                f"  steps {s.get('steps_total', '?')}  avg {s.get('steps_avg', '?')}"
+                f"  best {s.get('steps_best', '?')}  worst {s.get('steps_worst', '?')}")
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",

@@ -10,6 +10,7 @@ A run that lands the goal inside --max-steps counts as a success.
 from __future__ import annotations
 
 import argparse
+import json
 import random
 from collections import defaultdict
 
@@ -55,6 +56,8 @@ def main() -> int:
     try:
         wins = first_ep = None
         wins = 0
+        steps_log: list[int] = []
+        total_steps = 0
         for ep in range(a.episodes):
             eps = eps0 * (1.0 - ep / max(1, a.episodes))  # linear decay to ~0
             obs = env.reset()
@@ -68,11 +71,19 @@ def main() -> int:
                 obs = nxt
                 if done:
                     break
+            steps_log.append(env.steps)
+            total_steps += env.steps
             if env.goal_fn(env.emu):  # episode ended by reaching the goal, not the step cap
                 wins += 1
                 if first_ep is None:
                     first_ep = ep
                 print(f"  ep {ep}: SOLVED in {env.steps} steps" + (" (first success!)" if ep == first_ep else ""), flush=True)
+            if a.frame_port is not None:
+                best = min(steps_log); worst = max(steps_log)
+                json.dump({"instance": a.frame_port, "generation": ep, "wins": wins,
+                           "steps_total": total_steps, "steps_avg": round(total_steps / len(steps_log), 1),
+                           "steps_best": best, "steps_worst": worst},
+                          open(f"runs/rlstatus_{a.frame_port}.json", "w"))
             if (ep + 1) % 25 == 0:
                 print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
         learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng, a.publish_every)
