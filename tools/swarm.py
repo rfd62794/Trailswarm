@@ -160,6 +160,8 @@ def main() -> int:
                     help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
     ap.add_argument("--roles", action="store_true",
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
+    ap.add_argument("--starter", choices=["bulbasaur", "charmander", "squirtle"], default=None,
+                    help="fix the starter for every agent (default: rotate bulbasaur/charmander/squirtle)")
     a = ap.parse_args()
     GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
     seg_args: list[str] = []
@@ -179,7 +181,7 @@ def main() -> int:
             own = swarm_dir / f"agent{i}.json"
             if shared.exists():
                 shutil.copy(shared, own)
-            starter = ["bulbasaur", "charmander", "squirtle"][i % 3]
+            starter = a.starter or ["bulbasaur", "charmander", "squirtle"][i % 3]
             role_args: list[str] = []
             role = ""
             if a.roles:
