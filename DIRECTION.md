@@ -6,7 +6,8 @@ PokeAgent = reference agent + exploration lane.
 
 Phase 1 done = all of:
 
-1. One unbroken run from `baselines/bedroom.state` to the Boulder Badge, <=10 Claude consults, logged.
+1. One unbroken run from `baselines/bedroom.state` to the Boulder Badge — rule-based
+   agent, zero consults — logged.
 2. >=50% of 24 consecutive `beat_brock` segment runs succeed.
 3. README + short writeup.
 
