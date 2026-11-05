@@ -17,6 +17,8 @@ def test_write_state_records_sidecar_and_legacy_states_are_unlabeled(tmp_path):
     assert saved.game['x'] == 18
     assert saved.segment == 'to_route2'
     assert saved.verified
+    assert len(saved.tiles['window_keys']) == 9
+    assert 'window_classes' in saved.tiles
     assert json.loads(sidecar(state).read_text())['source'] == 'deliver_parcel_closed.state'
 
     legacy = tmp_path / 'legacy.state'

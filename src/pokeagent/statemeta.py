@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from pokeagent.observations import SpatialObserver, local_tile_window
 from pokeagent.qmodels import atomic_json
 from pokeagent.ram import read_state
 
@@ -33,6 +34,7 @@ class StateMeta:
     command: list[str] | None = None
     git_sha: str | None = None
     verified: bool = True
+    tiles: dict[str, Any] | None = None
 
 
 def _git_sha() -> str | None:
@@ -66,6 +68,30 @@ def game_snapshot(emu) -> dict[str, Any]:
     }
 
 
+def tile_snapshot(emu, maps_path: str | Path = 'runs/maps.json') -> dict[str, Any]:
+    state = read_state(emu)
+    tilemap = emu.read_range(0xC3A0, 360)
+    box_open = tilemap.find(bytes([0x79, 0x7A])) >= 0
+    obscured = bool(emu.read(0xD057) or box_open)
+    snapshot = {
+        "map_id": state.map_id,
+        "x": state.x,
+        "y": state.y,
+        "tileset": emu.read(0xD367),
+        "obscured": obscured,
+        "window_keys": list(local_tile_window(tilemap)),
+    }
+    try:
+        observer = SpatialObserver(maps_path)
+        values = observer.observe(tilemap, state.map_id, state.x, state.y,
+                                  snapshot["tileset"], obscured=obscured)
+        snapshot.update(window_classes=list(values[:9]), blocked_mask=values[9],
+                        maps_digest=observer.digest)
+    except (OSError, ValueError, TypeError, KeyError):
+        snapshot.update(window_classes=None, blocked_mask=None)
+    return snapshot
+
+
 def write_state(emu, path: str | Path, *, source: str | Path | None = None,
                 segment: str | None = None, note: str = "", verified: bool = True,
                 command: list[str] | None = None) -> StateMeta:
@@ -83,6 +109,7 @@ def write_state(emu, path: str | Path, *, source: str | Path | None = None,
         command=command if command is not None else [os.path.basename(sys.executable), *sys.argv[1:]],
         git_sha=_git_sha(),
         verified=verified,
+        tiles=tile_snapshot(emu),
     )
     atomic_json(sidecar(path), asdict(meta))
     return meta
@@ -119,4 +146,5 @@ def describe(path: str | Path) -> dict[str, Any]:
         "command": None,
         "git_sha": None,
         "verified": False,
+        "tiles": None,
     }
