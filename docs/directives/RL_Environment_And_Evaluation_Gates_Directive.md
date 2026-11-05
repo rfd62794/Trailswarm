@@ -46,7 +46,7 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb |
 | Base branch | repoman/rl-success-and-context |
@@ -57,4 +57,5 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 - 2026-11-04 23:15 · devin-overseer (delegated) · Queued → Approved — lint override: Lint checked main instead of the requested feature base. Verified with git ls-tree that observations.py, qmodels.py, both named tests and the directive are committed on repoman/rl-success-and-context. baselines/battle.state is deliberately an optional local-only asset; the directive explicitly requires skipping ROM checks when absent and forbids searching outside the worktree.; under delegate.band-normal, delegate.self-drafted, delegate.rate-limit
 - 2026-11-04 23:16 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6MYQVMVRMTQF06NFDNG7XY8
 - 2026-11-04 23:21 · dispatcher · launched pid=26944; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; provisioned: uv sync --frozen
+- 2026-11-04 23:21 · dispatcher · In progress → Blocked — dispatch died at spawn: Error: Not logged in. Run `devin.EXE auth login` to authenticate.
 <!-- queue:end -->
