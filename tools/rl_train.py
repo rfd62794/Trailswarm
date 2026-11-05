@@ -90,6 +90,8 @@ def main() -> int:
     ap.add_argument("--menu-controls", action="store_true")
     ap.add_argument("--spatial-context", action="store_true")
     ap.add_argument("--combat-context", action="store_true")
+    ap.add_argument("--option", action="append", default=None,
+                    help="meta-action: name=qpath[:steps]; invoke learned skill as one action")
     ap.add_argument("--battle-learning", action="store_true")
     ap.add_argument("--travel-priority", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
@@ -150,6 +152,14 @@ def main() -> int:
                      publish_frames=a.publish_frames, half_res=not a.full_res,
                      obs_extra=EXTRA_OBS.get(a.segment), screen_context=a.screen_context)
     env.actions = actions
+    from pokeagent.options import Option
+    opts = []
+    for spec in (a.option or []):
+        name, _, rest = spec.partition('=')
+        path, _, steps = rest.partition(':')
+        opts.append(Option(name, path, GOAL_FNS[name](), int(steps or 100)))
+    env.options = tuple(opts)
+    n_total = len(actions) + len(opts)  # buttons + meta-actions size the Q row
     env.render_interval = 1.0 / a.publish_fps
     env.battle_learning = a.battle_learning
     env.travel_priority = a.travel_priority
@@ -170,15 +180,15 @@ def main() -> int:
             env.close()
             ap.error('Potential shaping requires a supported navigation goal')
         phi = potential(distance_field(load_grids(a.maps), goals), default=0.0)
-    Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * len(actions))
+    Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * n_total)
     if a.load_q:  # offspring: start from a champion's table
         try:
-            for k, v in load_model(a.load_q, schema, len(actions)).items():
+            for k, v in load_model(a.load_q, schema, n_total).items():
                 Q[k] = v  # keys are (map,x,y) tuples serialized as repr strings
         except (ValueError, OSError, TypeError) as e:
             env.close()
             ap.error(str(e))
-    QB = defaultdict(lambda: [0.0] * len(actions)) if a.double_q else None
+    QB = defaultdict(lambda: [0.0] * n_total) if a.double_q else None
     if QB is not None:  # warm-start both estimators from the same inherited table
         for k, v in Q.items():
             QB[k] = list(v)
@@ -186,7 +196,7 @@ def main() -> int:
     def snapshot() -> dict:  # the shared/saved artifact: single table (mean of the two estimators under --double-q)
         if QB is None:
             return {repr(k): v for k, v in Q.items()}
-        return {repr(k): [(Q[k][i] + QB[k][i]) / 2 for i in range(len(actions))]
+        return {repr(k): [(Q[k][i] + QB[k][i]) / 2 for i in range(n_total)]
                 for k in set(Q) | set(QB)}
     def evaluation_env(state):
         evaluation = SegmentEnv(a.rom, state, make_goal(a.segment), goal_name=a.segment,
@@ -227,7 +237,7 @@ def main() -> int:
             atomic_json(f'runs/rlstatus_{a.frame_port}.json',
                         {'instance': a.frame_port, 'pid': os.getpid(), 'tag': a.tag,
                          'generation': episode, 'episode': episode + 1, 'wins': wins,
-                         'schema': schema, 'git_sha': run_git_sha, 'actions': len(actions), 'phase': phase,
+                         'schema': schema, 'git_sha': run_git_sha, 'actions': n_total, 'phase': phase,
                          'epsilon': epsilon, 'evaluation': latest_eval, 'updated_at': time.time(),
                          'outcomes': env.battle_outcomes, 'rewards': reward_components,
                          'current_steps': env.steps,
@@ -337,7 +347,7 @@ def main() -> int:
                 except Exception:
                     pass
             if a.save_q:
-                save_model(a.save_q, snapshot(), schema, len(actions))
+                save_model(a.save_q, snapshot(), schema, n_total)
             if interact_delta and (ep + 1) % max(1, a.share_every) == 0:
                 try:  # shared dead-end ledger: one worker's NES is every worker's NES
                     disk = json.loads(interact_path.read_text()) if interact_path.exists() else {}
@@ -354,11 +364,11 @@ def main() -> int:
                     sdir.mkdir(parents=True, exist_ok=True)
                     lid = str(a.frame_port if a.frame_port is not None else a.seed)
                     mine = sdir / f'{a.segment}_{lid}.json'
-                    save_model(mine, snapshot(), schema, len(actions))
+                    save_model(mine, snapshot(), schema, n_total)
                     tables = []
                     for f in sdir.glob(f'{a.segment}_*.json'):
                         try:
-                            tables.append(load_model(f, schema, len(actions)))
+                            tables.append(load_model(f, schema, n_total))
                         except (ValueError, OSError, TypeError):
                             continue
                     for k, v in mean_tables(tables).items():

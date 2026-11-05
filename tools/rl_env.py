@@ -381,8 +381,9 @@ class SegmentEnv:
                 if save_row or ctx.option == 3:  # text decode + option-index backup: A on SAVE can never be chosen
                     allowed = [i for i in allowed if self.actions[i] != Button.A]
                 return allowed or list(range(n))
+        opts = list(range(n, n + len(getattr(self, 'options', ()))))
         if not getattr(self, 'battle_learning', False) or self.emu.read(0xD057) != 1:
-            return list(range(n))
+            return list(range(n)) + opts
         if retreat_allowed(_u16(self.emu, 0xD015), _u16(self.emu, 0xD023), self.travel_priority):
             return list(range(len(self.actions)))
         tm = self.emu.read_range(0xC3A0, 360)
@@ -462,6 +463,15 @@ class SegmentEnv:
         return self._obs()
 
     def step(self, action: int):
+        if action >= len(getattr(self, 'actions', ACTIONS)):  # meta-action: run a learned sub-policy
+            opt = getattr(self, 'options', ())[action - len(getattr(self, 'actions', ACTIONS))]
+            total, steps, done, info = opt.run(self)
+            self.steps += steps
+            won = bool(info.pop('option_solved', False))
+            trunc = not done and self.steps >= self.max_steps
+            return self._obs(), total, done or trunc, {
+                'goal_reached': won, 'terminated': done, 'outcome': info.get('outcome', 'option'),
+                'truncated': trunc, 'battle': info.get('battle', {}), 'option': info}
         if action < 4:
             self.facing = action  # facing = last direction pressed, same accounting as the explorer
         self.emu.press(getattr(self, 'actions', ACTIONS)[action], hold_frames=self.hold, settle_frames=0)
