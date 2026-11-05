@@ -113,12 +113,21 @@ class AgentSnapshot:
             if f.name in _NESTED:
                 val = _build(_NESTED[f.name], val)
             elif f.name in _LISTS:
-                val = [_build(_LISTS[f.name], x) for x in (val or [])]
+                val = _build_list(_LISTS[f.name], val)
+            elif f.name == "drivers" and not isinstance(val, dict):
+                continue
             kw[f.name] = val
         snap = cls(**kw)
         snap.recent = snap.recent[-MAX_RECENT:]
-        snap.drivers = {**{d: 0 for d in DRIVERS}, **(snap.drivers or {})}
+        snap.drivers = {**{d: 0 for d in DRIVERS}, **snap.drivers}
         return snap
+
+
+def _build_list(klass, data):
+    """Dataclass list from a list of dicts; a non-list gives [] and non-dict items are skipped."""
+    if not isinstance(data, list):
+        return []
+    return [_build(klass, x) for x in data if isinstance(x, dict)]
 
 
 def _build(klass, data):
@@ -127,7 +136,7 @@ def _build(klass, data):
         return klass()
     kw = {f.name: data[f.name] for f in fields(klass) if f.name in data}
     if klass is Screen and "party" in kw:
-        kw["party"] = [_build(PartyMon, p) for p in (kw["party"] or [])]
+        kw["party"] = _build_list(PartyMon, kw["party"])
     return klass(**kw)
 
 

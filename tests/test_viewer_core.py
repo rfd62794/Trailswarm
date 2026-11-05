@@ -96,3 +96,20 @@ def test_commands():
     assert targets("a", ["a", "b"], "selected") == ["a"] and targets(None, ["a"], "selected") == []
     assert targets("a", ["a", "b"], "all") == ["a", "b"]
     assert [next_speed(x) for x in (1, 2, 4, 8, 3)] == [2, 4, 8, 1, 1]
+
+
+def test_model_forget_and_prune():
+    t = [0.0]
+    m = ViewerModel(clock=lambda: t[0])
+    m.poll([FakeSource("a", [AgentSnapshot(agent_id="a")], [(b"x", 1, 1)]),
+            FakeSource("b", [AgentSnapshot(agent_id="b")])])
+    t[0] = 50.0
+    m.poll([FakeSource("b", [AgentSnapshot(agent_id="b")])])
+    t[0] = 61.0
+    assert m.prune() == ["a"] and m.ids() == ["b"]
+    assert m.snapshot("a") is None and m.frame("a") is None
+    t[0] = 200.0
+    assert m.prune(after_s=500) == []
+    m.forget("b")
+    m.forget("b")
+    assert m.ids() == []

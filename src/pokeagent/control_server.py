@@ -25,6 +25,7 @@ from pokeagent.snapshot import AgentSnapshot
 BUTTONS = ("A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT")
 SPEEDS = (1, 2, 4, 8)
 TOKEN_HEADER = "X-PokeAgent-Token"
+MAX_BODY = 65536
 NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 PAUSE, RESUME, SPEED, PRESS, STEER = "pause", "resume", "speed", "press", "steer"
@@ -77,6 +78,8 @@ class ControlServer:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
+            timeout = 2  # a slow client cannot hold a thread
+
             def log_message(self, *a) -> None:  # silence request logging
                 pass
 
@@ -85,6 +88,9 @@ class ControlServer:
                 self.send_response(code)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(raw)))
+                if code >= 400:
+                    self.send_header("Connection", "close")
+                    self.close_connection = True
                 self.end_headers()
                 self.wfile.write(raw)
 
@@ -109,6 +115,16 @@ class ControlServer:
                     self._send(500, {"ok": False, "error": str(exc)})
 
             def do_POST(self) -> None:
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    if not 0 <= length <= MAX_BODY:
+                        raise ValueError
+                except ValueError:
+                    return self._send(400, {"ok": False, "error": "bad content-length"})
+                try:
+                    raw = self.rfile.read(length) if length else b""  # always drain before replying
+                except OSError:
+                    return self._send(400, {"ok": False, "error": "bad body"})
                 if not self._guard():
                     return
                 ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -117,8 +133,7 @@ class ControlServer:
                 if self.path.split("?")[0] != "/command":
                     return self._send(404, {"ok": False, "error": "not found"})
                 try:
-                    length = int(self.headers.get("Content-Length") or 0)
-                    body = json.loads(self.rfile.read(length) or b"")
+                    body = json.loads(raw or b"")
                     if not isinstance(body, dict):
                         raise ValueError("body must be an object")
                 except ValueError:

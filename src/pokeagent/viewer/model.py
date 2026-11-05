@@ -50,3 +50,17 @@ class ViewerModel:
         with self._lock:
             age = now - self._last_ok.get(agent_id, float("-inf"))
         return "live" if age < LIVE_S else "stale" if age <= LOST_S else "lost"
+
+    def forget(self, agent_id: str) -> None:
+        with self._lock:
+            for d in (self._snap, self._frame, self._last_ok):
+                d.pop(agent_id, None)
+
+    def prune(self, now: float | None = None, after_s: float = 60.0) -> list[str]:
+        """Drop agents lost for longer than ``after_s``; returns the dropped ids."""
+        now = self._clock() if now is None else now
+        with self._lock:
+            gone = [i for i, t in self._last_ok.items() if now - t > after_s]
+        for i in gone:
+            self.forget(i)
+        return gone

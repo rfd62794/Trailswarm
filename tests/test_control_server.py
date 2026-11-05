@@ -127,3 +127,26 @@ def test_state_name_validated(server, name):
     for cmd in ("save_state", "load_state"):
         assert post(port, {"cmd": cmd, "name": name})[0] == 400
     assert calls == []
+
+
+def raw_post(port, head_extra, body=b""):
+    import socket
+    req = (f"POST /command HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-PokeAgent-Token: {TOKEN}\r\n"
+           f"Content-Type: application/json\r\n{head_extra}\r\n").encode() + body
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as c:
+        c.sendall(req)
+        return int(c.recv(200).split()[1])
+
+
+@pytest.mark.parametrize("cl", ["abc", "-1", "65537"])
+def test_bad_content_length(server, cl):
+    port, calls = server
+    assert raw_post(port, f"Content-Length: {cl}\r\n") == 400
+    assert calls == []
+
+
+def test_error_replies_with_body_are_stable(server):
+    port, _ = server
+    for _ in range(30):
+        assert post(port, {"cmd": "pause"}, headers={"Content-Type": "text/plain"})[0] == 415
+        assert post(port, {"cmd": "pause"}, token="bad")[0] == 403
