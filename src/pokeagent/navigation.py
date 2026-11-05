@@ -74,7 +74,17 @@ def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
 
     if found:
         return _path(found)
-    if nearest and prev:  # goal beyond known space: ride to the frontier of knowledge
-        best = min(prev, key=lambda n: (n[0] != tmap, abs(n[1] - tx) + abs(n[2] - ty)))
+    if nearest and prev:  # goal beyond known space: ride toward it at the MAP level first
+        dist = {tmap: 0}
+        mq = deque([tmap])
+        while mq:  # warp-graph distance from each map to the target map
+            cur = mq.popleft()
+            for mid, md in maps.items():
+                for dest in (md.get('warps') or {}).values():
+                    if dest[0] == cur and int(mid) not in dist:
+                        dist[int(mid)] = dist[cur] + 1
+                        mq.append(int(mid))
+        best = min(prev, key=lambda n: (dist.get(n[0], 999),
+                                        abs(n[1] - tx) + abs(n[2] - ty) if n[0] == tmap else 0))
         return _path(best) if best != start else None
     return None
