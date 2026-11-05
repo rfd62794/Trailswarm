@@ -253,7 +253,7 @@ EXTRA_OBS = {"battle": battle_obs_extra, "grind": battle_obs_extra}
 SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["baselines/bedroom.state"],
                   "menu_party": ["baselines/bedroom.state"], "menu_options": ["baselines/bedroom.state"],
                   "menu_exit": ["baselines/bedroom.state"], "options_setup": ["baselines/bedroom.state"],
-                  "menu_tour": ["baselines/bedroom.state"],
+                  "menu_tour": ["runs/checkpoints/deliver_parcel_closed.state"],
                   "left_house": ["baselines/bedroom.state"],
                   "reach_pc": ["baselines/bedroom.state"],
                   "potion": ["runs/checkpoints/rl_reach_pc.state", "baselines/bedroom.state"],
@@ -502,6 +502,10 @@ class SegmentEnv:
                     write_state(self.emu, Path(f"runs/checkpoints/rl_{self.goal_name}.state"),
                                 source=self.state, segment=self.goal_name,
                                 note='RL milestone checkpoint')
+                    import os
+                    write_state(self.emu, Path(f"runs/checkpoints/rl_{self.goal_name}_{os.getpid()}.state"),
+                                source=self.state, segment=self.goal_name,
+                                note='RL milestone candidate (per-seat, best-of picks)')
                     self._goal_saved = True
                 except Exception:
                     pass

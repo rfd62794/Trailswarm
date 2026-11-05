@@ -20,7 +20,7 @@ from pathlib import Path
 
 # Ordered curriculum: (segment, seed checkpoint). rl_<seg>.state gates the next stage.
 LADDER = [
-    ('menu_tour', 'baselines/bedroom.state'),
+    ('menu_tour', 'runs/checkpoints/deliver_parcel_closed.state'),
     ('to_route1', 'baselines/bedroom.state'),
     ('to_viridian', 'runs/checkpoints/rl_to_route1.state'),
     ('to_route2', 'runs/checkpoints/rl_to_viridian.state'),
@@ -33,10 +33,38 @@ POLL_S = 60
 STATUS = Path('runs/ladder.json')
 
 
+def _eval_scores() -> dict:
+    """port -> latest greedy win_rate from seat status."""
+    scores = {}
+    for f in Path('runs').glob('rlstatus_*.json'):
+        try:
+            s = json.loads(f.read_text())
+            ev = s.get('evaluation') or {}
+            scores[f.stem.split('_')[1]] = ev.get('win_rate', 0.0) or 0.0
+        except Exception:
+            continue
+    return scores
+
+
+def best_checkpoint(seg: str) -> str | None:
+    """Best-scoring candidate rl_<seg>_<pid>.state, else the canonical rl_<seg>.state."""
+    scores = _eval_scores()
+    reg = json.loads(Path('runs/rl_agents.json').read_text()) if Path('runs/rl_agents.json').exists() else {}
+    pid_score = {str(v.get('pid')): scores.get(p, 0.0) for p, v in reg.items()}
+    cands = []
+    for f in Path('runs/checkpoints').glob(f'rl_{seg}_*.state'):
+        pid = f.stem.rsplit('_', 1)[-1]
+        cands.append((pid_score.get(pid, 0.0), str(f)))
+    if cands:
+        return max(cands)[1]
+    canon = Path(f'runs/checkpoints/rl_{seg}.state')
+    return str(canon) if canon.exists() else None
+
+
 def frontier() -> int:
     """Index of the deepest stage whose checkpoint does NOT yet exist (the stage to train)."""
     for i, (seg, _) in enumerate(LADDER):
-        if not Path(f'runs/checkpoints/rl_{seg}.state').exists():
+        if best_checkpoint(seg) is None:
             return i
     return len(LADDER) - 1
 
@@ -45,16 +73,11 @@ def seat_plan() -> list[dict]:
     f = frontier()
     plan = []
     for i, port in enumerate(PORTS):
-        if i < FRONTIER_SEATS:
-            seg, _ = LADDER[min(f, len(LADDER) - 1)]
-            start = LADDER[max(0, f - 1)][1] if f > 0 else LADDER[0][1]
-            start = f'runs/checkpoints/rl_{LADDER[f-1][0]}.state' if f > 0 else LADDER[0][1]
-        else:  # refinement seat: one stage behind the frontier, from its own seed
-            idx = max(0, f - 1)
-            seg = LADDER[idx][0]
-            start = LADDER[max(0, idx - 1)][1] if idx > 0 else LADDER[0][1]
-            if idx > 0:
-                start = f'runs/checkpoints/rl_{LADDER[idx-1][0]}.state'
+        idx = min(f, len(LADDER) - 1) if i < FRONTIER_SEATS else max(0, f - 1)
+        seg = LADDER[idx][0]
+        # frontier starts from the prior stage's best banked checkpoint; seed at the base
+        prior = best_checkpoint(LADDER[idx - 1][0]) if idx > 0 else None
+        start = prior or LADDER[idx][1]
         plan.append({'port': port, 'segment': seg, 'state': start})
     return plan
 
