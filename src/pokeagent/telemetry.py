@@ -20,22 +20,37 @@ def slot_name(agent_id: int | str) -> str:
 
 
 class FramePublisher:
-    """Writer side: renders the tick the agent was going to run anyway (no extra game frames)."""
+    """Writer side: renders the tick the agent was going to run anyway (no extra game frames).
 
-    def __init__(self, agent_id: int | str, emu) -> None:
+    half_res=True publishes 80x72 frames (every other pixel): ~4x cheaper render
+    + transport, and the viewer upscales on display anyway."""
+
+    def __init__(self, agent_id: int | str, emu, half_res: bool = False) -> None:
         self.emu = emu
+        self.half_res = half_res
         self.seq = 0
         try:
             self.shm = shared_memory.SharedMemory(name=slot_name(agent_id), create=True,
                                                   size=HEADER + FRAME_W * FRAME_H * 3)
         except FileExistsError:  # a killed publisher left a zombie slot: reclaim it
             self.shm = shared_memory.SharedMemory(name=slot_name(agent_id))
-        self.shm.buf[8:10] = FRAME_W.to_bytes(2, "little")
-        self.shm.buf[10:12] = FRAME_H.to_bytes(2, "little")
+        w, h = self.dims()
+        self.shm.buf[8:10] = w.to_bytes(2, "little")
+        self.shm.buf[10:12] = h.to_bytes(2, "little")
+
+    def dims(self) -> tuple[int, int]:
+        return (80, 72) if self.half_res else (FRAME_W, FRAME_H)
 
     def publish(self) -> None:
         self.emu.tick_rendered(1)
         data = self.emu.frame_rgb()
+        if self.half_res:  # decimate: every other pixel, every other row (~4x cheaper)
+            out = bytearray()
+            for y in range(0, FRAME_H, 2):
+                row = data[y * FRAME_W * 3:(y + 1) * FRAME_W * 3]
+                for x in range(0, FRAME_W, 2):
+                    out += row[x * 3:x * 3 + 3]
+            data = bytes(out)
         self.seq += 1
         self.shm.buf[0:8] = (self.seq | 1).to_bytes(8, "little")
         self.shm.buf[16:16 + len(data)] = data
@@ -76,11 +91,13 @@ class FrameSubscriber:
             s1 = int.from_bytes(b[0:8], "little")
             if s1 == 0 or s1 & 1:
                 return None  # never written, or mid-write
-            data = bytes(b[16:16 + FRAME_W * FRAME_H * 3])
+            w = int.from_bytes(b[8:10], "little") or FRAME_W
+            h = int.from_bytes(b[10:12], "little") or FRAME_H
+            data = bytes(b[16:16 + w * h * 3])
             if int.from_bytes(b[0:8], "little") != s1:
                 return None  # torn read; next tick gets a clean frame
             self.seq = s1
-            return data
+            return (data, w, h)
         except Exception:
             self.close()
             return None

@@ -62,7 +62,7 @@ class SegmentEnv:
         self.hold, self.settle = hold, settle  # ~8 frames/action: lean but still a real press
         self.steps = 0
         self.facing = 0  # tracked like the explorer does: last direction pressed (0=D,1=U,2=L,3=R)
-        self.frame_pub = FramePublisher(frame_port, self.emu) if frame_port is not None else None
+        self.frame_pub = FramePublisher(frame_port, self.emu, half_res=True) if frame_port is not None else None
 
     def publish(self) -> None:
         """Render the current frame into the shared-memory slot for tools/watch.py."""

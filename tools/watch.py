@@ -44,7 +44,8 @@ class Agent:
     def __init__(self, port: int) -> None:
         self.port = port
         self.png: Optional[bytes] = None  # latest frame: PNG bytes or raw RGB (see .raw)
-        self.raw = False                  # True when .png holds 160*144*3 RGB from shared memory
+        self.dims = (160, 144)            # frame WxH (half-res publishers send 80x72)
+        self.raw = False                  # True when .png holds raw RGB from shared memory
         self.status: dict = {}
         self.ok = False
         self.fails = 0        # consecutive failed polls; a tile only goes offline after several
@@ -60,9 +61,9 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         t0 = time.time()
         n += 1
         got_any = False
-        frame = agent.sub.read()
-        if frame is not None:
-            agent.png = frame
+        res = agent.sub.read()
+        if res is not None:
+            agent.png, agent.dims = res
             agent.raw = True
             agent.seq = agent.sub.seq
             got_any = True
@@ -214,7 +215,7 @@ def main() -> int:
     def draw(ag: Agent, label: tk.Label, scale: int) -> None:
         try:
             if ag.png and ag.raw:
-                im = Image.frombytes("RGB", (160, 144), ag.png)
+                im = Image.frombytes("RGB", ag.dims, ag.png)
             elif ag.png:
                 im = Image.open(io.BytesIO(ag.png))
             else:  # placeholder until the first frame lands: a dark box keeps the grid geometry fixed
