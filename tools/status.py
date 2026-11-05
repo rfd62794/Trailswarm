@@ -57,8 +57,8 @@ def _segment_attempts(goal: str, last_n: int = 24) -> tuple[int, int]:
     tries: list[str] = []
     for d in _run_dirs():
         meta = _meta(d)
-        if meta.get("stop_at_goal") != goal:
-            continue
+        if meta.get("stop_at_goal") != goal or meta.get("frame_share"):
+            continue  # watched runs may play differently: they don't count for the done-condition
         si = _start_index(meta)
         started = set(meta.get("initial_goals", []))
         if si is not None and si < i and goal not in started:

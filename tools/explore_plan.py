@@ -224,7 +224,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
     # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
     beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36)
-    if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < 8 and mx and hp / mx >= 0.5
+    if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5
             and not carrying_parcel and not beyond_viridian):
         # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
         #  sent the agent back to Route 1 to train - they spent 600+ presses there and never reached the lab)
@@ -232,7 +232,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         if pos[0] != 0x0C:
             p = g.path(pos, lambda n: n[0] == 0x0C)
             if p:
-                return p[0], f"goal train to L8 (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
+                return p[0], f"goal train to L{goals.get('_train_level', 8)} (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
         return None  # on Route 1: let exploration roam (grass encounters happen on their own)
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):
         # Already known from earlier agents: the spot where "got OAK PARCEL" was seen. Go there and talk (known facts first).
