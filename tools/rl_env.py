@@ -448,6 +448,25 @@ class SegmentEnv:
                     self._goal_saved = True
                 except Exception:
                     pass
+        if getattr(self, 'screen_context', False):
+            from pokeagent.screencontext import MenuKind, ScreenType, classify_screen
+            from pokeagent.explorer import frame_lines
+            tm = self.emu.read_range(0xC3A0, 360)
+            ctx = classify_screen(tm, self.emu.read(0xD057))
+            if ctx.screen == ScreenType.MENU:
+                self._menu_dwell = getattr(self, '_menu_dwell', 0) + 1 if ctx.menu == getattr(self, '_last_menu', None) else 1
+                self._last_menu = ctx.menu
+                if self._menu_dwell > 12:
+                    rew -= 0.02  # dwelling on the same menu surface is never progress
+            else:
+                self._menu_dwell = 0
+                self._last_menu = None
+            lines = frame_lines(tm)
+            if any('SAVING' in ln for ln in lines):
+                rew -= 0.3  # a committed save burns many frames for zero campaign value
+            elif (getattr(self, 'actions', ACTIONS)[action] == Button.A
+                    and any(ln.startswith('>SAVE') for ln in lines)):
+                rew -= 0.05  # selecting SAVE once is cheap to learn; repeating is not
         failed = outcome == BattleOutcome.BLACKOUT
         done = self.goal_reached or failed or self.steps >= self.max_steps
         return self._obs(), rew, done, {"goal_reached": self.goal_reached,
