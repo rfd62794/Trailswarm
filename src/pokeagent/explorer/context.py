@@ -1,0 +1,165 @@
+"""ExplorerContext: everything the demo's ``st`` dict held, as named fields, plus the live handles.
+
+Behaviours read and write the context; nothing else carries state between steps. ``get`` / ``setdefault`` /
+``__setitem__`` are a thin dict-protocol shim so ``goals.check_goals(emu, ctx)`` (which was written against
+the ``st`` dict and is shared with other tools) keeps working unchanged.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from pokeagent.explorer.memory import MapMemory
+from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
+from pokeagent.goals import check_goals
+from pokeagent.ram import read_state
+
+
+@dataclass
+class ExplorerOptions:
+    """The CLI flags the policy reads (``a.<flag>`` in the old closure)."""
+
+    starter: str = "any"
+    state_stem: str = ""  # Path(--state).stem, "" when no state
+    steps: int = 300
+    stop_at_goal: str | None = None
+    headless: bool = False
+    box_pace: int = 6
+    frames_per_step: int = 10
+    train_level: int = 8
+    maps_path: str = "runs/maps.json"
+
+
+@dataclass
+class Frame:
+    """One step's read-only snapshot of the screen (nothing changes between reads inside a step)."""
+
+    m: int = 0
+    x: int = 0
+    y: int = 0
+    tm: bytes = b""
+    box: bool = False
+    lines: list[str] = field(default_factory=list)
+    battling: bool = False  # wIsInBattle != 0, or a FIGHT line on screen
+
+
+@dataclass
+class ExplorerContext:
+    emu: Any
+    mem: MapMemory
+    opts: ExplorerOptions = field(default_factory=ExplorerOptions)
+    log: Callable[..., None] = lambda text, tag=None: None
+    run_dir: Path = Path(".")
+    trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
+    # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
+    step: int = 0
+    frame: int = 0
+    photo: Any = None
+    paused: bool = False
+    done: bool = False
+    facing: str = "DOWN"
+    last_fail: tuple | None = None
+    box_streak: int = 0
+    settle: int = 0
+    inter: dict | None = None
+    goal_steps: dict = field(default_factory=dict)
+    stable_frames: int = 0
+    explore_run: bool = False
+    speed: int = 1
+    a_pos: tuple | None = None
+    a_streak: int = 0
+    all_pp_out: int = 0
+    battle_pos: tuple | None = None
+    battles: int = 0
+    battles_won: int = 0
+    beat: dict | None = None
+    beat_sig_done: str | None = None
+    battle_log: dict | None = None
+    best_level_seen: int = 0
+    box_open_now: bool = False
+    burst_maps: set = field(default_factory=set)
+    catch_attempt: dict | None = None
+    catch_mode: bool = False
+    dialog: list = field(default_factory=list)
+    episode: dict | None = None
+    events_prev: bytes | None = None
+    exp_prev: int | None = None
+    explore_burst: int = 0
+    forget_move: str | None = None
+    goal_left_house: bool = False
+    goto: list | None = None
+    had_parcel: bool = False
+    in_battle: bool = False
+    initial_goals: set = field(default_factory=set)
+    initial_goals_ready: bool = False  # the old code tested '"initial_goals" in st'
+    known_maps_at_start: set | None = None
+    last_battle_hp: int | None = None
+    last_hash: int | None = None
+    last_move_choice: str | None = None
+    last_press: str | None = None
+    last_sig: tuple | None = None
+    last_text: str = ""
+    mash: int = 0
+    mom_failed_until: int = 0
+    mom_talk_hp: int = 0
+    mom_talk_step: int | None = None
+    move_nav: int = 0
+    move_reason: str = ""
+    no_pp: set = field(default_factory=set)
+    pending_move: dict | None = None
+    pos_hist: list = field(default_factory=list)
+    potion_hp_before: int | None = None
+    proc: dict | None = None
+    proc_done: set = field(default_factory=set)
+    proc_due: list = field(default_factory=list)
+    replay: list = field(default_factory=list)
+    replay_ctx: dict | None = None
+    replayed_here: tuple | None = None
+    seen_maps: set = field(default_factory=set)
+    shake: int = 0
+    shake_goals_150: tuple | None = None
+    shakes: int = 0
+    slow_until: int = 0
+    stall: int = 0
+    stalls: int = 0
+    yesno: dict | None = None
+    # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
+    view: Frame = field(default_factory=Frame)
+    bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
+
+    # --- dict-protocol shim for goals.check_goals ---
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        if not hasattr(self, key):
+            setattr(self, key, default)
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def pop(self, key: str) -> Any:
+        """Take a one-shot field's value and reset it to None (the old ``st.pop(key, None)``)."""
+        value = getattr(self, key)
+        setattr(self, key, None)
+        return value
+
+    # --- reads ---
+    def pos(self) -> tuple[int, int, int]:
+        s = read_state(self.emu)
+        return (s.map_id, s.x, s.y)
+
+    def goals(self) -> dict[str, bool]:
+        return check_goals(self.emu, self)
+
+    def refresh(self) -> Frame:
+        """Snapshot the screen for this step: position, tile map, open box, on-screen lines, battle."""
+        m, x, y = self.pos()
+        tm = self.emu.read_range(TILEMAP, TILEMAP_LEN)
+        box = box_open(tm)
+        lines = frame_lines(tm) if box else []
+        battling = self.emu.read(BATTLE_FLAG) != 0 or any("FIGHT" in ln for ln in lines)
+        self.view = Frame(m, x, y, tm, box, lines, battling)
+        return self.view
