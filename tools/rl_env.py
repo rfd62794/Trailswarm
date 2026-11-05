@@ -278,7 +278,7 @@ class SegmentEnv:
         if action < 4:
             self.facing = action  # facing = last direction pressed, same accounting as the explorer
         self.emu.press(getattr(self, 'actions', ACTIONS)[action], hold_frames=self.hold, settle_frames=0)
-        for _ in range(self.settle):  # settle frames ticked one at a time: a showcase agent publishes each one
+        for _ in range(self.hold + self.settle):  # settle frames ticked one at a time: a showcase agent publishes each one
             self.emu.tick_rendered(1) if self.publish_frames else self.emu.tick(1)
             if self.publish_frames and self.frame_pub is not None:
                 self.frame_pub.publish()

@@ -41,8 +41,9 @@ class FramePublisher:
     def dims(self) -> tuple[int, int]:
         return (80, 72) if self.half_res else (FRAME_W, FRAME_H)
 
-    def publish(self) -> None:
-        self.emu.tick_rendered(1)
+    def publish(self, advance: bool = True) -> None:
+        if advance:
+            self.emu.tick_rendered(1)
         data = self.emu.frame_rgb()
         if self.half_res:  # decimate: every other pixel, every other row (~4x cheaper)
             out = bytearray()

@@ -8,8 +8,14 @@ spec.loader.exec_module(module)
 
 
 class Emulator:
+    def __init__(self):
+        self.frames = 0
+
     def press(self, *args, **kwargs):
         pass
+
+    def tick(self, frames):
+        self.frames += frames
 
 
 def test_stateful_goal_evaluated_once_per_step():
@@ -17,6 +23,7 @@ def test_stateful_goal_evaluated_once_per_step():
     env.emu = Emulator()
     env.hold = 8
     env.settle = 0
+    env.publish_frames = False
     env.steps = 0
     env.max_steps = 10
     env.subgoals = ()
@@ -42,6 +49,7 @@ def test_timeout_is_not_a_win():
     env.emu = Emulator()
     env.hold = 8
     env.settle = 0
+    env.publish_frames = False
     env.steps = 0
     env.max_steps = 1
     env.subgoals = ()
