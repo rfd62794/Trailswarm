@@ -57,8 +57,8 @@ def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
         kind = MenuKind.BATTLE_COMMAND
     elif 'TYPE/' in text and battle_kind in (1, 2):
         kind = MenuKind.BATTLE_MOVES
-    elif 'CHOOSE A POK' in text and battle_kind in (1, 2):
-        kind = MenuKind.BATTLE_PARTY
+    elif 'CHOOSE A POK' in text:
+        kind = MenuKind.BATTLE_PARTY if battle_kind in (1, 2) else MenuKind.PARTY
     elif all(word in text for word in ('SAVE', 'OPTION')) and ('POKEDEX' in text or ('ITEM' in text and 'EXIT' in text)):
         kind = MenuKind.START
     elif all(word in text for word in ('TEXT SPEED', 'BATTLE ANIMATION', 'BATTLE STYLE')):
@@ -67,6 +67,8 @@ def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
         kind = MenuKind.PC
     elif all(word in text for word in ('BUY', 'SELL', 'QUIT')):
         kind = MenuKind.SHOP
+    elif 'CANCEL' in text:
+        kind = MenuKind.ITEMS
     option = -1
     if kind == MenuKind.BATTLE_COMMAND:
         for line in lines:
@@ -80,6 +82,12 @@ def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
     elif kind == MenuKind.BATTLE_MOVES:
         moves = [line for line in lines[3:] if line.strip()]
         for index, line in enumerate(moves):
+            if '>' in line:
+                option = index
+                break
+    elif kind in (MenuKind.START, MenuKind.ITEMS, MenuKind.PARTY, MenuKind.POKEDEX,
+                  MenuKind.SAVE, MenuKind.OPTIONS, MenuKind.PC, MenuKind.SHOP):
+        for index, line in enumerate(lines):
             if '>' in line:
                 option = index
                 break

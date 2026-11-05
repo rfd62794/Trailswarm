@@ -46,6 +46,16 @@ def test_battle_menu_option_indices():
     assert classify_screen(screen('FIGHT PKMN', 'ITEM >RUN'), 1).option == 3
 
 
+def test_start_menu_option_and_overworld_submenus():
+    start = classify_screen(screen('>POKEMON', 'ITEM', 'BCN', 'SAVE', 'OPTION', 'EXIT'))
+    assert (start.menu, start.option) == (MenuKind.START, 0)
+    start = classify_screen(screen('POKEMON', '>ITEM', 'BCN', 'SAVE', 'OPTION', 'EXIT'))
+    assert (start.menu, start.option) == (MenuKind.START, 1)
+    assert classify_screen(screen('CHOOSE A POKEMON.')).menu == MenuKind.PARTY
+    items = classify_screen(screen('POTION', '>CANCEL'))
+    assert (items.menu, items.option) == (MenuKind.ITEMS, 1)
+
+
 def test_battle_move_and_party_context():
     moves = classify_screen(screen('TYPE/', 'NORMAL', '35/35', '>TACKLE', 'TAIL WHIP'), 1)
     assert (moves.menu, moves.option) == (MenuKind.BATTLE_MOVES, 0)
