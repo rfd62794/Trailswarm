@@ -86,6 +86,10 @@ package.
   Steer (keyboard goes to the selected agent), Hand to RL / Hand to Explorer, Save state, Load state…,
   Spawn agent…, Stop. Keys follow the existing demo: arrows, `a`=A, `s`=B, Enter=START, Shift=SELECT,
   `p` pause, `t` turbo cycle. Keys only reach an agent when Steer is on for it (no accidental presses).
+- **Auto-pause on human input** (Robert, 2026-11-05): any human press puts the agent on *human hold* -
+  it stops making its own decisions (the game keeps running) until 3 s pass with no human input, then
+  resumes. The card shows "YOU HAVE IT" with a countdown; "Release" ends the hold at once. This stops the
+  agent and Robert fighting over the controls.
 - Colours: Explorer green, RL orange, human pink, Claude blue, consistently in cards, bars and logs.
   Dark theme.
 
@@ -166,6 +170,17 @@ The shape, in build order (each step must leave the demo and the viewer better):
    frontier cells, load its state, run the hybrid agent for a budget, and add new cells. Replaces
    `--segment`-only reruns as the swarm's default mode; segment records stay.
 6. **Sparse rewards only:** goal milestones and new cells. No dense shaping (the paper shows exploitation).
+7. **Save-state lookahead** for battles, menus and ledges (approved 2026-11-05): at those decision points,
+   save, try each candidate a few presses ahead, keep the best, reload. Exact because the emulator is
+   deterministic. Budgeted like the counterfactual comparisons.
+8. **Learning from Robert's corrections, with a grain of salt** (DAgger, approved 2026-11-05). Robert:
+   "the user also isn't perfect ... my interference is noise in the direction, and sometimes me fighting
+   the agent makes things worse briefly." So every human-hold segment is recorded as `{q_state, what the
+   agent would have done, what Robert did, outcome}` and treated as a **hypothesis, never a label**: it
+   enters with half the prior weight of an Explorer demonstration, is graded by the same rule as everything
+   else (did the next goal arrive sooner, without a stall), and is dropped if it loses. The few presses
+   right after a hold ends are excluded from grading the agent (the agent is recovering from the handover).
+   Human-hold segments never count against the agent's records.
 
 The low-level RL ladder (`tools/rl_*`, `rl_env.py`) is kept and not extended; skills it trained remain
 callable as options where they beat the Explorer behaviour (e.g. menus), decided by measurement.
@@ -189,6 +204,43 @@ callable as options where they beat the Explorer behaviour (e.g. menus), decided
 from `main`, and this design builds on that branch's `options.py`, `navigation.py`, `qmodels.py`,
 `telemetry.py`. It is reviewed and merged to `main` first (gates: independent review, green suite).
 
+Status 2026-11-05: done. PR #24 merged to `main` (merge commit `0ed5b5a`); suite at `bd2aef8` 178 passed,
+5 skipped (ROM-gated), 0 failed; Sonnet review MERGE-WITH-FOLLOWUPS (follow-ups listed in the PR).
+
+## 7a. Settled after the builder check (Claude's calls; Robert may override)
+
+- **Who runs the emulator.** Devin worktrees have no ROM or save states and the sandbox refuses the
+  `pokeagent` entry point. Builders deliver code plus unit tests against `FakeEmulator`, the fake agent
+  source and recorded fixtures. Every gate that needs a live run (Explorer parity, watchdog-vs-guards,
+  viewer frame rate, archive runs) is a **Claude verification step on the laptop** after the directive
+  lands on its branch; the result is recorded in the directive's Status row. Robert looks at the viewer
+  when convenient; his look is not a gate.
+- **The hybrid agent is a new runner**, `src/pokeagent/runner.py` (`pokeagent run --policy
+  explorer|hybrid`, plus `--headless`, `--state`, `--steps`, `--port`). It hosts the control server,
+  the status builder and the registry entry. `explore_demo.py` and `rl_train.py` get thin snapshot
+  adapters only so the viewer works from day one; they are not extended further.
+- **Hand to …** is offered only for drivers the agent actually has (`snapshot.drivers_available`); the
+  button is disabled otherwise. A pure Explorer has Explorer + human; a hybrid has Explorer + RL + human.
+- **"RL takes over only where it measured better" uses exact counterfactuals.** At a decision point where
+  the RL selector and the Explorer disagree (during training runs, not watched runs), the runner saves
+  state, runs the Explorer branch and the RL branch each to the next goal event or a 300-press budget,
+  reloads, and records `{q_state, explorer_presses, rl_presses, stalled_each}`. The emulator is
+  deterministic, so this is a fair A/B. Per Q-state, RL wins the state after >= 5 comparisons with a lower
+  mean press count and no more stalls than the Explorer; it loses it again if a later comparison window
+  of 5 reverses that. Comparisons are budgeted (default at most 1 per 50 presses).
+- **Seed data is generated, not mined.** Old logs are raw button presses. The extracted Explorer (step 1)
+  logs behaviour-level decisions (`runs/<run>/decisions.jsonl`: step, q_state, behaviour, presses,
+  outcome); the selector is seeded from those. Hard dependency: step 3 starts after steps 1-2.
+- **Viewer split.** Directive V1 = snapshot contract, agent-side control server/registry, viewer core
+  (sources, model, layout, commands) with full unit tests - Devin-testable. Directive V2 = the Dear PyGui
+  shell (`viewer/ui/`, `app.py`, panels) - Devin writes it against the fake source; Claude runs it on the
+  laptop against live agents and measures: UI >= 30 fps with 12 agents, agent steps/sec unchanged within
+  5% with the viewer attached vs detached.
+- **Archive storage.** `runs/archive/` (gitignored): `cells.json` index + one `.state` per cell. Cap 2,000
+  cells; when full, drop the cell with the most visits and worst steps-to-reach that is not on a best
+  path. One writer: the supervisor merges workers' `new_cells/*.json` submissions with atomic replace;
+  workers only read the index and their chosen state.
+
 ## 8. Left to the builder
 
 Exact Dear PyGui widget structure and theming; grid sizing details; the polling thread design; how each
@@ -205,3 +257,15 @@ on <=6 tiles, 40 A presses on one tile); Q state bucketing details; cell weighti
 - Old viewers retired in a separate directive after Robert has used the new one.
 - Build order: viewer track and Explorer extraction in parallel (independent files); watchdog, RL
   selector, recovery bandit and archive in sequence after the extraction.
+- Devin model for these directives: `swe-2-flash-max` (free; Robert's "SWE 2 Fast Max").
+
+## 10. Candidates after this design (proposed to Robert 2026-11-05, not yet decided)
+
+Ranked by fit: (1) save-state lookahead / MCTS for battles, menus and ledges - exact because the emulator
+is deterministic; (2) DAgger - every human Steer press is recorded with what the agent would have done and
+trained on; (3) contextual bandits for small one-shot choices (already used for stall recovery);
+(4) count-based novelty (part of the archive); (5) evolutionary search over segment press sequences or
+Explorer parameters; (6) utility-AI scoring for the behaviour selector; (7) Voyager-style LLM-written
+behaviours tested on save states, budgeted; (8) a small neural policy only as a comparison baseline.
+Claude recommends adding (1) and (2) next. **Robert approved 2026-11-05 ("I approve all")**: (1) and (2)
+are now section 5 steps 7 and 8; (3) and (4) were already in; (5)-(8) remain candidates.
