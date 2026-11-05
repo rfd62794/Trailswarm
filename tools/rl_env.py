@@ -351,14 +351,15 @@ class SegmentEnv:
             tm = self.emu.read_range(0xC3A0, 360)
             ctx = classify_screen(tm, self.emu.read(0xD057))
             lines = frame_lines(tm)
-            if any('SAVING' in ln for ln in lines):
+            if any('SAVING' in ln.upper() for ln in lines):
                 return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
                 allowed = [i for i in range(n) if self.actions[i] not in (Button.LEFT, Button.RIGHT)]
-                if any(ln.startswith('>SAVE') for ln in lines):
-                    allowed = [i for i in allowed if self.actions[i] != Button.A]  # mask, don't just penalize
+                save_row = any(ln.startswith('>SAVE') or 'SAV' in ln.split('>')[-1] for ln in lines)
+                if save_row or ctx.option == 3:  # text decode + option-index backup: A on SAVE can never be chosen
+                    allowed = [i for i in allowed if self.actions[i] != Button.A]
                 return allowed or list(range(n))
         if not getattr(self, 'battle_learning', False) or self.emu.read(0xD057) != 1:
             return list(range(n))
@@ -498,10 +499,10 @@ class SegmentEnv:
                 self._menu_dwell = 0
                 self._last_menu = None
             lines = frame_lines(tm)
-            if any('SAVING' in ln for ln in lines):
+            if any('SAVING' in ln.upper() for ln in lines):
                 rew -= 0.3  # a committed save burns many frames for zero campaign value
             elif (getattr(self, 'actions', ACTIONS)[action] == Button.A
-                    and any(ln.startswith('>SAVE') for ln in lines)):
+                    and (any(ln.startswith('>SAVE') for ln in lines) or ctx.option == 3)):
                 rew -= 0.05  # selecting SAVE once is cheap to learn; repeating is not
         failed = outcome == BattleOutcome.BLACKOUT
         done = self.goal_reached or failed or self.steps >= self.max_steps
