@@ -49,6 +49,7 @@ def main() -> int:
     ap.add_argument("--max-steps", type=int, default=400)
     ap.add_argument("--publish-every", type=int, default=16)
     ap.add_argument("--interval", type=float, default=120.0, help="seconds between culls")
+    ap.add_argument("--resume", action="store_true", help="seed all founders from runs/q_champion.json, fresh counts")
     a = ap.parse_args()
 
     Path("runs").mkdir(exist_ok=True)
@@ -56,10 +57,13 @@ def main() -> int:
     proc: dict[int, subprocess.Popen] = {}
     tags: dict[int, str] = {}
     children: dict[str, int] = {}  # tag -> how many offspring it has sired
+    champ = Path("runs/q_champion.json") if a.resume and Path("runs/q_champion.json").exists() else None
     ports = list(range(a.base_port, a.base_port + a.agents))
     for i, p in enumerate(ports):
         tags[p] = chr(ord("a") + i)  # founders: a, b, c, d, ...
-        proc[p] = spawn(p, gen * 100 + p, None, tags[p], a)
+        proc[p] = spawn(p, gen * 100 + p, champ, tags[p], a)  # --resume: everyone starts from the champion, fresh counts
+    if champ:
+        print(f"[gauntlet] resumed from runs/q_champion.json (counters reset)", flush=True)
     print(f"[gauntlet] {a.agents} learners on ports {ports[0]}-{ports[-1]}, cull every {a.interval:.0f}s", flush=True)
 
     while True:
@@ -76,6 +80,11 @@ def main() -> int:
         sire = Path(f"runs/q_table_{champion}.json")
         if not sire.exists():
             continue
+        try:  # the reigning champion's table is persisted separately: survives restarts and offspring edits
+            import shutil
+            shutil.copy(sire, "runs/q_champion.json")
+        except Exception:
+            pass
         try:
             proc[runt].kill()
         except Exception:
