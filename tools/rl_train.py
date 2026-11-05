@@ -163,7 +163,7 @@ def main() -> int:
         opts.append(Option(name, path, make_goal(name), int(steps or 100)))
     from pokeagent.options import ScriptedNav
     for spec in (a.nav or []):
-        parts = [int(p, 0) for p in spec.split(',')]
+        parts = [int(p, 0) for p in spec.split(':')]
         if len(parts) == 2:
             opts.append(ScriptedNav((parts[0], parts[1])))
         else:
