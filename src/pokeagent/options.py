@@ -13,16 +13,34 @@ from pokeagent.qmodels import load_model
 
 
 class Option:
-    def __init__(self, name: str, table_path: str, goal_fn, max_steps: int = 100):
+    def __init__(self, name: str, table_path: str, goal_fn, max_steps: int = 100, initiation=None):
         data = json.loads(Path(table_path).read_text())
         self.table = load_model(table_path, data.get('schema'), data.get('actions', 6))
         self.n_actions = data.get('actions', 6)
         self.goal_fn = goal_fn
         self.max_steps = max_steps
+        self.initiation = initiation or (lambda env: True)
         self.name = name
+        self.key_len = len(next(iter(self.table), ()))  # skill's obs width for outer->skill mapping
+
+    def available(self, env) -> bool:
+        try:
+            return bool(self.initiation(env))
+        except Exception:
+            return False
+
+    def _key(self, obs):
+        """Map outer-env obs to the skill's obs width: first 14 fields + last (L-14) tail fields."""
+        obs = tuple(obs)
+        L, M = self.key_len, len(obs)
+        if L >= M:
+            return obs[:L]
+        if L <= 14:
+            return obs[:L]
+        return obs[:14] + obs[M - (L - 14):]
 
     def act(self, obs) -> int:
-        row = self.table.get(tuple(obs))
+        row = self.table.get(self._key(obs))
         if row is None:
             return 0  # unvisited state under this skill: first action as fallback
         return max(range(min(len(row), self.n_actions)), key=lambda i: row[i])

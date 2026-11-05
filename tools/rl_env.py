@@ -583,6 +583,8 @@ class SegmentEnv:
             from pokeagent.observations import combat_observation
             base += combat_observation(self.emu)
         out = base + tuple(self.obs_extra(self.emu)) if self.obs_extra else base
+        if getattr(self, 'options', ()):  # availability flags BEFORE the pixel tail keeps skill obs slices stable
+            out += tuple(int(o.available(self)) for o in self.options)
         if self.screen_context:  # rendered-pixel truth: two signature flags at the tail
             try:
                 from pokeagent.pixelsig import match

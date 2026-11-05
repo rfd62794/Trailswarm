@@ -157,6 +157,7 @@ def main() -> int:
     for spec in (a.option or []):
         name, _, rest = spec.partition('=')
         path, _, steps = rest.partition(':')
+        path = path or f'runs/skills/{name}.json'  # name alone resolves to the skills library
         opts.append(Option(name, path, GOAL_FNS[name](), int(steps or 100)))
     env.options = tuple(opts)
     n_total = len(actions) + len(opts)  # buttons + meta-actions size the Q row
