@@ -190,6 +190,23 @@ def make_options_setup_goal():
     return f
 
 
+def make_menu_tour_goal():
+    """START -> ITEMS -> PARTY -> back to overworld: the whole surface, one episode."""
+    from pokeagent.screencontext import MenuKind, ScreenType, classify_screen
+    seen = {'start': False, 'items': False, 'party': False}
+    def f(emu):
+        context = classify_screen(emu.read_range(0xC3A0, 360), emu.read(0xD057))
+        if context.menu == MenuKind.START:
+            seen['start'] = True
+        elif context.menu == MenuKind.ITEMS:
+            seen['items'] = True
+        elif context.menu == MenuKind.PARTY:
+            seen['party'] = True
+        return all(seen.values()) and context.screen == ScreenType.UNKNOWN
+    f.reset = lambda: seen.update(start=False, items=False, party=False)
+    return f
+
+
 def goal_map(map_id: int):
     """Reach a campaign map: the RL ladder beyond the house is pure map_id goals."""
     def f(emu) -> bool:
@@ -214,6 +231,7 @@ def goal_boulder(emu) -> bool:
 GOAL_FNS = {"menu_start": goal_menu_start, "menu_items": goal_menu_kind('ITEMS'),
             "menu_party": goal_menu_kind('PARTY'), "menu_options": goal_menu_kind('OPTIONS'),
             "menu_exit": make_menu_exit_goal(), "options_setup": make_options_setup_goal(),
+            "menu_tour": make_menu_tour_goal(),
             "left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
             "buy_balls": goal_balls, "catch_pokemon": goal_team2, "campaign": goal_boulder, "beat_brock": goal_boulder,
             "reach_pc": goal_reach_pc, "exit_potion": goal_potion_run,
@@ -235,6 +253,7 @@ EXTRA_OBS = {"battle": battle_obs_extra, "grind": battle_obs_extra}
 SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["baselines/bedroom.state"],
                   "menu_party": ["baselines/bedroom.state"], "menu_options": ["baselines/bedroom.state"],
                   "menu_exit": ["baselines/bedroom.state"], "options_setup": ["baselines/bedroom.state"],
+                  "menu_tour": ["baselines/bedroom.state"],
                   "left_house": ["baselines/bedroom.state"],
                   "reach_pc": ["baselines/bedroom.state"],
                   "potion": ["runs/checkpoints/rl_reach_pc.state", "baselines/bedroom.state"],
@@ -276,6 +295,7 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "menu_items": ["bas
 SEGMENT_SUBGOALS = {"menu_items": [goal_menu_start], "menu_party": [goal_menu_start],
                     "menu_options": [goal_menu_start], "menu_exit": [goal_menu_start],
                     "options_setup": [goal_menu_start, goal_menu_kind('OPTIONS')],
+                    "menu_tour": [goal_menu_start, goal_menu_kind('ITEMS'), goal_menu_kind('PARTY')],
                     "potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion],
                     "to_route2": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
@@ -324,8 +344,24 @@ class SegmentEnv:
     def allowed_actions(self):
         from pokeagent.learning import retreat_allowed
         from pokeagent.screentext import CHARMAP
-        if not self.battle_learning or self.emu.read(0xD057) != 1:
-            return list(range(len(self.actions)))
+        from pokeagent.screencontext import MenuKind, ScreenType, classify_screen
+        from pokeagent.explorer import frame_lines
+        n = len(self.actions)
+        if getattr(self, 'screen_context', False):
+            tm = self.emu.read_range(0xC3A0, 360)
+            ctx = classify_screen(tm, self.emu.read(0xD057))
+            lines = frame_lines(tm)
+            if any('SAVING' in ln for ln in lines):
+                return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
+            if ctx.screen == ScreenType.DIALOG:
+                return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
+            if ctx.menu == MenuKind.START:
+                allowed = [i for i in range(n) if self.actions[i] not in (Button.LEFT, Button.RIGHT)]
+                if any(ln.startswith('>SAVE') for ln in lines):
+                    allowed = [i for i in allowed if self.actions[i] != Button.A]  # mask, don't just penalize
+                return allowed or list(range(n))
+        if not getattr(self, 'battle_learning', False) or self.emu.read(0xD057) != 1:
+            return list(range(n))
         if retreat_allowed(_u16(self.emu, 0xD015), _u16(self.emu, 0xD023), self.travel_priority):
             return list(range(len(self.actions)))
         tm = self.emu.read_range(0xC3A0, 360)
