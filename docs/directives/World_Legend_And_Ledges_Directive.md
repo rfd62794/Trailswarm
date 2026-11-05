@@ -136,11 +136,13 @@ did not fit.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
+| Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 18:43 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; depends on E1 (merged PR #30 a39b464)
+- 2026-11-05 18:44 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dependency E1 merged
 <!-- queue:end -->
