@@ -130,3 +130,17 @@ The ledge glyph is drawn on the **ledge tile itself**: the tile between the jump
 
 Test tail, line counts, a rendered Sees and Remembers sample from your synthetic test map, and anything that
 did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-05 18:43 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; depends on E1 (merged PR #30 a39b464)
+<!-- queue:end -->
