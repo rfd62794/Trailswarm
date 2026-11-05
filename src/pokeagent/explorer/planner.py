@@ -84,9 +84,9 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             targets = [s for s in balls if want == "ANY" or ball_species(s) == want]
             if not targets:
                 # The wanted ball is unknown: try an untried neighbour of every ball we have seen (including the declined
-                # ones). A neighbour with a recorded interaction was already tried (a plain wall or NPC), so skip it.
+                # ones). A neighbour with recorded dialog text was already tried (NPC/sign), so skip it; empty captures do not count.
                 seen = {(s[0], s[1], s[2], s[3]) for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and ball_species(s)} | set(declined)
-                lab_inter = maps.get("40", {}).get("interactions", {})
+                lab_inter = {k: e for k, e in maps.get("40", {}).get("interactions", {}).items() if (e.get("text") or "").strip()}
                 for (m, x, y, f) in seen:
                     for dx in (-1, 1):
                         nb = (m, x + dx, y, f)

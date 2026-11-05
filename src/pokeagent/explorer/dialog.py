@@ -26,10 +26,19 @@ def learn_decision(question: str, current_moves: list[str]) -> tuple[str, str, s
     return "NO", f"{new} ({move_value(new):.0f}) is not better than our weakest {worst} ({move_value(worst):.0f})", None
 
 
-def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
-    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "  # tolerant of ?,!,é and line breaks
+def offered_starter(question: str) -> str | None:
+    """The starter named by an Oak's-lab offer ("So! You want the fire POKeMON, CHARMANDER?"), else None."""
+    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "  # tolerant of ?, ! and line breaks
     offered = next((s for s in STARTERS if s.lower() in q.replace(" ", "")), None)
-    if offered and "want" in q and "nickname" not in q and "name" not in q.split():  # "So! You want CHARMANDER?"
+    if offered and "want" in q and "nickname" not in q and "name" not in q.split():
+        return offered
+    return None
+
+
+def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
+    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "
+    offered = offered_starter(question)
+    if offered:  # "So! You want CHARMANDER?"
         if starter == "any" or starter.upper() == offered:
             return "YES", f"starter offered: {offered} (wanted {starter})"
         return "NO", f"starter offered: {offered}, but we want {starter}"
