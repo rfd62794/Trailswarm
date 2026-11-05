@@ -29,7 +29,7 @@ def spawn(port: int, seed: int, sire: Path | None, tag: str, a) -> subprocess.Po
            "--episodes", str(a.episodes), "--evals", "0", "--max-steps", str(a.max_steps),
            "--frame-port", str(port), "--seed", str(seed), "--publish-every", str(a.publish_every),
            "--save-q", f"runs/q_table_{port}.json", "--tag", tag,
-           "--throttle-ms", str(a.throttle_ms)]
+           "--throttle-ms", str(a.throttle_ms), "--publish-fps", str(a.publish_fps)]
     if sire:
         cmd += ["--load-q", str(sire)]
     flags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)  # Windows: keep Robert's desktop responsive
@@ -55,6 +55,7 @@ def main() -> int:
     ap.add_argument("--resume", action="store_true", help="seed all founders from runs/q_champion.json, fresh counts")
     ap.add_argument("--throttle-ms", type=float, default=3.0,
                     help="per-step sleep passed to learners (3ms ~ 250 steps/s each, leaves CPU headroom)")
+    ap.add_argument("--publish-fps", type=float, default=15.0, help="tile updates/sec per agent, independent of step rate")
     a = ap.parse_args()
 
     Path("runs").mkdir(exist_ok=True)

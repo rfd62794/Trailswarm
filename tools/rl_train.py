@@ -18,12 +18,15 @@ from collections import defaultdict
 from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv
 
 
-def run_episode(env, policy, rng, pub_every: int = 8) -> tuple[bool, int]:
+def run_episode(env, policy, rng, pub_fps: float = 15.0) -> tuple[bool, int]:
     obs = env.reset()
+    last_pub = 0.0
     for _ in range(env.max_steps):
         obs, _r, done, _ = env.step(policy(obs, rng))
-        if env.steps % pub_every == 0:
-            env.publish()  # no-op unless frame_shm is set
+        now = time.time()
+        if now - last_pub >= 1.0 / pub_fps:  # wall-clock pacing: tile fps is independent of step rate
+            env.publish()
+            last_pub = now
         if done:
             break
     return env.goal_fn(env.emu), env.steps
@@ -45,7 +48,9 @@ def main() -> int:
     ap.add_argument("--hold", type=int, default=8)
     ap.add_argument("--settle", type=int, default=8)
     ap.add_argument("--publish-every", type=int, default=8,
-                    help="render+publish every Nth step to the frame slot (publish-per-step saturates the CPU)")
+                    help="deprecated; rendering is now wall-clock paced by --publish-fps")
+    ap.add_argument("--publish-fps", type=float, default=15.0,
+                    help="tile updates per second, independent of step rate (rendering quality stays fixed)")
     ap.add_argument("--save-q", default=None, help="write the Q table here every episode (gauntlet picks champions)")
     ap.add_argument("--load-q", default=None, help="seed the Q table from a saved table (offspring of a champion)")
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
@@ -78,11 +83,14 @@ def main() -> int:
         for ep in range(a.episodes):
             eps = max(a.eps_floor, eps0 * (1.0 - ep / max(1, a.episodes)))  # decay, but never stop exploring
             obs = env.reset()
+            last_pub = 0.0
             for _ in range(env.max_steps):
                 act = rng.randrange(len(ACTIONS)) if rng.random() < eps else max(range(len(ACTIONS)), key=lambda i: Q[obs][i])
                 nxt, rew, done, _ = env.step(act)
-                if env.steps % a.publish_every == 0:
-                    env.publish()  # no-op unless frame_shm is set
+                now = time.time()
+                if now - last_pub >= 1.0 / a.publish_fps:  # wall-clock pacing, not step pacing
+                    env.publish()
+                    last_pub = now
                 visits[nxt] += 1
                 rew += a.novelty / (visits[nxt] ** 0.5)  # intrinsic reward: unexplored states pull harder
                 q = Q[obs]
@@ -111,9 +119,9 @@ def main() -> int:
                           open(f"runs/rlstatus_{a.frame_port}.json", "w"))
             if (ep + 1) % 25 == 0:
                 print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
-        learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng, a.publish_every)
+        learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng, a.publish_fps)
                    for _ in range(a.evals)]
-        rand = [run_episode(env, lambda o, r: r.randrange(len(ACTIONS)), rng, a.publish_every) for _ in range(a.evals)]
+        rand = [run_episode(env, lambda o, r: r.randrange(len(ACTIONS)), rng, a.publish_fps) for _ in range(a.evals)]
     finally:
         env.close()
 
