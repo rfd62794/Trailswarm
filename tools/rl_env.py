@@ -180,7 +180,10 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "left_house": ["bas
                   "to_viridian": ["runs/checkpoints/rl_exit_potion.state",
                                   "runs/checkpoints/to_route1.state",
                                   "runs/checkpoints/rl_potion.state", "baselines/bedroom.state"],
-                  "to_route2": ["runs/checkpoints/rl_to_viridian.state",
+                  "to_route2": ["runs/checkpoints/deliver_parcel_closed.state",
+                                "runs/checkpoints/deliver_parcel.state",
+                                "runs/checkpoints/rl_deliver_parcel.state",
+                                "runs/checkpoints/rl_to_viridian.state",
                                 "runs/checkpoints/to_viridian.state",
                                 "runs/checkpoints/rl_exit_potion.state",
                                 "runs/checkpoints/to_route1.state", "baselines/bedroom.state"],
@@ -202,6 +205,7 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "left_house": ["bas
 # shaped sub-goals per segment: first-time detectors each worth a small bonus
 SEGMENT_SUBGOALS = {"potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion],
+                    "to_route2": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
                     "battle": [sub_enemy_hurt]}
 
 
@@ -213,7 +217,7 @@ class SegmentEnv:
                  half_res: bool = True, obs_extra=None, screen_context: bool = False) -> None:
         self.emu = PyBoyEmulator(Path(rom), headless=not windowed)
         if windowed and speed != 1:
-            self.emu._pyboy.set_emulation_speed(speed)  # 0 = unthrottled, 1 = realtime
+            self.emu.set_speed(speed)  # 0 = unthrottled, 1 = realtime
         self.state = Path(state)
         self.actions = tuple(ACTIONS)
         self.screen_context = screen_context

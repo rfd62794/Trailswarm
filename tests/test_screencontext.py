@@ -36,4 +36,19 @@ def test_cursor_and_unknown_menu():
     assert context.screen == ScreenType.MENU
     assert context.menu == MenuKind.UNKNOWN
     assert context.cursor == (2, 2)
-    assert len(context.observation()) == 5
+    assert len(context.observation()) == 6
+
+
+def test_battle_menu_option_indices():
+    assert classify_screen(screen('>FIGHT PKMN', 'ITEM RUN'), 1).option == 0
+    assert classify_screen(screen('FIGHT>PKMN', 'ITEM RUN'), 1).option == 1
+    assert classify_screen(screen('FIGHT PKMN', '>ITEM RUN'), 1).option == 2
+    assert classify_screen(screen('FIGHT PKMN', 'ITEM >RUN'), 1).option == 3
+
+
+def test_battle_move_and_party_context():
+    moves = classify_screen(screen('TYPE/', 'NORMAL', '35/35', '>TACKLE', 'TAIL WHIP'), 1)
+    assert (moves.menu, moves.option) == (MenuKind.BATTLE_MOVES, 0)
+    moves = classify_screen(screen('TYPE/', 'NORMAL', '30/30', 'TACKLE', '>TAIL WHIP'), 1)
+    assert (moves.menu, moves.option) == (MenuKind.BATTLE_MOVES, 1)
+    assert classify_screen(screen('CHOOSE A POKEMON.'), 1).menu == MenuKind.BATTLE_PARTY

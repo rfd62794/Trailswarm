@@ -24,6 +24,7 @@ class MenuKind(IntEnum):
     SHOP = 8
     BATTLE_COMMAND = 9
     BATTLE_MOVES = 10
+    BATTLE_PARTY = 11
 
 
 @dataclass(frozen=True)
@@ -32,9 +33,10 @@ class ScreenContext:
     menu: MenuKind = MenuKind.UNKNOWN
     confidence: float = 0.0
     cursor: tuple[int, int] = (-1, -1)
+    option: int = -1
 
     def observation(self) -> tuple[int, ...]:
-        return (int(self.screen), int(self.menu), round(self.confidence * 10), *self.cursor)
+        return (int(self.screen), int(self.menu), round(self.confidence * 10), *self.cursor, self.option)
 
 
 def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
@@ -53,8 +55,10 @@ def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
     kind = MenuKind.UNKNOWN
     if 'FIGHT' in text and 'RUN' in text:
         kind = MenuKind.BATTLE_COMMAND
-    elif 'TYPE/' in text and 'PP' in text:
+    elif 'TYPE/' in text and battle_kind in (1, 2):
         kind = MenuKind.BATTLE_MOVES
+    elif 'CHOOSE A POK' in text and battle_kind in (1, 2):
+        kind = MenuKind.BATTLE_PARTY
     elif all(word in text for word in ('SAVE', 'OPTION')) and ('POKEDEX' in text or ('ITEM' in text and 'EXIT' in text)):
         kind = MenuKind.START
     elif all(word in text for word in ('TEXT SPEED', 'BATTLE ANIMATION', 'BATTLE STYLE')):
@@ -63,10 +67,26 @@ def classify_screen(tilemap: bytes, battle_kind: int = 0) -> ScreenContext:
         kind = MenuKind.PC
     elif all(word in text for word in ('BUY', 'SELL', 'QUIT')):
         kind = MenuKind.SHOP
+    option = -1
+    if kind == MenuKind.BATTLE_COMMAND:
+        for line in lines:
+            if '>' in line:
+                tail = line.split('>', 1)[1].lstrip()
+                for index, name in enumerate(('FIGHT', 'PKMN', 'ITEM', 'RUN')):
+                    if tail.startswith(name):
+                        option = index
+                        break
+                break
+    elif kind == MenuKind.BATTLE_MOVES:
+        moves = [line for line in lines[3:] if line.strip()]
+        for index, line in enumerate(moves):
+            if '>' in line:
+                option = index
+                break
     if battle_kind in (1, 2):
-        return ScreenContext(ScreenType.BATTLE, kind, 1.0, cursor)
+        return ScreenContext(ScreenType.BATTLE, kind, 1.0, cursor, option)
     if kind != MenuKind.UNKNOWN:
-        return ScreenContext(ScreenType.MENU, kind, 0.9, cursor)
+        return ScreenContext(ScreenType.MENU, kind, 0.9, cursor, option)
     if framed:
         return ScreenContext(ScreenType.MENU if cursors else ScreenType.DIALOG,
                              confidence=0.6, cursor=cursor)

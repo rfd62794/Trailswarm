@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def schema_id(segment, *, screen=False, spatial=False, combat=False, battle_learning=False, travel_priority=False, potential=False, hold=8, settle=8, maps_digest='', novelty=0.0, menu_controls=False):
-    spec = dict(version=3, segment=segment, screen=screen, spatial=spatial, combat=combat,
+    spec = dict(version=4, segment=segment, screen=screen, spatial=spatial, combat=combat,
                 battle_learning=battle_learning, travel_priority=travel_priority, potential=potential,
                 hold=hold, settle=settle, maps_digest=maps_digest, novelty=novelty, menu_controls=menu_controls)
     return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
