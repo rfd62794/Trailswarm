@@ -3,7 +3,8 @@
 **Read first:** `docs/superpowers/specs/2026-11-05-viewer-and-hybrid-design.md` sections 4.1-4.4 and 7a.
 **Depends on (both merged to main):** `Viewer_Core_Directive.md` (snapshot, control_server, agent_registry,
 human_hold, viewer/{sources,model,layout,commands}) and `Explorer_Behaviours_Directive.md` (the
-`pokeagent.explorer` package with `ExplorerContext`). If any is missing, stop and write that in the Status row.
+`pokeagent.explorer` package with `ExplorerContext`) and `World_Legend_And_Ledges_Directive.md` (`explorer/legend.py`;
+Sees rows and legend come from it - import, do not re-implement). If any is missing, stop and write that in the Status row.
 **Do not list the tree recursively**; use `git ls-files`.
 
 ## 1. Why this exists
@@ -97,7 +98,7 @@ resize.
 - Do not delete or change `tools/watch.py`, `tools/agent_window.py`, `tools/webview.py` (retired later by its
   own directive). Do not change explore_demo's existing HTTP API on `--control-port`, its tk window, or any
   game logic.
-- No new dependencies. No module over 250 lines (explore_demo.py may grow by at most 60 lines).
+- No new dependencies. No module over 300 lines (explore_demo.py may grow by at most 60 lines).
 - `snapshot`, `control_server`, `agent_registry`, `adapters/` never import `viewer/`.
 
 ## 5. Verification
