@@ -366,6 +366,13 @@ class SegmentEnv:
                 return [i for i in range(n) if self.actions[i] not in (Button.A, Button.LEFT, Button.RIGHT)]
             if 'YES' in joined and 'NO' in joined:
                 return [i for i in range(n) if self.actions[i] == Button.B]  # unarmed confirm (save-state start): still can't say YES
+            try:  # pixel-truth backstop: last rendered frame, no extra tick
+                from pokeagent.pixelsig import match
+                rgb = self.emu.frame_rgb()
+                if match(rgb, 'dialog_box') or (getattr(self, '_save_armed', 0) and match(rgb, 'yesno_box')):
+                    return [i for i in range(n) if self.actions[i] == Button.B]
+            except Exception:
+                pass
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
