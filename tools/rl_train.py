@@ -14,7 +14,7 @@ import json
 import random
 from collections import defaultdict
 
-from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SegmentEnv
+from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SEGMENT_SUBGOALS, SegmentEnv
 
 
 def run_episode(env, policy, rng, pub_every: int = 8) -> tuple[bool, int]:
@@ -54,6 +54,7 @@ def main() -> int:
 
     rng = random.Random(a.seed)
     env = SegmentEnv(a.rom, a.state or SEGMENT_STATES[a.segment], GOAL_FNS[a.segment],
+                     subgoals=tuple(SEGMENT_SUBGOALS.get(a.segment, ())),
                      max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                      windowed=a.window, speed=a.speed, frame_port=a.frame_port)
     Q: dict[tuple, list[float]] = defaultdict(lambda: [0.0] * len(ACTIONS))

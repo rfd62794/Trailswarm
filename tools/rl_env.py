@@ -26,13 +26,28 @@ def goal_potion(emu) -> bool:
     return emu.read(0xD31D) > 0
 
 
-GOAL_FNS = {"left_house": goal_left_house, "potion": goal_potion}
+def sub_box_open(emu) -> bool:
+    """Any menu/dialog box is open: reaching the PC and opening it reads as progress."""
+    return emu.read_range(0xC3A0, 360).find(bytes([0x79, 0x7A])) >= 0
+
+
+def goal_potion_run(emu) -> bool:
+    """The full errand: POTION in the bag AND out of the house."""
+    return goal_left_house(emu) and emu.read(0xD31D) > 0
+
+
+GOAL_FNS = {"left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run}
 # which checkpoint each segment resets to (previous goal in the campaign chain)
-SEGMENT_STATES = {"left_house": "baselines/bedroom.state", "potion": "baselines/bedroom.state"}
+SEGMENT_STATES = {"left_house": "baselines/bedroom.state", "potion": "baselines/bedroom.state",
+                  "potion_run": "baselines/bedroom.state"}
+# shaped sub-goals per segment: first-time detectors each worth a small bonus
+SEGMENT_SUBGOALS = {"potion": [sub_box_open],
+                    "potion_run": [sub_box_open, goal_potion]}
 
 
 class SegmentEnv:
     def __init__(self, rom: str | Path, state: str | Path, goal_fn,
+                 subgoals: tuple = (), sub_bonus: float = 0.4,
                  max_steps: int = 300, hold: int = 8, settle: int = 8,
                  windowed: bool = False, speed: int = 1, frame_port: int | None = None) -> None:
         self.emu = PyBoyEmulator(Path(rom), headless=not windowed)
@@ -40,6 +55,9 @@ class SegmentEnv:
             self.emu._pyboy.set_emulation_speed(speed)  # 0 = unthrottled, 1 = realtime
         self.state = Path(state)
         self.goal_fn = goal_fn
+        self.subgoals = subgoals
+        self.sub_bonus = sub_bonus
+        self._claimed: set = set()
         self.max_steps = max_steps
         self.hold, self.settle = hold, settle  # ~8 frames/action: lean but still a real press
         self.steps = 0
@@ -56,6 +74,7 @@ class SegmentEnv:
             self.emu.load_state(self.state)
         self.emu.tick(60)
         self.steps = 0
+        self._claimed = set()
         return self._obs()
 
     def step(self, action: int):
@@ -63,8 +82,15 @@ class SegmentEnv:
             self.facing = action  # facing = last direction pressed, same accounting as the explorer
         self.emu.press(ACTIONS[action], hold_frames=self.hold, settle_frames=self.settle)
         self.steps += 1
+        rew = -0.01
+        for i, sg in enumerate(self.subgoals):
+            if i not in self._claimed and sg(self.emu):  # first time this episode: milestone bonus
+                self._claimed.add(i)
+                rew += self.sub_bonus
+        if self.goal_fn(self.emu):
+            rew += 1.0
         done = self.goal_fn(self.emu) or self.steps >= self.max_steps
-        return self._obs(), (1.0 if self.goal_fn(self.emu) else -0.01), done, {}
+        return self._obs(), rew, done, {}
 
     def _obs(self):
         s = read_state(self.emu)
