@@ -7,3 +7,5 @@ runs/
 .devin-scratch/
 
 kb/rom_tables.json
+
+.superpowers/
