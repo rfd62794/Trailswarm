@@ -155,7 +155,22 @@ def goal_map(map_id: int):
     return f
 
 
+def goal_balls(emu) -> bool:
+    """Any usable ball in the bag: Master/Ultra/Great/Poke Ball item IDs 1-4."""
+    from pokeagent.goals import bag_contents
+    return any(item in bag_contents(emu) for item in (1, 2, 3, 4))
+
+
+def goal_team2(emu) -> bool:
+    return read_state(emu).party_count > 1
+
+
+def goal_boulder(emu) -> bool:
+    return bool(emu.read(0xD356) & 1)
+
+
 GOAL_FNS = {"menu_start": goal_menu_start, "left_house": goal_left_house, "potion": goal_potion, "potion_run": goal_potion_run,
+            "buy_balls": goal_balls, "catch_pokemon": goal_team2, "campaign": goal_boulder, "beat_brock": goal_boulder,
             "reach_pc": goal_reach_pc, "exit_potion": goal_potion_run,
             "to_viridian": goal_map(0x01), "to_route2": goal_map(0x0D),
             "to_pewter": goal_map(0x02), "to_gym": goal_map(0x36),
@@ -201,11 +216,22 @@ SEGMENT_STATES = {"menu_start": ["baselines/bedroom.state"], "left_house": ["bas
                   "grind": ["runs/checkpoints/rl_grind.state",
                             "runs/checkpoints/to_viridian.state",
                             "runs/checkpoints/to_route1.state",
-                            "runs/checkpoints/rl_exit_potion.state", "baselines/bedroom.state"]}
+                            "runs/checkpoints/rl_exit_potion.state", "baselines/bedroom.state"],
+                  "buy_balls": ["runs/checkpoints/deliver_parcel_closed.state",
+                                 "runs/checkpoints/deliver_parcel.state",
+                                 "runs/checkpoints/to_viridian.state"],
+                  "catch_pokemon": ["runs/checkpoints/catch_ready.state",
+                                     "runs/checkpoints/deliver_parcel_closed.state",
+                                     "runs/checkpoints/to_viridian.state"],
+                  "campaign": ["baselines/bedroom.state"]}
 # shaped sub-goals per segment: first-time detectors each worth a small bonus
 SEGMENT_SUBGOALS = {"potion": [sub_box_open],
                     "potion_run": [sub_box_open, goal_potion],
                     "to_route2": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
+                    "buy_balls": [goal_map(0x00), goal_map(0x0C), goal_map(0x01)],
+                    "catch_pokemon": [goal_balls],
+                    "campaign": [goal_left_house, goal_potion, goal_map(0x0C), goal_map(0x01),
+                                 goal_balls, goal_team2, goal_map(0x0D), goal_map(0x02), goal_map(0x36)],
                     "battle": [sub_enemy_hurt]}
 
 
