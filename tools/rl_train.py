@@ -92,6 +92,8 @@ def main() -> int:
     ap.add_argument("--combat-context", action="store_true")
     ap.add_argument("--option", action="append", default=None,
                     help="meta-action: name=qpath[:steps]; invoke learned skill as one action")
+    ap.add_argument("--nav", action="append", default=None,
+                    help="meta-action: scripted BFS nav to X,Y on the current map (repeatable)")
     ap.add_argument("--battle-learning", action="store_true")
     ap.add_argument("--travel-priority", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
@@ -159,6 +161,10 @@ def main() -> int:
         path, _, steps = rest.partition(':')
         path = path or f'runs/skills/{name}.json'  # name alone resolves to the skills library
         opts.append(Option(name, path, make_goal(name), int(steps or 100)))
+    from pokeagent.options import ScriptedNav
+    for spec in (a.nav or []):
+        tx, _, ty = spec.partition(',')
+        opts.append(ScriptedNav((int(tx), int(ty))))
     env.options = tuple(opts)
     n_total = len(actions) + len(opts)  # buttons + meta-actions size the Q row
     env.render_interval = 1.0 / a.publish_fps

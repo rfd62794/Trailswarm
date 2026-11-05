@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pokeagent.navigation import load_memory, shortest_path
 from pokeagent.qmodels import load_model
+from pokeagent.ram import read_state
 
 
 class Option:
@@ -56,6 +58,45 @@ class Option:
             if self.goal_fn(env.emu):
                 done = True
                 info['option_solved'] = True
+        info['option'] = self.name
+        info['option_steps'] = steps
+        return total, steps, done, info
+
+
+class ScriptedNav:
+    """Deterministic skill: BFS the learned map graph to a target tile.
+
+    Not learned — geometry the shared map already knows. Re-plans each step so
+    moving NPCs or newly blocked edges can't trap it.
+    """
+
+    def __init__(self, target: tuple[int, int], max_steps: int = 200):
+        self.target = target
+        self.max_steps = max_steps
+        self.name = f'nav:{target[0]},{target[1]}'
+
+    def available(self, env) -> bool:
+        try:
+            return env.emu.read(0xD057) == 0 and env.emu.read_range(0xC3A0, 360).find(bytes([0x79, 0x7A])) < 0
+        except Exception:
+            return False
+
+    def run(self, env) -> tuple[float, int, bool, dict]:
+        total, steps, done, info = 0.0, 0, False, {}
+        memory = load_memory()
+        while steps < self.max_steps and not done:
+            s = read_state(env.emu)
+            if (s.x, s.y) == self.target:
+                done = True
+                info['option_solved'] = True
+                break
+            path = shortest_path(memory, s.map_id, s.x, s.y, *self.target)
+            if not path:
+                info['option_failed'] = 'unreachable'
+                break
+            _, rew, done, info = env.step(path[0])
+            total += rew
+            steps += 1
         info['option'] = self.name
         info['option_steps'] = steps
         return total, steps, done, info
