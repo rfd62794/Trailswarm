@@ -3,10 +3,10 @@
     uv run python tools/watch.py                      # auto-detect: 8765 and 8800-8815
     uv run python tools/watch.py --ports 8800-8807 --fps 8
 
-Each agent serves /screenshot.png and /status on its --control-port; this GUI polls them
-in per-agent threads and redraws as soon as new frames land. The grid auto-fits the window
-on resize (override with --fixed-scale). Click a tile to focus that agent; click the big
-view, the backdrop or Esc to go back out. No new dependencies (tkinter + PIL + stdlib HTTP).
+Frames come from each agent's pokeagent_frames_<port> shared-memory slot
+(pokeagent.telemetry.FrameSubscriber) when the agent runs --frame-share, or
+HTTP /screenshot.png + /status otherwise. Tiles auto-fit the window; click a
+tile to focus, click/Esc/right-click to go back. No new dependencies.
 """
 from __future__ import annotations
 
@@ -19,16 +19,17 @@ import threading
 import time
 import tkinter as tk
 import urllib.request
-from multiprocessing import shared_memory
 from typing import Optional
 
 from PIL import Image, ImageTk
+
+from pokeagent.telemetry import FrameSubscriber
 
 BG = "#101010"
 FG = "#d8d8d8"
 DIM = "#777777"
 BORDER = {"ok": "#3a3a3a", "battle": "#c0392b", "paused": "#b7950b", "dead": "#1d1d1d"}
-TILE_H = 160 + 20  # frame height + status line, at scale 1
+TILE_H = 160 + 20
 
 
 def fetch(port: int, path: str, timeout: float = 1.0) -> Optional[bytes]:
@@ -49,41 +50,7 @@ class Agent:
         self.fails = 0        # consecutive failed polls; a tile only goes offline after several
         self.seq = 0          # bumped every time a new frame lands (live-update signal)
         self.photo = None     # keep PhotoImage alive
-        self.shm = None       # shared_memory slot pokeagent_frames_<port>, if the agent publishes
-        self.shm_tried = 0.0
-
-
-def read_shm(a: Agent) -> Optional[bytes]:
-    """Latest published RGB frame from the agent's shared-memory slot (seqlock read)."""
-    if a.shm is None:
-        now = time.time()
-        if now - a.shm_tried < 5.0:  # don't hammer a missing slot; retry every 5s
-            return None
-        a.shm_tried = now
-        try:
-            a.shm = shared_memory.SharedMemory(name=f"pokeagent_frames_{a.port}")
-        except Exception:
-            a.shm = None
-        if a.shm is None:
-            return None
-    try:
-        b = a.shm.buf
-        s1 = int.from_bytes(b[0:8], "little")
-        if s1 == 0 or s1 & 1:
-            return None  # never written, or a write is in progress
-        data = bytes(b[16:16 + 160 * 144 * 3])
-        s2 = int.from_bytes(b[0:8], "little")
-        if s1 != s2:
-            return None  # torn read; the next tick gets a clean one
-        a.seq = s1
-        return data
-    except Exception:
-        try:
-            a.shm.close()
-        except Exception:
-            pass
-        a.shm = None
-        return None
+        self.sub = FrameSubscriber(port)  # frame slot reader; attaches when the agent publishes
 
 
 def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
@@ -93,13 +60,13 @@ def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
         t0 = time.time()
         n += 1
         got_any = False
-        if agent.shm is not None or agent.shm_tried == 0.0 or time.time() - agent.shm_tried >= 5.0:
-            frame = read_shm(agent)
-            if frame is not None:
-                agent.png = frame
-                agent.raw = True
-                got_any = True
-        if agent.shm is None:  # no frame slot: fall back to HTTP screenshots
+        frame = agent.sub.read()
+        if frame is not None:
+            agent.png = frame
+            agent.raw = True
+            agent.seq = agent.sub.seq
+            got_any = True
+        if not agent.sub.attached:  # no frame slot: fall back to HTTP screenshots
             png = fetch(agent.port, "/screenshot.png")
             if png is not None:
                 agent.png = png
@@ -194,11 +161,10 @@ def main() -> int:
 
     def relayout() -> None:
         # every probed port keeps a tile (dead ones dim to 'offline'), so the grid is stable
-        show = agents
-        cols = cols_for(len(show))
+        cols = cols_for(len(agents))
         for w in grid.winfo_children():
             w.grid_forget()
-        for i, ag in enumerate(show):
+        for i, ag in enumerate(agents):
             tiles[ag.port]["outer"].grid(row=i // cols, column=i % cols, padx=2, pady=2, sticky="n")
 
     def set_focus(port: Optional[int]) -> None:
@@ -276,7 +242,7 @@ def main() -> int:
                 t["outer"].configure(bg=border)
         root.after(30, redraw)  # ~30ms tick: frames appear as soon as a poll lands
 
-    relayout()  # static grid: every probed port gets a tile once, dead ones just dim
+    relayout()
     root.after(200, redraw)
     root.mainloop()
     return 0

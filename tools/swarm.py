@@ -165,7 +165,7 @@ def main() -> int:
     ap.add_argument("--share-frames", action="store_true",
                     help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
     a = ap.parse_args()
-    GOALS = ["potion", "left_house", "first_pokemon", "won_battle", "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel", "to_route2", "to_pewter", "to_gym", "beat_brock"]
+    from pokeagent.goals import GOALS
     seg_args: list[str] = []
     if a.segment:
         i = GOALS.index(a.segment)

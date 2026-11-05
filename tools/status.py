@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from review_runs import GOALS
+from pokeagent.goals import GOALS
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
