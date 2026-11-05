@@ -48,6 +48,7 @@ def main() -> int:
     ap.add_argument("--save-q", default=None, help="write the Q table here every episode (gauntlet picks champions)")
     ap.add_argument("--load-q", default=None, help="seed the Q table from a saved table (offspring of a champion)")
     ap.add_argument("--eps-floor", type=float, default=0.1, help="never stop exploring below this rate")
+    ap.add_argument("--tag", default="", help="lineage tag shown on the tile (gauntlet assigns e.g. a, a1, a1c)")
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
@@ -91,7 +92,7 @@ def main() -> int:
                 json.dump({repr(k): v for k, v in Q.items()}, open(a.save_q, "w"))
             if a.frame_port is not None:
                 best = min(steps_log); worst = max(steps_log)
-                json.dump({"instance": a.frame_port, "generation": ep, "wins": wins,
+                json.dump({"instance": a.frame_port, "tag": a.tag, "generation": ep, "wins": wins,
                            "steps_total": total_steps, "steps_avg": round(total_steps / len(steps_log), 1),
                            "steps_best": best, "steps_worst": worst},
                           open(f"runs/rlstatus_{a.frame_port}.json", "w"))
