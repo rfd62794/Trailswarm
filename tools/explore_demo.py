@@ -1124,26 +1124,44 @@ def main(argv=None) -> int:
             cursor_mv = next((ln.replace(">", "").strip() for ln in move_lines if ">" in ln), None)
             if cursor_mv and 1 <= len(move_lines) <= 4:  # the move menu
                 moves = [ln.replace(">", "").strip() for ln in move_lines]
+                # --- no-PP guard, two layers (Robert, 2026-11-04: reselecting an empty move stalls the run) ---
+                # 1) the game's refusal: an A-press that drew the 'no PP left' text marks the move unusable this battle
+                if any("PP" in ln.upper() for ln in lines_now):
+                    rejected = st.pop("last_move_choice", None)
+                    if rejected:
+                        st.setdefault("no_pp", set()).add(rejected)
+                        log(f"[{rejected} is out of PP - not reselecting it this battle]", "res")
+                # 2) the PP bytes already trusted by move_scores (wBattleMonPP 0xD02D-0xD030, slots = list order)
+                pp_of = [emu.read(0xD02D + i) & 0x3F for i in range(4)]
+                avail = [mv for i, mv in enumerate(moves)
+                         if (i >= len(pp_of) or pp_of[i] > 0) and mv not in st.get("no_pp", ())]
+                if not avail:  # every move refused or reads 0 PP: B out so the game can fall to STRUGGLE
+                    st["all_pp_out"] = st.get("all_pp_out", 0) + 1
+                    if st["all_pp_out"] > 1:
+                        do_press("B", "agent", "all moves out of PP: leaving the move list for STRUGGLE"); return
+                else:
+                    st["all_pp_out"] = 0
+                pool = avail or moves  # a stale all-zero PP read must not freeze the chooser: fall back
                 def score(mv):
                     d = mem.data.get("move_damage", {}).get(f"{species}:{mv}")
                     return (0, 0) if not d else (1, sum(d) / len(d))
-                tried = [mv for mv in moves if score(mv)[0]]
+                tried = [mv for mv in pool if score(mv)[0]]
                 ks = move_scores(emu)  # cartridge knowledge: power x type chart x STAB x accuracy, 0 when out of PP
                 norm0 = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
                 known = {norm0(k): v for k, v in ks.items()}
-                if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in moves):
+                if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in pool):
                     # Willing to try: a damaging move never used against this species gets one trial (x1.3 bonus)
                     def kscore(mv):
                         base = known.get(norm0(mv), (0, ""))[0]
                         return base * (1.3 if base > 0 and mv not in tried else 1.0)
                     if st.get("catch_mode"):  # weaken without a KO: the weakest move that still does damage
-                        target = min((mv for mv in moves if kscore(mv) > 0), key=kscore)
+                        target = min((mv for mv in pool if kscore(mv) > 0), key=kscore)
                         st["move_reason"] = "weakest hit, catching"
                     else:
-                        target = max(moves, key=lambda mv: (kscore(mv), score(mv)[1]))
+                        target = max(pool, key=lambda mv: (kscore(mv), score(mv)[1]))
                         st["move_reason"] = known.get(norm0(target), (0, ""))[1] + ("" if target in tried else " first try")
                 else:  # no knowledge (or all out of PP): variety first, then the best observed damage
-                    target = next((mv for mv in moves if mv not in tried), None) or max(moves, key=lambda mv: score(mv)[1])
+                    target = next((mv for mv in pool if mv not in tried), None) or max(pool, key=lambda mv: score(mv)[1])
                     st["move_reason"] = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
                 norm = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
                 st["move_nav"] = st.get("move_nav", 0) + 1
@@ -1151,6 +1169,7 @@ def main(argv=None) -> int:
                     chosen = cursor_mv if st["move_nav"] > 5 else target
                     st["move_nav"] = 0
                     st["pending_move"] = {"species": species, "move": chosen, "enemy_hp": enemy_hp}
+                    st["last_move_choice"] = chosen  # a 'no PP left' text next loop marks this move unusable
                     ename = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), f"#{species}")
                     do_press("A", "agent", f"BATTLE vs {ename} L{emu.read(0xCFF3)}: {chosen} ({st.get('move_reason', '')})"); return
                 do_press("DOWN", "agent", f"move menu: cursor to {target} (now on {cursor_mv})"); return
@@ -1161,6 +1180,7 @@ def main(argv=None) -> int:
             do_press("A", "agent", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT"); return
         if st.get("in_battle"):
             st["in_battle"] = False; st["last_battle_hp"] = None; st["potion_hp_before"] = None
+            st["no_pp"] = set(); st["all_pp_out"] = 0; st["last_move_choice"] = None
             ca = st.pop("catch_attempt", None)
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
                 dn = ca.get("dex") or 0
