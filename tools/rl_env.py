@@ -561,7 +561,16 @@ class SegmentEnv:
         if self.combat_context:
             from pokeagent.observations import combat_observation
             base += combat_observation(self.emu)
-        return base + tuple(self.obs_extra(self.emu)) if self.obs_extra else base
+        out = base + tuple(self.obs_extra(self.emu)) if self.obs_extra else base
+        if self.screen_context:  # rendered-pixel truth: two signature flags at the tail
+            try:
+                from pokeagent.pixelsig import match
+                self.emu.tick_rendered(1)
+                rgb = self.emu.frame_rgb()
+                out += (int(match(rgb, 'yesno_box')), int(match(rgb, 'dialog_box')))
+            except Exception:
+                out += (0, 0)
+        return out
 
     def close(self) -> None:
         if self.frame_pub is not None:
