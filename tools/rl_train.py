@@ -16,11 +16,12 @@ from collections import defaultdict
 from rl_env import ACTIONS, GOAL_FNS, SEGMENT_STATES, SegmentEnv
 
 
-def run_episode(env, policy, rng) -> tuple[bool, int]:
+def run_episode(env, policy, rng, pub_every: int = 8) -> tuple[bool, int]:
     obs = env.reset()
     for _ in range(env.max_steps):
         obs, _r, done, _ = env.step(policy(obs, rng))
-        env.publish()  # no-op unless frame_shm is set
+        if env.steps % pub_every == 0:
+            env.publish()  # no-op unless frame_shm is set
         if done:
             break
     return env.goal_fn(env.emu), env.steps
@@ -41,6 +42,8 @@ def main() -> int:
                     help="publish frames to pokeagent_frames_<port> so tools/watch.py can tile this run")
     ap.add_argument("--hold", type=int, default=8)
     ap.add_argument("--settle", type=int, default=8)
+    ap.add_argument("--publish-every", type=int, default=8,
+                    help="render+publish every Nth step to the frame slot (publish-per-step saturates the CPU)")
     a = ap.parse_args()
 
     rng = random.Random(a.seed)
@@ -58,7 +61,8 @@ def main() -> int:
             for _ in range(env.max_steps):
                 act = rng.randrange(len(ACTIONS)) if rng.random() < eps else max(range(len(ACTIONS)), key=lambda i: Q[obs][i])
                 nxt, rew, done, _ = env.step(act)
-                env.publish()  # no-op unless frame_shm is set
+                if env.steps % a.publish_every == 0:
+                    env.publish()  # no-op unless frame_shm is set
                 q = Q[obs]
                 q[act] += alpha * (rew + gamma * max(Q[nxt]) - q[act])
                 obs = nxt
@@ -71,9 +75,9 @@ def main() -> int:
                 print(f"  ep {ep}: SOLVED in {env.steps} steps" + (" (first success!)" if ep == first_ep else ""), flush=True)
             if (ep + 1) % 25 == 0:
                 print(f"  ep {ep + 1}: {wins} solves so far" + (f" (first at ep {first_ep})" if first_ep is not None else ", none yet"), flush=True)
-        learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng)
+        learned = [run_episode(env, lambda o, r: max(range(len(ACTIONS)), key=lambda i: Q[o][i]), rng, a.publish_every)
                    for _ in range(a.evals)]
-        rand = [run_episode(env, lambda o, r: r.randrange(len(ACTIONS)), rng) for _ in range(a.evals)]
+        rand = [run_episode(env, lambda o, r: r.randrange(len(ACTIONS)), rng, a.publish_every) for _ in range(a.evals)]
     finally:
         env.close()
 
