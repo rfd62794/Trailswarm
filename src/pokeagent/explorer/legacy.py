@@ -1,4 +1,4 @@
-"""The rule-based explorer policy, ported from tools/explore_demo.py.
+"""The framework's older, simpler explorer policy (the MCP server's ``Explorer``), ported from tools/explore_demo.py.
 
 The demo's policy lives inside its tkinter loop, so the framework keeps this
 self-contained port: same ``runs/maps.json`` schema (the framework and the
@@ -9,168 +9,15 @@ blocked - and the same blocked/warp learning with the two-strike confirm.
 
 from __future__ import annotations
 
-import json
-import os
-import time
 from pathlib import Path
 
 from pokeagent.emulator import Button, Emulator
+from pokeagent.explorer.memory import MapMemory
+from pokeagent.explorer.perceive import (
+    BATTLE_FLAG, DIRS, TILEMAP_ADDR, TILEMAP_LEN, box_open, frame_lines, is_menu,
+)
 from pokeagent.ram import read_state
 from pokeagent.screencontext import classify_screen
-from pokeagent.screentext import CHARMAP
-
-TILEMAP_ADDR, TILEMAP_LEN, BORDER_TL = 0xC3A0, 360, 0x79
-BATTLE_FLAG = 0xD057  # wIsInBattle (unverified)
-DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
-
-
-def box_open(tilemap: bytes) -> bool:
-    """A frame is open when a top-left corner tile is followed by a top-edge tile."""
-    return tilemap.find(bytes([BORDER_TL, 0x7A])) >= 0
-
-
-def is_menu(tilemap: bytes) -> bool:
-    return 0xED in tilemap  # the menu cursor tile (verified)
-
-
-def frame_lines(tilemap: bytes) -> list[str]:
-    """Readable text lines inside an open frame; '>' marks the menu cursor."""
-    out = []
-    for r in range(18):
-        row = tilemap[r * 20 : (r + 1) * 20]
-        if row.count(0x7C) < 2:  # both frame edges present
-            continue
-        inner = row[row.index(0x7C) + 1 : len(row) - row[::-1].index(0x7C) - 1]
-        line = "".join(
-            ch if ch.isprintable() else " "
-            for ch in (CHARMAP.get(b, " ") or " " for b in inner)
-        ).strip()
-        if any(ch.isalnum() for ch in line):
-            out.append(" ".join(line.split()))
-    return out
-
-
-class MapMemory:
-    """Per-map memory in the demo's runs/maps.json schema."""
-
-    def __init__(self, path: Path | str):
-        self.path = Path(path)
-        self.data = json.loads(self.path.read_text()) if self.path.exists() else {"maps": {}}
-
-    def m(self, map_id: int) -> dict:
-        return self.data["maps"].setdefault(
-            str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0}
-        )
-
-    def visit(self, map_id: int, x: int, y: int, step: int) -> None:
-        d = self.m(map_id)
-        d["visited"][f"{x},{y}"] = d["visited"].get(f"{x},{y}", 0) + 1
-        d["last_seen"] = step
-
-    def learn(self, before: tuple, button: str, after: tuple, *, confirmed: bool) -> str:
-        """Record what a press did; a failed move is 'blocked' only when confirmed."""
-        (m0, x0, y0), (m1, x1, y1) = before, after
-        if button not in DIRS:
-            return "pressed"
-        key = f"{x0},{y0},{button}"
-        blocked = self.m(m0)["blocked"]
-        if (m1, x1, y1) != (m0, x0, y0):
-            paths = self.m(m0).setdefault("paths", {})
-            edge = paths.setdefault(key, {"to": [m1, x1, y1], "count": 0})
-            edge["to"] = [m1, x1, y1]
-            edge["count"] += 1
-        if m1 != m0:
-            w = self.m(m0)["warps"]
-            taken = self.m(m0).setdefault("warp_taken", {})
-            taken[key] = taken.get(key, 0) + 1
-            w[key] = [m1, x1, y1]
-            return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
-        if (x1, y1) == (x0, y0):
-            if not confirmed:
-                return "no move (turned? fading?) - will retry once before calling it blocked"
-            if key not in blocked:
-                blocked.append(key)
-            return "blocked (confirmed)"
-        if key in blocked:
-            blocked.remove(key)  # it was a false 'blocked' (learned during a fade)
-            return "moved - cleared a false wall"
-        return "moved"
-
-    def interact(self, map_id: int, x: int, y: int, facing: str, text: str, *,
-                 screen: str | None = None, menu: str | None = None,
-                 outcome: str | None = None, transition: list | None = None,
-                 npc: dict | None = None) -> dict:
-        d = self.m(map_id).setdefault("interactions", {})
-        e = d.setdefault(
-            f"{x},{y},{facing}",
-            {"count": 0, "text": "", "presses": [], "menus": [], "choices": [],
-             "outcomes": {}, "screens": {}, "transitions": []},
-        )
-        e["count"] += 1
-        if text and not e["text"]:
-            e["text"] = text[:160]
-        if outcome:
-            e.setdefault("outcomes", {})[outcome] = e.setdefault("outcomes", {}).get(outcome, 0) + 1
-        if screen:
-            e.setdefault("screens", {})[screen] = e.setdefault("screens", {}).get(screen, 0) + 1
-        if menu and menu != "UNKNOWN" and menu not in e.setdefault("menus", []):
-            e["menus"].append(menu)
-        if transition and transition not in e.setdefault("transitions", []):
-            e["transitions"].append(transition)
-        if npc:
-            e["npc"] = {"pic": npc.get("pic"), "slot": npc.get("slot"), "last": npc.get("last")}
-        return e
-
-    def observe_npcs(self, map_id: int, emu: Emulator, step: int) -> None:
-        npcs = self.m(map_id).setdefault("npcs", {})
-        for slot in range(1, 16):
-            pic = emu.read(0xC100 + 16 * slot)
-            if not pic:
-                continue
-            x, y = emu.read(0xC205 + 16 * slot) - 4, emu.read(0xC204 + 16 * slot) - 4
-            key = f"slot{slot}:pic{pic}"
-            e = npcs.setdefault(key, {"pic": pic, "slot": slot, "positions": {},
-                                      "first_seen": step, "text": "", "talked": 0})
-            e["positions"][f"{x},{y}"] = e["positions"].get(f"{x},{y}", 0) + 1
-            e["moves"] = len(e["positions"]) > 1
-            e["last"] = [x, y]
-
-    def npc_at(self, map_id: int, x: int, y: int) -> dict | None:
-        for entry in self.m(map_id).get("npcs", {}).values():
-            if entry.get("last") == [x, y]:
-                return entry
-        return None
-
-    def interaction_known(self, map_id: int, x: int, y: int, facing: str) -> bool:
-        return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
-
-    def choose(self, map_id: int, x: int, y: int, facing: str) -> tuple[str, str]:
-        d = self.m(map_id)
-        best = None
-        tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
-        if facing in tried and not self.interaction_known(map_id, x, y, facing):
-            return "A", f"at ({x},{y}) facing {facing} is blocked and untested: pressing A"
-        for name, (dx, dy) in DIRS.items():
-            if name in tried:
-                continue
-            warp = d["warps"].get(f"{x},{y},{name}")
-            if warp:
-                visits = d.get("warp_taken", {}).get(f"{x},{y},{name}", 1) * 3
-            else:
-                visits = d["visited"].get(f"{x + dx},{y + dy}", 0)
-            if best is None or visits < best[0]:
-                best = (visits, name)
-        if best is None:
-            return "A", "every direction known blocked: pressing A to look around"
-        why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[0]}x"
-        return best[1], why
-
-    def save(self) -> None:
-        self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")  # atomic replace
-        tmp.write_text(json.dumps(self.data, indent=1))
-        os.replace(tmp, self.path)
 
 
 class Explorer:

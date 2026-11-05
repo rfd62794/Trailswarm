@@ -5,14 +5,14 @@ Every name the old single-file ``pokeagent.explorer`` module exposed is re-expor
 """
 from __future__ import annotations
 
-from pokeagent.explorer.legacy import (
+from pokeagent.explorer.legacy import Explorer
+from pokeagent.explorer.memory import MapMemory
+from pokeagent.explorer.perceive import (
     BATTLE_FLAG,
     BORDER_TL,
     DIRS,
     TILEMAP_ADDR,
     TILEMAP_LEN,
-    Explorer,
-    MapMemory,
     box_open,
     frame_lines,
     is_menu,
