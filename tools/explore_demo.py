@@ -39,6 +39,14 @@ import queue  # noqa: E402
 from concurrent.futures import Future  # noqa: E402
 
 from pokeagent.goals import GOALS, GOAL_MENU, bag_contents, check_goals
+
+
+def _git_sha() -> str:
+    try:
+        import subprocess
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        return ""
 # Procedures: (button, regex the screen must show afterwards | None). START menu order at game start:
 # POKeMON, ITEM, <name>, SAVE, OPTION, EXIT (POKeMON appears once you have one). READ records the screen.
 PROCEDURES = {
@@ -560,7 +568,8 @@ def main(argv=None) -> int:
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
     (run_dir / "meta.json").write_text(json.dumps({"start": Path(a.state).stem if a.state else "baseline",
                                                     "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed,
-                                                    "frame_share": a.frame_share, "train_level": a.train_level}))
+                                                    "frame_share": a.frame_share, "train_level": a.train_level,
+                                                    "window": not a.headless, "git_sha": _git_sha()}))
     mem = MapMemory(Path(a.maps))
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
