@@ -267,6 +267,8 @@ def main() -> int:
             last_pub = 0.0
             traj = []  # n-step buffer: (s, a, r, s')
             ep_path = []  # full (obs, act) record for --trace run-level analysis
+            ep_times = []  # wall-clock seconds since episode start, same length as ep_path
+            t0 = time.time()
             novelty_budget = 0.2
             repeat_budget = 0.5
             state_action_counts = {}
@@ -282,6 +284,7 @@ def main() -> int:
                     best = max(values[i] for i in allowed)
                     act = rng.choice([i for i in allowed if values[i] == best])
                 ep_path.append(list(obs) + [act])
+                ep_times.append(round(time.time() - t0, 2))
                 nxt, rew, done, info = env.step(act)
                 reward_components['extrinsic'] += rew
                 if phi:
@@ -353,7 +356,9 @@ def main() -> int:
                     tid = a.frame_port if a.frame_port is not None else a.seed
                     with open(f"runs/traces/{a.segment}_{tid}.jsonl", "a") as tf:
                         tf.write(json.dumps({"ep": ep, "steps": env.steps, "won": won,
-                                             "path": ep_path, "final_obs": list(obs), "schema": schema,
+                                             "path": ep_path, "times": ep_times,
+                                             "duration": round(time.time() - t0, 2),
+                                             "final_obs": list(obs), "schema": schema,
                                              "outcomes": env.battle_outcomes, "rewards": reward_components}) + "\n")
                 except Exception:
                     pass
