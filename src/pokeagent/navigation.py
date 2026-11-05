@@ -21,33 +21,48 @@ def load_memory(path: str = 'runs/maps.json') -> dict:
         return {}
 
 
-def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int):
-    """BFS over learned memory -> list of action indices, or None if unreachable."""
-    m = memory.get('maps', {}).get(str(map_id), {})
-    visited = set(m.get('visited', {}))
-    blocked = set(m.get('blocked', []))
-    if (x, y) == (tx, ty):
+def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
+                  tmap: int | None = None):
+    """BFS over learned memory -> list of action indices, or None if unreachable.
+
+    States are (map, x, y): walkable moves inside a map plus warp edges
+    'x,y,dir' -> [m1, x1, y1], so a route can hop doors/stairs across maps.
+    """
+    tmap = map_id if tmap is None else tmap
+    goal = (tmap, tx, ty)
+    start = (map_id, x, y)
+    if start == goal:
         return []
-    q = deque([(x, y)])
-    prev = {(x, y): None}
+    maps = memory.get('maps', {})
+    q = deque([start])
+    prev = {start: None}
     while q:
-        cx, cy = q.popleft()
+        m, cx, cy = q.popleft()
+        d = maps.get(str(m), {})
+        visited = set(d.get('visited', {}))
+        blocked = set(d.get('blocked', []))
+        warps = d.get('warps', {})
         for name, (dx, dy) in DIRS.items():
-            if f'{cx},{cy},{name}' in blocked:
+            key = f'{cx},{cy},{name}'
+            if key in warps:  # observed transition beats a stale 'blocked' (fade artifacts)
+                m1, x1, y1 = warps[key]
+                nxt = (m1, x1, y1)
+            elif key in blocked:
                 continue
-            nxt = (cx + dx, cy + dy)
+            else:
+                nxt = (m, cx + dx, cy + dy)
             if nxt in prev:
                 continue
-            if nxt != (tx, ty) and f'{nxt[0]},{nxt[1]}' not in visited:
-                continue  # only step onto learned-walkable tiles (target itself allowed)
-            prev[nxt] = (cx, cy, name)
-            if nxt == (tx, ty):
+            if nxt != goal and nxt[0] == m and f'{nxt[1]},{nxt[2]}' not in visited:
+                continue  # only learned-walkable tiles; warp landings count as known
+            prev[nxt] = (m, cx, cy, name)
+            if nxt == goal:
                 path = []
                 cur = nxt
                 while prev[cur] is not None:
-                    px, py, d = prev[cur]
-                    path.append(BUTTON[d])
-                    cur = (px, py)
+                    pm, px, py, b = prev[cur]
+                    path.append(BUTTON[b])
+                    cur = (pm, px, py)
                 return path[::-1]
             q.append(nxt)
     return None

@@ -70,10 +70,11 @@ class ScriptedNav:
     moving NPCs or newly blocked edges can't trap it.
     """
 
-    def __init__(self, target: tuple[int, int], max_steps: int = 200):
+    def __init__(self, target: tuple[int, int], max_steps: int = 200, target_map: int | None = None):
         self.target = target
+        self.target_map = target_map
         self.max_steps = max_steps
-        self.name = f'nav:{target[0]},{target[1]}'
+        self.name = f'nav:{target[0]},{target[1]}' if target_map is None else f'nav:{target_map}:{target[0]},{target[1]}'
 
     def available(self, env) -> bool:
         try:
@@ -86,11 +87,12 @@ class ScriptedNav:
         memory = load_memory()
         while steps < self.max_steps and not done:
             s = read_state(env.emu)
-            if (s.x, s.y) == self.target:
+            tmap = s.map_id if self.target_map is None else self.target_map
+            if s.map_id == tmap and (s.x, s.y) == self.target:
                 done = True
                 info['option_solved'] = True
                 break
-            path = shortest_path(memory, s.map_id, s.x, s.y, *self.target)
+            path = shortest_path(memory, s.map_id, s.x, s.y, *self.target, tmap=tmap)
             if not path:
                 info['option_failed'] = 'unreachable'
                 break

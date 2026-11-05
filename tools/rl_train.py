@@ -163,8 +163,11 @@ def main() -> int:
         opts.append(Option(name, path, make_goal(name), int(steps or 100)))
     from pokeagent.options import ScriptedNav
     for spec in (a.nav or []):
-        tx, _, ty = spec.partition(',')
-        opts.append(ScriptedNav((int(tx), int(ty))))
+        parts = [int(p, 0) for p in spec.split(',')]
+        if len(parts) == 2:
+            opts.append(ScriptedNav((parts[0], parts[1])))
+        else:
+            opts.append(ScriptedNav((parts[1], parts[2]), target_map=parts[0]))
     env.options = tuple(opts)
     n_total = len(actions) + len(opts)  # buttons + meta-actions size the Q row
     env.render_interval = 1.0 / a.publish_fps
