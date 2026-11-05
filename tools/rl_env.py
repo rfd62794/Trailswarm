@@ -354,8 +354,13 @@ class SegmentEnv:
             joined = ' '.join(lines).upper()
             if 'SAVING' in joined:
                 return [i for i in range(n) if self.actions[i] == Button.B]  # game locks input; only B is honest
-            if 'YES' in joined and 'NO' in joined:
-                return [i for i in range(n) if self.actions[i] == Button.B]  # any confirm prompt: only honest answer is NO/B
+            self._save_armed = getattr(self, '_save_armed', 0)
+            if any(ln.startswith('>SAVE') for ln in lines) or (ctx.menu == MenuKind.START and ctx.option == 3):
+                self._save_armed = 10  # next ~10 decisions are inside the save flow
+            elif self._save_armed > 0:
+                self._save_armed -= 1
+            if self._save_armed and 'YES' in joined and 'NO' in joined:
+                return [i for i in range(n) if self.actions[i] == Button.B]  # save confirm only: legitimate YES/NO stays free
             if ctx.screen == ScreenType.DIALOG:
                 return [i for i in range(n) if self.actions[i] in (Button.A, Button.B)]
             if ctx.menu == MenuKind.START:
