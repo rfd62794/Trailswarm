@@ -37,7 +37,7 @@ class Supervisor:
                  limit: Callable[[], int], steps: int = 400, starter: str | None = None, roles: list[str] | None = None,
                  segment: Callable[[int], str | None] | None = None, stop_file: Path | None = None,
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
-                 heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None,
+                 heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None, plan: Any = None,
                  watch: Callable[[dict], Any] | None = None, watch_s: float = 15.0,
                  on_stall: Callable[..., None] | None = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
@@ -46,7 +46,7 @@ class Supervisor:
         self.steps, self.starter, self.segment, self.stop_now = steps, starter, segment, stop_now
         self.stop_file = Path(stop_file) if stop_file else self.root / "runs" / "swarm.stop"
         self.deadline, self.firsts, self.clock, self.sleep, self.log = deadline, firsts, clock, sleep, log
-        self.fast_s, self.pause_s = fast_s, pause_s
+        self.fast_s, self.pause_s, self.plan = fast_s, pause_s, plan  # plan: seg_sched.Curriculum
         self.heartbeat, self.segment_ok, self.watch_factory, self.watch_s = heartbeat, segment_ok, watch, watch_s
         self.on_stall = on_stall
         self.watchers: dict[int, Any] = {}
@@ -98,21 +98,24 @@ class Supervisor:
     def _config(self, slot: Slot) -> dict:
         n = self.seq
         self.seq += 1
-        return {"slot": slot.idx, "seq": n, "seed": 1000 + n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
+        cfg = {"slot": slot.idx, "seq": n, "seed": 1000 + n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
                 "starter": self.starter or STARTERS[n % 3], "steps": self.steps,
                 "segment": self._pick_segment(n),
                 "own": self.swarm_dir / f"agent{slot.idx}-{n}.json"}
+        return self.plan.configure(cfg, n) if self.plan else cfg  # curriculum: segment, start state, budget (seg_sched)
 
     def _start(self, slot: Slot) -> None:
         cfg = self._config(slot)
         self.swarm_dir.mkdir(parents=True, exist_ok=True)
-        if self.shared.exists():
-            shutil.copy(self.shared, cfg["own"])  # the freshest merged memory: learning compounds
+        src = self.plan.maps_source(cfg, self.shared) if self.plan else self.shared  # a confirm replays its ORIGINAL memory
+        if src.exists():
+            shutil.copy(src, cfg["own"])  # the freshest merged memory: learning compounds
         cfg["hash"], cfg["started_wall"] = self._digest(cfg["own"]), time.time()
         slot.cfg, slot.started = cfg, self.clock()
-        if cfg["segment"] and self.segment_ok and not self.segment_ok(cfg["segment"]):
+        if cfg["segment"] and not cfg.get("job") and self.segment_ok and not self.segment_ok(cfg["segment"]):
             self.log(f"WARNING segment {cfg['segment']}: no checkpoint, running a full agent")
         try:
+            self.plan and self.plan.on_start(cfg)  # keeps what a replay needs; raises if the job's start state is gone
             slot.handle = self.launch(cfg)
             if self.watch_factory:
                 self.watchers[slot.idx] = self.watch_factory(cfg)
@@ -150,7 +153,7 @@ class Supervisor:
         self._unowned.discard(slot.idx)
         cfg, slot.handle = slot.cfg, None
         self.watchers.pop(slot.idx, None)
-        if rc == 0 and cfg["segment"] and ran < SOLVED_FAST_S:
+        if rc == 0 and cfg["segment"] and not cfg.get("job") and ran < SOLVED_FAST_S:
             self.solved[cfg["segment"]] = self.clock()
             self.log(f"segment {cfg['segment']} finished in {ran:.0f}s (already solved); "
                      f"not re-picking for {SOLVED_HOLD_S:.0f}s")
@@ -174,6 +177,7 @@ class Supervisor:
             if keep:
                 note += f", kept in {self._keep(cfg['own'])} for --merge-only"
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
+        self.plan and self.plan.on_finish(cfg, rc)
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
         too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
         if too_fast and not self.stopping:

@@ -221,6 +221,8 @@ def adopt(sup, data: dict) -> int:
                     f"{cfg.get('starter')}); new settings apply to its refill")
         if sup.watch_factory:
             sup.watchers[s.idx] = sup.watch_factory(cfg)
+        if getattr(sup, "plan", None):
+            sup.plan.adopted(cfg)  # curriculum bookkeeping (an in-flight replay must not be issued twice)
     want = len(sup.slots)
     for s in sup.slots:
         by_idx.setdefault(s.idx, s)

@@ -24,6 +24,7 @@ class ExplorerOptions:
     state_stem: str = ""  # Path(--state).stem, "" when no state
     steps: int = 300
     stop_at_goal: str | None = None
+    stop_at_map: int | None = None  # sub-segment runs end on first entry into this map id
     headless: bool = False
     box_pace: int = 6
     frames_per_step: int = 10

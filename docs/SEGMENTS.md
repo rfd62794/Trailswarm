@@ -34,3 +34,28 @@ Grading a segment variant: fewer presses wins when the end condition is met; a v
 not need to lose, or that triggered a stall, ranks below one that did not (review_runs.py reports waste per
 run; the battle log reports HP per turn). Human and Claude presses inside a segment are kept as demonstrations
 but graded by the same rule, so a human shortcut only survives if it keeps winning.
+
+## Curriculum (daisy chain)
+
+`uv run python tools/swarm.py --continuous --plan curriculum --agents N` hands each free slot one segment by need
+instead of one huge run: 70% unsolved segments (weakest first), 20% the frontier (the segment after the furthest
+checkpoint, started from that goal's best checkpoint), 10% polish of solved segments (explorers hunting tiny gains),
+plus a replay slot whenever a new best is waiting for confirmation. A segment is solved at >= 90% over its last 20
+attempts. Each job starts from the PREVIOUS segment's best checkpoint (`runs/checkpoints/<goal>.best.state`, else
+`<goal>.state`), stops at its own end (`--stop-at-goal`, or `--stop-at-map` for a sub-segment) and gets a step budget of
+3x the best solve's presses (1,500 to 6,000; 3,000 with no solve yet).
+
+* A faster solve is a candidate until a re-run with the same seed, starter, box pace, starting map memory AND the exact
+  start-state file (both copied, with its sha256, under `runs/segments/inputs/<tag>/`; the run starts from that copy and the
+  replay never re-resolves a checkpoint) solves again; then it is `confirmed` and its end state becomes `<goal>.best.state`.
+* A segment with < 30% solved after >= 20 attempts is split at the maps its failed attempts reached (first entry into
+  each map id); the pieces (`<goal>@<map hex>`, last `<goal>@end`) have their own checkpoints and stats and chain back.
+* Stats live in `runs/segments.json`. `uv run python tools/segments.py` ingests finished runs and prints segment,
+  tries, rate, best, expected frames (a failure costs its frames, calibrated from goal_frames, plus half a typical solve), confirmed, share of slots, and the
+  chained personal best; `tools/status.py` shows the same table.
+* Splits use only tagged, non-estimated failed attempts; a cut map is never the segment's start map, never one an earlier
+  segment's attempts walked, and must be reached by >= 2 failed attempts. `tools/segments.py --reset-splits [GOAL]` undoes them.
+* Frames per press is calibrated from goal_frames.jsonl (default 10.5); a failure's penalty is half the segment's median solve
+  (at least 600 frames); polish goes to the segment with the most to win (expected minus best). A janitor deletes kept job
+  dirs and candidate states older than 24 h that no best points at, and `end.state` is deleted from every run folder after
+  ingest (only candidates keep a copy). `swarm.py --port-base N` picks the first control port (use >= 9700 for checks).

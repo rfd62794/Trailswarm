@@ -9,6 +9,7 @@ from pathlib import Path
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
 from pokeagent.goals import GOALS, check_goals
 
 
@@ -61,9 +62,12 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 except PermissionError:
                     time.sleep(0.2)
             if ctx.opts.stop_at_goal == g:  # AFTER the milestone is persisted (it used to return before recording it)
+                save_end_state(ctx)
                 ctx.done = True; shutdown(ctx); ctx.log(f"segment done: {g} at step {ctx.step}", "hdr")
                 if ctx.opts.headless:
                     fr.goals = goals
                     return True
     fr.goals = goals
+    if stop_at_map_reached(ctx):
+        return bool(ctx.opts.headless)
     return False

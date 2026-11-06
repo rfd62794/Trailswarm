@@ -50,6 +50,11 @@ def segment_args(goal: str | None) -> list[str]:
     return ["--state", str(start), "--stop-at-goal", goal] if start.exists() else []
 
 
+def job_args(job: dict) -> list[str]:
+    """A curriculum job: start checkpoint, stop condition and the tag that links the run back to its job."""
+    return ["--state", job["start"], *job["stop"], "--tag", job["tag"]]
+
+
 def weakest_segment(n: int) -> str | None:
     """The n-th refill takes the next-weakest goal (consistency < 70%); None when everything is consistent."""
     try:
@@ -65,17 +70,20 @@ def weakest_segment(n: int) -> str | None:
 class Launcher:
     """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
 
-    def __init__(self, share_frames: bool, roles_mode: bool = False, ram_diff_slots: int = 0):
+    def __init__(self, share_frames: bool, roles_mode: bool = False, ram_diff_slots: int = 0, port_base: int | None = None):
         self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
         self.ram_diff_slots = ram_diff_slots  # slots 0..N-1 record event RAM diffs (tools/ram_discover.py); default none
+        self.port_base = PORT_BASE if port_base is None else port_base
 
     def _port(self) -> int:
         used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
-        return next(p for p in range(PORT_BASE, PORT_BASE + 100) if p not in used)
+        return next(p for p in range(self.port_base, self.port_base + 100) if p not in used)
 
     def __call__(self, cfg: dict):
-        role_args = ["--explore-rate", "0.5" if cfg["role"] == "explorer" else "0.0"]
-        if cfg["role"] in ("trainer", "explorer") and self.roles_mode:
+        role_args = ["--explore-rate", str(cfg["explore_rate"]) if "explore_rate" in cfg
+                     else "0.5" if cfg["role"] == "explorer" else "0.0"]
+        job = cfg.get("job")
+        if cfg["role"] in ("trainer", "explorer") and self.roles_mode and not job:
             ck = ROOT / "runs" / "checkpoints"
             start = next((p for p in (ck / "team_best.state", ck / "to_route1.state") if p.exists()), None)
             if start:
@@ -83,7 +91,7 @@ class Launcher:
         port = self._port()
         cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
-               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + role_args + segment_args(cfg["segment"])
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
@@ -127,6 +135,10 @@ def run_continuous(a) -> int:
     roles = ["trainer", "explorer"] if a.roles else None
     segment = weakest_segment if a.segment == "auto" else (lambda _n: a.segment) if a.segment else None
     sup: list = []
+    plan = None
+    if a.plan == "curriculum":
+        from seg_sched import Curriculum
+        plan = Curriculum(ROOT)
 
     def limit() -> int:  # machine cap minus agents we did not start (a viewer-spawned one counts against us)
         live = resources.live_agent_count(ROOT)
@@ -134,11 +146,11 @@ def run_continuous(a) -> int:
         room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
         return sup[0].running() + room
 
-    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots), merge_file_into, limit, steps=a.steps,
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
-                             segment_ok=lambda g: bool(segment_args(g))))
+                             segment_ok=lambda g: bool(segment_args(g)), plan=plan))
     if adopted is not None:
         sup[0].adopt(adopted)
         swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)
@@ -154,6 +166,10 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
+    ap.add_argument("--port-base", type=int, default=PORT_BASE,
+                    help="--continuous: first control port to try (100 ports); default POKEAGENT_SWARM_PORT_BASE or 8800")
+    ap.add_argument("--plan", choices=["curriculum"], default=None,
+                    help="--continuous: curriculum = pick each slot's segment by need (tools/segments.py shows the table)")
     ap.add_argument("--segment", default=None,
                     help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
     ap.add_argument("--roles", action="store_true",
