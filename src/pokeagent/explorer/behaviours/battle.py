@@ -15,6 +15,7 @@ from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, reco
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle_run import cave_run
+from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
@@ -128,6 +129,9 @@ class Battle(BehaviourBase):
             ctx.in_battle = True
             ctx.box_streak = 0
             scan_battle_text(ctx)
+            bring = bring_out_press(ctx, lines_now)  # fainted lead: choose a Pokemon that can fight, not slot 0 again
+            if bring is not None:
+                return bring
             if ctx.pending_effect and ctx.step - ctx.pending_effect["step"] > PENDING_EFFECT_MAX_STEPS:
                 _finalize_pending_effect(ctx)  # the result text never came: count the hit neutral
             kind = ctx.emu.read(0xD057)

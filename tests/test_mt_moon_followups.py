@@ -64,3 +64,22 @@ def test_enclosed_tile_walls_are_purged_on_load_but_real_walls_stay(tmp_path):
     assert mem.purged_enclosed_walls == 4
     assert sorted(d["blocked"]) == sorted(["15,26,UP", "15,26,DOWN", "3,3,UP", "3,3,DOWN", "3,3,LEFT", "3,3,RIGHT", "9,9,UP", "9,9,DOWN", "9,9,LEFT"])
     assert "14,26,UP" not in d["fails"] and d["fails"]["15,26,UP"] == 2 and d["warps"]["14,26,UP"] == [60, 1, 1]
+
+
+def test_bring_out_picks_a_slot_that_can_fight_not_the_fainted_lead(tmp_path):
+    """Mt Moon 1F endless battle: Wartortle (slot 0) fainted, Magikarp alive; A on slot 0 answered 'no will to fight' for 3,300 presses."""
+    from pokeagent.explorer.behaviours.bring_out import able_slot, bring_out_press
+    mem = {BATTLE: 2, 0xD163: 3, 0xD164: 179, 0xD165: 133, 0xD166: 24,
+           0xD16C: 0, 0xD16D: 0,                      # slot 0 fainted
+           0xD16C + 0x2C: 0, 0xD16D + 0x2C: 22,       # slot 1 Magikarp, 22 HP
+           0xD16C + 0x58: 0, 0xD16D + 0x58: 15}       # slot 2 a real mon, 15 HP
+    ctx = make_ctx(tmp_path, memory=mem)
+    assert able_slot(ctx.emu) == 2                      # a real fighter beats Magikarp
+    assert bring_out_press(ctx, ["Bring out which", "POKEMON?"]).button == "DOWN"   # cursor 0 -> 2
+    ctx.emu.set(0xCC26, 2)
+    assert bring_out_press(ctx, ["Bring out which", "POKEMON?"]).button == "A"
+    assert bring_out_press(ctx, ["There no will", "to fight!"]) is None
+    ctx.emu.set(0xD16D + 0x58, 0)
+    assert able_slot(ctx.emu) == 1                      # only Magikarp left: send it rather than loop
+    ctx.emu.set(0xD16D + 0x2C, 0)
+    assert able_slot(ctx.emu) is None
