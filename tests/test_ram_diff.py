@@ -116,3 +116,18 @@ def test_truncation_keeps_the_rarest_bytes(tmp_path):
     rd.close()
     last = json.loads((tmp_path / "e.jsonl").read_text().splitlines()[-1])
     assert [d[0] for d in last["d"]] == [0xD347, 0xD500, 0xD501]
+
+
+def test_start_ram_diff_keeps_a_private_copy_of_the_start_state(tmp_path):
+    from pokeagent.explorer.ram_diff import start_ram_diff
+    from pokeagent.ramlab.replay import load_trace, start_state
+    st = tmp_path / "cp.state"; st.write_bytes(b"state-bytes")
+    run = tmp_path / "run"; run.mkdir()
+    ctx = NS(ram_diff=None)
+    rd = start_ram_diff(ctx, FakeEmulator(), run, str(st), "Pokemon Red.gb")
+    rd.close()
+    assert ctx.ram_diff is rd and (run / "ram_start.state").read_bytes() == b"state-bytes"
+    st.write_bytes(b"overwritten by a goal checkpoint")
+    meta, _ = load_trace(run)
+    assert meta["start"] == "cp" and meta["lead_ticks"] == 30
+    assert start_state(meta, tmp_path, run) == run / "ram_start.state"

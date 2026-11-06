@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import time
 from collections import Counter
 from pathlib import Path
@@ -17,6 +18,7 @@ from typing import Any
 
 from pokeagent.explorer.ram_event_kinds import HRAM_LEN, HRAM_START, WRAM_LEN, WRAM_START, addr_of, classify, first_line
 
+START_COPY = "ram_start.state"
 _NONZERO = re.compile(rb"[^\x00]")
 
 
@@ -134,7 +136,10 @@ class RamDiffer:
 def start_ram_diff(ctx: Any, emu: Any, run_dir: Path, state: str | None, rom: str) -> RamDiffer:
     """Wire a RamDiffer into ``ctx``: call right after the start state is loaded, before the first press."""
     rd = RamDiffer(Path(run_dir) / "ram_events.jsonl")
-    sha = hashlib.sha1(Path(state).read_bytes()).hexdigest() if state and Path(state).is_file() else ""
+    sha = ""
+    if state and Path(state).is_file():           # keep a private copy: goal checkpoints overwrite runs/checkpoints/*.state
+        shutil.copyfile(state, Path(run_dir) / START_COPY)
+        sha = hashlib.sha1(Path(state).read_bytes()).hexdigest()
     rd.attach(emu, {"start": Path(state).stem if state else "baseline", "state_sha1": sha, "lead_ticks": 30, "rom": Path(rom).name})
     rd.learn_noise(emu)
     ctx.ram_diff = rd

@@ -1,8 +1,10 @@
 """Auto-verification: replay the recorded witnesses of a candidate and assert the predicted change.
 
-Per witness (run, step): the replayed pre-state must match the recorded 'before' byte (the replay is in sync),
-the press must produce the predicted kind of change, and the same stretch of time WITHOUT the press must not.
-A finding is verified only when >= MIN_WITNESSES witnesses are all in sync and a clear majority pass both parts.
+Per witness (run, step): the replayed pre-state must match the recorded 'before' byte (the replay is in sync)
+and the press must produce the predicted kind of change. A control replay of the same stretch WITHOUT the press
+says whether the change is press-driven or time-driven (a menu/text box keeps opening on its own after an
+earlier press); that is reported in the evidence, not required. A finding is verified only when >= MIN_WITNESSES
+witnesses are all in sync and at least two thirds reproduce the change.
 """
 from __future__ import annotations
 
@@ -28,15 +30,15 @@ def judge(kind: str, vals: dict, recorded_before: int, ev: list[int], ct: list[i
 
 
 def passed(results: list[dict]) -> bool:
-    ok = [r for r in results if r["in_sync"] and r["event_ok"] and r["control_clean"]]
+    ok = [r for r in results if r["in_sync"] and r["event_ok"]]
     return len(results) >= MIN_WITNESSES and all(r["in_sync"] for r in results) and len(ok) * 3 >= len(results) * 2
 
 
 def evidence_text(c: Candidate, results: list[dict]) -> str:
-    ok = sum(r["event_ok"] and r["control_clean"] for r in results)
+    ok = sum(r["event_ok"] for r in results)
+    drive = "press-driven" if all(r["control_clean"] for r in results) else "time-driven (also changes without the press)"
     return (f"{c.event}: byte {describe(c.kind)} ({c.support} occurrences in {c.runs} run(s), specificity {c.specificity}, "
-            f"consistency {c.consistency}); replay: {ok}/{len(results)} witnesses reproduce it with the press and stay "
-            f"unchanged without it")
+            f"consistency {c.consistency}); replay: {ok}/{len(results)} witnesses reproduce it, {drive}")
 
 
 def gather(cands: list[Candidate], by_key: dict, runs_dir: dict[str, Path], per: int = 3) -> dict[str, dict[int, list]]:
@@ -96,6 +98,6 @@ def run_checks(cands: list[Candidate], records: list[dict], runs_dir: dict[str, 
             "evidence": evidence_text(c, res) if res else notes.get(c.key(), "no replayable witness"),
             "stats": {"support": c.support, "runs": c.runs, "specificity": c.specificity, "consistency": c.consistency,
                       "score": c.score},
-            "replay": {"witnesses": len(res), "passed": sum(r["event_ok"] and r["control_clean"] for r in res),
+            "replay": {"witnesses": len(res), "passed": sum(r["event_ok"] for r in res),
                        "in_sync": sum(r["in_sync"] for r in res)}})
     return findings, [{"key": k, "note": n} for k, n in notes.items()]

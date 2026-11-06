@@ -37,7 +37,10 @@ def load_trace(run_dir: Path) -> tuple[dict, list[tuple[int, str, int, int]]]:
     return meta, presses
 
 
-def start_state(meta: dict, states: Path) -> Path:
+def start_state(meta: dict, states: Path, run_dir: Path | None = None) -> Path:
+    own = Path(run_dir) / "ram_start.state" if run_dir else None
+    if own is not None and own.is_file():          # the run kept its own copy of the start state
+        return own
     p = Path(states) / f"{meta.get('start', '')}.state"
     if not p.is_file():
         raise Unreplayable(f"start state {p.name} not found")
@@ -60,7 +63,7 @@ class Replayer:
         """Save the state just before press ``step`` (1-based, = ctx.step) for each wanted step, in one pass."""
         meta, presses = load_trace(run_dir)
         emu = self.emu
-        emu.tick(60); emu.load_state(start_state(meta, self.states)); emu.tick(meta.get("lead_ticks", LEAD_TICKS))
+        emu.tick(60); emu.load_state(start_state(meta, self.states, run_dir)); emu.tick(meta.get("lead_ticks", LEAD_TICKS))
         base, wanted, out = emu.frames, set(steps), {}
         for i, (f, btn, hold, settle) in enumerate(presses):
             if f > emu.frames - base:

@@ -24,15 +24,15 @@ def records():
 class FakeReplayer:
     """Replays by table: with the press the byte goes 1->2; without it nothing moves (set `leaky` to break control)."""
 
-    def __init__(self, leaky=False, drift=False):
-        self.leaky, self.drift = leaky, drift
+    def __init__(self, leaky=False, drift=False, dead=False):
+        self.leaky, self.drift, self.dead = leaky, drift, dead
 
     def pre_states(self, run_dir, steps):
         return {s: Path(f"{run_dir.name}_{s}") for s in steps}
 
     def branches(self, pre, press, gap, addrs):
         pre_v = 9 if self.drift else 1
-        ev = {a: [pre_v, pre_v, 2] for a in addrs}
+        ev = {a: [pre_v, pre_v, pre_v if self.dead else 2] for a in addrs}
         ct = {a: [pre_v, pre_v, 2 if self.leaky else pre_v] for a in addrs}
         return ev, ct
 
@@ -59,7 +59,10 @@ def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
     labels = LabelIndex(ENTRIES)
     good, _ = run_checks(cands, recs, runs, FakeReplayer(), labels)
     assert good[0]["verified"] and good[0]["status"] == "confirms" and good[0]["label"] == "wPlayerMoney"
-    for bad in (FakeReplayer(leaky=True), FakeReplayer(drift=True)):
+    assert "press-driven" in good[0]["evidence"]
+    leaky, _ = run_checks(cands, recs, runs, FakeReplayer(leaky=True), labels)
+    assert leaky[0]["verified"] and "time-driven" in leaky[0]["evidence"]
+    for bad in (FakeReplayer(drift=True), FakeReplayer(dead=True)):
         res, _ = run_checks(cands, recs, runs, bad, labels)
         assert not res[0]["verified"]
     entries = [dict(e) for e in ENTRIES]
@@ -67,7 +70,7 @@ def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
     assert F.apply_to_map(entries, data) == 1
     assert entries[0]["verified"] and "replay" in entries[0]["evidence"] and not entries[1].get("verified")
     entries2 = [dict(e) for e in ENTRIES]
-    res, _ = run_checks(cands, recs, runs, FakeReplayer(leaky=True), labels)
+    res, _ = run_checks(cands, recs, runs, FakeReplayer(dead=True), labels)
     assert F.apply_to_map(entries2, {"findings": res}) == 0 and not entries2[0].get("verified")
 
 
