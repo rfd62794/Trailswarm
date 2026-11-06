@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 
-from pokeagent.registry import process_alive
+from pokeagent.registry import process_state
 
 
 def _dir(root: Path) -> Path:
@@ -20,7 +20,7 @@ def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, p
     path = d / f"{agent_id}.json"
     for other in d.glob("*.json"):  # a dead agent's file on the same control port is stale: drop it
         e = _entry(other)
-        if other != path and e.get("port") == port and not process_alive(e.get("pid")):
+        if other != path and e.get("port") == port and process_state(e.get("pid")) == "gone":
             other.unlink(missing_ok=True)
     entry = {"id": agent_id, "kind": kind, "pid": os.getpid() if pid is None else pid, "port": port,
              "frame_slot": frame_slot, "token": token, "started": time.time()}
@@ -56,7 +56,7 @@ def list_agents(root: Path) -> list[dict]:
             continue
         if not isinstance(entry, dict):
             continue
-        if process_alive(entry.get("pid")):
+        if process_state(entry.get("pid")) != "gone":  # "unknown" (access denied) is kept and counted, never deleted
             out.append(entry)
         else:  # prune: a dead agent's file would otherwise accumulate forever
             p.unlink(missing_ok=True)

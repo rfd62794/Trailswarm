@@ -25,6 +25,7 @@ class GridView:
         self._sig: tuple | None = None
         self._rr = 0
         self.view_max, self.page = view_max(), 0
+        self.pin: str | None = None
 
     def _ranked(self) -> list[str]:
         """Live agents first, then stale, then lost; stable by id so the grid does not reshuffle."""
@@ -43,7 +44,7 @@ class GridView:
     def sync(self) -> None:
         """Create/resync cards for the current agent set and area size (cheap no-op otherwise)."""
         all_ids = self._ranked()
-        ids, more, self.page = page_ids(all_ids, self.view_max, self.page)
+        ids, more, self.page = page_ids(all_ids, self.view_max, self.page, self.pin)
         w, h = self.area_size()
         sig = (tuple(ids), more, w // 20, h // 20)
         if sig == self._sig:

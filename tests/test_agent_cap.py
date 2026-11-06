@@ -87,3 +87,40 @@ def test_overnight_clips_agents():
     overnight = _load_tool("overnight")
     assert overnight.round_agents(8, cap=6, free_mb=64000, cpus=16, rss_mb=350) == 6
     assert overnight.round_agents(8, cap=6, free_mb=100, cpus=16, rss_mb=350) == 1
+
+
+def test_page_ids_pins_selected_agent():
+    ids = [f"a{i}" for i in range(11)]
+    vis, more, _ = page_ids(ids, 8, 0, pin="a10")
+    assert "a10" in vis and len(vis) == 8 and more == 3
+    vis, _, _ = page_ids(ids, 8, 1, pin="a10")  # already on this page: unchanged
+    assert vis == ids[8:]
+    vis, _, _ = page_ids(ids, 8, 1, pin="a0")
+    assert "a0" in vis and len(vis) == 3
+    assert page_ids(ids, 8, 0, pin="zzz")[0] == ids[:8]  # unknown pin ignored
+
+
+def test_spawn_control_message_when_swarm_holds_lock(tmp_path):
+    from pokeagent.viewer.spawn_control import SpawnControl
+    register(tmp_path, "a", "explorer", 1, "s", pid=os.getpid())
+    sup = sv.Supervisor(tmp_path, limits={"cap": 6, "free_mb": 64000, "cpus": 16, "rss_mb": 350})
+    t = [0.0]
+    ctl = SpawnControl(sup, tmp_path, clock=lambda: t[0], limits=sup._limits)
+    from pokeagent import resources
+    with resources.spawn_lock(tmp_path):
+        ctl.refresh(force=True)
+        assert ctl.capped and "swarm is running (1 agents)" in ctl.message
+        assert "spawning disabled until it ends" in ctl.message
+
+
+def test_spawn_control_caches_status(tmp_path):
+    from pokeagent.viewer.spawn_control import SpawnControl
+    calls = []
+    t = [0.0]
+    ctl = SpawnControl(None, tmp_path, clock=lambda: t[0], probe=lambda root, **k: calls.append(1) or (0, 6, 6))
+    ctl.refresh(force=True)
+    ctl.refresh(); ctl.refresh()
+    assert len(calls) == 1 and ctl.capped and "agent limit" in ctl.message
+    t[0] += 2.1
+    ctl.refresh(force=True)
+    assert len(calls) == 2

@@ -12,12 +12,13 @@ import json
 import os
 import statistics
 import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
 from pokeagent.agent_registry import list_agents
-from pokeagent.registry import process_alive
+from pokeagent.registry import process_state
 
 DEFAULT_CAP = 6
 RESERVE_MB = 2048
@@ -145,10 +146,23 @@ def max_agents(cap: int | None = None, root: Path | None = None, free_mb: float 
     return max(1, min(configured_cap(cap), by_ram, by_cpu))
 
 
+def headroom(root: Path, extra_live: int = 0, **kw) -> tuple[int, int, int]:
+    """(agents that may start now, max_agents, live). RAM room comes from free RAM alone (it already shrinks as
+    agents run); CPU and cap room subtract the live agents. The first agent is always allowed."""
+    live = live_agent_count(root) + extra_live
+    free = kw.get("free_mb")
+    free = free_ram_mb() if free is None else free
+    rss = kw.get("rss_mb") or load_rss(root)
+    cpus = kw.get("cpus") or cpu_count()
+    ram_room = int((free - RESERVE_MB) // rss)
+    room = min(ram_room, cpus - CPU_RESERVE - live, configured_cap(kw.get("cap")) - live)
+    return max(room, 1 if live == 0 else 0), max_agents(root=root, **kw), live
+
+
 def room_for(want: int, root: Path, **kw) -> tuple[int, str]:
-    """(agents that may start now, one-line reason). ``kw`` are max_agents overrides (cap, free_mb, ...)."""
-    mx, live = max_agents(root=root, **kw), live_agent_count(root)
-    n = max(0, min(want, mx - live))
+    """(agents that may start now, one-line reason). ``kw`` are overrides (cap, free_mb, cpus, rss_mb)."""
+    room, mx, live = headroom(root, **kw)
+    n = max(0, min(want, room))
     why = (f"agent limit: max {mx} (RAM/CPU/cap), {live} live ({2 * live} processes: venv launcher + "
            f"interpreter each); starting {n} of {want} requested")
     return n, why
@@ -164,28 +178,51 @@ def _try_acquire(path: Path) -> bool:
     return True
 
 
+
+
 def _stale(path: Path) -> bool:
     try:
         if time.time() - path.stat().st_mtime > LOCK_STALE_S:
             return True
-        return not process_alive(int(path.read_text().strip() or 0))
+        return process_state(int(path.read_text().strip() or 0)) == "gone"
     except (OSError, ValueError):
         return True
 
 
+def lock_held(root: Path) -> bool:
+    path = _runs(root) / "spawn.lock"
+    return path.exists() and not _stale(path)
+
+
+def _take_over(path: Path) -> None:
+    """Atomically move a stale lock aside (rename succeeds for exactly one waiter), then discard it. If what we
+    moved turns out to be live (a rival re-created it between our check and the rename), put it back."""
+    tomb = path.with_name(f"{path.name}.stale.{os.getpid()}.{uuid.uuid4().hex}")
+    try:
+        os.rename(path, tomb)
+    except OSError:
+        return  # someone else got there first
+    if not _stale(tomb):
+        try:
+            os.link(tomb, path)
+        except OSError:
+            pass
+    tomb.unlink(missing_ok=True)
+
+
 @contextmanager
 def spawn_lock(root: Path, wait_s: float = 0.0):
-    """Global lock (runs/spawn.lock) so two swarms cannot race past the cap. Dead/old holders are stolen."""
+    """Global lock (runs/spawn.lock) so two swarms cannot race past the cap. Dead/old holders are taken over."""
     _runs(root).mkdir(parents=True, exist_ok=True)
     path = _runs(root) / "spawn.lock"
     end = time.monotonic() + wait_s
     while not _try_acquire(path):
         if _stale(path):
-            path.unlink(missing_ok=True)
+            _take_over(path)
             continue
         if time.monotonic() >= end:
             raise LockBusy(f"another swarm holds {path}")
-        time.sleep(0.1)
+        time.sleep(0.05)
     try:
         yield
     finally:

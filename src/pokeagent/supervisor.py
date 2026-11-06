@@ -36,6 +36,10 @@ def build_argv(kind: str, args: list[str], port: int, root: Path) -> list[str]:
     return argv + list(args)
 
 
+def swarm_running_message(root: Path) -> str:
+    return f"a swarm is running ({resources.live_agent_count(root)} agents) - spawning disabled until it ends"
+
+
 class SpawnRefused(RuntimeError):
     """The agent limit is reached (or another swarm is mid-spawn); the message is shown in the viewer."""
 
@@ -51,17 +55,16 @@ class Supervisor:
         port = free_port()
         argv = build_argv(kind, list(args), port, self.root)
         try:
-            with resources.spawn_lock(self.root, wait_s=5.0):
+            with resources.spawn_lock(self.root, wait_s=0.5):
                 registered = {e["pid"] for e in list_agents(self.root)}
                 # agents spawned here that have not registered yet still count against the limit
                 pending = sum(1 for pid, p in self._procs.items() if p.poll() is None and pid not in registered)
-                mx, live = resources.max_agents(root=self.root, **self._limits), len(registered)
-                if live + pending >= mx:
-                    raise SpawnRefused(f"agent limit reached: {live + pending} of max {mx} "
-                                       f"(RAM/CPU/cap); not spawning another")
+                room, mx, live = resources.headroom(self.root, extra_live=pending, **self._limits)
+                if room < 1:
+                    raise SpawnRefused(f"agent limit reached: {live} of max {mx} (RAM/CPU/cap); not spawning another")
                 proc = subprocess.Popen(argv, cwd=str(self.root))
         except resources.LockBusy as e:
-            raise SpawnRefused(f"another spawn is in progress: {e}") from e
+            raise SpawnRefused(swarm_running_message(self.root)) from e
         self._procs[proc.pid] = proc
         return proc.pid
 

@@ -88,3 +88,65 @@ def test_register_removes_stale_same_port(tmp_path):
 def test_real_rss_reader_reads_own_process():
     mb = R.process_rss_mb(os.getpid())
     assert mb is not None and mb > 5
+
+
+def test_prune_keeps_file_when_process_state_unknown(tmp_path, monkeypatch):
+    from pokeagent import agent_registry as ar
+    register(tmp_path, "denied", "rl", 1, "s", pid=4242)
+    register(tmp_path, "gone", "rl", 2, "s", pid=4243)
+    monkeypatch.setattr(ar, "process_state", lambda pid: "unknown" if pid == 4242 else "gone")
+    assert [e["id"] for e in ar.list_agents(tmp_path)] == ["denied"]  # access denied: still counted, kept
+    d = tmp_path / "runs" / "agents"
+    assert (d / "denied.json").exists() and not (d / "gone.json").exists()
+
+
+def test_process_state_real():
+    from pokeagent.registry import process_state
+    assert process_state(os.getpid()) == "alive"
+    assert process_state(2 ** 22 + 99991) == "gone"
+
+
+def test_room_for_ram_not_double_counted(tmp_path):
+    for i in range(2):
+        register(tmp_path, f"a{i}", "explorer", i, "s", pid=os.getpid())
+    # free RAM already reflects the 2 live agents: (4500-2048)//350 = 7 more fit; cpu room = 16-2-2 = 12; cap 10-2 = 8
+    n, _ = R.room_for(20, root=tmp_path, cap=10, free_mb=4500, cpus=16, rss_mb=350)
+    assert n == 7
+    # cpu room subtracts live: 6 cpus - 2 - 2 live = 2
+    n, _ = R.room_for(20, root=tmp_path, cap=10, free_mb=64000, cpus=6, rss_mb=350)
+    assert n == 2
+
+
+def test_first_agent_always_allowed(tmp_path):
+    n, _ = R.room_for(3, root=tmp_path, cap=6, free_mb=10, cpus=1, rss_mb=350)
+    assert n == 1
+
+
+def test_lock_takeover_is_exclusive(tmp_path):
+    import threading
+    import time as _t
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "spawn.lock").write_text("999999999", encoding="utf-8")  # stale
+    holders, worst, errs = [0], [0], []
+
+    def worker():
+        try:
+            with R.spawn_lock(tmp_path, wait_s=10):
+                holders[0] += 1
+                worst[0] = max(worst[0], holders[0])
+                _t.sleep(0.05)
+                holders[0] -= 1
+        except Exception as e:  # pragma: no cover
+            errs.append(e)
+    ts = [threading.Thread(target=worker) for _ in range(6)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not errs and worst[0] == 1
+    assert not list((tmp_path / "runs").glob("spawn.lock*"))  # no tombstones left behind
+
+
+def test_lock_held(tmp_path):
+    assert R.lock_held(tmp_path) is False
+    with R.spawn_lock(tmp_path):
+        assert R.lock_held(tmp_path) is True
+    assert R.lock_held(tmp_path) is False

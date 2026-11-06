@@ -22,14 +22,17 @@ def view_max() -> int:
     return clamp_view_max(os.environ.get("POKEAGENT_VIEW_MAX", VIEW_MAX))
 
 
-def page_ids(ids: list[str], limit: int, page: int) -> tuple[list[str], int, int]:
+def page_ids(ids: list[str], limit: int, page: int, pin: str | None = None) -> tuple[list[str], int, int]:
     """(visible ids, how many agents are NOT shown, normalised page). ``ids`` come ranked most-active first;
-    page 0 is the top ``limit``, later pages cycle through the rest, wrapping back to 0."""
+    page 0 is the top ``limit``, later pages cycle through the rest, wrapping back to 0. ``pin`` (the focused or
+    selected agent) is always visible: it replaces the last card of a page that does not include it."""
     if len(ids) <= limit:
         return list(ids), 0, 0
     pages = -(-len(ids) // limit)
     page %= pages
     vis = ids[page * limit:(page + 1) * limit]
+    if pin in ids and pin not in vis:
+        vis = vis[:-1] + [pin]
     return vis, len(ids) - len(vis), page
 
 
