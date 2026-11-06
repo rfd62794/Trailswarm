@@ -205,6 +205,9 @@ def _build_parser() -> argparse.ArgumentParser:
                       help="poll/UI rate (default 30)")
     view.set_defaults(func=_cmd_view)
 
+    from pokeagent.world.app import add_parser as _add_world
+    _add_world(sub)
+
     cli_hex.register(sub)
     return parser
 

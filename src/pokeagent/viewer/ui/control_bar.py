@@ -20,6 +20,7 @@ class ControlBar:
         self.speed_btn = None
         self.pause_btn = None
         self.steer_box = None
+        self.view_btn = None
         self.hand_btns: dict[str, str | int] = {}
         self._build(parent)
 
@@ -32,6 +33,7 @@ class ControlBar:
                                             callback=lambda s, a, u: self.host.toggle_pause())
             self.speed_btn = dpg.add_button(label="1x", width=44,
                                             callback=lambda s, a, u: self.host.cycle_speed())
+            self.view_btn = dpg.add_button(label="World view", width=84, callback=lambda s, a, u: self.host.focus.toggle_mode())
             self.steer_box = dpg.add_checkbox(label="Steering (focus view)", default_value=False, enabled=False)
         # row 2: hand-off + state slots
         with dpg.group(horizontal=True, parent=parent):
@@ -61,6 +63,8 @@ class ControlBar:
             dpg.set_item_label(self.speed_btn, SPEED_LABELS.get(self.host.speed(), "1x"))
         if self.pause_btn is not None and dpg.does_item_exist(self.pause_btn):
             dpg.set_item_label(self.pause_btn, "Resume" if self.host.paused() else "Pause")
+        if dpg.does_item_exist(self.view_btn):
+            dpg.set_item_label(self.view_btn, "Grid view" if self.host.focus.mode == "world" else "World view")
         if self.steer_box is not None and dpg.does_item_exist(self.steer_box):
             dpg.set_value(self.steer_box, self.host.steering())
         if dpg.does_item_exist("spawn_btn"):

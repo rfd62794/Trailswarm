@@ -41,6 +41,16 @@ class HttpShmSource:
         except Exception:
             return None
 
+    def events(self, since: int = 0) -> dict:
+        """``{"epoch", "events"}`` from ``GET /events`` (events with seq > ``since``); empty events on any failure."""
+        try:
+            with urllib.request.urlopen(urllib.request.Request(f"{self.base}/events?since={int(since)}", headers=self._headers),
+                                        timeout=TIMEOUT_S) as r:
+                out = json.loads(r.read())
+                return out if isinstance(out, dict) and isinstance(out.get("events"), list) else {"events": []}
+        except Exception:
+            return {"events": []}
+
     def frame(self) -> tuple[bytes, int, int] | None:
         if self._sub is None:
             return None
@@ -80,6 +90,9 @@ class FakeSource:
 
     def snapshot(self) -> AgentSnapshot | None:
         return self._next(self._snaps)
+
+    def events(self, since: int = 0) -> dict:
+        return {"epoch": "fake", "events": [e for e in getattr(self, "event_log", []) if e.get("seq", 0) > since]}
 
     def frame(self) -> tuple[bytes, int, int] | None:
         return self._next(self._frames)

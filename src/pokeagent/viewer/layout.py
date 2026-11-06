@@ -27,15 +27,36 @@ def grid(n: int, width: int, height: int, aspect: tuple[int, int] = CARD_ASPECT)
 
 
 class FocusState:
+    """Which view is showing: ``mode`` is the multi-agent view (grid | world); ``focused`` an agent on top of it.
+    Leaving focus returns to the mode focus was entered from."""
+
+    MODES = ("grid", "world")
+
     def __init__(self) -> None:
         self.focused: str | None = None
+        self.mode = "grid"
+        self.return_mode = "grid"
+
+    @property
+    def view(self) -> str:
+        return "focus" if self.focused is not None else self.mode
+
+    def set_mode(self, mode: str) -> None:
+        if mode in self.MODES and self.focused is None:
+            self.mode = mode
+
+    def toggle_mode(self) -> None:
+        self.set_mode("world" if self.mode == "grid" else "grid")
 
     def focus(self, agent_id: str) -> None:
+        if self.focused is None:
+            self.return_mode = self.mode
         self.focused = agent_id
 
     def back(self) -> None:
-        self.focused = None
+        if self.focused is not None:
+            self.focused, self.mode = None, self.return_mode
 
     def toggle(self, agent_id: str) -> None:
-        """Double-click: focusing the focused card returns to multi-view."""
-        self.focused = None if self.focused == agent_id else agent_id
+        """Double-click: focusing the focused card returns to the view it came from."""
+        self.back() if self.focused == agent_id else self.focus(agent_id)
