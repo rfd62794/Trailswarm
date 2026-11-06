@@ -146,6 +146,11 @@ class Presser:
         record_interaction(ctx, fr)
         track_progress(ctx, fr)
         observe(ctx, fr)
+        if ctx.anomalies is not None:
+            try:  # watching must never end a run
+                ctx.anomalies.observe(ctx, fr)
+            except Exception as e:
+                ctx.log(f"[anomaly monitor failed: {e!r}]", "res")
         write_transition(ctx, fr)
         if record_goals(ctx, fr):
             return

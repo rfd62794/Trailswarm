@@ -1,0 +1,40 @@
+{
+ "potion": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 18
+  }
+ ],
+ "left_house": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 107
+  }
+ ],
+ "first_pokemon": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 256,
+   "species_byte": 153,
+   "wanted": "bulbasaur"
+  }
+ ],
+ "to_route1": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 478
+  }
+ ],
+ "to_viridian": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 612
+  }
+ ],
+ "oaks_parcel": [
+  {
+   "run": "explore-20261105-222836-20980",
+   "step": 656
+  }
+ ]
+}

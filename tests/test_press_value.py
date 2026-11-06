@@ -192,7 +192,7 @@ def test_merge_takes_the_larger_n_per_entry_and_caps():
 
 def test_swarm_merge_memory_calls_it():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-    import swarm
+    import swarm_merge as swarm
     dst = swarm.merge_memory({"maps": {}}, {"maps": {}, "press_value": {"a": {"A": {"n": 5, "effect": 1, "progress": 0}}}})
     assert dst["press_value"]["a"]["A"]["n"] == 5
 
