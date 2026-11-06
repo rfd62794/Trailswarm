@@ -82,3 +82,9 @@ def test_register_removes_stale_same_port(tmp_path):
     register(tmp_path, "new", "explorer", 8801, "s", pid=os.getpid())
     assert not (tmp_path / "runs" / "agents" / "old.json").exists()
     assert [e["id"] for e in list_agents(tmp_path)] == ["new"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows memory API")
+def test_real_rss_reader_reads_own_process():
+    mb = R.process_rss_mb(os.getpid())
+    assert mb is not None and mb > 5
