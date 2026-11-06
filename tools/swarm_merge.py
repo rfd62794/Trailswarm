@@ -150,6 +150,26 @@ def merge_memory(dst: dict, src: dict) -> dict:
     return dst
 
 
+_sleep = time.sleep
+
+
+def replace_durably(tmp: Path, text: str, dest: Path, tries: int = 5) -> None:
+    """Write tmp, fsync, then os.replace; a Windows reader holding dest open raises PermissionError, so back off."""
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    for i in range(tries):
+        try:
+            os.replace(tmp, dest)
+            return
+        except PermissionError:
+            if i == tries - 1:
+                tmp.unlink(missing_ok=True)
+                raise
+            _sleep(0.1 * (i + 1))
+
+
 @contextmanager
 def merge_lock(shared: Path, wait_s: float = 30.0):
     """``<maps>.lock``: two finishes (or a --merge-only beside a live swarm) never read-modify-write at once."""
@@ -175,6 +195,5 @@ def merge_file_into(shared: Path, own: Path) -> dict:
         dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
         merge_memory(dst, json.loads(own.read_text()))
         tmp = shared.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(dst, indent=1))
-        os.replace(tmp, shared)
+        replace_durably(tmp, json.dumps(dst, indent=1), shared)
     return dst

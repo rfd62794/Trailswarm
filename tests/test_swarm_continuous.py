@@ -130,7 +130,7 @@ def test_slow_or_clean_exit_resets_streak(tmp_path):
     w.sup.tick()
     w.end(w.procs[0], rc=1, after=5)
     w.sup.tick()
-    w.end(w.procs[1], rc=0, after=5)  # fast but clean
+    w.end(w.procs[1], rc=0, after=100)  # full-length clean run
     w.sup.tick()
     w.end(w.procs[2], rc=1, after=5)  # streak restarted at 1
     w.sup.tick()
@@ -235,3 +235,82 @@ def test_kill_tree_leaves_no_grandchild(tmp_path):
             break
         time.sleep(0.1)
     assert h.poll() is not None and not alive(gc)
+
+
+def test_heartbeat_called_every_tick_and_keeps_old_lock_fresh(tmp_path):
+    import os
+    import time
+    from pokeagent import resources
+    (tmp_path / "runs").mkdir()
+    with resources.spawn_lock(tmp_path):
+        lock = tmp_path / "runs" / "spawn.lock"
+        w = World(tmp_path, n=1, heartbeat=lambda: os.utime(lock))
+        old = time.time() - 8 * 3600
+        os.utime(lock, (old, old))
+        assert resources._stale(lock)  # an 8 h old lock looks stale to a rival swarm...
+        w.sup.tick()
+        assert not resources._stale(lock)  # ...until the supervisor's heartbeat touches it
+
+
+def test_merge_retries_permission_error_then_succeeds(tmp_path, monkeypatch):
+    sm = _load("swarm_merge")
+    monkeypatch.setattr(sm, "_sleep", lambda s: None)
+    real, calls = sm.os.replace, []
+
+    def flaky(a, b):
+        calls.append(1)
+        if len(calls) < 4:
+            raise PermissionError("reader has it open")
+        return real(a, b)
+
+    monkeypatch.setattr(sm.os, "replace", flaky)
+    own = tmp_path / "own.json"
+    own.write_text(json.dumps({"maps": {}, "team_best_level": 5}))
+    sm.merge_file_into(tmp_path / "maps.json", own)
+    assert len(calls) == 4 and json.loads((tmp_path / "maps.json").read_text())["team_best_level"] == 5
+
+
+def test_final_merge_failure_keeps_agent_memory_for_recovery(tmp_path):
+    w = World(tmp_path, n=1)
+
+    def bad_merge(shared, own):
+        raise PermissionError("locked")
+
+    w.sup.merge = bad_merge
+    w.sup.tick()
+    w.end(w.procs[0])
+    w.sup.tick()
+    kept = tmp_path / "runs" / "swarm" / "unmerged" / "agent0-0.json"
+    assert kept.exists() and any("kept in" in line for line in w.logs) and w.sup.merged == 0
+
+
+def test_fast_clean_exit_short_of_budget_backs_off(tmp_path):
+    w = World(tmp_path, n=1, steps=400)  # 400 steps cannot finish in 3 s
+    w.sup.tick()
+    w.end(w.procs[0], rc=0, after=3)
+    w.sup.tick()
+    w.end(w.procs[1], rc=0, after=3)
+    w.sup.tick()
+    assert len(w.procs) == 2 and any("paused 300s" in line for line in w.logs)
+
+
+def test_launcher_exception_feeds_backoff_not_crash(tmp_path):
+    w = World(tmp_path, n=1)
+
+    def boom(cfg):
+        raise OSError("no free port")
+
+    w.sup.launch = boom
+    w.sup.tick()
+    w.sup.tick()
+    w.sup.tick()
+    assert w.sup.running() == 0 and sum("failed to start" in line for line in w.logs) == 2
+    assert any("paused 300s" in line and "no free port" in line for line in w.logs)
+
+
+def test_missing_segment_checkpoint_warns_every_refill(tmp_path):
+    w = World(tmp_path, n=1, segment=lambda n: "won_battle", segment_ok=lambda g: False)
+    w.sup.tick()
+    w.end(w.procs[0])
+    w.sup.tick()
+    assert sum("segment won_battle: no checkpoint, running a full agent" in line for line in w.logs) == 2

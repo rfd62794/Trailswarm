@@ -15,6 +15,7 @@ import argparse
 import atexit
 import contextlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -84,6 +85,11 @@ class Launcher:
         return h
 
 
+def touch_lock() -> None:
+    with contextlib.suppress(OSError):
+        os.utime(ROOT / "runs" / "spawn.lock")
+
+
 def run_continuous(a) -> int:
     import swarm_continuous as sc
     stack = contextlib.ExitStack(); atexit.register(stack.close)
@@ -109,7 +115,8 @@ def run_continuous(a) -> int:
     sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
-                             firsts=lambda: sc.goal_firsts(ROOT)))
+                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock,
+                             segment_ok=lambda g: bool(segment_args(g))))
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
     return 0
@@ -203,13 +210,12 @@ def main() -> int:
 
     merged = 0
     dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
-    for own in sorted(swarm_dir.glob("agent*.json")):
+    for own in sorted([*swarm_dir.glob("agent*.json"), *(swarm_dir / "unmerged").glob("agent*.json")]):
         try:
             dst = merge_file_into(shared, own); merged += 1
+            own.unlink()  # merged; a stale file must not be merged again by a later --merge-only
         except Exception as e:
-            print(f"skip {own.name}: {e!r}")
-    for own in swarm_dir.glob("agent*.json"):
-        own.unlink()  # merged; a stale file must not be merged again by a later --merge-only
+            print(f"skip {own.name} (kept): {e!r}")
     print(f"merged {merged} agent memories into {shared}: maps={len(dst['maps'])}, "
           f"tiles={sum(len(m['visited']) for m in dst['maps'].values())}, "
           f"interactions={sum(len(m.get('interactions', {})) for m in dst['maps'].values())}, "

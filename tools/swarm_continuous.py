@@ -21,6 +21,7 @@ BOX_PACES = [8, 16, 30]
 FAST_S = 60.0
 PAUSE_S = 300.0
 POLL_S = 1.0
+MIN_S_PER_STEP = 0.05  # a clean exit faster than this per step cannot have used its step budget
 
 
 @dataclass
@@ -39,6 +40,7 @@ class Supervisor:
                  limit: Callable[[], int], steps: int = 400, starter: str | None = None, roles: list[str] | None = None,
                  segment: Callable[[int], str | None] | None = None, stop_file: Path | None = None,
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
+                 heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = lambda m: print(m, flush=True), fast_s: float = FAST_S, pause_s: float = PAUSE_S):
         self.root, self.shared, self.launch, self.merge, self.limit = Path(root), Path(shared), launch, merge, limit
@@ -46,6 +48,7 @@ class Supervisor:
         self.stop_file = Path(stop_file) if stop_file else self.root / "runs" / "swarm.stop"
         self.deadline, self.firsts, self.clock, self.sleep, self.log = deadline, firsts, clock, sleep, log
         self.fast_s, self.pause_s = fast_s, pause_s
+        self.heartbeat, self.segment_ok = heartbeat, segment_ok
         roles = roles or ["exploiter", "explorer"]
         self.slots = [Slot(i, roles[i % len(roles)]) for i in range(n)]
         self.seq = self.finished = self.merged = 0
@@ -89,9 +92,24 @@ class Supervisor:
             shutil.copy(self.shared, cfg["own"])  # the freshest merged memory: learning compounds
         cfg["hash"] = self._digest(cfg["own"])
         slot.cfg, slot.started = cfg, self.clock()
-        slot.handle = self.launch(cfg)
+        if cfg["segment"] and self.segment_ok and not self.segment_ok(cfg["segment"]):
+            self.log(f"WARNING segment {cfg['segment']}: no checkpoint, running a full agent")
+        try:
+            slot.handle = self.launch(cfg)
+        except Exception as e:  # no free port, Popen failure: a failed start feeds the backoff, never crashes us
+            cfg["own"].unlink(missing_ok=True)
+            self.log(f"slot {slot.idx} failed to start: {e!r}; {self.status()}")
+            self._note_failure(slot, f"launch error {e!r}")
+            return
         seg = f", segment {cfg['segment']}" if cfg["segment"] else ""
         self.log(f"slot {slot.idx} refilled: seed {cfg['seed']}, starter {cfg['starter']}, {cfg['role']}{seg}; {self.status()}")
+
+    def _note_failure(self, slot: Slot, why: str) -> None:
+        slot.streak += 1
+        if slot.streak >= 2:
+            slot.paused_until = self.clock() + self.pause_s
+            self.log(f"slot {slot.idx} paused {self.pause_s:.0f}s: {slot.streak} fast failures in a row "
+                     f"({why}, role {slot.role}); see runs/swarm/agent{slot.idx}.log")
 
     def _refill(self) -> None:
         if self.stopping:
@@ -111,29 +129,40 @@ class Supervisor:
         ran = self.clock() - slot.started
         cfg, slot.handle = slot.cfg, None
         self.finished += 1
+        keep = False
         try:
             if not cfg["own"].exists():
                 raise FileNotFoundError("no memory file")
             if self._digest(cfg["own"]) == cfg.get("hash"):
                 note = "memory untouched, skipped"  # crashed before saving: nothing to learn from
             else:
-                self.merge(self.shared, cfg["own"])
+                try:
+                    self.merge(self.shared, cfg["own"])
+                except Exception:
+                    keep = True
+                    raise
                 self.merged += 1
                 note = "merged"
         except Exception as e:  # a crashed agent may leave nothing or a torn file; the swarm carries on
             note = f"not merged ({e!r})"
+            if keep:
+                note += f", kept in {self._keep(cfg['own'])} for --merge-only"
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
-        if rc != 0 and ran < self.fast_s and not self.stopping:
-            slot.streak += 1
-            if slot.streak >= 2:
-                slot.paused_until = self.clock() + self.pause_s
-                self.log(f"slot {slot.idx} paused {self.pause_s:.0f}s: {slot.streak} fast failures in a row "
-                         f"(rc={rc}, <{self.fast_s:.0f}s each, role {slot.role}); see runs/swarm/agent{slot.idx}.log")
+        too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
+        if too_fast and not self.stopping:
+            self._note_failure(slot, f"rc={rc}, {ran:.0f}s, budget {cfg['steps']} steps")
         else:
             slot.streak = 0
 
+    def _keep(self, own: Path) -> Path:
+        dest = self.swarm_dir / "unmerged"
+        dest.mkdir(parents=True, exist_ok=True)
+        return Path(shutil.move(str(own), str(dest / own.name)))
+
     def tick(self) -> None:
+        if self.heartbeat:
+            self.heartbeat()  # keeps runs/spawn.lock fresh: a live swarm's lock must never look 6 h old
         for s in self.slots:
             if s.handle is None:
                 continue
