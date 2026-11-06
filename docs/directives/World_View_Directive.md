@@ -39,6 +39,15 @@ game's own player sprite at its real coordinates.
    (from the overlay module), the disagreement layer; hover = agent/tile tooltip; click an agent = open its focus
    card; click a tile = everything known about it (ROM truth + union of beliefs + who learned it); a side feed of
    recent events across all agents (filterable: battles, items, goals, stalls).
+4b. **Stadium views** (Robert: "specialized Stadium-Views that the Agent goes to when a fight begins, allowing
+   the fight to be observed separately. But I want to be able to see the multiples across the entire map,
+   wandering around"): the world map always keeps every agent visible. When an agent's `battle_start` arrives,
+   its map marker switches to a battle badge (crossed swords + enemy species) and a **stadium panel** opens in a
+   strip beside the map: one tile per agent currently in battle, showing that agent's live frame (the existing
+   shared-memory frame) plus a battle card built from the battle events - both sides' species, levels, HP bars,
+   last move with its multiplier/effect, turn count, and the counter planner's pick if present. Panels close a few
+   seconds after `battle_end` (result shown). Click a stadium panel to open that agent's focus view. Later phase
+   (not this directive): render the stadium from ROM battle sprites instead of the live frame.
 5. **Export:** `pokeagent world --png out.png` renders the current world state to an image (for sharing).
 
 ## 3. The work
