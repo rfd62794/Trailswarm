@@ -209,6 +209,35 @@ def main() -> int:
             return {repr(k): v for k, v in Q.items()}
         return {repr(k): [(Q[k][i] + QB[k][i]) / 2 for i in range(n_total)]
                 for k in set(Q) | set(QB)}
+
+    agent_view = None
+    if a.frame_port is not None:  # viewer agent: snapshot+commands for `pokeagent view`
+        try:
+            import atexit
+            from pokeagent.adapters.rl_snapshot import RlAgentView
+
+            def _brain(obs):
+                if obs is None:
+                    return ""
+                row = list(Q.get(obs) or [0.0] * n_total)
+                if QB is not None:
+                    other = QB.get(obs) or row
+                    row = [(x + y) / 2 for x, y in zip(row, other)]
+                allowed = env.allowed_actions()
+                i = max(allowed, key=lambda j: row[j] if j < len(row) else -1e9)
+                act = env.actions[i] if i < len(env.actions) else f"opt{i}"
+                name = act.name if hasattr(act, "name") else str(act)
+                return f"{obs} -> {name}({row[i]:.2f})" if i < len(row) else f"{obs} -> {name}"
+
+            agent_view = RlAgentView(env, Path(f'runs/rlstatus_{a.frame_port}.json'),
+                                    agent_id=f"rl-{a.frame_port}",
+                                    frame_slot=f"pokeagent_frames_{a.frame_port}",
+                                    segment=a.segment, brain_fn=_brain)
+            agent_view.serve(port=0)
+            atexit.register(agent_view.close)
+        except Exception as e:
+            print(f"viewer agent unavailable: {e!r}")
+
     def evaluation_env(state):
         evaluation = SegmentEnv(a.rom, state, make_goal(a.segment), goal_name=a.segment,
                                 max_steps=a.max_steps, hold=a.hold, settle=a.settle,
