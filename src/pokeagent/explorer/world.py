@@ -68,6 +68,11 @@ class WorldGraph:
         return p
 
     def _bfs(self, start, goal_fn, limit):
+        r = self._bfs_node(start, goal_fn, limit)
+        return r[1] if r else None
+
+    def _bfs_node(self, start, goal_fn, limit):
+        """_bfs that also returns the goal node: (node, buttons) or None (buttons [] when start is the goal)."""
         prev = {start: None}
         q = deque([start])
         while q and len(prev) < limit:
@@ -77,7 +82,7 @@ class WorldGraph:
                 while prev[node]:
                     node, btn = prev[node]
                     out.append(btn)
-                return out[::-1]
+                return cur, out[::-1]
             for nxt, btn in self.neighbours(cur):
                 if nxt not in prev:
                     prev[nxt] = (cur, btn)

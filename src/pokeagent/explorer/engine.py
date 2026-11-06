@@ -22,6 +22,7 @@ class Engine:
         self.presser = presser or Presser(ctx)
         self.selector = selector or Selector(default_behaviours())
         self.decision_log = decision_log
+        self._prev_from = None  # `from` position of the last press that moved the player
         self._pending_outcomes: list[dict] = []  # decision records since the last goal event
 
     def step(self) -> Decision | None:
@@ -38,8 +39,11 @@ class Engine:
         after = ctx.pos()
         box_after = box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
         outcome = classify_outcome(before, after, decision.button, box_after, len(ctx.goal_steps) > goals_reached)
+        reversal = after != before and after == self._prev_from
+        if after != before:
+            self._prev_from = before
         rec = make_record(ctx.step, decision.behaviour, decision.rule, decision.button, before,
-                          stage, box, battle, outcome)
+                          stage, box, battle, outcome, reversal)
         if self.decision_log is not None:
             self.decision_log.write(rec)
         self._pending_outcomes.append(rec)

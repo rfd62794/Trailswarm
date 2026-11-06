@@ -1,8 +1,9 @@
 """Decision log: runs/<run>/decisions.jsonl, one line per behaviour decision that pressed a button.
 
-Fields: step, behaviour, rule, button, map, x, y, goal_stage, box, battle, outcome. ``map``/``x``/``y``/``box``/
-``battle`` describe the situation the decision was made in; ``outcome`` is what the press did:
-moved | blocked | box | map_change | goal | none.
+Fields: step, behaviour, rule, button, map, x, y, goal_stage, box, battle, outcome, reversal. ``map``/``x``/``y``/
+``box``/``battle`` describe the situation the decision was made in; ``outcome`` is what the press did:
+moved | blocked | box | map_change | goal | none. ``reversal`` is True when the press undid the previous
+position-changing press (landed back on the tile it came from).
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from pathlib import Path
 from pokeagent.explorer.perceive import DIRS
 from pokeagent.goals import GOALS
 
-FIELDS = ("step", "behaviour", "rule", "button", "map", "x", "y", "goal_stage", "box", "battle", "outcome")
+FIELDS = ("step", "behaviour", "rule", "button", "map", "x", "y", "goal_stage", "box", "battle", "outcome", "reversal")
 
 
 def goal_stage(goals: dict) -> str:
@@ -35,9 +36,10 @@ def classify_outcome(before: tuple, after: tuple, button: str, box_after: bool, 
 
 
 def make_record(step: int, behaviour: str, rule: str, button: str, before: tuple, stage: str,
-                box: bool, battle: bool, outcome: str) -> dict:
+                box: bool, battle: bool, outcome: str, reversal: bool = False) -> dict:
     return {"step": step, "behaviour": behaviour, "rule": rule, "button": button, "map": before[0], "x": before[1],
-            "y": before[2], "goal_stage": stage, "box": box, "battle": battle, "outcome": outcome}
+            "y": before[2], "goal_stage": stage, "box": box, "battle": battle, "outcome": outcome,
+            "reversal": reversal}
 
 
 class DecisionLog:

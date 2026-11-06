@@ -88,6 +88,9 @@ class ExplorerContext:
     exp_prev: int | None = None
     explore_burst: int = 0
     forget_move: str | None = None
+    frontier_at: tuple | None = None  # position the committed route's next button was chosen at
+    frontier_route: list = field(default_factory=list)  # buttons left to the committed frontier_target
+    frontier_target: tuple | None = None  # (map, x, y) frontier tile the frontier behaviour is committed to
     goal_left_house: bool = False
     goto: list | None = None
     had_parcel: bool = False
@@ -96,6 +99,7 @@ class ExplorerContext:
     initial_goals_ready: bool = False  # the old code tested '"initial_goals" in st'
     known_maps_at_start: set | None = None
     last_battle_hp: int | None = None
+    last_dir: str | None = None  # direction of the last press that moved the player (choose()'s reverse penalty)
     last_hash: int | None = None
     last_move_choice: str | None = None
     last_press: str | None = None
@@ -114,6 +118,7 @@ class ExplorerContext:
     proc: dict | None = None
     proc_done: set = field(default_factory=set)
     proc_due: list = field(default_factory=list)
+    recent_tiles: dict = field(default_factory=dict)  # map -> last TABU_LEN (x, y) stood on (choose()'s tabu)
     replay: list = field(default_factory=list)
     replay_ctx: dict | None = None
     replayed_here: tuple | None = None

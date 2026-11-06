@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
@@ -19,6 +20,12 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     """Per-press learning: tile visits, story flags, team checkpoint, XP economics, items, NPC talk, beats."""
     name, source, before, after, tm, box_before, box_after, text, extra, goals_before, result, bag_pre = fr.name, fr.source, fr.before, fr.after, fr.tm, fr.box_before, fr.box_after, fr.text, fr.extra, fr.goals_before, fr.result, fr.bag_pre
     ctx.mem.visit(after[0], after[1], after[2], ctx.step)
+    if after != before:  # a move: momentum memory for choose() - in-memory only, never written to maps.json
+        if name in DIRS:
+            ctx.last_dir = name
+        stood = ctx.recent_tiles.setdefault(after[0], [])
+        stood.append((after[1], after[2]))
+        del stood[:-TABU_LEN]
     ctx.mem.observe_npcs(after[0], ctx.emu, ctx.step)
     # Event/completion tracking: the story flags (wEventFlags 0xD747-0xD886, from pokered.sym) are the game's own
     # record of what has been done once. Any bit that flips is remembered with where, when and what was on screen.
