@@ -280,3 +280,22 @@ def test_switch_out_names_the_swap_and_counts_it(tmp_path):
     assert d.button == "RIGHT" and d.rule.startswith("switch_train: MAGIKARP L5 -> out, ")
     ctx.emu.set(0xD014, STARTER)  # the swap landed: the battle mon is no longer the Magikarp
     assert SwitchOut().step(ctx) is None and ctx.magikarp_shared == 1 and ctx.switch_train is None
+
+
+def test_trainee_numbers_reach_meta_json_and_status(tmp_path):
+    import json
+    import sys
+    from pokeagent.explorer.trainee import record_trainee
+    ctx = party_ctx(tmp_path, [(MAGIKARP, 7, 20, 20), (STARTER, 18, 51, 51)])
+    (tmp_path / "meta.json").write_text("{}")
+    ctx.magikarp_shared, ctx.battles = 4, 9
+    record_trainee(ctx)
+    meta = json.loads((tmp_path / "meta.json").read_text())
+    assert meta["magikarp"]["level"] == 7 and meta["magikarp"]["battles_shared"] == 4 and meta["side_goals"] == {"gyarados": False}
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "tools"))
+    import status
+    run = tmp_path / "explore-1"
+    run.mkdir()
+    (run / "meta.json").write_text(json.dumps(meta))
+    line = status._trainee_line([run])
+    assert "L7" in line and "battles shared 4 of 9" in line and "gyarados=no" in line
