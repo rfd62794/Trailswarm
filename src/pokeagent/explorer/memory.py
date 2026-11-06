@@ -47,17 +47,29 @@ class MapMemory(NavMixin):
             d.get("warps", {}).pop(key, None)
             d.get("warp_cand", {}).pop(key, None)  # or learn() would re-add it on the next sighting
 
-    def forget_warp(self, map_id: int, key: str):
-        """Drop a learned warp that a press just disproved (we walked on in the same map) and tombstone it in
-        bad_warps so learn() and the swarm merge never bring it back. A stale warp (learned from Oak's forced walk:
-        Pallet (9,11) UP -> the lab) made the planner's shortest route to the lab a 2-step ping-pong forever."""
+    def forget_warp(self, map_id: int, key: str, *, tombstone: bool = False):
+        """Drop a learned warp that presses disproved. Without `tombstone` it is recoverable: learn() re-adds it after
+        two real sightings. With it, bad_warps keeps learn() and the swarm merge from ever bringing it back."""
         d = self.m(map_id)
         d["warps"].pop(key, None)
         d.get("warp_cand", {}).pop(key, None)
         d.get("warp_taken", {}).pop(key, None)
-        bad = self.data.setdefault("bad_warps", [])
-        if f"{map_id}:{key}" not in bad:
-            bad.append(f"{map_id}:{key}")
+        if tombstone:
+            bad = self.data.setdefault("bad_warps", [])
+            if f"{map_id}:{key}" not in bad:
+                bad.append(f"{map_id}:{key}")
+
+    def _note_warp_disproof(self, m0: int, key: str):
+        """A learned warp's press moved us exactly one tile in the pressed direction inside the same map (after the
+        settle wait): the door is not there. 2 disproofs pop it (recoverable); disproven again after it was
+        re-learned (4 in all) it is tombstoned. A push-back (guard, locked gym) moves us the other way: no evidence."""
+        d = self.m(m0)
+        counts = d.setdefault("warp_disproof", {})
+        counts[key] = counts.get(key, 0) + 1
+        if counts[key] == 2:
+            self.forget_warp(m0, key)
+        elif counts[key] >= 4:
+            self.forget_warp(m0, key, tombstone=True)
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -78,8 +90,10 @@ class MapMemory(NavMixin):
             edge = paths.setdefault(key, {"to": [m1, x1, y1], "count": 0})
             edge["to"] = [m1, x1, y1]
             edge["count"] += 1
-        if key in self.m(m0)["warps"] and m1 == m0 and (x1, y1) != (x0, y0) and self.m(m0)["warps"][key][0] != m0:
-            self.forget_warp(m0, key)  # the press walked us along the same map: this was never a door
+        ddx0, ddy0 = DIRS[button]
+        warp = self.m(m0)["warps"].get(key)
+        if warp and m1 == m0 and warp[0] != m0 and (x1, y1) == (x0 + ddx0, y0 + ddy0):
+            self._note_warp_disproof(m0, key)
         if m1 != m0:
             w = self.m(m0)["warps"]
             if WHITEOUT_LANDINGS.get((m1, x1, y1), m0) != m0:
@@ -92,6 +106,7 @@ class MapMemory(NavMixin):
                 return f"map changed to 0x{m1:02X} (seen once - not recorded as a warp yet)"
             taken = self.m(m0).setdefault("warp_taken", {})
             taken[key] = taken.get(key, 0) + 1
+            self.m(m0).get("warp_disproof", {}).pop(key, None)  # it really warps: earlier disproofs were fades/glitches
             w[key] = [m1, x1, y1]  # exact [map, x, y] shape for the Map_Memory module; counts live beside it
             return f"WARP to map 0x{m1:02X} ({x1},{y1}) - taken {taken[key]}x"
         ddx, ddy = x1 - x0, y1 - y0

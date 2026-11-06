@@ -29,6 +29,10 @@ def settle_position(ctx: ExplorerContext, before, max_frames=600):
             break
     if prev[0] != before[0]:
         ctx.emu.tick(60); prev = ctx.pos()
+    elif prev != before and f"{before[1]},{before[2]},{ctx.last_press}" in ctx.mem.m(before[0])["warps"]:
+        # Stepped onto a learned door tile: the warp fade can start after the position looked stable. Wait it out so
+        # a real warp is never sampled as 'walked one tile' (that reading is what disproves a warp).
+        ctx.emu.tick(60); prev = ctx.pos()
     return prev
 
 

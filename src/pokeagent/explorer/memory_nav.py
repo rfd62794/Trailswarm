@@ -86,8 +86,10 @@ class NavMixin:
     def _frontier(self, d: dict, visited: dict, blocked: set, n: tuple) -> bool:
         """A tile that still has an unexplored side (same predicate the demo's frontier_step used)."""
         for name, (dx, dy) in DIRS.items():
-            if f"{n[1]},{n[2]},{name}" not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited \
-                    and f"{n[1]},{n[2]},{name}" not in d.get("warps", {})                     and f"{n[1]},{n[2]},{name}" not in d.get("jumps", {}):  # a ledge tile is hopped over, never visited
+            key = f"{n[1]},{n[2]},{name}"
+            if (key not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited
+                    and key not in d.get("warps", {})
+                    and key not in d.get("jumps", {})):  # a ledge tile is hopped over, never visited
                 return True
         return False
 

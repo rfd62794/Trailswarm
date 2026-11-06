@@ -27,23 +27,67 @@ def pallet_mem(tmp_path) -> MapMemory:
     return mem
 
 
-def test_stale_warp_is_forgotten_when_the_press_walks_on_in_the_same_map(tmp_path):
+def disprove(mem, n=1):
+    for _ in range(n):
+        mem.learn((0, 9, 11), "UP", (0, 9, 10), confirmed=False)
+
+
+def test_push_back_in_the_opposite_direction_is_not_a_disproof(tmp_path):
     mem = pallet_mem(tmp_path)
-    assert mem.learn((0, 9, 11), "UP", (0, 9, 10), confirmed=False) == "moved"
-    assert "9,11,UP" not in mem.m(0)["warps"]
-    assert "0:9,11,UP" in mem.data["bad_warps"]
-    assert "12,12,UP" in mem.m(0)["warps"]  # the real door is untouched
-    # and a later map change from that key is not re-learned as a warp
+    for _ in range(5):
+        mem.learn((0, 9, 11), "UP", (0, 9, 12), confirmed=False)  # a guard walks us back DOWN
+        mem.learn((0, 9, 11), "UP", (0, 9, 11), confirmed=False)  # or does not let us move at all
+    assert "9,11,UP" in mem.m(0)["warps"] and not mem.m(0).get("warp_disproof")
+
+
+def test_one_disproof_keeps_the_warp(tmp_path):
+    mem = pallet_mem(tmp_path)
+    disprove(mem)
+    assert "9,11,UP" in mem.m(0)["warps"] and mem.m(0)["warp_disproof"]["9,11,UP"] == 1
+
+
+def test_two_disproofs_pop_the_warp_without_a_tombstone(tmp_path):
+    mem = pallet_mem(tmp_path)
+    mem.m(0)["warp_cand"] = {"9,11,UP": 2}; mem.m(0)["warp_taken"] = {"9,11,UP": 8}
+    disprove(mem, 2)
+    d = mem.m(0)
+    assert "9,11,UP" not in d["warps"] and "9,11,UP" not in d["warp_cand"] and "9,11,UP" not in d["warp_taken"]
+    assert not mem.data.get("bad_warps") and "12,12,UP" in d["warps"]
+    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)  # recoverable: two real sightings bring it back
+    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
+    assert "9,11,UP" in d["warps"]
+
+
+def test_disproven_again_after_relearning_is_tombstoned(tmp_path):
+    mem = pallet_mem(tmp_path)
+    disprove(mem, 2)
+    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
+    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)  # re-learned (and it really warped: count resets)
+    assert "warp_disproof" not in mem.m(0) or "9,11,UP" not in mem.m(0)["warp_disproof"]
+    mem.m(0)["warp_disproof"] = {"9,11,UP": 2}  # history of a warp that keeps being disproven after a re-learn
+    disprove(mem, 1)
+    assert "9,11,UP" in mem.m(0)["warps"] and not mem.data.get("bad_warps")  # 3: still only a doubt
+    disprove(mem, 1)
+    assert "9,11,UP" not in mem.m(0)["warps"] and "0:9,11,UP" in mem.data["bad_warps"]
     mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
     mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
     assert "9,11,UP" not in mem.m(0)["warps"]
+
+
+def test_a_real_warp_resets_the_disproof_count(tmp_path):
+    mem = pallet_mem(tmp_path)
+    disprove(mem)
+    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
+    assert "9,11,UP" not in mem.m(0).get("warp_disproof", {})
+    disprove(mem)
+    assert "9,11,UP" in mem.m(0)["warps"]
 
 
 def test_deliver_parcel_route_does_not_ping_pong_after_a_walk(tmp_path):
     mem = pallet_mem(tmp_path)
     maps = mem.data["maps"]
     # before the fix the planner said DOWN at (9,10) and UP at (9,11): a two-tile oscillation
-    mem.learn((0, 9, 11), "UP", (0, 9, 10), confirmed=False)  # the press the agent actually makes
+    disprove(mem, 2)  # the presses the agent actually makes
     seen = []
     pos = (0, 9, 10)
     for _ in range(12):
