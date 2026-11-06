@@ -37,6 +37,7 @@ class Obs:
     warps: dict = field(default_factory=dict)
     jumps: dict = field(default_factory=dict)
     box: bool = False
+    box_before: bool = False
     battle: bool = False
     joy_ignore: int = 0
     screen_sig: int = 0                # hash(tilemap, sprite table)
@@ -70,6 +71,7 @@ class Detectors:
         self.text_n = 0
         self.window: deque = deque(maxlen=FROZEN_PRESSES)
         self.broken_n: dict = {}
+        self.pending_tp: Finding | None = None   # a teleport held one observation, until the screen proves it was no cutscene
 
     def reset(self) -> None:
         self.__init__()
@@ -139,20 +141,27 @@ class Detectors:
         return out
 
     def _teleport(self, o: Obs) -> list[Finding]:
+        out, self.pending_tp = ([self.pending_tp] if self.pending_tp and not (o.box or o.joy_ignore) else []), None
+        if o.box or o.joy_ignore or o.box_before:
+            return out  # forced walks, cutscenes, whiteouts: the game moved the player
+        self.pending_tp = self._teleport_candidate(o)
+        return out
+
+    def _teleport_candidate(self, o: Obs) -> Finding | None:
         if o.prev is None or o.prev[0] != o.map:
-            return []
+            return None
         dx, dy = o.x - o.prev[1], o.y - o.prev[2]
         dist = abs(dx) + abs(dy)
         if dist < TELEPORT_MIN_JUMP:
-            return []
+            return None
         pk = f"{o.prev[1]},{o.prev[2]},"
         if any(k.startswith(pk) for k in o.warps) or any(k.startswith(pk) for k in o.jumps):
-            return []  # a learned warp within the map, or a ledge hop
+            return None  # a learned warp within the map, or a ledge hop
         straight = dx == 0 or dy == 0
         if straight and dist <= FORCED_WALK_MAX and o.map in SPINNER_MAPS:
-            return []  # spinner arrows: a forced walk
-        return [Finding("teleport", o.map, o.x, o.y, (o.x, o.y), {"from": list(o.prev[1:]), "to": [o.x, o.y],
-                        "jump": dist, "straight": straight, "button": o.button})]
+            return None  # spinner arrows: a forced walk
+        return Finding("teleport", o.map, o.x, o.y, (o.x, o.y), {"from": list(o.prev[1:]), "to": [o.x, o.y],
+                        "jump": dist, "straight": straight, "button": o.button})
 
     def _impossible(self, o: Obs) -> list[Finding]:
         now = set(o.broken)

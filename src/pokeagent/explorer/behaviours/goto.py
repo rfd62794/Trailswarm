@@ -1,7 +1,7 @@
 """goto: a human or Claude asked for a destination; route there over the learned world."""
 from __future__ import annotations
 
-from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.world import WorldGraph
 
@@ -19,10 +19,14 @@ class Goto(BehaviourBase):
             if (m, x, y) == target:
                 ctx.goto = None; ctx.log(f"[arrived at {target}]", "res")
             else:
+                if ctx.anomalies is not None:
+                    ctx.anomalies.expire(ctx)
                 g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
                 p = g.path((m, x, y), lambda n: n == target)
                 if p:
                     return Decision(p[0], "goto_step", f"goto {target}: {len(p)} steps left")
+                if ctx.mem.temp_blocked and WorldGraph(ctx.mem.data["maps"]).path((m, x, y), lambda n: n == target):
+                    return no_press("goto_wait", f"goto {target}: only route is past a wandering NPC; waiting for its tile to clear")
                 ctx.goto = None; ctx.log(f"[no known route to {target}; exploring instead]", "res")
         return None
 

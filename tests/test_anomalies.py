@@ -5,7 +5,7 @@ import json
 
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer import anomaly_detectors as ad
-from pokeagent.explorer.anomalies import WAIT_PRESSES, AnomalyMonitor
+from pokeagent.explorer.anomalies import TEMP_BLOCK_FRAMES, WAIT_FRAMES, AnomalyMonitor
 from pokeagent.explorer.anomaly_ram import bad_bcd, impossible_state
 from pokeagent.explorer.anomaly_record import RATE_PRESSES, AnomalyLog, cause_hint
 from pokeagent.explorer.anomaly_sprites import doorway_tiles, read_sprites
@@ -77,19 +77,34 @@ def test_player_blocking_npc_when_standing_on_its_only_exit():
     assert "player_blocking_npc" not in kinds(out)
 
 
+def tp(det, **kw):
+    """A teleport is held one observation; the next quiet press releases it."""
+    return det.update(obs(pos=(0, kw.pop("to", 9), 6), prev=(0, 5, 6), **kw)) + det.update(obs(pos=(0, 9, 6)))
+
+
 def test_teleport_flags_unexplained_jump_but_not_warps_ledges_or_map_changes():
     d = ad.Detectors()
-    f = d.update(obs(pos=(0, 9, 6), prev=(0, 5, 6), button="RIGHT"))
+    f = tp(d, button="RIGHT")
     assert kinds(f) == ["teleport"] and f[0].details["jump"] == 4
-    assert not d.update(obs(pos=(0, 6, 6), prev=(0, 5, 6)))                       # one tile
-    assert not d.update(obs(pos=(1, 9, 6), prev=(0, 5, 6)))                       # map change
+    assert not tp(ad.Detectors(), to=6)                                            # one tile
+    d = ad.Detectors()
+    assert not d.update(obs(pos=(1, 9, 6), prev=(0, 5, 6))) + d.update(obs())      # map change
+    d = ad.Detectors()
     o = obs(pos=(0, 9, 6), prev=(0, 5, 6))
     o.warps = {"5,6,RIGHT": [0, 9, 6]}
-    assert not d.update(o)                                                         # warp inside the map
+    assert not d.update(o) + d.update(obs())                                       # warp inside the map
     o = obs(pos=(0, 5, 8), prev=(0, 5, 6), button="DOWN")
     o.jumps = {"5,6,DOWN": [5, 8]}
-    assert not d.update(o)                                                         # ledge
-    assert not d.update(obs(pos=(0xC7, 5, 10), prev=(0xC7, 5, 6), button="DOWN"))  # spinner map forced walk
+    assert not d.update(o) + d.update(obs())                                       # ledge
+    assert not d.update(obs(pos=(0xC7, 5, 10), prev=(0xC7, 5, 6), button="DOWN")) + d.update(obs())  # spinner map
+
+
+def test_teleport_suppressed_by_joypad_lock_or_text_box_around_it():
+    assert not tp(ad.Detectors(), joy_ignore=0x30)                                 # forced walk
+    assert not tp(ad.Detectors(), box_before=True)                                 # cutscene after a dialog
+    d = ad.Detectors()
+    d.update(obs(pos=(0, 9, 6), prev=(0, 5, 6)))
+    assert not d.update(obs(box=True))                                             # a box opens next: whiteout / script
 
 
 def test_impossible_state_is_debounced_and_checks_ram():
@@ -197,7 +212,7 @@ def test_monitor_records_doorway_npc_with_state_png_and_decisions(tmp_path):
     assert sum(json.loads(ln)["type"] == "npc_in_doorway" for ln in lines) == 1  # rate limited to one
 
 
-def test_mitigation_waits_then_reroutes_with_temporary_block_not_a_wall(tmp_path):
+def test_mitigation_waits_without_pressing_then_reroutes_with_temporary_block_not_a_wall(tmp_path):
     ctx = make_ctx(tmp_path, SLOT1_AT_5_5)
     md = ctx.mem.m(0)
     press_in_place(ctx)  # the blocked press creates the block
@@ -207,23 +222,65 @@ def test_mitigation_waits_then_reroutes_with_temporary_block_not_a_wall(tmp_path
     wait = AnomalyWait()
     assert wait.applies(ctx)
     rules = []
-    for _ in range(WAIT_PRESSES + 1):
+    for _ in range(WAIT_FRAMES // 10 + 2):
         d = wait.step(ctx)
+        assert d.button == ""  # nothing is pressed
         rules.append(d.rule)
-        if d.rule == "wait_for_npc":
-            press_in_place(ctx, "B")
-    assert rules == ["wait_for_npc"] * WAIT_PRESSES + ["reroute_npc"]
+        if d.rule == "reroute_npc":
+            break
+        ctx.frame += 10
+    assert rules[-1] == "reroute_npc" and set(rules[:-1]) == {"wait_for_npc"} and len(rules) > 2
     assert (0, 5, 5) in ctx.mem.temp_blocked and mon.block is None
     assert "5,6,UP" not in md["blocked"]
-    # the router and the local chooser both treat the tile as blocked while it lasts
     md["visited"].update({"5,6": 1, "5,5": 1, "5,7": 1})
     g = ctx.mem._frontier_graph()
     assert (0, 5, 5) not in {n for n, _ in g.neighbours((0, 5, 6))}
     name, _, _ = ctx.mem.choose_local(0, 5, 6, "UP")
     assert name != "UP"
-    ctx.step += 1000
+    ctx.frame += TEMP_BLOCK_FRAMES
     press_in_place(ctx, "B")
     assert not ctx.mem.temp_blocked  # expired: the NPC tile is walkable again
+
+
+def test_goto_keeps_its_goal_while_the_only_route_is_temporarily_blocked(tmp_path):
+    from pokeagent.explorer.behaviours import Goto
+    ctx = make_ctx(tmp_path)
+    md = ctx.mem.m(0)
+    md["visited"].update({"5,6": 1, "5,5": 1})
+    ctx.goto = [0, 5, 5]
+    ctx.mem.temp_blocked[(0, 5, 5)] = ctx.frame + TEMP_BLOCK_FRAMES
+    ctx.refresh()
+    d = Goto().step(ctx)
+    assert d.button == "" and d.rule == "goto_wait" and ctx.goto == [0, 5, 5]
+    ctx.frame += TEMP_BLOCK_FRAMES
+    assert Goto().step(ctx).button == "UP" and ctx.goto == [0, 5, 5]
+
+
+def test_failed_moves_into_a_person_are_not_walls_and_old_false_walls_are_purged(tmp_path):
+    from pokeagent.explorer.memory_purge import purge_npc_walls
+    mem = MapMemory(tmp_path / "m.json")
+    for _ in range(5):
+        assert "not a wall" in mem.learn((0, 5, 6), "UP", (0, 5, 6), confirmed=True, npc_ahead=True)
+    assert "5,6,UP" not in mem.m(0)["blocked"] and not mem.m(0).get("fails")
+    mem.learn((0, 5, 6), "UP", (0, 5, 6), confirmed=True)  # a real wall
+    assert "5,6,UP" in mem.m(0)["blocked"]
+    data = {"maps": {"0": {"blocked": ["5,6,UP", "9,9,LEFT", "bad"], "fails": {"5,6,UP": 3}, "npcs": {
+        "slot2:pic13": {"moves": True, "positions": {"5,5": 970, "3,8": 5}},
+        "slot3:pic9": {"moves": False, "positions": {"9,8": 50}}}}}}
+    assert purge_npc_walls(data) == 1
+    assert data["maps"]["0"]["blocked"] == ["9,9,LEFT", "bad"] and not data["maps"]["0"]["fails"]
+
+
+def test_anomaly_files_are_capped_per_run(tmp_path):
+    from pokeagent.explorer import anomaly_record as ar
+    log = ar.AnomalyLog(tmp_path, "r")
+    emu = FakeEmulator()
+    f = ad.Finding("teleport", 0, 1, 1, (1, 1))
+    for i in range(ar.MAX_FILES // 2 + 10):
+        log.write(f, step=i, frame=i, emu=emu, decisions=[], player=(1, 1))
+    assert len(list((tmp_path / "anomalies").glob("r-*"))) == ar.MAX_FILES
+    assert not (tmp_path / "anomalies" / "r-0-teleport.state").exists()
+    assert (tmp_path / "anomalies" / f"r-{ar.MAX_FILES // 2 + 9}-teleport.png").exists()
 
 
 def test_wait_ends_early_when_the_npc_leaves(tmp_path):
@@ -231,7 +288,8 @@ def test_wait_ends_early_when_the_npc_leaves(tmp_path):
     press_in_place(ctx)
     assert ctx.anomalies.block
     ctx.emu.set(0xC215, 8)  # NPC steps to (4,5)
-    press_in_place(ctx, "B")
+    ctx.refresh()
+    assert AnomalyWait().step(ctx) is None  # the no-press wait notices and ends
     assert ctx.anomalies.block is None and not ctx.mem.temp_blocked
 
 

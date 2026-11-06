@@ -15,8 +15,8 @@ from pokeagent.explorer.anomaly_record import RECENT_DECISIONS, AnomalyLog
 from pokeagent.explorer.anomaly_sprites import doorway_tiles, read_sprites, walkable_tiles, wanderer_slots
 from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN
 
-WAIT_PRESSES = 6          # presses spent waiting for a blocking wanderer to move before routing around it
-TEMP_BLOCK_PRESSES = 40   # steps the blocker's tile stays temporarily blocked for routing (never learned as a wall)
+WAIT_FRAMES = 90          # emulator frames (no-press waits) spent waiting for a blocking wanderer to move before routing around it
+TEMP_BLOCK_FRAMES = 300   # frames the blocker's tile stays temporarily blocked for routing (never learned as a wall)
 JOY_IGNORE, SPRITE_TABLE = 0xCD6B, (0xC100, 0x200)  # wJoyIgnore (pokered.sym); the 15 sprite state slots
 
 
@@ -27,7 +27,7 @@ class Block:
     tile: tuple
     slot: int
     player: tuple
-    waited: int = 0
+    since: int = 0   # ctx.frame when the block was first seen
 
 
 class AnomalyMonitor:
@@ -56,18 +56,20 @@ class AnomalyMonitor:
     def build_obs(self, ctx, fr) -> Obs:
         emu, (m, x, y) = ctx.emu, fr.after
         md = ctx.mem.m(m)
-        sig = hash(emu.read_range(TILEMAP, TILEMAP_LEN) + emu.read_range(*SPRITE_TABLE))
+        battle, joy = emu.read(0xD057) != 0, emu.read(JOY_IGNORE)
+        candidate = tuple(fr.before) == (m, x, y) and not fr.box_after and not battle and not joy  # a frozen-screen candidate
+        sig = hash(emu.read_range(TILEMAP, TILEMAP_LEN) + emu.read_range(*SPRITE_TABLE)) if candidate else 0
         return Obs(step=ctx.step, frame=ctx.frame, map=m, x=x, y=y, button=fr.name, prev=tuple(fr.before),
                    sprites=read_sprites(emu), wanderers=wanderer_slots(md.get("npcs", {})),
                    doors=doorway_tiles(md.get("warps", {})), walkable=walkable_tiles(md), warps=md.get("warps", {}),
-                   jumps=md.get("jumps", {}), box=fr.box_after, battle=emu.read(0xD057) != 0,
-                   joy_ignore=emu.read(JOY_IGNORE), screen_sig=sig, broken=impossible_state(emu, self.valid_maps))
+                   jumps=md.get("jumps", {}), box=fr.box_after, box_before=fr.box_before, battle=battle,
+                   joy_ignore=joy, screen_sig=sig, broken=impossible_state(emu, self.valid_maps))
 
     def observe(self, ctx, fr) -> list[dict]:
         """Run every detector on the press just made; returns the records written."""
         obs = self.build_obs(ctx, fr)
         self._track_block(obs)
-        self._expire_temp_blocks(ctx)
+        self.expire(ctx)
         written = []
         for f in self.det.update(obs):
             if self.log.allow(f.type, f.map, f.tile, obs.step):
@@ -86,18 +88,25 @@ class AnomalyMonitor:
             dx, dy = DIRS[o.button]
             for slot, (pic, sx, sy) in o.sprites.items():
                 if slot in o.wanderers and (sx, sy) == (o.x + dx, o.y + dy):
-                    self.block = Block(o.map, (sx, sy), slot, (o.x, o.y))
+                    self.block = Block(o.map, (sx, sy), slot, (o.x, o.y), since=o.frame)
+
+    def check_block(self, ctx) -> Block | None:
+        """No-press waits never reach observe(): re-read the sprite table so a wanderer that left ends the wait."""
+        b = self.block
+        if b is not None and read_sprites(ctx.emu).get(b.slot, (0, None, None))[1:] != b.tile:
+            self.block = b = None
+        return b
 
     def reroute(self, ctx) -> None:
-        """The wait is over: treat the blocker's tile as blocked for TEMP_BLOCK_PRESSES steps and replan."""
+        """The wait is over: treat the blocker's tile as blocked for TEMP_BLOCK_FRAMES frames and replan."""
         b, self.block = self.block, None
         if b is None:
             return
-        ctx.mem.temp_blocked[(b.map, *b.tile)] = ctx.step + TEMP_BLOCK_PRESSES
+        ctx.mem.temp_blocked[(b.map, *b.tile)] = ctx.frame + TEMP_BLOCK_FRAMES
         ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = [], None, None
 
     @staticmethod
-    def _expire_temp_blocks(ctx) -> None:
+    def expire(ctx) -> None:
         tb = getattr(ctx.mem, "temp_blocked", {})
-        for k in [k for k, until in tb.items() if until <= ctx.step]:
+        for k in [k for k, until in tb.items() if until <= ctx.frame]:
             del tb[k]

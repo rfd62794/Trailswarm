@@ -1,9 +1,9 @@
-"""anomaly_wait: a wanderer NPC stands on the tile the agent is pressing into. Wait a few presses for it to move,
-then route around its tile (temporarily blocked, never learned as a wall)."""
+"""anomaly_wait: a wanderer NPC stands on the tile the agent is pressing into. Wait a short while (no button pressed)
+for it to move, then route around its tile (temporarily blocked, never learned as a wall)."""
 from __future__ import annotations
 
-from pokeagent.explorer.anomalies import WAIT_PRESSES
-from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.anomalies import WAIT_FRAMES
+from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 
 
@@ -16,10 +16,12 @@ class AnomalyWait(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         mon = ctx.anomalies
-        blk = mon.block
+        blk = mon.check_block(ctx)
+        if blk is None:
+            return None  # it moved on its own: carry on
         where = f"({blk.tile[0]},{blk.tile[1]})"
-        if blk.waited < WAIT_PRESSES:
-            blk.waited += 1
-            return Decision("B", "wait_for_npc", f"NPC slot {blk.slot} blocks {where}: waiting {blk.waited}/{WAIT_PRESSES} presses for it to move")
+        waited = ctx.frame - blk.since
+        if waited < WAIT_FRAMES:
+            return no_press("wait_for_npc", f"NPC slot {blk.slot} blocks {where}: waiting for it to move ({waited}/{WAIT_FRAMES} frames)")
         mon.reroute(ctx)
-        return Decision("B", "reroute_npc", f"NPC slot {blk.slot} still on {where}: routing around it (tile blocked for a while, not a wall)")
+        return no_press("reroute_npc", f"NPC slot {blk.slot} still on {where}: routing around it (tile blocked for a while, not a wall)")

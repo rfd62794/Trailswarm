@@ -70,10 +70,10 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
     else:
         fail_key = (before, name)
         confirmed = ctx.last_fail == fail_key
-        result = ctx.mem.learn(before, name, after, confirmed=confirmed)
+        dx, dy = DIRS.get(name, (0, 0))
+        npc_ahead = name in DIRS and after == before and (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
+        result = ctx.mem.learn(before, name, after, confirmed=confirmed, npc_ahead=npc_ahead)
         if "ahead_tiles" in extra and after[0] == before[0]:
-            dx, dy = DIRS[name]
-            npc_ahead = (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
                 ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person
             elif result.startswith("moved"):

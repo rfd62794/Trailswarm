@@ -7,6 +7,7 @@ from pathlib import Path
 
 RATE_PRESSES = 200       # one record per (type, map, tile) per this many presses
 RECENT_DECISIONS = 10    # decisions attached to every record
+MAX_FILES = 200          # state/png files kept per run; the oldest are pruned
 CAUSE_LOOKBACK = 6       # decisions examined for the cause hint
 NPC_TYPES = frozenset({"npc_in_doorway", "npc_blocking_path", "player_blocking_npc"})
 GAME_TYPES = frozenset({"teleport", "impossible_state"})
@@ -62,4 +63,13 @@ class AnomalyLog:
         with (self.runs_dir / "anomalies.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec) + "\n")
         self.count += 1
+        self._prune(out)
         return rec
+
+    def _prune(self, out: Path) -> None:
+        files = sorted(out.glob(f"{self.run}-*"), key=lambda p: (p.stat().st_mtime, p.name))
+        for old in files[:max(0, len(files) - MAX_FILES)]:
+            try:
+                old.unlink()
+            except OSError:
+                pass

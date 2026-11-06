@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
+from pokeagent.explorer.memory_purge import purge_npc_walls
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
 
@@ -34,6 +35,7 @@ class MapMemory(NavMixin, WarpsMixin):
         self.temp_blocked: dict = {}  # (map, x, y) -> step it expires: a wanderer NPC's tile, routing only, never saved
         self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
         self.purge_bad_warps()
+        self.purged_npc_walls = purge_npc_walls(self.data)  # false walls learned against wandering NPCs
 
     def purge_bad_warps(self):
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
@@ -56,7 +58,7 @@ class MapMemory(NavMixin, WarpsMixin):
     def visit(self, map_id, x, y, step):
         d = self.m(map_id); d["visited"][f"{x},{y}"] = d["visited"].get(f"{x},{y}", 0) + 1; d["last_seen"] = step
 
-    def learn(self, before, button, after, *, confirmed: bool) -> str:
+    def learn(self, before, button, after, *, confirmed: bool, npc_ahead: bool = False) -> str:
         """Record what a press did. A move that fails is only 'blocked' once CONFIRMED (same press from
         the same tile failed twice in a row); a single failure can be a turn-in-place or a warp fade."""
         (m0, x0, y0), (m1, x1, y1) = before, after
@@ -102,6 +104,8 @@ class MapMemory(NavMixin, WarpsMixin):
                 blocked.append(bk)
             return f"LEDGE jump {button} to ({x1},{y1}) - one way"
         if (x1, y1) == (x0, y0):
+            if npc_ahead:  # a person stands there: not a wall, not even a failed-move count
+                return "no move (a person is in the way) - not a wall"
             fails = self.m(m0).setdefault("fails", {})  # failures NOT required to be consecutive: alternating
             fails[key] = fails.get(key, 0) + 1          # presses at a map edge never confirmed a wall before
             if fails[key] >= 2:
