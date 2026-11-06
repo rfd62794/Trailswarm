@@ -37,3 +37,25 @@ def purge_npc_walls(data: dict) -> int:
                 keep.append(key)
         d["blocked"] = keep
     return removed
+
+
+def purge_enclosed_walls(data: dict) -> int:
+    """Drop the walls of a tile we stood on (``visited``) that memory says is blocked in ALL four directions: nobody walks
+    into a tile with no way out, so those were learned while a full-screen page (Pokedex entry) swallowed the presses
+    (Mt Moon B2F, 2026-11-05; the stuck_tile anomaly records show learned_blocked = all four). Only learned ``blocked``
+    entries and their fail counters go: ROM data, warps and jumps are never touched. Returns how many entries were dropped."""
+    removed = 0
+    for d in data.get("maps", {}).values():
+        blocked = set(d.get("blocked", []))
+        enclosed = []
+        for key in d.get("visited", {}):
+            keys = [f"{key},{name}" for name in DIRS]
+            if all(k in blocked for k in keys):
+                enclosed += keys
+        if enclosed:
+            drop = set(enclosed)
+            d["blocked"] = [k for k in d["blocked"] if k not in drop]
+            for k in enclosed:
+                d.get("fails", {}).pop(k, None)
+            removed += len(enclosed)
+    return removed
