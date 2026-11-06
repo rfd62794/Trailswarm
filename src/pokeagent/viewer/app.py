@@ -132,7 +132,7 @@ def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
     return added, gone
 
 
-def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899) -> int:
+def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False) -> int:
     root = Path(root)
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
@@ -171,6 +171,8 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     win = ViewerWindow(model, holder["sources"], fps=fps, supervisor=Supervisor(root),
                        root=root, world=world)
     win.entries = entries
+    if world_mode:
+        win.focus.set_mode("world")
     try:
         win.run()
     finally:

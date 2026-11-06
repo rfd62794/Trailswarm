@@ -252,3 +252,11 @@ def test_dpg_world_mode_headless():
         assert win.focus.view == "world"
     finally:
         dpg.destroy_context()
+
+
+def test_cli_world_help(capsys):
+    from pokeagent.cli import main
+    with pytest.raises(SystemExit) as ei:
+        main(["world", "--help"])
+    assert ei.value.code == 0
+    assert "--png" in capsys.readouterr().out
