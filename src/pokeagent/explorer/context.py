@@ -124,6 +124,7 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)

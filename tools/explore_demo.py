@@ -266,9 +266,9 @@ def main(argv=None) -> int:
                 if emu.read(0xD057):
                     vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu)))
                 else:
-                    vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(ascii_vision(emu, mem, emu.read(0xD367)))
-                                  + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(mem.render_memory(m_, x_, y_, npcs))
-                                  + "\n\n@ you  N npc  W warp\ni talks  # wall  . seen")
+                    sees = ascii_vision(emu, mem, emu.read(0xD367)); rem = mem.render_memory(m_, x_, y_, npcs)
+                    vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(sees) + "\n" + sees.legend
+                                  + f"\n\nREMEMBERS map 0x{m_:02X}\n" + "\n".join(rem) + "\n" + rem.legend)
                 tm_d = emu.read_range(TILEMAP, TILEMAP_LEN)
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, ctx)

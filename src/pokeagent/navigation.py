@@ -26,7 +26,8 @@ def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
     """BFS over learned memory -> list of action indices, or None if unreachable.
 
     States are (map, x, y): walkable moves inside a map plus warp edges
-    'x,y,dir' -> [m1, x1, y1], so a route can hop doors/stairs across maps.
+    'x,y,dir' -> [m1, x1, y1] and one-way ledge jumps 'x,y,dir' -> [x1, y1],
+    so a route can hop doors/stairs across maps and drop down ledges.
     """
     tmap = map_id if tmap is None else tmap
     goal = (tmap, tx, ty)
@@ -43,19 +44,26 @@ def shortest_path(memory: dict, map_id: int, x: int, y: int, tx: int, ty: int,
         visited = set(d.get('visited', {}))
         blocked = set(d.get('blocked', []))
         warps = d.get('warps', {})
+        jumps = d.get('jumps', {})
         for name, (dx, dy) in DIRS.items():
             key = f'{cx},{cy},{name}'
             if key in warps:  # observed transition beats a stale 'blocked' (fade artifacts)
                 m1, x1, y1 = warps[key]
                 nxt = (m1, x1, y1)
+                known = True
+            elif key in jumps:  # a recorded ledge jump: one-way edge, the landing counts as known
+                x1, y1 = jumps[key]
+                nxt = (m, x1, y1)
+                known = True
             elif key in blocked:
                 continue
             else:
                 nxt = (m, cx + dx, cy + dy)
+                known = False
             if nxt in prev:
                 continue
-            if nxt != goal and nxt[0] == m and f'{nxt[1]},{nxt[2]}' not in visited:
-                continue  # only learned-walkable tiles; warp landings count as known
+            if not known and nxt != goal and nxt[0] == m and f'{nxt[1]},{nxt[2]}' not in visited:
+                continue  # only learned-walkable tiles; warp and ledge landings count as known
             prev[nxt] = (m, cx, cy, name)
             if nxt == goal:
                 found = nxt
