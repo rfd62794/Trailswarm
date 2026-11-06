@@ -255,8 +255,8 @@ class WorldView:
         if not m:
             return
         aid = pick(self._points, self.vp, *m)
-        if aid:
-            t = self.wm.track(aid)
+        t = self.wm.track(aid) if aid else None  # None: the agent exited since _points was built
+        if t is not None:
             lines = [aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
         else:
             loc = locate(self.world.layout, *self.vp.to_world(*m))
