@@ -34,3 +34,12 @@ def test_item_step_party_pick_uses_the_given_slot_outside_fights(tmp_path):
     ctx = make_ctx(tmp_path, memory={0xCC2F: 0, 0xCC26: 0})
     d = item_step(ctx, ["Use item on which", "POKEMON?"], "", 0x14, "POTION", "t", party_target=1)
     assert (d.button, d.rule) == ("DOWN", "item_party_pick")
+
+
+def test_use_toss_box_over_the_item_list_is_answered_not_scrolled(tmp_path):
+    """ROM batch 2026-11-06: after A on POTION the USE/TOSS box covers the list; rows 'x N' made item_step scroll for 40 presses."""
+    from pokeagent.explorer.behaviours.cave_escape import rope_press
+    ctx = make_ctx(tmp_path, memory={0xD35E: 0x3C, **BAG, **PARTY})
+    over = ["HP UP", "x 1", ">POTION", "x 3", ">USE", "TOSS"]
+    assert rope_press(ctx, over, 0x14, "POTION").button == "A"
+    assert rope_press(ctx, ["POTION", "x 3", "USE", ">TOSS"], 0x14, "POTION").button == "UP"

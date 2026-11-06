@@ -31,6 +31,9 @@ def wants_rope(ctx: ExplorerContext) -> bool:
 def rope_press(ctx: ExplorerContext, lines: list[str], item_id: int = ESCAPE_ROPE, name: str = "ESCAPE ROPE",
                why: str = "cave HP critical", party_target: int | None = None) -> Decision:
     """The next press of an overworld item-use sequence (the rope, or cave_topup's POTION) for the menu on screen."""
+    if any("TOSS" in ln for ln in lines):  # the USE/TOSS box sits OVER the item list (whose 'x N' rows stay visible): answer it first
+        return Decision("UP" if any(ln.lstrip(">").strip().startswith("TOSS") and ln.startswith(">") for ln in lines) else "A",
+                        "rope_use", f"{name}: choosing USE")
     if item_list_open(lines) or party_prompt_open(lines):
         if item_list_open(lines) and bag_index(ctx.emu, item_id) is None:
             return Decision("B", "rope_missing", f"{name} is gone from the bag: closing the list")
