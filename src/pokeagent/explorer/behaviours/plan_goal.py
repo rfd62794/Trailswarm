@@ -7,8 +7,10 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.training import readiness_for, train_level_for
+from pokeagent.explorer.grind import GrindBudget
+from pokeagent.explorer.training import readiness_for, required_level, stage_goal
 from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
 
 
@@ -31,8 +33,14 @@ class PlanGoal(BehaviourBase):
         if verdict and verdict.text != ctx.readiness_note:
             ctx.readiness_note = verdict.text
             ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})", "res")
+        need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
+        if clamp != ctx.clamp_note:
+            ctx.clamp_note = clamp
+            if clamp:
+                ctx.log(f"[readiness] {clamp}", "res")
+        need = self._budgeted(ctx, goals_now_all, need, verdict)
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
-                             "_level": ctx.emu.read(0xD18C), "_train_level": train_level_for(goals_now_all, ctx.opts.train_level, party),
+                             "_level": ctx.emu.read(0xD18C), "_train_level": need,
                              "_center_intent": ctx.center_intent, "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         if planned and "at Mom, talking" in planned[1]:
@@ -41,3 +49,17 @@ class PlanGoal(BehaviourBase):
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             return Decision(planned[0], "plan_goal", planned[1])
         return None
+
+    @staticmethod
+    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
+        """The training level, or 0 (gate lifted) once the grind budget for this goal is spent."""
+        goal, level = stage_goal(goals), ctx.emu.read(0xD18C)
+        if goal is None:
+            return need
+        ctx.grind = ctx.grind or GrindBudget()
+        why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
+                               training=0 < level < need, ceiling=level_ceiling(goal),
+                               required=need)
+        if why:
+            ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
+        return 0 if ctx.grind.lifted(goal) else need

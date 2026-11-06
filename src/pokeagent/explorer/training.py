@@ -15,6 +15,7 @@ from pokeagent.knowledge.readiness import Readiness, assess
 # (Robert, 2026-11-05: two blackouts in Mt Moon at level 8; Misty's Staryu/Starmie are L18/L21.)
 TRAIN_LEVEL_BY_GOAL = {"beat_brock": 12, "to_mt_moon": 14, "beat_misty": 20}
 BOSS_LABEL = {"beat_brock": "BROCK", "to_mt_moon": "MT MOON", "beat_misty": "MISTY"}
+CAP_ABOVE_TABLE = 5
 _cache: dict = {}
 
 
@@ -37,11 +38,20 @@ def readiness_for(goals: dict, party: list | None) -> Readiness | None:
     return _cache[key]
 
 
-def train_level_for(goals: dict, floor: int = 8, party: list | None = None) -> int:
-    """Level wanted for the next unmet goal's stage: the readiness verdict for `party` when it can be computed,
-    else the table; the --train-level flag (`floor`) is a hard floor under either."""
+def required_level(goals: dict, floor: int = 8, party: list | None = None) -> tuple[int, str]:
+    """(level wanted, clamp note). The readiness verdict is clamped to the table value + CAP_ABOVE_TABLE (a sane grind
+    distance: a counter catch is the answer past it); the --train-level flag (`floor`) stays a hard floor above the clamp."""
     goal = stage_goal(goals)
     if goal is None:
-        return floor
-    verdict = readiness_for(goals, party)
-    return max(verdict.required if verdict else TRAIN_LEVEL_BY_GOAL[goal], floor)
+        return floor, ""
+    verdict, table = readiness_for(goals, party), TRAIN_LEVEL_BY_GOAL[goal]
+    if not verdict:
+        return max(table, floor), ""
+    cap = table + CAP_ABOVE_TABLE
+    note = f"clamp L{verdict.required} -> L{cap} vs {BOSS_LABEL[goal]}: consider a counter catch" if verdict.required > cap else ""
+    return max(min(verdict.required, cap), floor), note
+
+
+def train_level_for(goals: dict, floor: int = 8, party: list | None = None) -> int:
+    """Level wanted for the next unmet goal's stage (see required_level)."""
+    return required_level(goals, floor, party)[0]

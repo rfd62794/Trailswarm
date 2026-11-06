@@ -43,3 +43,14 @@ def species_on(map_id: int, kb: dict | None = None) -> dict[str, tuple[int, int,
 def train_vs(species: str, kb: dict | None = None) -> list[str]:
     """Human lines: where to meet `species`, with levels (the map to grind on to face it)."""
     return [f"{r['name']} {r['kind']}: L{r['levels'][0]}-{r['levels'][1]} ({r['chance'] * 100:.0f}% per encounter)" for r in where_to_catch(species, kb)]
+
+
+# The map the agent grinds on before each stage (planner: Route 1 for Brock, Route 3 for Mt Moon, Route 24 for Misty).
+TRAIN_MAP = {"beat_brock": 0x0C, "to_mt_moon": 0x0E, "beat_misty": 0x23}
+
+
+def level_ceiling(goal: str, kb: dict | None = None) -> int | None:
+    """Highest wild grass level on the goal's training route, or None when the route or its table is unknown."""
+    m = TRAIN_MAP.get(goal)
+    species = species_on(m, kb) if m is not None else {}
+    return max((hi for _, hi, _ in species.values()), default=None)

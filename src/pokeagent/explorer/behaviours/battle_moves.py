@@ -16,6 +16,21 @@ from pokeagent.explorer.kb import ROM_KB
 MENU_CURSORS = ("", "FIGHT", "PKMN", "ITEM", "RUN", "CANCEL")  # a cursor on the battle menu is not a move
 
 
+NON_HIT_NOTES = ("stat-down", "heal", "foe already", "fight ends")
+
+
+def pick_catch_move(pool: list[str], tags: dict[str, str], kscore, norm) -> tuple[str, str]:
+    """Catch mode: a sleep / paralyse move first (it raises the catch rate), else the weakest damaging hit,
+    else the first usable move (only a heal or stat move left - never an empty min())."""
+    status = [mv for mv in pool if "catch-status" in tags.get(norm(mv), "")]
+    if status:
+        return max(status, key=kscore), "status before the catch"
+    hits = [mv for mv in pool if kscore(mv) > 0 and not ("[" in tags.get(norm(mv), "") and any(x in tags.get(norm(mv), "") for x in NON_HIT_NOTES))]
+    if hits:
+        return min(hits, key=kscore), "weakest hit, catching"
+    return pool[0], "no damaging move usable: first move"
+
+
 class BattleMoves(BehaviourBase):
     name = "battle_moves"
 
@@ -87,16 +102,13 @@ class BattleMoves(BehaviourBase):
             norm0 = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
             known = {norm0(k): v for k, v in ks.items()}
             tags = {norm0(k): v[1] for k, v in ks.items()}
-            nonhit = {k for k, t in tags.items() if "[" in t and any(x in t for x in ("stat-down", "heal", "foe already", "fight ends"))}
             if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in pool):
                 # Willing to try: a damaging move never used against this species gets one trial (x1.3 bonus)
                 def kscore(mv):
                     base = known.get(norm0(mv), (0, ""))[0]
                     return base * (1.3 if base > 0 and mv not in tried else 1.0)
                 if ctx.catch_mode:  # a sleep / paralyse move first (it raises the catch rate), else the weakest damaging hit
-                    status = [mv for mv in pool if "catch-status" in tags.get(norm0(mv), "")]
-                    target = max(status, key=kscore) if status else min((mv for mv in pool if kscore(mv) > 0 and norm0(mv) not in nonhit), key=kscore)
-                    ctx.move_reason = "status before the catch" if status else "weakest hit, catching"
+                    target, ctx.move_reason = pick_catch_move(pool, tags, kscore, norm0)
                 else:
                     target = max(pool, key=lambda mv: (kscore(mv), score(mv)[1]))
                     ctx.move_reason = "" if target in tried else "first try"
