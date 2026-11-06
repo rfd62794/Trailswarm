@@ -68,6 +68,16 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
     return legend.Rendered(rows, legend.line(kinds))
 
 
+def wrap_move(move: str, width: int = 22, prefix: str = "move  ") -> list[str]:
+    """The move rule wrapped at spaces to fit ``width`` columns (continuations indented); never cuts a word."""
+    if not move:
+        return []
+    import textwrap
+    parts = textwrap.wrap(move, width, initial_indent=prefix, subsequent_indent="  ",
+                          break_long_words=False, break_on_hyphens=False)
+    return parts or [prefix + move]
+
+
 def battle_view(emu, move: str = "") -> list[str]:
     """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
     we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
@@ -80,8 +90,7 @@ def battle_view(emu, move: str = "") -> list[str]:
             f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
             "(hp addrs unverified)"]
-    if move:
-        rows.append(f"move  {move}")
+    rows += wrap_move(move)
     rows += ["", "MENU/TEXT:"]
     menu = [ln for ln in lines if ">" in ln or ln.isupper()]
     rows += [ln[:20] for ln in (menu or lines)[:6]]

@@ -133,3 +133,22 @@ def test_registry_order_and_dispatch():
     assert registry.lines_for("render", rich_snapshot()) == []
     assert registry.lines_for("nope", rich_snapshot()) == []
     assert registry.lines_for("sees", rich_snapshot()) == sees_panel.sees_lines(rich_snapshot())
+
+
+def test_sees_text_scale_is_fixed_across_line_sets():
+    from pokeagent.viewer.panels import plain
+    from pokeagent.viewer.panels.textimg import SEES_GRID, fit_lines, lines_texture
+    over = [plain("@N.T......", "#ffffff")] * 9
+    battle = [plain("A very long battle line that overflows", "#ffffff")] * 3
+    a = lines_texture(over, 200, 180, grid=SEES_GRID)
+    b = lines_texture(battle, 200, 180, grid=SEES_GRID)
+    assert a[1:] == b[1:] == (400, 360)
+    cut = fit_lines(battle, SEES_GRID[1], SEES_GRID[0])
+    assert len(cut[0][0][0]) == SEES_GRID[0] and cut[0][0][0].endswith("\u2026")
+    # row pitch is constant: the same line lands at the same pixel rows with 2 or 9 lines
+    one = [plain("X", "#ffffff")]
+    x1 = lines_texture(one, 200, 180, grid=SEES_GRID)[0]
+    x2 = lines_texture(one + [plain("Y", "#ffffff")] * 8, 200, 180, grid=SEES_GRID)[0]
+    top = 40 * 800  # first 40 pixel rows (row 0 band) identical
+    assert (x1[:top] == x2[:top]).all()
+    assert lines_texture(over[:2], 200, 100)[1:] == lines_texture(over, 200, 100)[1:]

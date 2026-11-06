@@ -185,13 +185,13 @@ def test_window_sends_on_worker_thread():
     src = Src("a", [snap("a")], [FRAME])
     model.poll([src])
     win = ViewerWindow(model, {"a": src})
-    win.selected, win._steer = "a", True
+    win.selected = "a"; win.toggle_focus("a")
     t0 = time.monotonic()
     win.send_to_targets("pause")
     win.key_button("Up")
     assert time.monotonic() - t0 < 0.1                   # caller returned without waiting on send
     win.flush_sends()
-    assert [c for c, _ in src.sent] == ["pause", "press"] and threads[0] != threading.get_ident()
+    assert [c for c, _ in src.sent] == ["steer", "pause", "press"] and threads[0] != threading.get_ident()
 
 
 # --- concurrent polling -------------------------------------------------------------
