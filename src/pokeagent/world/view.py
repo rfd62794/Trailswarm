@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-MIN_ZOOM, MAX_ZOOM = 0.04, 4.0
+from pokeagent.world import zoom as zsnap
+
+MIN_ZOOM, MAX_ZOOM = 0.04, 8.0
 
 
 @dataclass
@@ -16,13 +18,29 @@ class Viewport:
     cx: float = 0.0
     cy: float = 0.0
     zoom: float = 0.1
+    auto_fit: bool = True      # until the user zooms/pans, a resize re-fits the world
 
     def fit(self) -> None:
-        self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, min(self.screen_w / self.world_w, self.screen_h / self.world_h)))
+        z = zsnap.fit_snap(self.world_w, self.world_h, self.screen_w, self.screen_h)
+        self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, z))
         self.cx, self.cy = self.world_w / 2, self.world_h / 2
+        self.auto_fit = True
 
     def resize(self, w: int, h: int) -> None:
+        """New screen size: the view centre stays (maximize/restore); a never-touched view re-fits."""
         self.screen_w, self.screen_h = max(1, w), max(1, h)
+        if self.auto_fit:
+            self.fit()
+
+    def one_to_one(self, scale: float = 1.0) -> None:
+        """One game pixel per screen pixel x ``scale`` (the DPI factor), keeping the centre."""
+        self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, scale))
+        self.auto_fit = False
+
+    def step_zoom_at(self, sx: float, sy: float, direction: int) -> None:
+        """Wheel step: jump to the next crisp zoom level about a screen point."""
+        target = zsnap.step(self.zoom, direction)
+        self.zoom_at(sx, sy, target / self.zoom)
 
     def to_screen(self, wx: float, wy: float) -> tuple[float, float]:
         return (wx - self.cx) * self.zoom + self.screen_w / 2, (wy - self.cy) * self.zoom + self.screen_h / 2
@@ -32,12 +50,14 @@ class Viewport:
 
     def pan(self, dsx: float, dsy: float) -> None:
         """Drag the map by a screen delta."""
+        self.auto_fit = False
         self.cx -= dsx / self.zoom
         self.cy -= dsy / self.zoom
         self._clamp()
 
     def zoom_at(self, sx: float, sy: float, factor: float) -> None:
         """Zoom about a screen point so the world point under it stays put."""
+        self.auto_fit = False
         wx, wy = self.to_world(sx, sy)
         self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, self.zoom * factor))
         self.cx = wx - (sx - self.screen_w / 2) / self.zoom
@@ -45,6 +65,7 @@ class Viewport:
         self._clamp()
 
     def center_on(self, wx: float, wy: float) -> None:
+        self.auto_fit = False
         self.cx, self.cy = wx, wy
         self._clamp()
 
