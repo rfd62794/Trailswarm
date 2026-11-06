@@ -46,10 +46,10 @@ def world_px(world, m: int, x: int, y: int) -> tuple[int, int]:
     return px + CELL // 2, py + CELL // 2
 
 
-def draw_frame(base: Image.Image, runs, t, world, origin, scale, trail, label) -> Image.Image:
+def draw_frame(base: Image.Image, runs, t, world, origin, scale, trail, label, big=2.0) -> Image.Image:
     im = base.copy()
     d = ImageDraw.Draw(im)
-    r = max(4, round(4.5 * scale / 0.5))
+    r = round(5 * big)                                         # px radius, independent of map scale
     pos = []
     for steps in runs:
         k = min(len(steps) - 1, int(t * len(steps)))
@@ -63,11 +63,11 @@ def draw_frame(base: Image.Image, runs, t, world, origin, scale, trail, label) -
         for j in range(1, len(pts)):
             f = j / len(pts)                                      # older segments fade towards the map grey
             col = tuple(int(g + (v - g) * f) for v, g in zip(c, (170, 170, 170)))
-            d.line([pts[j - 1], pts[j]], fill=col, width=2 + (f > 0.6))
+            d.line([pts[j - 1], pts[j]], fill=col, width=round((2 + (f > 0.6)) * big))
     for i, (pts, indoors) in enumerate(pos):
         c, (x, y) = COLORS[i % len(COLORS)], pos[i][0][-1]
         box = [x - r, y - r, x + r, y + r]
-        d.ellipse(box, fill=None if indoors else c, outline=(0, 0, 0) if not indoors else c, width=2 if indoors else 1)
+        d.ellipse(box, fill=None if indoors else c, outline=(0, 0, 0) if not indoors else c, width=round((2 if indoors else 1) * big))
     d.rectangle([0, 0, 8 + 7 * len(label), 20], fill=(0, 0, 0))
     d.text((5, 5), label, fill=(255, 255, 255))
     return im
@@ -82,6 +82,7 @@ def main() -> int:
     ap.add_argument("--frames", type=int, default=75)
     ap.add_argument("--size", type=int, default=850, help="longest side in px after the crop")
     ap.add_argument("--trail", type=int, default=15)
+    ap.add_argument("--agent-scale", type=float, default=2.0, help="agent dot and trail size multiplier")
     ap.add_argument("--colors", type=int, default=64)
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--keep-frames", help="also save each frame as PNG into this directory")
@@ -112,7 +113,7 @@ def main() -> int:
     base = Image.composite(base, Image.new("RGB", base.size, (205, 205, 205)), keep)
     print(f"crop cells x{x0 // CELL}-{x1 // CELL} y{y0 // CELL}-{y1 // CELL}, base {base.size}", file=sys.stderr)
     label = f"overnight swarm, {len(runs)} agents"
-    imgs = [draw_frame(base, runs, n / (a.frames - 1), world, (x0, y0), scale, a.trail, label) for n in range(a.frames)]
+    imgs = [draw_frame(base, runs, n / (a.frames - 1), world, (x0, y0), scale, a.trail, label, a.agent_scale) for n in range(a.frames)]
     if a.keep_frames:
         Path(a.keep_frames).mkdir(parents=True, exist_ok=True)
         for n, im in enumerate(imgs):
