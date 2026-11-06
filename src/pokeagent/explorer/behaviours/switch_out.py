@@ -42,6 +42,16 @@ def switch_press(frames: list[str], screen: list[str], cur: int, target: int) ->
     return None
 
 
+def run_press(frames: list[str]) -> str | None:
+    """Next button toward RUN on the battle menu (FIGHT PKMN / ITEM RUN), None when it is not on screen."""
+    joined = " ".join(frames)
+    if "FIGHT" not in joined or "RUN" not in joined:
+        return None
+    if re.search(r">\s*RUN", joined):
+        return "A"
+    return "RIGHT" if re.search(r">\s*ITEM", joined) else "DOWN"  # FIGHT -> ITEM -> RUN, PKMN -> RUN
+
+
 class SwitchOut(BehaviourBase):
     name = "switch_out"
 
@@ -60,11 +70,17 @@ class SwitchOut(BehaviourBase):
                 ctx.switch_train = None
             return None
         target = switch_candidate(ctx.emu)
-        if target is None:
-            ctx.switch_gave_up = ctx.battles; ctx.switch_train = None
-            ctx.log("[switch_train: nobody healthy enough to send in; fighting with the Magikarp]", "res")
-            return None
         tm = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
+        if target is None:
+            # Nobody fit to send in. A Magikarp only knows SPLASH: leave a wild fight (the first sighting is logged once),
+            # a trainer fight cannot be left, so it carries on as before.
+            if ctx.emu.read(0xD057) == 1:
+                wild_run = run_press(frame_lines(tm))
+                return Decision(wild_run, "switch_train_run", "switch_train: nobody healthy to send in, SPLASH is useless: RUN") if wild_run else None
+            if ctx.switch_gave_up != ctx.battles:
+                ctx.switch_gave_up = ctx.battles
+                ctx.log("[switch_train: nobody healthy enough to send in; fighting on]", "res")
+            return None
         btn = switch_press(frame_lines(tm), screen_lines(tm), ctx.emu.read(MENU_ITEM), target)
         if btn is None:
             return None  # text scrolling / animation: the usual dialog handling runs

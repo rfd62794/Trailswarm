@@ -5,7 +5,7 @@ import pytest
 
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.behaviours import PartyOrder, SwitchOut, default_behaviours
-from pokeagent.explorer.behaviours.switch_out import switch_press
+from pokeagent.explorer.behaviours.switch_out import run_press, switch_press
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
 from pokeagent.explorer.dialog import magikarp_offer, yesno_answer
 from pokeagent.explorer.memory import MapMemory
@@ -254,9 +254,23 @@ def test_switch_out_not_for_other_leads_gave_up_or_flee(tmp_path):
     assert names.index("battle") < names.index("switch_out") < names.index("catch")  # flee decisions are made first
 
 
-def test_switch_out_nobody_fit_fights_on(tmp_path):
-    ctx = battle_ctx(tmp_path, [(MAGIKARP, 5, 17, 17), (STARTER, 18, 0, 51)])
-    assert SwitchOut().step(ctx) is None and ctx.switch_gave_up == 1
+def test_run_press_walks_the_cursor_to_run():
+    assert run_press([">FIGHT PKMN", "ITEM RUN"]) == "DOWN" and run_press(["FIGHT PKMN", ">ITEM RUN"]) == "RIGHT"
+    assert run_press(["FIGHT>PKMN", "ITEM RUN"]) == "DOWN" and run_press(["FIGHT PKMN", "ITEM>RUN"]) == "A"
+    assert run_press(["Wild ZUBAT"]) is None
+
+
+def test_switch_out_nobody_fit_runs_from_wild_and_fights_on_in_trainer_battles(tmp_path):
+    mons = [(MAGIKARP, 5, 17, 17), (STARTER, 18, 0, 51)]
+    wild = battle_ctx(tmp_path, mons, kind=1)
+    draw_framed(wild.emu, [">FIGHT PKMN", "ITEM RUN"])
+    d = SwitchOut().step(wild)
+    assert d.button == "DOWN" and d.rule == "switch_train_run"
+    draw_framed(wild.emu, ["FIGHT PKMN", "ITEM>RUN"])
+    assert SwitchOut().step(wild).button == "A"
+    trainer = battle_ctx(tmp_path, mons, kind=2)
+    draw_framed(trainer.emu, [">FIGHT PKMN", "ITEM RUN"])
+    assert SwitchOut().step(trainer) is None and trainer.switch_gave_up == 1
 
 
 def test_switch_out_names_the_swap_and_counts_it(tmp_path):

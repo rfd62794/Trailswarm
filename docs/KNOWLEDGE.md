@@ -107,6 +107,9 @@ blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.
   member opens ">SWITCH / STATS / CANCEL" (SWITCH is the FIRST row in a fight); A on SWITCH prints "MAGIKARP enough! Come back!" then "Go! WARTORTLE!".
   Gen 1 does not reorder the party on an in-battle switch. The enemy then acts (turn one is spent). Seen: "MAGIKARP gained 30 EXP. Points!" and
   "WARTORTLE gained 30 EXP. Points!" after the Zubat fainted - the switched-out Magikarp shares the experience.
+- No healthy member to send in (all fainted or under 25% HP): a Magikarp only knows SPLASH, so a wild fight is left with RUN (rule
+  `switch_train_run`); a trainer fight cannot be left and carries on. Headless runs from to_route3.state (seeds 7/11/23, 4,000 steps): Magikarp
+  reached L6-L7 and shared 4-9 battles; level 20 needs a few hundred shared fights (about 30 EXP each at these levels), so it is far off.
 - Engine notes: the buy_magikarp goal is settled (so the ladder never blocks) when a MAGIKARP/GYARADOS is owned, money < 500, the party is full, or
   Mt Moon 1F has been entered. `gyarados` is in `SIDE_GOALS` (reported by check_goals and tools/status.py, never the planner's next goal).
   With a Magikarp in the party, `party_hp`, the training level and the BattleView read the fighter (the battle's active mon, else the strongest
