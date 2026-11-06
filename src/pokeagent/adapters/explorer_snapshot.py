@@ -19,7 +19,7 @@ from pokeagent.adapters.event_feed import EventFeed
 from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
-from pokeagent.goals import SIDE_GOALS
+from pokeagent.goals import GOALS, SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
 from pokeagent.ram import read_state
@@ -107,7 +107,7 @@ class ExplorerAgentView:
             segment=Segment(id="run", name=current or ctx.opts.stop_at_goal or "explore",
                             steps=ctx.step),
             goals=[Goal(id=k, name=k, status="done" if v else ("current" if k == current else "ahead"))
-                   for k, v in sorted(check.items())],
+                   for k, v in sorted(check.items(), key=lambda kv: (GOALS.index(kv[0]) if kv[0] in GOALS else len(GOALS), kv[0]))],
             thinking=Thinking(want=want, plan=(dec.why if dec else "") or (dec.behaviour if dec else ""),
                               blocker=str(ctx.last_fail) if ctx.last_fail else "",
                               driver="explorer", rule=(dec.rule if dec else ""),

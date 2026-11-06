@@ -39,7 +39,7 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
 )
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
-from pokeagent.goals import GOALS, check_goals  # noqa: E402
+from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
 from pokeagent.statemeta import _git_sha  # noqa: E402
 
@@ -287,7 +287,7 @@ def main(argv=None) -> int:
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, ctx)
                 dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
-                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nGOALS:  " + goals_brief(g)
                               + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
                               f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
