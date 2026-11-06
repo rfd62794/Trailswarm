@@ -77,3 +77,42 @@ def test_unwanted_list_is_closed_with_b_and_missing_item_closes(tmp_path):
     assert iu.close_unwanted_list(ctx, LIST_TOP).button == "B"
     assert iu.close_unwanted_list(ctx, ["FIGHT PKMN", ">ITEM RUN"]) is None
     assert iu.item_step(ctx, LIST_TOP, "", 0x99, "ELIXIR", "t").button == "B"
+
+
+# --- cave_escape: the ESCAPE ROPE sequence ---
+from pokeagent.explorer.behaviours import cave_escape as ce  # noqa: E402
+
+START_MENU = ["POKeDEX", "POKeMON", ">ITEM", "RED", "SAVE", "OPTION", "EXIT"]
+
+
+def _hurt(ctx, hp=10, mx=62, bag=None):
+    for a, v in {0xD163: 1, 0xD16C: hp >> 8, 0xD16D: hp & 255, 0xD18D: mx >> 8, 0xD18E: mx & 255}.items():
+        ctx.emu.set(a, v)
+    ctx.emu.set(0xD35E, 0x3B)
+    ctx.refresh()
+
+
+def test_rope_wanted_only_in_cave_hurt_with_no_heal_item(tmp_path):
+    ctx = make_ctx(tmp_path)
+    _hurt(ctx)
+    assert not ce.wants_rope(ctx)           # the bag has a POTION
+    ctx.emu.set(iu.BAG_COUNT, 6)            # list now ends before POTION; ESCAPE ROPE (0x1D) is row 4
+    ctx.refresh()
+    assert ce.wants_rope(ctx)
+    ctx.emu.set(0xD35E, 0x0E); ctx.refresh()
+    assert not ce.wants_rope(ctx)           # outside the cave
+    _hurt(ctx, hp=40)
+    assert not ce.wants_rope(ctx)           # not critical
+
+
+def test_rope_sequence_reads_the_screen(tmp_path):
+    ctx = make_ctx(tmp_path, {iu.MENU_ITEM: 0, iu.LIST_SCROLL: 0})
+    assert ce.rope_press(ctx, []).button == "START"
+    assert ce.rope_press(ctx, [">POKeDEX", "POKeMON", "ITEM", "RED", "SAVE", "OPTION", "EXIT"]).button == "DOWN"
+    assert ce.rope_press(ctx, START_MENU).button == "A"
+    d = ce.rope_press(ctx, LIST_TOP)         # ESCAPE ROPE is bag row 4, cursor at row 0
+    assert (d.button, d.rule) == ("DOWN", "item_list_scroll")
+    ctx.emu.set(iu.MENU_ITEM, 2); ctx.emu.set(iu.LIST_SCROLL, 2)
+    assert ce.rope_press(ctx, ["HP UP", "x 1", ">ESCAPE ROPE", "x 1"]).rule == "item_use"
+    assert ce.rope_press(ctx, [">USE", "TOSS"]).button == "A"
+    assert ce.rope_press(ctx, ["Hello there"]).button == "B"
