@@ -23,6 +23,7 @@ from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
+from pokeagent.viewer.screen_fit import viewport_size, work_area
 from pokeagent.viewer.spawn_control import SpawnControl
 from pokeagent.viewer.ui.world_host import WorldHost
 from pokeagent.world.model import WorldModel
@@ -192,7 +193,8 @@ class ViewerWindow:
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
         dpg.create_context()
-        dpg.create_viewport(title="PokeAgent viewer", width=1500, height=950,
+        vw, vh = viewport_size(work_area())  # never taller than the screen: the control bar stays visible
+        dpg.create_viewport(title="PokeAgent viewer", width=vw, height=vh, x_pos=0, y_pos=0,
                             clear_color=self._bg())
 
     def _populate(self) -> None:
