@@ -1,7 +1,8 @@
 # Trailswarm
 
 Trailswarm is a rule-based agent that plays Pokemon Red through the PyBoy emulator. It reads the game's own data (RAM, the tile map, ROM tables), learns the world into a shared map memory, and runs as a swarm of parallel headless agents that you can watch and steer from a desktop viewer.
-nThe Python package and CLI are still named `pokeagent` (`uv run pokeagent ...`); the project was renamed from PokeAgent on 2026-11-06.
+
+The Python package and CLI are still named `pokeagent` (`uv run pokeagent ...`); the project was renamed from PokeAgent on 2026-11-06.
 
 <!-- TODO: World view GIF -->
 
