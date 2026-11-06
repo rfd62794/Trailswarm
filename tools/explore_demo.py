@@ -302,7 +302,7 @@ def main(argv=None) -> int:
         ctx.stable_frames = ctx.stable_frames + 1 if h == ctx.last_hash else 0
         ctx.last_hash = h
         try:
-            pace = (1 if a.adaptive_pace else a.box_pace) if (a.box_pace and ctx.box_open_now) else a.frames_per_step
+            pace = (a.frames_per_step if a.adaptive_pace else a.box_pace) if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
             hold = agent_view.hold.active() if agent_view is not None else False

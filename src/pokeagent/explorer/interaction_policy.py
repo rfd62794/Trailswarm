@@ -21,6 +21,7 @@ class Need:
     goal_changed: bool = False  # the goal moved on since a blocker was recorded
     nearest_healer: bool = True  # this entry is the nearest known healer by route length
     trainer_beaten: bool = False
+    reread: bool = False  # a goal or remote order explicitly wants this spot read again (goto target, centre intent)
 
 
 def needs_heal(party: list, below: float = HEAL_BELOW) -> bool:
@@ -52,6 +53,8 @@ def decide(entry: dict | None, need: Need) -> tuple[bool, str]:
     if kind is None:
         return True, R_NEW
     if kind in (INFO, SIGN):
+        if need.reread:
+            return True, "info/sign: a goal explicitly wants it read again"
         return False, R_MEMORISED if (entry.get("pages") or entry.get("text")) else R_NEW
     if kind == GIVER:
         if entry.get("done") or (entry.get("gave") is not None and entry["gave"] in need.bag_ids):

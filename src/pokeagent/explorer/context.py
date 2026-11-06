@@ -122,6 +122,7 @@ class ExplorerContext:
     mom_failed_until: int = 0
     talk_closed_frame: int = -1  # ctx.frame when the last interaction's box closed (post_talk_settle)
     post_talk_waits: int = 0
+    setup_steps: int = 0  # presses spent on one-time setup (the text speed procedure), not counted in ctx.step
     box_empty_since: int = -1  # ctx.frame when the current empty-box stretch began
     box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
     pace: object = None  # text_pace.PaceLearner, built lazily over mem.data

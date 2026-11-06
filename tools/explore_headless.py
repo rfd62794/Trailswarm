@@ -34,6 +34,9 @@ FRAMES_PER_STEP, BOX_PACE = 4, 6  # explore_demo --headless: decisions every 4 f
 def run(args) -> dict:
     random.seed(args.seed)
     work = Path(tempfile.mkdtemp(prefix="headless-"))
+    if args.maps_copy:
+        import shutil
+        shutil.copy(args.maps_copy, work / "maps.json")
     mem = MapMemory(work / "maps.json", record_paths=False)
     emu = PyBoyEmulator(Path(args.rom), headless=True)
     emu.tick(60); emu.load_state(Path(args.state)); emu.tick(30)
@@ -45,7 +48,7 @@ def run(args) -> dict:
     emu.press = lambda b, hold=8, settle=16: (count.__setitem__("frames", count["frames"] + hold), press(b, hold, settle))[1]
     trans = (work / "transitions.jsonl").open("a", encoding="utf-8")
     ctx = ExplorerContext(emu=emu, mem=mem, log=lambda t, tag=None: print(t) if args.verbose else None, run_dir=work, trans=trans,
-                          explore_run=False, opts=ExplorerOptions(steps=args.steps, headless=True, frames_per_step=4,
+                          explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text))
     presser = Presser(ctx)
@@ -76,11 +79,15 @@ def run(args) -> dict:
         ctx.last_hash = h
         if ctx.box_open_now:
             m["box_frames"] += 1  # idle frames between decisions while a box is up count toward the text pace
-        pace = (1 if args.adaptive else BOX_PACE) if ctx.box_open_now else FRAMES_PER_STEP
+        pace = (FRAMES_PER_STEP if args.adaptive else BOX_PACE) if ctx.box_open_now else FRAMES_PER_STEP
         if ctx.slow_until > ctx.step:
             pace = max(pace, 40)
         if ctx.frame % pace == 0:
-            engine.step()
+            try:
+                engine.step()
+            except Exception as e:  # the demo never lets one bad step stop the run: log it and keep going
+                m["step_errors"] = m.get("step_errors", 0) + 1
+                ctx.log(f"[agent step error: {e!r}]", "res")
     mem.save(); trans.close()
     if args.adaptive:  # the fast path waits for the prompt itself, so it counts its own pages
         tp = mem.data.get("text_press_stats", {"presses": 0, "pages": 0})
@@ -98,7 +105,7 @@ def run(args) -> dict:
            "presses_per_page": round(m["box_presses"] / max(1, m["pages"]), 2),
            "frames_per_page": round(m["box_frames"] / max(1, m["pages"]), 1),
            "option_byte": emu.read(0xD355), "hp_end": [emu.read(0xD16D), emu.read(0xD18E)], "map_end": emu.read(0xD35E), "text_speed": mem.data.get("text_speed"), "types": types,
-           "retalked_info_or_sign": retalk, "stats": stats, "goals": [g for g, v in check_goals(emu, ctx).items() if v],
+           "retalked_info_or_sign": retalk, "stats": stats, "goals": [g for g, v in check_goals(emu, ctx).items() if v], "goal_steps": dict(ctx.goal_steps), "starter_species": emu.read(0xD16B),
            "pace": mem.data.get("text_pace"), "work": str(work)}
     emu.close()
     return out
@@ -112,7 +119,9 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--adaptive", action="store_true", help="learned A pacing (text_press)")
     ap.add_argument("--fast-text", action="store_true", help="run the set_text_speed_fast procedure first")
+    ap.add_argument("--maps-copy", default=None, help="start from a copy of this maps.json (default: fresh)")
     ap.add_argument("--hurt", type=int, default=0, help="set the lead mon's HP to this value after loading (heal check)")
+    ap.add_argument("--starter", default="bulbasaur")
     ap.add_argument("--verbose", action="store_true")
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
     return 0

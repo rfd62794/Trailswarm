@@ -5,6 +5,7 @@ Called by press_interact when a text box closes. Adds to the interaction entry: 
 giver, ``done``. Per-type totals go to maps.json ``interaction_stats`` (presses, talks, re-talks, heals)."""
 from __future__ import annotations
 
+from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.interaction_types import GIVER, HEALER, SIGN, INFO, TYPES, read_effects, record_type
 from pokeagent.explorer.perceive import EFFECT_WINDOW
 
@@ -37,6 +38,7 @@ def close_interaction(ctx, inter: dict, pos_after: tuple) -> str:
     kind = record_type(entry, fx)
     if kind == GIVER:
         entry["done"] = True
+    entry["goal"] = goal_stage(ctx.goals())  # which goal was active when it was last read (retalk_veto compares)
     best = entry.get("best_presses")
     entry["best_presses"] = inter["presses"] if best is None else min(best, inter["presses"])
     st = stats(ctx)

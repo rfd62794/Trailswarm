@@ -83,7 +83,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.last_fail = fail_key if (name in DIRS and after == before) else None
         if after[0] != before[0]:
             ctx.settle = 30  # fade already waited out; a short pause so the watcher sees the arrival
-        if box_after and not ctx.inter:  # walked into an NPC, or a scripted event fired (Oak!)
+        if box_after and not ctx.inter and ctx.proc is None:  # (a procedure's own menu is not an interaction) walked into an NPC, or a scripted event fired (Oak!)
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text)
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
                            "choices": [], "snap": snap_pre, "pos": before}

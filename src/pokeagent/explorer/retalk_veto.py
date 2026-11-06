@@ -6,6 +6,7 @@ needs healing. A hurt party always lets the press through (it may be a healer we
 that vetoed, which goes into the decision log."""
 from __future__ import annotations
 
+from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.interaction_policy import Need, decide, needs_heal
 from pokeagent.explorer.interaction_record import stats
 from pokeagent.explorer.interaction_types import GIVER, HEALER, INFO, SIGN
@@ -25,10 +26,20 @@ def entry_in_front(ctx) -> dict | None:
     return ctx.mem.m(v.m).get("interactions", {}).get(f"{v.x},{v.y},{ctx.facing}")
 
 
+def _thing_in_front(ctx) -> bool:
+    v = ctx.view
+    dx, dy = DIRS.get(ctx.facing, (0, 0))
+    return ctx.mem.npc_at(v.m, v.x + dx, v.y + dy) is not None
+
+
 def veto(ctx, decision) -> str | None:
     """None to let the press through, else the policy rule that says talking again is not worth it."""
     if decision.button != "A" or ctx.view.box or ctx.view.battling or ctx.proc is not None:
         return None
+    if decision.behaviour == "readiness" and _thing_in_front(ctx):
+        # "busy: A in case text is waiting" must never talk to whoever stands in front: that is how the wrong starter ball
+        # got taken (a mash A right after a step towards the ball opened the offer and the next A said YES)
+        return "readiness mash would talk to the NPC / ball in front: B instead"
     entry = entry_in_front(ctx)
     if not entry or entry.get("type") not in VETOABLE:
         return None
@@ -36,7 +47,12 @@ def veto(ctx, decision) -> str | None:
     party = _party_hp(win)
     if needs_heal(party):
         return None
-    talk, rule = decide(entry, Need(party=party, bag_ids=frozenset(_bag(win))))
+    stage = goal_stage(ctx.goals())
+    changed = entry.get("goal") not in (None, stage)  # the goal moved on since this spot was last read
+    target = ctx.goto and tuple(ctx.goto[:3]) == (ctx.view.m, ctx.view.x, ctx.view.y)
+    need = Need(party=party, bag_ids=frozenset(_bag(win)), wants_item=bool(ctx.center_intent), goal_changed=changed,
+                reread=bool(target))
+    talk, rule = decide(entry, need)
     if talk:
         return None
     stats(ctx)["retalks_avoided"] = stats(ctx).get("retalks_avoided", 0) + 1

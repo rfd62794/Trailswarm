@@ -8,6 +8,13 @@ from __future__ import annotations
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 
+def uncount(ctx: ExplorerContext) -> None:
+    """A wait is not a press: take the decision LoopGuard just added to its position history back out, so a few waits
+    never add up to "60 presses on <=6 tiles" (that fired at step 18 and cost a 25-step shake)."""
+    if ctx.pos_hist:
+        ctx.pos_hist.pop()
+
+
 MAX_WAIT = 40  # decisions (a fallback cap for callers that never tick ctx.frame)
 EMPTY_FRAMES = 45  # a box border can linger this long while the screen redraws after the last page
 
@@ -25,6 +32,7 @@ class BoxSettle(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         ctx.box_empty_waits += 1
+        uncount(ctx)
         return no_press("box_settle", "the text box is empty (opening or closing): waiting, not pressing A")
 
 
@@ -42,5 +50,6 @@ class PostTalkSettle(BehaviourBase):
                 and ctx.frame - ctx.talk_closed_frame < POST_TALK_FRAMES and ctx.post_talk_waits < MAX_WAIT)
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
+        uncount(ctx)
         ctx.post_talk_waits += 1  # bounded even if nothing ticks ctx.frame (a caller without the demo loop)
         return no_press("post_talk_settle", "a text box just closed: letting the screen redraw before pressing anything")

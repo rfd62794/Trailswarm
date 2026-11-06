@@ -8,7 +8,8 @@ from pokeagent.emulator import Button
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open, is_menu
 from pokeagent.explorer.text_pace import HOLD_FRAMES, PROMPT_COL, PROMPT_ROW, PaceLearner, prompt_waiting, screen_kind
 
-WAIT_STEP, WAIT_MAX, STABLE_FRAMES = 2, 120, 10  # poll every 2 frames; give up after 120; a still screen counts as ready
+WAIT_STEP, WAIT_MAX, STABLE_FRAMES = 2, 120, 10
+JOY_IGNORE, MENU_SAFE_FRAMES = 0xCD6B, 30  # wJoyIgnore; frames a freshly drawn menu needs before it takes input  # poll every 2 frames; give up after 120; a still screen counts as ready
 
 
 def _tm(emu) -> bytes:
@@ -18,7 +19,7 @@ def _tm(emu) -> bytes:
 def _mask(tm: bytes) -> bytes:
     """The screen without the blinking prompt arrow (its blink must not read as the page changing)."""
     i = PROMPT_ROW * 20 + PROMPT_COL
-    return tm[:i] + b"" + tm[i + 1:]
+    return tm[:i] + bytes([0x7F]) + tm[i + 1:]
 
 
 def learner(ctx) -> PaceLearner:
@@ -27,8 +28,10 @@ def learner(ctx) -> PaceLearner:
     return ctx.pace
 
 
-def fast_a_press(ctx) -> dict:
-    """Press A once on an open box. Returns {"kind", "dropped", "waited", "frames"} for the metrics."""
+def fast_a_press(ctx) -> dict | None:
+    """Press A once on a text page that is waiting for it (the prompt arrow is up). Returns {"kind", "dropped", "waited",
+    "frames"}, or None WITHOUT pressing when the screen is not a plain mid-text page (a menu, a YES/NO, a last page with no
+    arrow, a joypad-ignored moment): the caller then makes the ordinary, slower press. Fast is only ever for the safe case."""
     emu, pl = ctx.emu, learner(ctx)
     tm = _tm(emu)
     kind = screen_kind(tm, bool(emu.read(0xD057)), is_menu(tm))
@@ -40,7 +43,10 @@ def fast_a_press(ctx) -> dict:
         tm = nxt
         if still >= STABLE_FRAMES:
             break  # the last page has no prompt: it is simply waiting
-    prompt = prompt_waiting(tm)
+    if kind != "box" or emu.read(JOY_IGNORE) or not prompt_waiting(tm):
+        ctx.text_frames = getattr(ctx, "text_frames", 0) + waited
+        return None
+    prompt = True
     settle = pl.settle(kind)
     emu.press(Button.A, HOLD_FRAMES, settle)
     after, calm, after_wait = _tm(emu), 0, 0
@@ -49,6 +55,9 @@ def fast_a_press(ctx) -> dict:
         nxt = _tm(emu)
         calm = calm + WAIT_STEP if _mask(nxt) == _mask(after) else 0
         after = nxt
+    if is_menu(after):  # a menu / YES-NO just opened: it takes input only after its own start-up delay (a DOWN sent
+        emu.tick(MENU_SAFE_FRAMES)  # right away was lost, and the wrong starter was taken)
+        after_wait += MENU_SAFE_FRAMES
     dropped = (prompt or kind in ("menu", "yesno")) and _mask(after) == _mask(tm)  # something was waiting for A, we pressed, nothing changed
     pl.record(kind, dropped)
     st = ctx.mem.data.setdefault("text_press_stats", {"presses": 0, "pages": 0, "dropped": 0, "frames": 0})

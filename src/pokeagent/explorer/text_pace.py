@@ -10,7 +10,8 @@ from __future__ import annotations
 
 PROMPT_TILE, PROMPT_ROW, PROMPT_COL = 0xEE, 16, 18  # blinking down arrow in the dialog box
 KINDS = ("box", "menu", "yesno", "battle")
-MIN_SETTLE, MAX_SETTLE, START_SETTLE = 2, 40, 16  # frames after a press before the screen is read
+MIN_SETTLE, MAX_SETTLE, START_SETTLE = 2, 40, 16
+MENU_MIN_SETTLE = 12  # menus and YES/NO never go below this (they ignore input right after drawing)  # frames after a press before the screen is read
 SHRINK_STEP, SHRINK_AFTER, GROW_FACTOR = 2, 3, 2  # shrink 2 frames after 3 clean presses; double on a drop
 HOLD_FRAMES = 4  # button held; the game polls input every frame, 4 is enough and 8 was the old default
 
@@ -50,5 +51,5 @@ class PaceLearner:
             e["clean"] += 1
             if e["clean"] >= SHRINK_AFTER:
                 e["clean"] = 0
-                e["settle"] = max(MIN_SETTLE, e["settle"] - SHRINK_STEP)
+                e["settle"] = max(MENU_MIN_SETTLE if kind in ("menu", "yesno") else MIN_SETTLE, e["settle"] - SHRINK_STEP)
         return e["settle"]

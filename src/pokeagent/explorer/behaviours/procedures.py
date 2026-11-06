@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import re
 
+from pokeagent.explorer.behaviours.box_settle import uncount
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines, party_hp
 from pokeagent.goals import bag_contents
 
-from pokeagent.explorer.text_speed import OPTIONS_ADDR, text_speed_steps, check_text_speed
+from pokeagent.explorer.text_speed import check_text_speed, seed_text_speed, text_speed_steps
 
 # POKeMON, ITEM, <name>, SAVE, OPTION, EXIT (POKeMON appears once you have one). READ records the screen.
 PROCEDURES = {
@@ -31,19 +32,25 @@ class Procedures(BehaviourBase):
     name = "procedures"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        if ctx.opts.fast_text and "set_text_speed_fast" not in ctx.proc_done and ctx.emu.read(OPTIONS_ADDR) & 7 != 1:
-            ctx.proc_done.add("set_text_speed_fast"); ctx.proc_due.insert(0, "set_text_speed_fast")  # once, first thing
+        if ctx.opts.fast_text and not ctx.view.box and not ctx.view.battling:
+            seed_text_speed(ctx)  # first thing, retried once on failure, cached when verified
         if ctx.proc is not None:
             return True
         return bool(ctx.proc_due) and not ctx.view.box and ctx.emu.read(0xD057) == 0
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
+        decision = self._step(ctx)
+        if decision is not None and not decision.button:
+            uncount(ctx)  # a procedure's pacing waits are not presses (LoopGuard counts decisions)
+        return decision
+
+    def _step(self, ctx: ExplorerContext) -> Decision | None:
         proc = ctx.proc
         if proc is None and ctx.proc_due and not ctx.view.box and ctx.emu.read(0xD057) == 0:
             name = ctx.proc_due.pop(0)
             if name in PROCEDURES:
                 rec = ctx.mem.data.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": ctx.opts.box_pace or 12})
-                ctx.proc = proc = {"name": name, "steps": list(PROCEDURES[name](ctx) if callable(PROCEDURES[name]) else PROCEDURES[name]), "i": 0, "retries": 0, "pace": rec["pace"], "wait": 0}
+                ctx.proc = proc = {"name": name, "steps": list(PROCEDURES[name](ctx) if callable(PROCEDURES[name]) else PROCEDURES[name]), "i": 0, "retries": 0, "pace": rec["pace"], "wait": 0, "step0": ctx.step}
                 ctx.log(f"[procedure {name}: start, pace {proc['pace']} frames]", "res")
         if proc:
             if proc["wait"] > 0:
