@@ -56,3 +56,20 @@ def test_inside_the_cave_the_planner_never_walks_out_to_train(tmp_path):
     for floor in sorted(DUNGEON_MAPS):
         r = _plan(tmp_path, (floor, 5, 5), "to_mt_moon", level=10)
         assert r is None or "Route 3" not in r[1]
+
+
+def test_battle_presses_do_not_feed_the_stuck_loop_detector(tmp_path):
+    """200 presses of battle text on one tile are a fight, not a loop; shaking after it random-walked into more fights."""
+    from pokeagent.explorer.behaviours.guards import LoopGuard
+    from test_battle_types import BATTLE, make_ctx
+    ctx = make_ctx(tmp_path, memory={BATTLE: 1})
+    for _ in range(200):
+        ctx.refresh()
+        LoopGuard().step(ctx)
+    ctx.emu.set(BATTLE, 0)
+    ctx.refresh()
+    assert LoopGuard().step(ctx) is None and ctx.shake == 0 and ctx.shakes == 0
+    for _ in range(150):  # the same 200 presses outside a fight still count (a real overworld loop)
+        ctx.refresh()
+        LoopGuard().step(ctx)
+    assert ctx.shakes >= 1
