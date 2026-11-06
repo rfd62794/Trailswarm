@@ -1,25 +1,25 @@
 """Rolling supervisor upgrade: hand a live swarm's agents to a NEW supervisor without stopping any of them.
 
-New supervisor: request_handoff() claims runs/swarm.handoff exclusively (O_EXCL, holds its pid) and waits for
+New supervisor: request_handoff() claims runs/swarm.handoff exclusively (swarm_claims.py; holds its pid) and waits for
 runs/swarm/adopt-<pid>.json (30 s, one more look after, else it refuses: no double supervision). Old supervisor:
-hand_over() merges agents that already exited, writes adopt-<pid>.json (per live agent: slot, pid tree root, seed,
-config, memory copy, run dir, start hash, process identity), moves runs/spawn.lock to the new pid, and exits WITHOUT
-killing anyone. The new one adopts them: polls their pids, applies its watchdog, merges on exit, refills on its code.
+hand_over() moves runs/spawn.lock to the new pid (swarm_lock.py), merges agents that already exited, writes
+adopt-<pid>.json (per live agent: slot, pid tree root, seed, config, memory copy, run dir, start hash, process identity)
+and exits WITHOUT killing anyone. The new one adopts them: polls their pids, applies its watchdog, merges on exit,
+refills on its code. Any failure after the lock moved puts the lock back and the old supervisor keeps supervising.
 """
 from __future__ import annotations
 
-import contextlib
-import json
 import os
 import time
 from pathlib import Path
 from typing import Callable
 
+from swarm_claims import claim, read_json, withdraw, write_atomic  # noqa: F401
 from swarm_ident import SIGNATURE, Ident
+from swarm_lock import acquire_after_handoff, adopt_lock, lock_holder, transfer_lock  # noqa: F401
 from swarm_slot import Slot
 
 ANSWER_S = 30.0
-STALE_CLAIM_S = 10.0
 EXTRA_S = 5.0  # grace for an old supervisor that had already committed (lock moved) when we withdrew
 
 
@@ -55,9 +55,14 @@ class ProcHandle:
         cmd = self.ident.cmdline(self.pid)
         return cmd is not None and sig in cmd
 
-    def kill(self) -> None:
-        if self._state(self.pid) != "gone" and self.owned():  # unknown identity = not ours: never kill
-            self._kill(self.pid)
+    def kill(self) -> bool:
+        """True = gone or killed. False = alive but not provably ours: nothing sent, the caller must keep the handle."""
+        if self._state(self.pid) == "gone":
+            return True
+        if not self.owned():
+            return False
+        self._kill(self.pid)
+        return True
 
 
 def default_state():
@@ -66,106 +71,12 @@ def default_state():
     return process_state, kill_tree
 
 
-def _create_exclusive(path: Path, data: dict) -> bool:
-    """Publish a fully written file at path only if nobody has it (hard link = atomic, never seen half-written)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.new")
-    tmp.write_text(json.dumps(data))
-    try:
-        os.link(tmp, path)
-        return True
-    except FileExistsError:
-        return False
-    except OSError:  # no hard links here: plain exclusive create
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            return False
-        with os.fdopen(fd, "w") as f:
-            f.write(json.dumps(data))
-        return True
-    finally:
-        tmp.unlink(missing_ok=True)
-
-
-def _claim_is_dead(req: Path, alive: Callable[[int], bool]) -> dict | None:
-    """The claim's content if it is live; None-able result is wrapped: returns {} for dead, the dict for live."""
-    cur = _read_json(req)
-    if cur is None:  # empty/torn: only dead once it is old enough that its writer cannot still be writing
-        try:
-            return {} if time.time() - req.stat().st_mtime > STALE_CLAIM_S else {"pid": -1}
-        except OSError:
-            return {}
-    return {"pid": cur.get("pid")} if alive(int(cur.get("pid") or 0)) else {}
-
-
-def _replace_dead_claim(req: Path, alive: Callable[[int], bool]) -> bool:
-    """Move a dead claim aside atomically (exactly one replacer wins). If what we moved turns out live, put it back."""
-    tomb = req.with_name(f"{req.name}.dead.{os.getpid()}")
-    try:
-        os.rename(req, tomb)
-    except OSError:
-        return False  # someone else already took it: back off
-    ok = _claim_is_dead(tomb, alive) == {}
-    if not ok:
-        with contextlib.suppress(OSError):
-            os.link(tomb, req)
-    tomb.unlink(missing_ok=True)
-    return ok
-
-
-def _write_atomic(path: Path, data: dict | str, indent: int | None = 1) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(data if isinstance(data, str) else json.dumps(data, indent=indent))
-    os.replace(tmp, path)
-
-
-def _read_json(path: Path) -> dict | None:
-    try:
-        d = json.loads(Path(path).read_text())
-        return d if isinstance(d, dict) else None
-    except (OSError, ValueError):
-        return None
-
-
 def adopt_path(swarm_dir: Path, pid: int) -> Path:
     return Path(swarm_dir) / f"adopt-{pid}.json"
 
 
 def read_adopt(swarm_dir: Path, pid: int) -> dict | None:
-    return _read_json(adopt_path(swarm_dir, pid))
-
-
-def transfer_lock(root: Path, new_pid: int) -> bool:
-    """Old side: point runs/spawn.lock at the new supervisor, only if it is ours. No window where it is free."""
-    lock = Path(root) / "runs" / "spawn.lock"
-    try:
-        if lock.read_text().strip() != str(os.getpid()):
-            return False
-        _write_atomic(lock, str(new_pid))
-        return True
-    except OSError:
-        return False
-
-
-@contextlib.contextmanager
-def adopt_lock(root: Path):
-    """New side: take over the lock the old supervisor already pointed at us; refuse if it is not ours."""
-    from pokeagent import resources
-    lock = Path(root) / "runs" / "spawn.lock"
-    try:
-        ours = lock.read_text().strip() == str(os.getpid())
-    except OSError:
-        ours = False
-    if not ours:
-        raise resources.LockBusy(f"{lock} was not transferred to pid {os.getpid()}")
-    try:
-        yield
-    finally:
-        with contextlib.suppress(OSError):
-            if lock.read_text().strip() == str(os.getpid()):
-                lock.unlink()
+    return read_json(adopt_path(swarm_dir, pid))
 
 
 def _run_dir(root: Path, seed: int, started_wall: float) -> str | None:
@@ -177,16 +88,25 @@ def _run_dir(root: Path, seed: int, started_wall: float) -> str | None:
         return None
 
 
+def _record(sup, s) -> dict:
+    cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in s.cfg.items()}
+    wall = cfg.get("started_wall", time.time())
+    created = sup.ident.created(s.handle.pid)
+    return {"slot": s.idx, "pid": s.handle.pid, "seed": cfg["seed"], "role": s.role, "own": cfg["own"],
+            "hash": cfg.get("hash"), "started_wall": wall, "run_dir": _run_dir(sup.root, cfg["seed"], wall),
+            "ident": {"created": created, "sig": SIGNATURE} if created is not None else {"sig": SIGNATURE}, "cfg": cfg}
+
+
 def hand_over(sup) -> bool:
-    """Old side. False = not handing over (request unreadable/dead, or the lock is not ours to move): keep running.
+    """Old side. False = not handing over (request unreadable/dead/withdrawn, lock not ours, or an error): keep running.
     Otherwise: merge exited agents once, record the live ones, leave them running; the caller exits without kill_all."""
-    req = _read_json(sup.handoff_file)
+    req = read_json(sup.handoff_file)
     if not req or not isinstance(req.get("pid"), int):
         return False
     pid = req["pid"]
 
     def still_asked() -> bool:  # the claim is still that requester's, and it is alive to receive the answer
-        cur = _read_json(sup.handoff_file)
+        cur = read_json(sup.handoff_file)
         return bool(cur) and cur.get("pid") == pid and sup.state(pid) != "gone"
 
     if not still_asked():
@@ -196,25 +116,28 @@ def hand_over(sup) -> bool:
             sup._refused = pid
             sup.log(f"handoff to pid {pid} refused: runs/spawn.lock is not ours to transfer; still supervising")
         return False
-    sup.stopping = sup.handed_over = True
-    agents = []
-    for s in sup.slots:
-        if s.handle is None:
-            continue
-        rc = s.handle.poll()
-        if rc is not None:
-            sup._finish(s, rc)  # exited since the last tick: merge it here, exactly once (the new side never sees it)
-            continue
-        cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in s.cfg.items()}
-        wall = cfg.get("started_wall", time.time())
-        created = sup.ident.created(s.handle.pid)
-        agents.append({"slot": s.idx, "pid": s.handle.pid, "seed": cfg["seed"], "role": s.role, "own": cfg["own"],
-                       "hash": cfg.get("hash"), "started_wall": wall, "run_dir": _run_dir(sup.root, cfg["seed"], wall),
-                       "ident": {"created": created, "sig": SIGNATURE} if created is not None else {"sig": SIGNATURE},
-                       "cfg": cfg})
-    _write_atomic(adopt_path(sup.swarm_dir, pid),
-                  {"from_pid": os.getpid(), "to_pid": pid, "next_seq": sup.seq, "agents": agents})
-    if (_read_json(sup.handoff_file) or {}).get("pid") == pid:
+    try:
+        if not still_asked():  # withdrawn while we moved the lock: take it back
+            transfer_lock(sup.root, os.getpid(), expect=pid)
+            return False
+        agents = []
+        for s in sup.slots:
+            if s.handle is None:
+                continue
+            rc = s.handle.poll()
+            if rc is not None:
+                sup._finish(s, rc)  # exited since the last tick: merge it here, exactly once
+            else:
+                agents.append(_record(sup, s))
+        write_atomic(adopt_path(sup.swarm_dir, pid),
+                     {"from_pid": os.getpid(), "to_pid": pid, "next_seq": sup.seq, "agents": agents})
+    except Exception as e:  # nothing was handed over: undo the lock move and carry on as the supervisor
+        transfer_lock(sup.root, os.getpid(), expect=pid)
+        adopt_path(sup.swarm_dir, pid).unlink(missing_ok=True)
+        sup.log(f"handoff to pid {pid} failed ({e!r}); lock restored, still supervising")
+        return False
+    sup.stopping = sup.handed_over = True  # only now: the answer is on disk
+    if (read_json(sup.handoff_file) or {}).get("pid") == pid:
         sup.handoff_file.unlink(missing_ok=True)  # the acknowledgement; never someone else's newer claim
     sup.log(f"handoff to pid {pid}: {len(agents)} running agents left running, lock transferred; old supervisor exiting")
     return True
@@ -229,37 +152,22 @@ def request_handoff(root: Path, wait_s: float = ANSWER_S, clock: Callable[[], fl
     runs = Path(root) / "runs"
     req, mine = runs / "swarm.handoff", adopt_path(runs / "swarm", pid)
     mine.unlink(missing_ok=True)  # only OUR stale answer; other requesters' files are never touched
-    for _ in range(2):
-        if _create_exclusive(req, {"pid": pid, "at": time.time()}):
-            break
-        if _claim_is_dead(req, alive) or not _replace_dead_claim(req, alive):
-            return None  # a live requester is mid-request (or lost the replace race): no concurrent handoffs
-    else:
-        return None
+    if not claim(req, pid, alive):
+        return None  # a live requester is mid-request: no concurrent handoffs
     end = clock() + wait_s
     while clock() < end:
         data = read_adopt(mine.parent, pid)
         if data is not None:
             return data
         sleep(1.0)
-    withdrawn = req.with_name(f"{req.name}.withdrawn.{pid}")
-    with contextlib.suppress(OSError):
-        os.rename(req, withdrawn)  # atomic: a late old supervisor now sees no claim
-    withdrawn.unlink(missing_ok=True)
+    withdraw(req, pid)  # atomic rename: a late old supervisor now sees no claim
     data = read_adopt(mine.parent, pid)  # answered before it saw the withdrawal? then we adopt
-    if data is None and _lock_is_ours(root, pid):  # it had already moved the lock: its answer is about to land
+    if data is None and lock_holder(root) == str(pid):  # it had already moved the lock: its answer is about to land
         end = clock() + EXTRA_S
         while data is None and clock() < end:
             sleep(1.0)
             data = read_adopt(mine.parent, pid)
     return data
-
-
-def _lock_is_ours(root: Path, pid: int) -> bool:
-    try:
-        return (Path(root) / "runs" / "spawn.lock").read_text().strip() == str(pid)
-    except OSError:
-        return False
 
 
 def adopt(sup, data: dict) -> int:

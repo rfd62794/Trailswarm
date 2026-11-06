@@ -54,6 +54,7 @@ class Supervisor:
         self.solved: dict[str, float] = {}
         roles = self.roles = roles or ["exploiter", "explorer"]
         self.handed_over = False
+        self._unowned: set[int] = set()
         self.handoff_file = self.root / "runs" / "swarm.handoff"
         self.ident = swarm_handoff.Ident()
         self.state, self.kill_pid = swarm_handoff.default_state()  # liveness / tree-kill of adopted agents (by pid)
@@ -146,6 +147,7 @@ class Supervisor:
     # --- finishing ---------------------------------------------------------------------------------------
     def _finish(self, slot: Slot, rc: Any) -> None:
         ran = self.clock() - slot.started
+        self._unowned.discard(slot.idx)
         cfg, slot.handle = slot.cfg, None
         self.watchers.pop(slot.idx, None)
         if rc == 0 and cfg["segment"] and ran < SOLVED_FAST_S:
@@ -194,8 +196,7 @@ class Supervisor:
             if s.handle is None:
                 continue
             rc = s.handle.poll()
-            if rc is None and self.clock() - s.started > max(240, self.steps * 1.2):
-                s.handle.kill()
+            if rc is None and self.clock() - s.started > max(240, self.steps * 1.2) and self._kill(s, "timeout"):
                 rc = "killed (timeout)"
             if rc is not None:
                 self._finish(s, rc)
@@ -217,20 +218,31 @@ class Supervisor:
         self.next_watch = self.clock() + self.watch_s
         for s in self.slots:
             w = self.watchers.get(s.idx)
-            if s.handle is None or w is None or s.handle.poll() is not None:
+            if s.handle is None or w is None or s.handle.poll() is not None or s.idx in self._unowned:
                 continue
             reason = w.check()
             if reason:
                 self.log(f"slot {s.idx} stalled: {reason} (last position {w.last_pos})")
                 if self.on_stall:
                     self.on_stall(self.swarm_dir, s.idx, s.cfg["seed"], reason, w)
-                s.handle.kill()  # the whole process tree we launched
-                self._finish(s, "stalled")
+                if self._kill(s, "stalled"):  # the whole process tree we launched
+                    self._finish(s, "stalled")
+
+    def _kill(self, s: Slot, why: str) -> bool:
+        """Kill a slot's agent. False = alive but not provably ours (adopted pid, identity unknown): keep the handle, so the
+        slot is neither finished nor refilled until that pid is gone. Plain Popen handles return None = done."""
+        if s.handle.kill() is not False:
+            return True
+        if s.idx not in self._unowned:
+            self._unowned.add(s.idx)
+            self.log(f"slot {s.idx}: pid {getattr(s.handle, 'pid', '?')} is alive but not provably our agent; "
+                     f"not killing it ({why}); keeping the slot until it exits")
+        return False
 
     def kill_all(self) -> None:
         for s in self.slots:
             if s.handle is not None and s.handle.poll() is None:
-                s.handle.kill()
+                self._kill(s, "stop")
 
     def request_stop(self, why: str) -> None:
         if not self.stopping:
@@ -266,7 +278,9 @@ class Supervisor:
                 return  # the agents belong to the new supervisor now
             self.kill_all()  # never leave agents holding ports
             for s in self.slots:
-                if s.handle is not None:
+                if s.handle is not None and s.handle.poll() is None:
+                    self.log(f"slot {s.idx}: pid {getattr(s.handle, 'pid', '?')} left running (not provably ours to kill)")
+                elif s.handle is not None:
                     self._finish(s, "killed")
             self.stop_file.unlink(missing_ok=True)
         self.log(f"swarm done: {self.status()}")

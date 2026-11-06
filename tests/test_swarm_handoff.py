@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 import pytest
 from test_swarm_continuous import World, _load
@@ -356,13 +357,94 @@ def test_empty_old_claim_is_replaced_but_fresh_empty_claim_blocks(tmp_path):
     assert sh.request_handoff(tmp_path, wait_s=30, pid=NEW, alive=lambda p: True, sleep=answer) == {"agents": []}
 
 
-def test_dead_claim_replace_backs_off_when_lost_or_live(tmp_path):
+def test_dead_claim_replacement_is_serialised_by_replacer_lock(tmp_path):
     req = tmp_path / "swarm.handoff"
-    assert sh._replace_dead_claim(req, lambda p: False) is False  # someone already took it
     req.write_text(json.dumps({"pid": 111}))
-    assert sh._replace_dead_claim(req, lambda p: True) is False  # it was live after all: put back
-    assert json.loads(req.read_text()) == {"pid": 111}
-    assert sh._replace_dead_claim(req, lambda p: False) is True and not req.exists()
+    rl = tmp_path / "swarm.handoff.replace"
+    rl.write_text("")  # another replacer is mid-replace
+    assert sh.claim(req, NEW, lambda p: False) is False
+    assert json.loads(req.read_text()) == {"pid": 111}  # untouched
+    old = rl.stat().st_mtime - 120
+    os.utime(rl, (old, old))  # its holder died: stale replacer lock is cleared
+    assert sh.claim(req, NEW, lambda p: False) is True
+    assert json.loads(req.read_text())["pid"] == NEW and not rl.exists()
+    assert sh.claim(req, 5, lambda p: True) is False  # now live: never replaced
+
+
+def test_withdraw_only_removes_own_claim(tmp_path):
+    req = tmp_path / "swarm.handoff"
+    req.write_text(json.dumps({"pid": 7}))
+    sh.withdraw(req, NEW)
+    assert json.loads(req.read_text()) == {"pid": 7}
+    sh.withdraw(req, 7)
+    assert not req.exists() and [p.name for p in tmp_path.iterdir()] == []
+
+
+def test_unowned_live_kill_keeps_handle_and_starts_no_replacement(tmp_path):
+    w, data = _handed(tmp_path, n=1)
+    fp = _fp(500)
+    fp.cmd.pop(500)  # identity unreadable: alive but not provably ours
+    w2 = _new_world(tmp_path, 1, fp)
+    w2.sup.adopt(data)
+    w2.t += 10000  # past the per-agent timeout
+    w2.sup.tick()
+    assert fp.killed == [] and w2.sup.slots[0].handle is not None and w2.procs == []
+    assert any("not provably our agent" in line for line in w2.logs)
+    w2.sup.tick()
+    assert sum("not provably" in line for line in w2.logs) == 1 and w2.procs == []
+    fp.state[500] = "gone"  # it exits on its own: normal finish and refill
+    w2.sup.tick()
+    assert len(w2.procs) == 1
+
+
+def test_withdrawn_between_check_and_lock_move_puts_lock_back(tmp_path, monkeypatch):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+    live = sys.modules["swarm_handoff"]  # the module the supervisor really calls
+    real = live.transfer_lock
+
+    def move_then_withdraw(root, new_pid, expect=None):
+        ok = real(root, new_pid, expect)
+        if expect is None:
+            w.sup.handoff_file.unlink()  # the requester withdraws right after the lock moved
+        return ok
+
+    monkeypatch.setattr(live, "transfer_lock", move_then_withdraw)
+    w.sup.tick()
+    lock = tmp_path / "runs" / "spawn.lock"
+    assert lock.read_text() == str(os.getpid())
+    assert not w.sup.handed_over and not w.sup.stopping and sh.read_adopt(w.sup.swarm_dir, NEW) is None
+    assert w.sup.running() == 2
+
+
+def test_failure_after_lock_move_rolls_back(tmp_path, monkeypatch):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(sys.modules["swarm_handoff"], "write_atomic", boom)
+    w.sup.tick()
+    assert (tmp_path / "runs" / "spawn.lock").read_text() == str(os.getpid())
+    assert not w.sup.handed_over and not w.sup.stopping and any("lock restored" in line for line in w.logs)
+    assert w.sup.running() == 2
+
+
+def test_lock_failure_after_answer_still_supervises_loudly(tmp_path, monkeypatch):
+    import contextlib
+    from pokeagent import resources
+
+    def busy(root, wait_s=0.0):
+        raise resources.LockBusy("held")
+
+    monkeypatch.setattr(resources, "spawn_lock", busy)
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "spawn.lock").write_text("1")
+    said = []
+    with contextlib.ExitStack() as stack:
+        assert sh.acquire_after_handoff(stack, tmp_path, [500, 501], said.append, tries=2, wait_s=0) is False
+    assert said and "500" in said[0] and "WITHOUT" in said[0]
 
 
 def test_withdraw_is_atomic_rename_and_late_answer_after_lock_move_is_adopted(tmp_path):

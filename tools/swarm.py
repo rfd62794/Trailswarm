@@ -108,11 +108,8 @@ def run_continuous(a) -> int:
             print("not starting: no handoff (no answer in 30 s, or another upgrade is in flight); no double supervision")
             return 1
     try:
-        if adopted is not None:  # the old supervisor already pointed the lock at us: no gap for a third process
-            try:
-                stack.enter_context(swarm_handoff.adopt_lock(ROOT))
-            except resources.LockBusy:
-                stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        if adopted is not None:  # the old supervisor already pointed the lock at us; we supervise its agents regardless
+            swarm_handoff.acquire_after_handoff(stack, ROOT, [x["pid"] for x in adopted.get("agents", [])], print)
         else:
             stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
     except resources.LockBusy as e:
