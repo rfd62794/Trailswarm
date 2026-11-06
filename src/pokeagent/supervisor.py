@@ -10,6 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pokeagent import resources
+from pokeagent.agent_registry import list_agents
+
 _TOOLS = {"explorer": "tools/explore_demo.py", "rl": "tools/rl_train.py"}
 
 
@@ -33,16 +36,35 @@ def build_argv(kind: str, args: list[str], port: int, root: Path) -> list[str]:
     return argv + list(args)
 
 
+def swarm_running_message(root: Path) -> str:
+    return f"a swarm is running ({resources.live_agent_count(root)} agents) - spawning disabled until it ends"
+
+
+class SpawnRefused(RuntimeError):
+    """The agent limit is reached (or another swarm is mid-spawn); the message is shown in the viewer."""
+
+
 class Supervisor:
-    def __init__(self, root: Path = Path(".")) -> None:
+    def __init__(self, root: Path = Path("."), limits: dict | None = None) -> None:
         self.root = Path(root)
+        self._limits = limits or {}  # max_agents overrides (cap, free_mb, cpus, rss_mb); tests inject fakes
         self._procs: dict[int, subprocess.Popen] = {}
 
     def spawn(self, kind: str, *args: str) -> int:
-        """Launch ``kind`` with ``args``; returns the child pid."""
+        """Launch ``kind`` with ``args``; returns the agent process pid. Raises SpawnRefused at the agent limit."""
         port = free_port()
         argv = build_argv(kind, list(args), port, self.root)
-        proc = subprocess.Popen(argv, cwd=str(self.root))
+        try:
+            with resources.spawn_lock(self.root, wait_s=0.5):
+                registered = {e["pid"] for e in list_agents(self.root)}
+                # agents spawned here that have not registered yet still count against the limit
+                pending = sum(1 for pid, p in self._procs.items() if p.poll() is None and pid not in registered)
+                room, mx, live = resources.headroom(self.root, extra_live=pending, **self._limits)
+                if room < 1:
+                    raise SpawnRefused(f"agent limit reached: {live} of max {mx} (RAM/CPU/cap); not spawning another")
+                proc = subprocess.Popen(argv, cwd=str(self.root))
+        except resources.LockBusy as e:
+            raise SpawnRefused(swarm_running_message(self.root)) from e
         self._procs[proc.pid] = proc
         return proc.pid
 

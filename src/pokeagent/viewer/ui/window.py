@@ -23,6 +23,7 @@ from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
+from pokeagent.viewer.spawn_control import SpawnControl
 
 log = logging.getLogger(__name__)
 _BAR_H = 120  # reserved height for the three control-bar rows
@@ -37,6 +38,7 @@ class ViewerWindow:
                  root: Path | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
+        self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
         self.selected: str | None = None
@@ -105,10 +107,17 @@ class ViewerWindow:
     def load_state(self, name: str) -> None:
         self.send_to_targets("load_state", name=name or "slot")
 
+    def at_agent_cap(self) -> bool:
+        """Cached (refreshed off the UI thread every 2 s): True when spawning is disabled."""
+        self._spawn.refresh()
+        return self._spawn.capped
+
+    @property
+    def spawn_msg(self) -> str:
+        return self._spawn.message
+
     def spawn_agent(self, kind: str, args: str) -> None:
-        if self.supervisor is not None:
-            argv = [kind] + (args.split() if args else [])
-            self.supervisor.spawn(*argv)
+        self._spawn.spawn(kind, args)
 
     def stop_targets(self) -> None:
         if self.supervisor is not None:
@@ -245,6 +254,7 @@ class ViewerWindow:
             dpg.configure_item(self._focus_view.area, show=focused is not None)
             self._focus_view.sync(focused)
         if self._grid is not None:
+            self._grid.pin = focused or self.selected  # the agent being watched/steered never pages out
             self._grid.sync()
         hold = self._hold_s_for
         if self._grid is not None and focused is None:
