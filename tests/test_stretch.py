@@ -221,3 +221,51 @@ def test_layer_failure_falls_back_to_plain_layout_once(monkeypatch):
     layer.mode = "inplace"
     layer.layout(1.0, ())
     assert len(calls) == 2                                          # inputs changed: tried again
+
+
+def test_gap_cells_never_negative_at_the_map_edge():
+    wk = walkgrid(10, 10)
+    wk[0:2, 0:3] = False
+    fp = fit.footprint(wk, (1, 2))
+    gx, gy = fit.gap_cells(wk, (0, 0, 3, 3), (1, 2))
+    assert gx >= 0 and gy >= 0 and fp[0] >= 0
+
+
+def test_overrides_load_survives_wrong_json_types(tmp_path):
+    for body in ({"interiors": [1, 2]}, {"bands": {"x": [5], "y": 7}}, {"bands": [1]}, {"interiors": {"10": [1], "11": None}}, [1, 2]):
+        u = tmp_path / "u.json"
+        u.write_text(json.dumps(body))
+        ov = Overrides.load(u, None)
+        assert ov.interiors == {} and ov.bands == {"x": {}, "y": {}}
+    u.write_text("{not json")
+    assert Overrides.load(u, None).interiors == {}
+
+
+def test_overrides_edits_are_deltas_over_defaults(tmp_path):
+    d, u = tmp_path / "d.json", tmp_path / "u.json"
+    d.write_text(json.dumps({"interiors": {"10": {"dx": 3, "dy": -1}}}))
+    ov = Overrides.load(u, d)
+    ov.move(10, 0.5, 0)
+    assert ov.user["interiors"][10] == {"dx": 0.5, "dy": 0.0}               # only the delta is stored
+    assert ov.interiors[10] == {"dx": 3.5, "dy": -1.0}                      # applied on top of the default
+    ov.save()
+    assert json.loads(u.read_text())["interiors"]["10"] == {"dx": 0.5, "dy": 0.0}
+    t = Overrides.load(u, d).adjust(10, Xform(10.0, 10.0, 1.0), (0, 0))
+    assert (t.ox, t.oy) == (13.5, 9.0)
+
+
+def test_edit_flush_stays_dirty_when_save_fails():
+    from types import SimpleNamespace
+    from pokeagent.viewer.ui.world_edit import EditLayout
+    tries = []
+
+    def save():
+        tries.append(1)
+        if len(tries) == 1:
+            raise OSError("disk full")
+    e = EditLayout(SimpleNamespace(ov=SimpleNamespace(save=save)))
+    e.touch()
+    e.flush()
+    assert e._dirty_at is not None                                         # kept for a retry
+    e.tick(e._dirty_at + 1.0)
+    assert len(tries) == 2 and e._dirty_at is None

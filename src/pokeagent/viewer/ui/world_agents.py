@@ -49,8 +49,8 @@ def draw_hover(v) -> None:
     if not m:
         return
     aid = pick(v._points, v.vp, *m)
-    if aid:
-        t = v.wm.track(aid)
+    t = v.wm.track(aid) if aid else None      # None: the agent exited since _points was built
+    if t is not None:
         lines = [aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
     else:
         loc = locate(v.vl or v.world.layout, *v.vp.to_world(*m))

@@ -3,7 +3,7 @@
 {"interiors": {"<map id>": {"dx": cells, "dy": cells, "scale": float, "hidden": bool, "mode": "inplace"|"inplace_full"|"inset"}},
  "bands": {"x": {"<logical column>": extra cells}, "y": {"<logical row>": extra cells}}}
 Two layers: ``defaults`` (atlas/layout_defaults.json) and ``user`` (runs/atlas/layout_overrides.json). The user layer wins per
-interior key; bands add up. Edits and ``save`` touch the user layer only. Bad entries are dropped on load with a log line.
+interior key, except dx/dy which are deltas added to the defaults; bands add up. Edits and ``save`` touch the user layer only. Bad entries are dropped on load with a log line.
 """
 from __future__ import annotations
 
@@ -61,15 +61,31 @@ def _read_layer(path: Path | None) -> dict:
         d = d if isinstance(d, dict) else {}
     except (OSError, ValueError):
         return layer
-    for k, v in (d.get("interiors") or {}).items():
+    ints, bands = d.get("interiors"), d.get("bands")
+    if not isinstance(ints, dict):
+        ints = {}
+        if d.get("interiors") is not None:
+            log.warning("layout overrides: 'interiors' is not an object; ignored")
+    if not isinstance(bands, dict):
+        bands = {}
+        if d.get("bands") is not None:
+            log.warning("layout overrides: 'bands' is not an object; ignored")
+    for k, v in ints.items():
         try:
+            if not isinstance(v, dict):
+                raise ValueError(v)
             clean = _clean_interior(v)
             if clean:
                 layer["interiors"][int(k)] = clean
         except (ValueError, TypeError, AttributeError):
             log.warning("layout overrides: dropped bad interior entry %r", k)
     for ax in ("x", "y"):
-        for k, v in ((d.get("bands") or {}).get(ax) or {}).items():
+        axis = bands.get(ax)
+        if not isinstance(axis, dict):
+            if axis is not None:
+                log.warning("layout overrides: bands.%s is not an object; ignored", ax)
+            continue
+        for k, v in axis.items():
             try:
                 layer["bands"][ax][int(k)] = int(_num(v, 0, MAX_BAND))
             except (ValueError, TypeError):
@@ -85,14 +101,20 @@ class Overrides:
 
     @classmethod
     def load(cls, user: Path | None = USER, defaults: Path | None = DEFAULTS) -> "Overrides":
-        return cls(_read_layer(defaults), _read_layer(user), user)
+        try:
+            return cls(_read_layer(defaults), _read_layer(user), user)
+        except Exception:                      # a bad file must never stop the viewer: start with empty layers
+            log.exception("layout overrides unreadable; using none")
+            return cls(path=user)
 
     # -- merged read view -------------------------------------------------------------
     @property
     def interiors(self) -> dict[int, dict]:
         out = {m: dict(o) for m, o in self.defaults["interiors"].items()}
         for m, o in self.user["interiors"].items():
-            out.setdefault(m, {}).update(o)
+            d = out.setdefault(m, {})
+            for k, v in o.items():              # dx/dy are deltas on top of the defaults; everything else replaces
+                d[k] = d.get(k, 0.0) + v if k in ("dx", "dy") else v
         return out
 
     @property
@@ -122,10 +144,9 @@ class Overrides:
         self._u(m).update(_clean_interior(kw))
 
     def move(self, m: int, ddx: float, ddy: float) -> None:
-        o = self._u(m)
-        cur = self.interiors.get(m, {})
-        o["dx"] = round(_num(cur.get("dx", 0.0) + ddx, -MAX_SHIFT, MAX_SHIFT), 3)
-        o["dy"] = round(_num(cur.get("dy", 0.0) + ddy, -MAX_SHIFT, MAX_SHIFT), 3)
+        o = self._u(m)                           # the user's own delta only: defaults are never copied into the user file
+        o["dx"] = round(_num(o.get("dx", 0.0) + ddx, -MAX_SHIFT, MAX_SHIFT), 3)
+        o["dy"] = round(_num(o.get("dy", 0.0) + ddy, -MAX_SHIFT, MAX_SHIFT), 3)
 
     def rescale(self, m: int, base: float, factor: float) -> None:
         cur = self.interiors.get(m, {}).get("scale", base)

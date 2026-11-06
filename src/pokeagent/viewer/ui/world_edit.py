@@ -34,11 +34,13 @@ class EditLayout:
     def flush(self) -> None:
         if self._dirty_at is None:
             return
-        self._dirty_at = None
         try:
             self.layer.ov.save()
-        except OSError as exc:
-            log.warning("layout overrides not saved: %s", exc)
+        except OSError as exc:                 # stay dirty: the next tick retries
+            log.warning("layout overrides not saved (will retry): %s", exc)
+            self._dirty_at = time.monotonic()
+            return
+        self._dirty_at = None
 
     def press(self) -> None:
         L = self.layer

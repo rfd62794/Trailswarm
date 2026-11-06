@@ -5,6 +5,7 @@ worker thread; the render loop only draws what is ready. Hit testing and zoom ma
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import OrderedDict
@@ -20,6 +21,7 @@ from pokeagent.world import draw
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
 
+log = logging.getLogger(__name__)
 TEX = "world_tex"
 MAX_UPLOADS = 2         # chunk uploads per frame (a pan never stalls the UI on a burst of 16 MB uploads)
 MAX_TEX = 40            # chunk textures kept on the GPU (about 16 MB each)
@@ -37,6 +39,7 @@ class WorldView:
         self.npcs = False
         self.hover_text: list[str] = []
         self.interiors = InteriorLayer(self)
+        self._frame_err = ""
         self.vl = None                          # this frame's view layout (in-place interiors)
         self.status = "loading Kanto from the ROM..."
         self._tex: OrderedDict = OrderedDict()
@@ -206,6 +209,14 @@ class WorldView:
             return
         if self._pending is not None:
             self.pyr, self._pending = self._pending, None
+        try:
+            self._frame(now, dl)
+        except Exception as exc:                  # nothing in the World view may kill the window: log once, skip the frame
+            if str(exc) != self._frame_err:
+                self._frame_err = str(exc)
+                log.exception("world view frame skipped")
+
+    def _frame(self, now: float, dl) -> None:
         self.interiors.tick_world()
         self._maybe_rebuild(now)
         self._drag()
