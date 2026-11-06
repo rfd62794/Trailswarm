@@ -108,6 +108,24 @@ def _items_picked(d: Path) -> int:
     return n
 
 
+def interaction_lines(maps: dict) -> list[str]:
+    """Defined-interaction metrics from maps.json: presses per type, re-talks avoided, heal visits, frames per text page."""
+    st = maps.get("interaction_stats") or {}
+    out = []
+    by = st.get("by_type", {})
+    if by:
+        out.append("interactions by type (talks, mean presses): " + ", ".join(
+            f"{k} {v['talks']}x {v['presses'] / max(1, v['talks']):.1f}" for k, v in sorted(by.items())))
+    if st:
+        out.append(f"re-talks avoided: {st.get('retalks_avoided', 0)}; info/sign re-talked: {st.get('retalks', 0)}; "
+                   f"heal visits: {st.get('heal_visits', 0)}")
+    tp = maps.get("text_press_stats")
+    if tp and tp.get("pages"):
+        out.append(f"text pace: {tp['frames'] / tp['pages']:.1f} frames/page, {tp['presses'] / tp['pages']:.2f} presses/page, "
+                   f"{tp.get('dropped', 0)} dropped; speed byte {(maps.get('text_speed') or {}).get('byte', '?')}")
+    return out
+
+
 def _trainee_line(dirs: list[Path]) -> str:
     """Newest run that recorded Magikarp numbers (meta.json "magikarp") plus the background goals (SIDE_GOALS)."""
     for d in reversed(dirs):
@@ -160,6 +178,9 @@ def main() -> int:
     maps = _load_json(RUNS / "maps.json", {})
     tiles = sum(len(m.get("visited", {})) for m in maps.get("maps", {}).values())
     print(f"world: {len(maps.get('maps', {}))} maps, {tiles} tiles, team_best_level={maps.get('team_best_level', '?')}")
+
+    for line in interaction_lines(maps):
+        print(line)
 
     dirs = _run_dirs()
     if dirs:

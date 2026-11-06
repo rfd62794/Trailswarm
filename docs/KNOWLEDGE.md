@@ -134,3 +134,27 @@ Mt Moon (0x3B/0x3C/0x3D) trainers, from the ROM: 1F has HIKER, YOUNGSTER, 2 LASS
 Move meaning: `knowledge/moves.py` maps each ROM effect byte to an `Effect`; every effect id in the drained moves is covered (test-guarded).
 Party readiness (`knowledge/readiness.py`) replaces the fixed training-level table: it simulates our party (RAM stats, known moves) against the boss
 party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only the fallback when the data or the party is missing.
+
+## Poke Mart, text speed, text prompt (ROM-verified 2026-11-05)
+
+Probed headless in the Viridian Mart (map 42, 0x2A) from `oaks_parcel.state` (player at the clerk, (2,5)), with `shop.buy()` driving it.
+
+- **The clerk only opens the shop after the parcel is delivered.** Before that every A repeats "Okay! Say hi to PROF.OAK for me!". Found by
+  setting bits: **EVENT_OAK_GOT_PARCEL = 0xD74E bit 0** (the clerk handing it over is bit 1, event index 57). Setting it makes the menu appear.
+- **Menu texts, in order** (screen text; `$` is the yen tile 0xF0): `BUY $3175 | SELL | QUIT` + "Hi there! May I help you?" (wTextBoxID 14, 3 items)
+  -> BUY -> "Take your time." with the item list (wTextBoxID 13): `POKe BALL $200 | ANTIDOTE $100 | PARLYZ HEAL $200 | BURN HEAL $250 | CANCEL`
+  -> item -> quantity box `x01 $200` (UP/DOWN +-1 and it wraps 99 <-> 1; LEFT/RIGHT do nothing) -> A -> "POKe BALL? That will be $1000. OK?" with `>YES / NO`
+  -> A -> "Here you are! Thank you!" -> list again -> B -> "Is there anything else I can do?" with BUY/SELL/QUIT -> B -> "Thank you!" -> closed.
+- The confirm text does not finish by itself: it waits for a press after "That will be" (the down-arrow prompt tile shows). The screen is "ready"
+  when `>YES` is on it, not when a frame count has passed. The YES/NO box id is not constant, so `buy()` reads it from the screen.
+- **Stock** is `wItemList` 0xCF7B = [count, item ids..., 0xFF]; Viridian: `04 0B 0F 0C` = POKe BALL, ANTIDOTE, PARLYZ HEAL, BURN HEAL. The cursor's list
+  index is `wListScrollOffset` 0xCC36 + `wCurrentMenuItem` 0xCC26.
+- **Money** is BCD at 0xD347..0xD349 (`ramworld.read_money`). **Result:** 5 POKe BALLs (item 0x04): money 3175 -> 2175, bag {0x46:1} -> {0x46:1, 0x04:5}.
+  Also bought 12 ANTIDOTE (idx 1: 3175 -> 1975) and 95 ANTIDOTE (down-wrap path, 99900 -> 90400); 99 POKe BALLs with 3175 money is refused up front.
+- **Text speed byte** `wOptions` 0xD355, low 3 bits: 1 FAST, 3 MEDIUM, 5 SLOW (a new game reads 3). START menu: `POKeMON, ITEM, <name>, SAVE, OPTION, EXIT`
+  (even in the bedroom with no party, wMaxMenuItem 6), so OPTION is 4 DOWNs from the top. The OPTION screen: `TEXT SPEED / FAST >MEDIUM SLOW / BATTLE ANIMATION
+  / ON OFF / BATTLE STYLE / SHIFT SET`, the cursor on the current speed; one LEFT sets 0xD355 to 0x01 at once, B leaves. Procedure `set_text_speed_fast`.
+- **Text prompt**: the blinking down-arrow tile is **0xEE at screen row 16, column 18** (tilemap 0xC3A0 + 16*20 + 18), alternating with 0x7F; the last page of a
+  text has no arrow and simply waits for A. `text_pace.prompt_waiting`.
+- **Press cost**: `Presser` used to spend ~48 frames per A in a text box (hold 8 + settle 16 + 24 stillness). 3,000-step headless run from `baselines/bedroom.state`
+  (`tools/explore_headless.py`): 2.21 -> 1.87 presses per text page, 119.5 -> 65.7 frames per page (text FAST + learned pace).

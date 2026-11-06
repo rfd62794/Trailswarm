@@ -10,6 +10,8 @@ from pokeagent.explorer.world import POKECENTER_MAPS, STARTERS, WorldGraph, inte
 
 # No-grind list for everything east of Pewter (Route 3/4, Mt Moon 1F/B1F/B2F, Cerulean + Pokecenter + Gym, Routes 24/25, Bill's house):
 # never turn back to Route 1 to train from here.
+MAX_TOPOFF_TRIPS = 2
+GRIND_IN_PLACE = (0x0D, 0x33)  # Route 2 and Viridian Forest: past Viridian, training happens here, never back south
 EAST_MAPS = (0x0E, 0x0F, 0x3B, 0x3C, 0x3D, 0x03, 0x40, 0x41, 0x23, 0x24, 0x58, 0x44)
 
 
@@ -34,7 +36,8 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # stays 50% (a trek back is long).
     # (the Pokecenter itself must use the same 90%: with 50% inside, an agent at 70% HP walked in at Viridian, walked
     # straight back out, and ping-ponged through the door for 220 presses - 07:14 round)
-    heal_below = 0.9 if pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
+    top_off = goals.get("_heal_trips", 0) < MAX_TOPOFF_TRIPS  # area_grind: the 90% heal trip is bounded (Route 2 <-> Viridian yo-yo)
+    heal_below = 0.9 if top_off and pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
     if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed")
             and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33, 0x02, 0x36, 0x03, 0x0F, 0x23) or pos[0] in POKECENTER_MAPS)):
         # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
@@ -42,7 +45,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         if pos[0] in POKECENTER_MAPS:
             if pos[1] != 3:
                 return ("RIGHT" if pos[1] < 3 else "LEFT"), f"HP {hp}/{mx}: crossing the Pokecenter to the counter"
-            if pos[2] > 2:
+            if pos[2] > 3:  # y=3 is the counter row: the nurse (3,1) answers across it (Viridian: 483 heals from (3,3) facing UP)
                 return "UP", f"HP {hp}/{mx}: walking up to the nurse"
             return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
         p = g.path(pos, lambda n: n[0] in POKECENTER_MAPS)
@@ -134,16 +137,11 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
     # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
     beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36) + EAST_MAPS
-    if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5
-            and not carrying_parcel and not beyond_viridian):
-        # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
-        #  sent the agent back to Route 1 to train - they spent 600+ presses there and never reached the lab)
-        # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
-        if pos[0] != 0x0C:
-            p = g.path(pos, lambda n: n[0] == 0x0C)
-            if p:
-                return p[0], f"goal train to L{goals.get('_train_level', 8)} (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
-        return None  # on Route 1: let exploration roam (grass encounters happen on their own)
+    # Training never walks the agent back south. Before Route 2 only the floor level is asked (see training.required_level) and it
+    # is met by the fights on the way to Viridian; from Route 2 on, Brock's target is ground out where the agent stands.
+    if (0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5 and goals.get("to_route2")
+            and pos[0] in GRIND_IN_PLACE):
+        return None  # Route 2 / the Forest: roam the grass here and fight what comes (the grind budget still caps it)
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):
         # Already known from earlier agents: the spot where "got OAK PARCEL" was seen. Go there and talk (known facts first).
         known = [tuple(goals["_parcel_spot"])] if goals.get("_parcel_spot") else []  # (map, x, y, facing) from the item log

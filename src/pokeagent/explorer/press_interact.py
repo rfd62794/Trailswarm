@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.interaction_record import close_interaction
 from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
 from pokeagent.explorer.press_frame import PressFrame
@@ -43,6 +44,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             inter["entry"].setdefault("effects", [])
             if fx not in inter["entry"]["effects"]:
                 inter["entry"]["effects"].append(fx)
+            close_interaction(ctx, inter, after)
             result = (f"interaction closed after {inter['presses']} presses; menus seen: {len(inter['menus'])}, "
                       f"choices: {inter['choices'] or 'none'}; effects: {fx}")
             ctx.inter = None
@@ -66,7 +68,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.mem.recent_talk.add(f"{before[1]},{before[2]},{ctx.facing}")
         if box_after:
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
-                           "choices": [], "snap": snap_pre, "ball": ball}
+                           "choices": [], "snap": snap_pre, "ball": ball, "pos": before, "solid": npc_in_front is None}
             extra["sprites"] = sprite_snapshot(ctx.emu)
         result = (f"INTERACTION at ({before[1]},{before[2]}) facing {ctx.facing}: \"{text[:60]}\""
                   if box_after else f"nothing to interact with facing {ctx.facing} (remembered)")
@@ -86,10 +88,10 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.last_fail = fail_key if (name in DIRS and after == before) else None
         if after[0] != before[0]:
             ctx.settle = 30  # fade already waited out; a short pause so the watcher sees the arrival
-        if box_after and not ctx.inter:  # walked into an NPC, or a scripted event fired (Oak!)
+        if box_after and not ctx.inter and ctx.proc is None:  # (a procedure's own menu is not an interaction) walked into an NPC, or a scripted event fired (Oak!)
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text)
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
-                           "choices": [], "snap": snap_pre}
+                           "choices": [], "snap": snap_pre, "pos": before}
             extra["sprites"] = sprite_snapshot(ctx.emu)
             extra["trigger"] = True  # a box with no A press is a contact/scripted event, not an interaction
             result += f'; event on contact: "{text[:50]}"'

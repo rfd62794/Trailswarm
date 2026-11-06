@@ -37,6 +37,7 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
     DIRS, TILEMAP, TILEMAP_LEN, ascii_vision, battle_view, box_open, box_text, frame_lines, is_menu, npc_positions,
     party_hp,
 )
+from pokeagent.explorer.seeding import idle_frames
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
 from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
@@ -76,6 +77,10 @@ def main(argv=None) -> int:
     ap.add_argument("--tag", default=None, help="opaque label stored in meta.json (the curriculum links a run to its job)")
     ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
+    ap.add_argument("--adaptive-pace", action=argparse.BooleanOptionalAction, default=True,
+                    help="A through text boxes the moment the prompt shows, at the learned minimum settle (text_press); overrides --box-pace")
+    ap.add_argument("--fast-text", action=argparse.BooleanOptionalAction, default=True,
+                    help="set TEXT SPEED to FAST once at the start (START > OPTION), verified on the option byte")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
     ap.add_argument("--train-level", type=int, default=8,
                     help="planner trains on Route 1 until the lead reaches this level (Brock sweep: 8/10/12/14)")
@@ -100,6 +105,7 @@ def main(argv=None) -> int:
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
+    emu.tick(idle_frames(a.seed))  # --seed shifts the game's RNG (seed 0/None: unchanged)
 
     root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
     root.configure(bg="#111")
@@ -124,7 +130,8 @@ def main(argv=None) -> int:
         emu=emu, mem=mem, log=log, run_dir=run_dir, trans=trans, explore_run=explore_run,
         opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", steps=a.steps,
                              stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
-                             frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps))
+                             frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
+                             adaptive_pace=a.adaptive_pace, fast_text=a.fast_text))
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
@@ -308,7 +315,7 @@ def main(argv=None) -> int:
         ctx.stable_frames = ctx.stable_frames + 1 if h == ctx.last_hash else 0
         ctx.last_hash = h
         try:
-            pace = a.box_pace if (a.box_pace and ctx.box_open_now) else a.frames_per_step
+            pace = (a.frames_per_step if a.adaptive_pace else a.box_pace) if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
             hold = agent_view.held() if agent_view is not None else False
