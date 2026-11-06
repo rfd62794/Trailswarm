@@ -16,7 +16,6 @@ TRAINER_BATTLE = 2  # wIsInBattle: 1 wild, 2 trainer
 HEALER, SHOP, PC, GIVER, VENDOR, TRAINER, STORY, BLOCKER, SIGN, INFO = (
     "healer", "shop", "pc", "giver", "vendor", "trainer", "story", "blocker", "sign", "info")
 TYPES = (HEALER, SHOP, PC, GIVER, VENDOR, TRAINER, STORY, BLOCKER, SIGN, INFO)
-GIVE_WORDS = ("received", "got ", "obtained", "found")
 
 
 @dataclass
