@@ -23,11 +23,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PORT_BASE = int(os.environ.get("POKEAGENT_SWARM_PORT_BASE", 8800))  # scratch swarms use a high base
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
 from swarm_proc import TreeProc  # noqa: E402
+import swarm_handoff  # noqa: E402
 from swarm_watch import ProgressWatch, record_stall  # noqa: E402
 from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
@@ -67,7 +69,7 @@ class Launcher:
 
     def _port(self) -> int:
         used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
-        return next(p for p in range(8800, 8900) if p not in used)
+        return next(p for p in range(PORT_BASE, PORT_BASE + 100) if p not in used)
 
     def __call__(self, cfg: dict):
         role_args = ["--explore-rate", "0.5" if cfg["role"] == "explorer" else "0.0"]
@@ -87,7 +89,7 @@ class Launcher:
 
 
 def make_watch(cfg: dict):
-    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer")
+    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer", since_wall=cfg.get("started_wall"))
 
 
 def touch_lock() -> None:
@@ -98,14 +100,27 @@ def touch_lock() -> None:
 def run_continuous(a) -> int:
     import swarm_continuous as sc
     stack = contextlib.ExitStack(); atexit.register(stack.close)
+    adopted = None
+    if resources.lock_held(ROOT):  # a live supervisor: ask it to hand its agents over (rolling upgrade, no drain)
+        print("a supervisor holds runs/spawn.lock: asking it to hand over its agents (30 s)...")
+        adopted = swarm_handoff.request_handoff(ROOT)
+        if adopted is None:
+            print("not starting: no handoff (no answer in 30 s, or another upgrade is in flight); no double supervision")
+            return 1
     try:
-        stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        if adopted is not None:  # the old supervisor already pointed the lock at us; we supervise its agents regardless
+            swarm_handoff.acquire_after_handoff(stack, ROOT, [x["pid"] for x in adopted.get("agents", [])], print)
+        else:
+            stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
     except resources.LockBusy as e:
         print(f"not starting: {e}"); return 1
-    n, why = plan_agents(ROOT, max(1, a.agents))
-    print(why)
-    if n == 0:
-        print("no room for more agents; not starting a swarm"); return 0
+    if adopted is not None:
+        n = a.agents or len(adopted.get("agents", [])) or 4  # requested count; else keep what was running
+    else:
+        n, why = plan_agents(ROOT, max(1, a.agents or 4))
+        print(why)
+        if n == 0:
+            print("no room for more agents; not starting a swarm"); return 0
     shared = ROOT / a.maps
     roles = ["trainer", "explorer"] if a.roles else None
     segment = weakest_segment if a.segment == "auto" else (lambda _n: a.segment) if a.segment else None
@@ -122,14 +137,18 @@ def run_continuous(a) -> int:
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
                              segment_ok=lambda g: bool(segment_args(g))))
+    if adopted is not None:
+        sup[0].adopt(adopted)
+        swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
+    stack.close()  # release runs/spawn.lock now (also when we handed our own agents on to a newer supervisor)
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--agents", type=int, default=4)
+    ap.add_argument("--agents", type=int, default=None, help="slot count (default 4; with --upgrade, the adopted agent count)")
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
@@ -143,6 +162,9 @@ def main() -> int:
                     help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
     ap.add_argument("--continuous", action="store_true",
                     help="keep --agents running: merge each agent's memory as it exits, then start a replacement")
+    ap.add_argument("--upgrade", "--adopt", action="store_true", dest="upgrade",
+                    help="--continuous: take over a running supervisor's agents (no drain); also happens automatically "
+                         "when a live supervisor holds the lock. --agents changes the slot count gradually")
     ap.add_argument("--duration", type=float, default=None, help="--continuous: stop refilling after this many hours")
     ap.add_argument("--stop-now", action="store_true", help="--continuous: on stop, kill running agents instead of letting them finish")
     a = ap.parse_args()
@@ -170,7 +192,7 @@ def main() -> int:
             stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
         except resources.LockBusy as e:
             print(f"not starting: {e}"); return 1
-        n, why = plan_agents(ROOT, a.agents)
+        n, why = plan_agents(ROOT, a.agents or 4)
         print(why)
         if n == 0:
             print("no room for more agents; not starting a swarm"); return 0
