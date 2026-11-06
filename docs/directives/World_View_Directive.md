@@ -34,8 +34,11 @@ game's own player sprite at its real coordinates.
    tinted / outlined in its agent colour with a small id label; animate smoothly between `move` events (walk
    frames, 16 px per step over the move's frames); draw static map objects (NPCs, trainers, item balls, signs)
    from the ROM object data, and for the selected agent overlay its live NPC positions.
-4. **World View window** (Dear PyGui, inside the existing viewer as a third mode next to grid and focus; also
-   `pokeagent world`): the stitched Kanto texture with zoom/pan, all agents live, trails, toggleable learning layers
+4. **World View window** (Dear PyGui, inside the existing viewer as a third mode; also `pokeagent world`). Modes
+   become `grid | world | focus`: a toolbar toggle switches grid <-> world; double-clicking an agent card (grid) or an
+   agent marker / stadium panel (world) enters focus on that agent; leaving focus (◀ button, Esc, double-click)
+   returns to the mode it came from and releases the hold exactly as today. Steering stays focus-only. Extend
+   `viewer/layout.py` FocusState with a `return_mode` and test the transitions. the stitched Kanto texture with zoom/pan, all agents live, trails, toggleable learning layers
    (from the overlay module), the disagreement layer; hover = agent/tile tooltip; click an agent = open its focus
    card; click a tile = everything known about it (ROM truth + union of beliefs + who learned it); a side feed of
    recent events across all agents (filterable: battles, items, goals, stalls).

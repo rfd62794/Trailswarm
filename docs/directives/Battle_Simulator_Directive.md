@@ -2,7 +2,9 @@
 
 **Read first:** `docs/directives/Game_Knowledge_Directive.md`, `src/pokeagent/explorer/battle.py`,
 `src/pokeagent/explorer/stats.py`, `src/pokeagent/ramstructs.py`.
-**Depends on:** Game Knowledge merged (species base stats, learnsets, move effects, trainer parties). If missing, stop.
+**Depends on:** Game Knowledge merged - check that `src/pokeagent/knowledge/moves.py` exists on main and that the
+laptop's `kb/rom_tables.json` contains species base stats, learnsets and trainer parties (regenerate it with
+`tools/rom_tables.py` if not). If either is missing, stop.
 **Builder:** a Claude builder on the laptop with the ROM, `kb/` and checkpoint copies (gitignored).
 **Do not list the tree recursively**; use `git ls-files`.
 
@@ -25,7 +27,9 @@ same save state (sim-to-real).
 2. Opponent AI: wild = random among known moves; trainers = the Gen 1 trainer AI rules (document which subset is
    modelled; unknown rules fall back to random).
 3. `sim/policy.py`: our side's decision interface (same choices as the real battle menu: move, switch, item, run)
-   so the real battle behaviour and the sim share one policy object; `sim/rollout.py`: run N seeded battles,
+   plus an adapter that wraps the EXISTING live decision logic (move_scores / battle_moves / flee / potion rules)
+   as a policy, so the sim can play exactly what the live agent would play - the live battle code is called by the
+   adapter, never changed by it; `sim/rollout.py`: run N seeded battles,
    return win rate, turns, HP left, faint counts.
 4. **Sim-to-real harness** `tools/sim_vs_real.py`: from real pre-battle save states (make them by walking into
    grass / trainers from checkpoints), read both parties from RAM, simulate N times, then play the real battle in
