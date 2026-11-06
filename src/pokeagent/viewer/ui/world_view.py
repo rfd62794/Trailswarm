@@ -5,6 +5,7 @@ worker thread; the render loop only draws what is ready. Hit testing and zoom ma
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import OrderedDict
@@ -14,14 +15,16 @@ import numpy as np
 
 from pokeagent.atlas import sprites
 from pokeagent.viewer import ui_scale
-from pokeagent.world import anim, draw
+from pokeagent.viewer.ui.world_agents import draw_agents, draw_hover
+from pokeagent.viewer.ui.world_interiors import InteriorLayer
+from pokeagent.world import draw
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
 
+log = logging.getLogger(__name__)
 TEX = "world_tex"
 MAX_UPLOADS = 2         # chunk uploads per frame (a pan never stalls the UI on a burst of 16 MB uploads)
 MAX_TEX = 40            # chunk textures kept on the GPU (about 16 MB each)
-MIN_SPRITE_PX = 26      # an agent is never drawn smaller than this (1x px; scaled by DPI), however far out you zoom
 REBUILD_S = 3.0         # layer images are recomposed at most this often
 
 
@@ -35,6 +38,9 @@ class WorldView:
         self.trails = True
         self.npcs = False
         self.hover_text: list[str] = []
+        self.interiors = InteriorLayer(self)
+        self._frame_err = ""
+        self.vl = None                          # this frame's view layout (in-place interiors)
         self.status = "loading Kanto from the ROM..."
         self._tex: OrderedDict = OrderedDict()
         self._sprite_tex: dict = {}
@@ -134,21 +140,24 @@ class WorldView:
 
     def _wheel(self, delta) -> None:
         m = self._mouse()
-        if m and self.pyr:
+        if m and self.pyr and not self.interiors.edit_wheel(delta):
             self.vp.step_zoom_at(m[0], m[1], 1 if float(delta) > 0 else -1)
 
     def _click(self) -> None:
         self._down_at = self._mouse()
+        self.interiors.press()
 
     def _release(self) -> None:
         m, d = self._mouse(), self._down_at
+        self.interiors.release()
         self._down_at = self._last_mouse = None
         if m and d and abs(m[0] - d[0]) < 4 and abs(m[1] - d[1]) < 4 and self.world:
             aid = pick(self._points, self.vp, *m)
             if aid:
                 self._on_select(aid)
             elif self.side:
-                loc = locate(self.world.layout, *self.vp.to_world(*m))
+                loc = locate(self.vl or self.world.layout, *self.vp.to_world(*m))
+                self.interiors.selected = loc[0] if loc and self.interiors.plan and loc[0] in self.interiors.plan.anchors else None
                 if loc:
                     self.side.show_tile(*loc)
 
@@ -162,7 +171,9 @@ class WorldView:
         m = self._mouse()
         if m and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
             if self._last_mouse:
-                self.vp.pan(m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
+                d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
+                if not self.interiors.edit_drag(*d):
+                    self.vp.pan(*d)
             self._last_mouse = m
         else:
             self._last_mouse = None
@@ -186,15 +197,27 @@ class WorldView:
             threading.Thread(target=self._load, args=(self._loader,), daemon=True, name="world-load").start()
         dpg.delete_item(dl, children_only=True)
         if self._loaded is not None:
+            prev_world, prev_vp = self.world, self.vp
             (self.world, self.pyr), self._loaded = self._loaded, None
             self.vp = Viewport(*self.world.layout.size_px, self.vp.screen_w, self.vp.screen_h)
-            self.vp.fit()
+            if not (prev_world is not None and self.interiors.swap.restore(prev_world, prev_vp, self.vp)):
+                self.vp.fit()
+            self._built_for, self._pending = None, None
             self.status = ""
         if self.pyr is None:
             dpg.draw_text((20, 20), self.status, size=ui_scale.px(18), parent=dl)
             return
         if self._pending is not None:
             self.pyr, self._pending = self._pending, None
+        try:
+            self._frame(now, dl)
+        except Exception as exc:                  # nothing in the World view may kill the window: log once, skip the frame
+            if str(exc) != self._frame_err:
+                self._frame_err = str(exc)
+                log.exception("world view frame skipped")
+
+    def _frame(self, now: float, dl) -> None:
+        self.interiors.tick_world()
         self._maybe_rebuild(now)
         self._drag()
         vp, self._uploads = self.vp, 0
@@ -207,8 +230,12 @@ class WorldView:
                 dpg.draw_image(tex, a, b, parent=dl)
             else:
                 self._draw_coarser(f, cx, cy, a, b)
-        self._draw_agents(now)
-        self._draw_hover()
+        tracks = tuple(t.map for t in self.wm.tracks() if t.placed)
+        self.interiors.update_hover(self._mouse())
+        self.vl = self.interiors.layout(vp.zoom, tracks)
+        self.interiors.draw(dl)
+        draw_agents(self, now)
+        draw_hover(self)
         if self.side:
             self.side.update()
 
@@ -222,48 +249,6 @@ class WorldView:
                 dpg.draw_image(tex, a, b, uv_min=(u0, v0), uv_max=(u1, v1), parent=self.canvas)
                 return
             g *= 2
-
-    def _draw_agents(self, now: float) -> None:
-        w, vp, dl = self.world, self.vp, self.canvas
-        tracks = self.wm.tracks()
-        ids = [t.id for t in tracks]
-        self._points = {}
-        for t in tracks:
-            col = draw.agent_colour(t.id, ids)
-            if self.trails:
-                pts = [vp.to_screen(*p) for p in anim.trail_points(t, w.layout, 120)]
-                n = len(pts)
-                for a in range(0, n - 1, 8):
-                    dpg.draw_polyline(pts[a:a + 9], color=(*col, 60 + 180 * a // max(n, 1)), thickness=max(2, ui_scale.px(2)), parent=dl)
-            pos = anim.place(t, w.layout, now)
-            if pos is None:
-                continue
-            x, y, phase = pos
-            cx, cy = vp.to_screen(x + 8, y + 8)
-            self._points[t.id] = (x + 8, y + 8)
-            half = ui_scale.sprite_px(vp.zoom, 9, MIN_SPRITE_PX / 2)
-            dpg.draw_circle((cx, cy), half + 3, color=(*col, 255), thickness=2, parent=dl)
-            dpg.draw_image(self._agent_tex(t.facing, phase, col), (cx - half, cy - half), (cx + half, cy + half), parent=dl)
-            dpg.draw_text((cx + half + 4, cy - ui_scale.px(8)), t.id[-8:], color=(255, 255, 255, 255), size=ui_scale.px(14), parent=dl)
-            if t.battle and t.battle.ended_at is None:
-                for a, b in (((-7, -34), (7, -20)), ((7, -34), (-7, -20))):
-                    dpg.draw_line((cx + a[0], cy + a[1]), (cx + b[0], cy + b[1]), color=(230, 40, 40, 255), thickness=3, parent=dl)
-                dpg.draw_text((cx - ui_scale.px(24), cy - ui_scale.px(52)), t.battle.species or "?", color=(255, 220, 80, 255), size=ui_scale.px(14), parent=dl)
-
-    def _draw_hover(self) -> None:
-        m = self._mouse()
-        if not m:
-            return
-        aid = pick(self._points, self.vp, *m)
-        t = self.wm.track(aid) if aid else None  # None: the agent exited since _points was built
-        if t is not None:
-            lines = [aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
-        else:
-            loc = locate(self.world.layout, *self.vp.to_world(*m))
-            lines = [f"{loc}"] if loc else []
-        lines = [s for s in lines if s]
-        for i, s in enumerate(lines):
-            dpg.draw_text((m[0] + ui_scale.px(14), m[1] + ui_scale.px(8 + 15 * i)), s, color=(255, 255, 160, 255), size=ui_scale.px(14), parent=self.canvas)
 
     def delete(self) -> None:
         for t in (self.area, "world_input"):
