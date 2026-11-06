@@ -13,7 +13,7 @@ from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_goals import record_goals
 from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
-from pokeagent.goals import GOALS, bag_contents, check_goals
+from pokeagent.goals import GOALS, bag_contents, check_goals, goals_brief
 
 
 def settle_position(ctx: ExplorerContext, before, max_frames=600):
@@ -117,7 +117,7 @@ def log_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     """Console log of the press, periodic map save, and the step cap."""
     name, source, why, after, result, goals = fr.name, fr.source, fr.why, fr.after, fr.result, fr.goals
     mm = ctx.mem.m(after[0])
-    gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
+    gtxt = goals_brief(goals)
     ctx.log(f"--- step {ctx.step}/{ctx.opts.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {ctx.facing}  "
         f"party={ctx.emu.read(0xD163)} bag={ctx.emu.read(0xD31D)}  goals: {gtxt}\n"
         f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "

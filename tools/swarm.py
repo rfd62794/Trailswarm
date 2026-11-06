@@ -54,7 +54,8 @@ def weakest_segment(n: int) -> str | None:
     """The n-th refill takes the next-weakest goal (consistency < 70%); None when everything is consistent."""
     try:
         import overnight
-        cons = {g: c for g, c in overnight.consistency().items() if c is not None and c < 0.7}
+        from pokeagent.campaign import selectable
+        cons = {g: c for g, c in overnight.consistency().items() if c is not None and c < 0.7 and selectable(g)}  # no Surf goals for agents without Surf
     except Exception:
         return None
     weak = sorted(cons, key=cons.get)[:3]

@@ -1,4 +1,6 @@
-"""Campaign goals: the single source of truth for the 25-goal ladder and its RAM detectors.
+"""Campaign goals: the single source of truth for the goal ladder (data/campaign.json) and its RAM detectors.
+
+The first 25 goals keep the hand-coded detectors in check_goals; the rest are generic detectors from the data file (pokeagent.campaign).
 
 tools/{explore_demo,overnight,swarm,review_runs,status}.py all read GOALS from here —
 tests/test_goal_order.py guards against new local copies. goals.json is a stale
@@ -6,13 +8,15 @@ sibling, not a source.
 """
 from __future__ import annotations
 
+from pokeagent import campaign
 from pokeagent.magikarp import gyarados_goal, magikarp_goal_settled
 
-GOALS = ["potion", "left_house", "first_pokemon", "won_battle",
-         "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
-         "to_route2", "to_pewter", "to_gym", "beat_brock",
-         "to_route3", "to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
-         "heal_cerulean", "beat_misty", "nugget_bridge", "to_bill", "ss_ticket"]
+GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 25 ids are the hand-coded ones below
+
+def goals_brief(goals: dict) -> str:
+    """One short log line for the whole ladder: done/total and the next few unmet goals."""
+    return campaign.brief(goals, GOALS)
+
 
 # Background goals: reported by check_goals and tools/status.py, never part of the ladder (they must not block the route).
 SIDE_GOALS = ["gyarados"]
@@ -94,10 +98,12 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          "heal_cerulean": healed_in_cerulean(emu, st, m), "beat_misty": bool(emu.read(0xD356) & 2),
          "nugget_bridge": 0x23 in seen, "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
+    g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:
         if k in st.get("goal_steps", {}) or k in st.get("initial_goals", set()):
             g[k] = True
+    campaign.infer_unverified(g)  # unverified goals (no RAM detector) follow from later ones; keeps the ladder from stalling
     g["gyarados"] = gyarados_goal(emu, st)  # side goal: informational, not in the ladder
     return g

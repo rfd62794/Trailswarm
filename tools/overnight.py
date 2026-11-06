@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 from pokeagent import resources
+from pokeagent.campaign import selectable
 from pokeagent.goals import GOALS
 
 
@@ -35,6 +36,13 @@ def consistency(last_n: int = 16) -> dict[str, float]:
         return _consistency(last_n)
     except Exception:
         return {}
+
+
+def is_attempt(i: int, si: int, stop: int, furthest: int) -> bool:
+    """Was a run an attempt at goal index i? It started upstream (si < i), was not stopped before it, and either started
+    within one rung of it, stopped at it, or the goal is at most one past the furthest checkpoint (a 128-goal ladder
+    must not count every full run as a failed attempt at goals it never could have reached)."""
+    return si < i <= stop and (i <= si + 2 or stop == i or i <= furthest + 1)
 
 
 def _consistency(last_n: int = 16) -> dict[str, float]:
@@ -56,6 +64,7 @@ def _consistency(last_n: int = 16) -> dict[str, float]:
         si = -1 if st in ("baseline", "bedroom") else GOALS.index(st) if st in GOALS else GOALS.index("to_route1") if st == "team_best" else None
         stop = GOALS.index(meta["stop_at_goal"]) if meta.get("stop_at_goal") in GOALS else len(GOALS)
         return si, stop
+    fi = max((GOALS.index(g) for g in GOALS if (ROOT / "runs" / "checkpoints" / f"{g}.state").exists()), default=-1)
     for i, g in enumerate(GOALS):
         # an ATTEMPT at goal i: the run started upstream of it (start index < i) and was not stopped before it
         tries = []
@@ -65,7 +74,7 @@ def _consistency(last_n: int = 16) -> dict[str, float]:
                 started_done = set(json.loads((p / "meta.json").read_text()).get("initial_goals", []))
             except Exception:
                 started_done = set()
-            if si is not None and si < i and stop >= i and g not in started_done:
+            if si is not None and is_attempt(i, si, stop, fi) and g not in started_done:
                 tries.append(p.name)
         tries = tries[-last_n:]
         out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None
@@ -104,7 +113,7 @@ def main() -> int:
         rnd += 1
         cons = consistency()
         skip = {g for g, until in skipped.items() if until > rnd}  # goals whose segment produced no attempts: back off
-        ready = [g for g in GOALS if g not in skip and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
+        ready = [g for g in GOALS if g not in skip and selectable(g) and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
         # known-failing goals first, FURTHEST first (the frontier of the campaign), then goals never sampled
         failing = [g for g in reversed(ready) if cons.get(g) is not None and cons.get(g) < 0.7]
         unsampled = [g for g in ready if cons.get(g) is None]
@@ -115,7 +124,8 @@ def main() -> int:
             objective, args = f"segment {weak} (consistency {cons.get(weak)})", ["--segment", weak]
         else:
             far = furthest_checkpoint()
-            objective, args = f"explore beyond {far}", (["--segment", GOALS[min(len(GOALS) - 1, GOALS.index(far) + 1)]] if far and GOALS.index(far) + 1 < len(GOALS) else [])
+            nxt = GOALS[GOALS.index(far) + 1] if far and GOALS.index(far) + 1 < len(GOALS) else None
+            objective, args = f"explore beyond {far}", (["--segment", nxt] if nxt and selectable(nxt) else [])
         picked = weak if (weak and "segment" in objective) else None
         t0 = time.time()
         last = run_swarm(["--agents", str(a.agents), "--steps", str(a.steps)] + args, timeout=max(900, int(a.steps * 1.2) + 600))

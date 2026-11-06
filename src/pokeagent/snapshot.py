@@ -93,6 +93,8 @@ class AgentSnapshot:
     sees: Sees = field(default_factory=Sees)
     screen: Screen = field(default_factory=Screen)
     human_hold: bool = False
+    claude_hold_s: float = 0.0  # seconds left on a Claude lease (0 = none); the agent makes no own decisions while > 0
+    extra: dict = field(default_factory=dict)  # intervention digest inputs (intervene.extra); empty for agents without it
     frame_slot: str = ""
     updated_at: float = 0.0
 

@@ -339,6 +339,25 @@ def test_stalled_agent_is_stopped_merged_logged_and_replaced(tmp_path):
     assert len(watchers) == 2
 
 
+def test_claude_held_agent_is_not_killed_and_the_skip_is_logged_once(tmp_path):
+    watchers = []
+    w = World(tmp_path, n=1, watch=lambda cfg: watchers.append(FakeWatch()) or watchers[-1], watch_s=15.0)
+    w.sup.tick()
+    watchers[0].skipped = "claude hold"  # ProgressWatch.check() returns None and says why while a lease is on
+    for _ in range(3):
+        w.t += 20
+        w.sup.tick()
+    assert not w.procs[0].killed
+    assert sum("stall check skipped: claude hold" in line for line in w.logs) == 1
+    watchers[0].skipped = ""
+    w.t += 20
+    w.sup.tick()
+    watchers[0].skipped = "claude hold"
+    w.t += 20
+    w.sup.tick()
+    assert sum("stall check skipped: claude hold" in line for line in w.logs) == 2  # logged again for a new lease
+
+
 def test_healthy_agent_not_stopped_and_watch_is_rate_limited(tmp_path):
     watchers = []
     w = World(tmp_path, n=1, watch=lambda cfg: watchers.append(FakeWatch()) or watchers[-1], watch_s=15.0)
