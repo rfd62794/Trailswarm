@@ -9,8 +9,8 @@ larger n wins).
 
 The gate (called by the Selector for every decision): readiness, guards, battle_moves and advance_dialog do not
 press A/B in a context that has had >= GATE_MIN_N presses with an effect rate under GATE_MAX_RATE (and little
-progress). They wait instead, but never longer than WAIT_BOUND frames, so nothing deadlocks. Battle text that is
-still printing is not paged until it stops changing or the prompt arrow shows.
+progress). They wait instead, but never longer than WAIT_BOUND frames, so nothing deadlocks. Battle text contexts
+need more proof (n >= 20, effect < 10%). Text still printing is only a signature part, never a hold of its own.
 """
 from __future__ import annotations
 
@@ -24,11 +24,12 @@ MAX_SIGS = 500  # signatures kept in maps.json (most used)
 GATE_MIN_N = 8  # presses of evidence before a context may be gated
 GATE_MAX_RATE = 0.15  # effect (and progress) rate below which a press is not worth making
 WAIT_BOUND = 90  # frames a gate may hold a press back before it lets one through
+BATTLE_TEXT_MIN_N = 20  # battle text contexts need this much evidence ...
+BATTLE_TEXT_MAX_RATE = 0.10  # ... and an effect rate under this before they are gated
 PROGRESS_WINDOW = 8  # a goal / beat advancing within this many A/B presses credits them
 PRINT_QUIET = 12  # frames the box text must hold still before it counts as waiting for input
 ARROW = 0xEE  # the blinking "more text" prompt arrow tile
 GATED = ("readiness", "guards", "battle_moves", "advance_dialog")
-PAGING_RULES = ("fight", "advance_a")  # the A presses that merely page text
 FP_RANGES = ((0xD163, 0x110), (0xD31D, 42), (0xD747, 0x140))  # party, bag, story flags
 
 
@@ -96,10 +97,12 @@ class PressValue:
     # --- the gate's question ---
     def verdict(self, fine: str, coarse: str, button: str) -> str | None:
         """'effect 3/40' when this context has proven useless for this button, else None."""
+        battle_text = fine.startswith("battle_text")  # paging battle text is cheap and was costly to hold: more proof needed
+        min_n, max_rate = (BATTLE_TEXT_MIN_N, BATTLE_TEXT_MAX_RATE) if battle_text else (GATE_MIN_N, GATE_MAX_RATE)
         for sig in (fine, coarse):
             e = self.table.get(sig, {}).get(button)
-            if e and e["n"] >= GATE_MIN_N:
-                if e["effect"] / e["n"] < GATE_MAX_RATE and e["progress"] / e["n"] < GATE_MAX_RATE:
+            if e and e["n"] >= min_n:
+                if e["effect"] / e["n"] < max_rate and e["progress"] / e["n"] < max_rate:
                     return f"{button} had effect {e['effect']}/{e['n']} here"
                 return None  # the finest context with enough evidence decides
         return None
@@ -155,8 +158,6 @@ def gate(ctx, decision: Decision) -> Decision:
     why = None
     if decision.behaviour in GATED:
         why = pv.verdict(fine, coarse, decision.button)
-        if why is None and decision.button == "A" and decision.rule in PAGING_RULES and fine.startswith("battle_text_printing"):
-            why = "battle text still printing"
     if why is not None and pv.hold(f"{fine}|{decision.button}", ctx.frame):
         if decision.behaviour == "readiness":
             ctx.busy_presses = max(0, ctx.busy_presses - 1)  # the press was counted when decided, but never made

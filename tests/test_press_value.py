@@ -107,17 +107,21 @@ def test_gate_falls_back_to_the_coarse_context_for_unseen_text(tmp_path):
     assert gate(ctx, Decision("A", "advance_a", behaviour="advance_dialog")).button == ""
 
 
-def test_battle_text_still_printing_is_not_paged_until_it_waits(tmp_path):
+def test_battle_text_needs_more_proof_and_printing_alone_never_holds(tmp_path):
     ctx = make_ctx(tmp_path, memory={0xD057: 1})
     put_box(ctx, text_rows=("WILD PIDGEY",))
     ctx.refresh()
     pv = get_pv(ctx)
-    pv.watch(ctx)  # first sight of this text: it just changed, so it is printing
-    d = gate(ctx, Decision("A", "fight", behaviour="battle_moves"))
-    assert d.button == "" and "printing" in d.why
-    ctx.frame += 20  # unchanged for a while: waiting for input
-    pv.watch(ctx)
-    assert gate(ctx, Decision("A", "fight", behaviour="battle_moves")).button == "A"
+    pv.watch(ctx)  # text just changed: printing
+    d = Decision("A", "fight", behaviour="battle_moves")
+    assert gate(ctx, d).button == "A"  # no history: pressing is never held for printing alone
+    fine, coarse = context_sigs(ctx, "battle_moves")
+    poor(pv, fine, n=19, effect=0)
+    assert gate(ctx, d).button == "A"  # under 20 presses
+    poor(pv, fine, n=40, effect=5)  # 12.5% is not under 10%
+    assert gate(ctx, d).button == "A"
+    poor(pv, fine, n=40, effect=3)
+    assert gate(ctx, d).button == ""
 
 
 def test_prompt_arrow_means_waiting_at_once(tmp_path):
