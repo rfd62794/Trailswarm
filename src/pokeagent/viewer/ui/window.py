@@ -193,7 +193,7 @@ class ViewerWindow:
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
-        scale = ui_scale.init()  # DPI awareness first: sizes below are physical pixels
+        scale = ui_scale.init()  # DPI awareness first; sizes below are physical px
         dpg.create_context()
         vw, vh = viewport_size(work_area(), scale)  # never taller than the screen: the control bar stays visible
         dpg.create_viewport(title="PokeAgent viewer", width=vw, height=vh, x_pos=0, y_pos=0,
@@ -280,9 +280,7 @@ class ViewerWindow:
     def run(self) -> None:
         self._build()
         dpg.set_viewport_resize_callback(lambda *_: setattr(self, "_last_size", (0, 0)))
-        dpg.setup_dearpygui()
-        ui_scale.install_font(dpg)
-        self._populate()
+        dpg.setup_dearpygui(); ui_scale.install_font(dpg); self._populate()
         theme.apply()  # theme colours need the initialized context; binds before first frame
         dpg.show_viewport()
         dpg.set_primary_window(self._win, True)
