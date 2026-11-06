@@ -75,7 +75,7 @@ class InteriorLayer:
         w = v.world
         self.edit.tick(time.monotonic())
         if self._failed == self._sig():
-            return w.layout
+            return full_world(w).layout          # same as the failure path: never the compact layout with off-canvas rooms
         try:
             self._purge(w)
             if self.plan is None or (self._rev, self._erev, self._wid) != (v.wm.rev, self.edit.rev, id(w)):
