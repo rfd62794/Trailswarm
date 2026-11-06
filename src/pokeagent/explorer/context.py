@@ -106,7 +106,13 @@ class ExplorerContext:
     last_press: str | None = None
     last_sig: tuple | None = None
     last_text: str = ""
-    mash: int = 0
+    mash: int = 0  # decisions spent in the current busy stretch (Readiness)
+    busy_presses: int = 0  # A/B nudges in the current busy stretch
+    busy_start: int = 0  # ctx.frame when the stretch began
+    busy_sig: str = ""  # the situation signature of the stretch
+    busy_strategy: str = ""  # the mash_skill strategy chosen for it
+    busy_last_press: int = 0  # ctx.frame of the last nudge
+    skill: object = None  # MashSkill, built lazily over mem.data
     mom_failed_until: int = 0
     party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
     order_retry_at: int = 0  # step before which a failed reorder_party is not retried
