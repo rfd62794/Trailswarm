@@ -45,8 +45,8 @@ def test_top_off_threshold_drops_to_half_after_the_trips():
     g = {g: True for g in GOALS[:GOALS.index("to_route2") + 1]}
     g.update(_hp=(25, 30), _level=10, _train_level=0)  # 83%: under the 90% top-off, over 50%
     first = plan_step({**g, "_heal_trips": 0}, {}, (41, 2, 5), "UP")  # inside the Viridian center
-    assert first is not None and "Pokecenter" in first[1]
+    assert first is not None and "to heal" not in first[1] and "HP 25/30" in first[1]
     later = plan_step({**g, "_heal_trips": 2}, {}, (41, 2, 5), "UP")
-    assert later is None or "Pokecenter" not in later[1]
+    assert later is None or "HP 25/30" not in later[1]  # no heal rule fires any more
     hurt = plan_step({**g, "_hp": (10, 30), "_heal_trips": 2}, {}, (41, 2, 5), "UP")
-    assert hurt is not None and "Pokecenter" in hurt[1]  # below 50% still heals
+    assert hurt is not None and "HP 10/30" in hurt[1]  # below 50% still heals
