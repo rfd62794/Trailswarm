@@ -108,6 +108,11 @@ class ExplorerContext:
     last_text: str = ""
     mash: int = 0
     mom_failed_until: int = 0
+    party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
+    order_retry_at: int = 0  # step before which a failed reorder_party is not retried
+    switch_train: dict | None = None  # switch_out_lead in progress for this battle
+    switch_gave_up: int = -1  # ctx.battles value of the battle whose switch was abandoned
+    magikarp_shared: int = 0  # battles in which the trainee was sent out and swapped on turn one
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None

@@ -88,3 +88,26 @@ blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.
 - Decoders: `ramstructs.py` (party/battle mons, item lists), `ramworld.py` (badges, dex, map header, menu, event flags);
   stats awareness in `explorer/stats.py` and `explorer/stat_records.py` (DVs, stat exp, formula; catch keep-best and per-map stat-exp are report-only).
 - Gen 1 quirk: party stats are only recomputed at level-up, so they ignore stat exp earned since.
+
+## Magikarp: buy, reorder, switch-train (ROM-verified headless 2026-11-05)
+
+- Internal species ids (kb `name_of_internal`): 133 = MAGIKARP, 22 = GYARADOS. Party count 0xD163, species list 0xD164, mon structs 0xD16B stride 44.
+  A bought Magikarp arrives at level 5 with 17-18 HP. Money is BCD at 0xD347 (500 = 500 off the total).
+- The salesman is a wanderer in the Mt Moon Pokemon Center (0x44), pic id 10, pacing the row y=6 between x=8 and x=11. Stand on y=5 above him
+  facing DOWN and press A. His pitch runs ~17 presses before the YES/NO appears (the old "menu open for 12 presses -> B" guard answered NO for us
+  until `AdvanceDialog` exempted the MAGIKARP offer). Texts: "MAN Hello, there! Have I got a deal just for you! I'll let you have a swell MAGIKARP
+  for just 500! What do you say?" -> YES/NO box (with the money window "3553" above it) -> "BCN got MAGIKARP!" -> "Do you want to give a nickname to
+  MAGIKARP?" (YES/NO, we answer NO). Saying NO: "No? I only | doing this as a favor to you!". Afterwards he says "Well, I don't give refunds!".
+- Party screens (all unframed full-screen lists, so `frame_lines` is blind to them; `explorer/party_menu.py` decodes the whole tile map):
+  START menu is a frame "POKeDEX / POKeMON / ITEM / <name> / SAVE / OPTION / EXIT" (cursor remembered between opens; wCurrentMenuItem 0xCC26 = row);
+  A on POKeMON opens the list with the prompt "Choose a POKeMON."; wCurrentMenuItem is the party slot under the cursor; A on a member opens
+  "STATS / SWITCH / CANCEL" (outside a fight; STATS is row 0, SWITCH row 1); A on SWITCH prints "Move POKeMON where?" and the cursor starts on the
+  chosen member; moving it to another slot and pressing A swaps the two (RAM order changes at once); B closes the list, B again the START menu.
+- In a fight: battle menu is a frame ">FIGHT PKMN / ITEM RUN" (PKMN is RIGHT of FIGHT); A on PKMN opens the same "Choose a POKeMON." list; A on a
+  member opens ">SWITCH / STATS / CANCEL" (SWITCH is the FIRST row in a fight); A on SWITCH prints "MAGIKARP enough! Come back!" then "Go! WARTORTLE!".
+  Gen 1 does not reorder the party on an in-battle switch. The enemy then acts (turn one is spent). Seen: "MAGIKARP gained 30 EXP. Points!" and
+  "WARTORTLE gained 30 EXP. Points!" after the Zubat fainted - the switched-out Magikarp shares the experience.
+- Engine notes: the buy_magikarp goal is settled (so the ladder never blocks) when a MAGIKARP/GYARADOS is owned, money < 500, the party is full, or
+  Mt Moon 1F has been entered. `gyarados` is in `SIDE_GOALS` (reported by check_goals and tools/status.py, never the planner's next goal).
+  With a Magikarp in the party, `party_hp`, the training level and the BattleView read the fighter (the battle's active mon, else the strongest
+  non-Magikarp), not party slot 0.
