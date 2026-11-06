@@ -1,7 +1,7 @@
 """Pure readers of the screen and RAM: what the explorer sees (moved unchanged from tools/explore_demo.py)."""
 from __future__ import annotations
 
-from pokeagent.explorer import legend, tilekind
+from pokeagent.explorer import items, legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
 from pokeagent.names import load_registry
 from pokeagent.screentext import CHARMAP
@@ -51,6 +51,7 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
     d = mem.m(m)
     npcs = {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
     trainers = tilekind.trainer_tiles(d)
+    item_pos = {(x, y) for _slot, x, y in items.item_balls(emu)}  # live: a picked-up ball is gone, not '*'
     tile_types = mem.data.get("tile_types", {})
     grass_ids = mem.data.get("grass_ids", {})
     kinds = set()
@@ -61,11 +62,21 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
             mx, my = px + (c - 4), py + (r - 4)
             block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
             kind = "you" if (c, r) == (4, 4) else tilekind.classify(
-                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, strict=False)
+                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, items=item_pos, strict=False)
             kinds.add(kind)
             line += legend.glyph(kind, tilekind.ledge_dir(d, mx, my) if kind == "ledge" else None)
         rows.append(line)
     return legend.Rendered(rows, legend.line(kinds))
+
+
+def wrap_move(move: str, width: int = 22, prefix: str = "move  ") -> list[str]:
+    """The move rule wrapped at spaces to fit ``width`` columns (continuations indented); never cuts a word."""
+    if not move:
+        return []
+    import textwrap
+    parts = textwrap.wrap(move, width, initial_indent=prefix, subsequent_indent="  ",
+                          break_long_words=False, break_on_hyphens=False)
+    return parts or [prefix + move]
 
 
 def battle_view(emu, move: str = "") -> list[str]:
@@ -80,8 +91,7 @@ def battle_view(emu, move: str = "") -> list[str]:
             f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
             "(hp addrs unverified)"]
-    if move:
-        rows.append(f"move  {move}")
+    rows += wrap_move(move)
     rows += ["", "MENU/TEXT:"]
     menu = [ln for ln in lines if ">" in ln or ln.isupper()]
     rows += [ln[:20] for ln in (menu or lines)[:6]]

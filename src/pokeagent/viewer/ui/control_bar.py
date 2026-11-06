@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.viewer.ui.keys import handler
+
 SPEED_LABELS = {1: "1x", 2: "2x", 4: "4x", 8: "8x"}
 BAR_TAG = "bar_first"
 
@@ -30,13 +32,12 @@ class ControlBar:
                                             callback=lambda s, a, u: self.host.toggle_pause())
             self.speed_btn = dpg.add_button(label="1x", width=44,
                                             callback=lambda s, a, u: self.host.cycle_speed())
-            self.steer_box = dpg.add_checkbox(label="Steer", default_value=False,
-                                              callback=lambda s, a, u: self.host.set_steer(bool(a)))
+            self.steer_box = dpg.add_checkbox(label="Steering (focus view)", default_value=False, enabled=False)
         # row 2: hand-off + state slots
         with dpg.group(horizontal=True, parent=parent):
             for drv in ("rl", "explorer"):
                 self.hand_btns[drv] = dpg.add_button(label=f"Hand to {drv.title()}", width=96,
-                                                     callback=lambda s, a, u, d=drv: self.host.hand_to(d))
+                                                     callback=handler(self.host.hand_to, drv))
             dpg.add_input_text(tag="state_name", width=110, hint="state name")
             dpg.add_button(label="Save", width=52,
                            callback=lambda s, a, u: self.host.save_state(dpg.get_value("state_name")))
@@ -59,6 +60,8 @@ class ControlBar:
             dpg.set_item_label(self.speed_btn, SPEED_LABELS.get(self.host.speed(), "1x"))
         if self.pause_btn is not None and dpg.does_item_exist(self.pause_btn):
             dpg.set_item_label(self.pause_btn, "Resume" if self.host.paused() else "Pause")
+        if self.steer_box is not None and dpg.does_item_exist(self.steer_box):
+            dpg.set_value(self.steer_box, self.host.steering())
         snaps = self.host.target_snaps()
         for drv, tag in self.hand_btns.items():
             if dpg.does_item_exist(tag):

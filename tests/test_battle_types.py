@@ -221,7 +221,8 @@ def test_battle_view_shows_move_rule_line():
     emu = FakeEmulator({BATTLE: 1})
     assert not any(r.startswith("move") for r in battle_view(emu))
     rows = battle_view(emu, "EMBER x2 FIRE>GRASS/POISON STAB")
-    assert "move  EMBER x2 FIRE>GRASS/POISON STAB" in rows
+    i = rows.index("move  EMBER x2")           # wrapped at spaces to fit the 22-col Sees grid
+    assert rows[i + 1].strip().startswith("FIRE>GRASS/POISON") and "STAB" in " ".join(rows[i:i + 3])
 
 
 def test_move_choose_decision_carries_the_rule_string(tmp_path, monkeypatch):
