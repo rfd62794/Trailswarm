@@ -47,7 +47,7 @@ def test_events_endpoint_is_token_guarded():
     bus = ev.EventBus()
     bus.emit(ev.Move(x=1))
     bus.emit(ev.Move(x=2))
-    srv = ControlServer(lambda: AgentSnapshot(agent_id="a"), {}, token="tok", events_fn=bus.since)
+    srv = ControlServer(lambda: AgentSnapshot(agent_id="a"), {}, token="tok", events_fn=bus.payload)
     port = srv.start()
     try:
         def get(path, token="tok"):
@@ -58,7 +58,7 @@ def test_events_endpoint_is_token_guarded():
             except urllib.error.HTTPError as e:
                 return e.code, json.loads(e.read())
         code, body = get("/events?since=1")
-        assert code == 200 and [e["x"] for e in body] == [2]
+        assert code == 200 and [e["x"] for e in body["events"]] == [2] and body["epoch"] == bus.epoch
         assert get("/events", token="bad")[0] == 403
         assert get("/events?since=zzz")[0] == 400
     finally:
@@ -104,3 +104,26 @@ def test_feed_learns_from_memory_delta():
     learns = [e for e in feed.bus.since(0) if e["type"] == "learn"]
     assert [(e["kind"], e["x"], e["dir"]) for e in learns] == [("wall", 1, "UP"), ("warp", 4, "DOWN"), ("wall", 2, "LEFT")]
     assert learns[1]["dest"] == [7, 1, 1]
+
+
+def test_payload_replays_when_cursor_is_past_the_ring():
+    bus = ev.EventBus()
+    for i in range(3):
+        bus.emit(ev.Move(x=i))
+    assert [e["seq"] for e in bus.payload(99)["events"]] == [1, 2, 3]       # a restarted agent: full replay, not silence
+    assert bus.payload(2)["events"][0]["seq"] == 3
+    assert ev.EventBus().epoch != ev.EventBus().epoch
+
+
+def test_stall_counts_game_steps_not_observations():
+    emu, feed = FakeEmu(), EventFeed()
+    emu.mem.update({0xD35E: 0, 0xD362: 5, 0xD361: 6})
+    ctx = type("C", (), {"step": 0})()
+    for _ in range(500):                       # many observations inside a few steps: no stall
+        feed.observe(emu, ctx)
+    assert not [e for e in feed.bus.since(0) if e["type"] == "stall"]
+    ctx.step = 250
+    feed.observe(emu, ctx)
+    feed.observe(emu, ctx)
+    stalls = [e for e in feed.bus.since(0) if e["type"] == "stall"]
+    assert len(stalls) == 1 and stalls[0]["steps"] == 250

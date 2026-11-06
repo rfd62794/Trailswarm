@@ -47,6 +47,25 @@ class Pyramid:
         lh, lw = self.level(f).shape[:2]
         return (cx * CHUNK * f, cy * CHUNK * f, min(lw, (cx + 1) * CHUNK) * f, min(lh, (cy + 1) * CHUNK) * f)
 
+    def plan(self, zoom: float, rect: tuple[float, float, float, float], max_chunks: int = 30) -> tuple[int, list[tuple[int, int]]]:
+        """(level, chunks) for a view: the sharpest level that needs at most ``max_chunks`` textures (coarser when zoomed out
+        over too much map), so the texture cache never thrashes."""
+        f = self.level_for_zoom(zoom)
+        cs = self.chunks(f, *rect)
+        while len(cs) > max_chunks and f < LEVELS[-1]:
+            f *= 2
+            cs = self.chunks(f, *rect)
+        return f, cs
+
+    def parent(self, f: int, cx: int, cy: int, g: int) -> tuple[int, int, float, float, float, float]:
+        """The chunk of coarser level ``g`` that contains level-``f`` chunk (cx, cy), and the (u0, v0, u1, v1) sub-rectangle of it."""
+        r = g // f
+        pcx, pcy = cx // r, cy // r
+        ph, pw = self.chunk(g, pcx, pcy).shape[:2]
+        u0, v0 = (cx % r) * CHUNK / r / pw, (cy % r) * CHUNK / r / ph
+        ch, cw = self.chunk(f, cx, cy).shape[:2]
+        return pcx, pcy, u0, v0, min(1.0, u0 + cw / r / pw), min(1.0, v0 + ch / r / ph)
+
     def chunk(self, f: int, cx: int, cy: int) -> np.ndarray:
         """(h, w, 3) uint8 pixels of one chunk."""
         return self.level(f)[cy * CHUNK:(cy + 1) * CHUNK, cx * CHUNK:(cx + 1) * CHUNK]

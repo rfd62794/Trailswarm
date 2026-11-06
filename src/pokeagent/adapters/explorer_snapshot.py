@@ -167,7 +167,7 @@ class ExplorerAgentView:
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:
         """Start the viewer-facing control server + registry entry; returns the port."""
         self._ctl = ControlServer(self.snapshot, self.handlers(), port=port, token="",
-                                 events_fn=lambda since: self.feed.bus.since(since))
+                                 events_fn=self.feed.bus.payload)
         self._port = self._ctl.start()
         agent_registry.register(self.root, agent_id or self.agent_id, "explorer", self._port,
                                 self.frame_slot, pid=os.getpid(), token=self._ctl.token)

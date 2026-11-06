@@ -10,6 +10,7 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.world import events as ev
 
 BATTLE_FLAG = 0xD057
+STALL_STEPS = 200      # game steps without moving before a stall event
 _DELTA = {(0, -1): "UP", (0, 1): "DOWN", (-1, 0): "LEFT", (1, 0): "RIGHT"}
 _LEARN = (("blocked", "wall"), ("warps", "warp"), ("jumps", "jump"), ("encounters", "encounter"))
 
@@ -30,7 +31,8 @@ class EventFeed:
         self._hold = False
         self._dec_key: tuple = ()
         self._counts: dict[tuple[str, str], int] = {}
-        self._stall = 0
+        self._move_step = 0
+        self._stalled = False
 
     def observe(self, emu, ctx, mem=None, dec=None, outcome: str = "", hold: bool = False, goals: dict | None = None) -> None:
         self._position(emu, ctx)
@@ -50,11 +52,11 @@ class EventFeed:
         pos = (emu.read(0xD35E), emu.read(0xD362), emu.read(0xD361))
         step = int(getattr(ctx, "step", 0))
         if pos == self._pos:
-            self._stall += 1
-            if self._stall == 200:
-                self.bus.emit(ev.Stall(reason="no movement", steps=step))
+            if step - self._move_step >= STALL_STEPS and not self._stalled:
+                self._stalled = True
+                self.bus.emit(ev.Stall(reason="no movement", steps=step - self._move_step))   # game steps, not observations
             return
-        prev, self._pos, self._stall = self._pos, pos, 0
+        prev, self._pos, self._move_step, self._stalled = self._pos, pos, step, False
         if prev is not None and prev[0] != pos[0]:
             self.bus.emit(ev.MapChange(map=pos[0], x=pos[1], y=pos[2], prev_map=prev[0]))
         elif prev is not None:

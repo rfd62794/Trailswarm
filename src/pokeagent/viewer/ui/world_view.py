@@ -14,10 +14,11 @@ import numpy as np
 
 from pokeagent.atlas import sprites
 from pokeagent.world import anim, draw
-from pokeagent.world.pyramid import Pyramid, to_gpu
+from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
 
 TEX = "world_tex"
+MAX_UPLOADS = 2         # chunk uploads per frame (a pan never stalls the UI on a burst of 16 MB uploads)
 MAX_TEX = 40            # chunk textures kept on the GPU (about 16 MB each)
 MIN_SPRITE_PX = 26      # an agent is never drawn smaller than this, however far out you zoom
 REBUILD_S = 3.0         # layer images are recomposed at most this often
@@ -39,6 +40,8 @@ class WorldView:
         self._last_mouse: tuple[float, float] | None = None
         self._down_at: tuple[float, float] | None = None
         self._pending: Pyramid | None = None
+        self._loaded = None
+        self._uploads = 0
         self._built_for: tuple | None = None
         self._building = False
         self._built_at = 0.0
@@ -64,10 +67,7 @@ class WorldView:
             pyr = Pyramid(w.base)
             for f in (2, 4, 8):
                 pyr.level(f)
-            self.world, self.pyr = w, pyr
-            self.vp = Viewport(*w.layout.size_px, self.vp.screen_w, self.vp.screen_h)
-            self.vp.fit()
-            self.status = ""
+            self._loaded = (w, pyr)                 # the UI thread adopts it (viewport state is never touched from here)
         except Exception as exc:
             self.status = f"world failed to load: {exc}"
 
@@ -98,11 +98,15 @@ class WorldView:
         threading.Thread(target=work, daemon=True, name="world-layers").start()
 
     # -- textures ------------------------------------------------------------------------
-    def _chunk_tex(self, f: int, cx: int, cy: int):
+    def _chunk_tex(self, f: int, cx: int, cy: int, force: bool = False):
+        """The texture of a chunk if it is on the GPU; otherwise upload it - at most MAX_UPLOADS per frame (None = not yet)."""
         key = (id(self.pyr), f, cx, cy)
         if key in self._tex:
             self._tex.move_to_end(key)
             return self._tex[key]
+        if self._uploads >= MAX_UPLOADS and not force:
+            return None
+        self._uploads += 1
         rgb = self.pyr.chunk(f, cx, cy)
         tag = dpg.add_static_texture(rgb.shape[1], rgb.shape[0], to_gpu(rgb), parent=TEX)
         self._tex[key] = tag
@@ -180,6 +184,11 @@ class WorldView:
             self._started = True
             threading.Thread(target=self._load, args=(self._loader,), daemon=True, name="world-load").start()
         dpg.delete_item(dl, children_only=True)
+        if self._loaded is not None:
+            (self.world, self.pyr), self._loaded = self._loaded, None
+            self.vp = Viewport(*self.world.layout.size_px, self.vp.screen_w, self.vp.screen_h)
+            self.vp.fit()
+            self.status = ""
         if self.pyr is None:
             dpg.draw_text((20, 20), self.status, size=18, parent=dl)
             return
@@ -187,14 +196,31 @@ class WorldView:
             self.pyr, self._pending = self._pending, None
         self._maybe_rebuild(now)
         self._drag()
-        vp, f = self.vp, Pyramid.level_for_zoom(self.vp.zoom)
-        for cx, cy in self.pyr.chunks(f, *vp.visible()):
+        vp, self._uploads = self.vp, 0
+        f, chunks = self.pyr.plan(vp.zoom, vp.visible(), MAX_TEX - 10)
+        for cx, cy in chunks:
             x0, y0, x1, y1 = self.pyr.chunk_rect(f, cx, cy)
-            dpg.draw_image(self._chunk_tex(f, cx, cy), vp.to_screen(x0, y0), vp.to_screen(x1, y1), parent=dl)
+            a, b = vp.to_screen(x0, y0), vp.to_screen(x1, y1)
+            tex = self._chunk_tex(f, cx, cy)
+            if tex is not None:
+                dpg.draw_image(tex, a, b, parent=dl)
+            else:
+                self._draw_coarser(f, cx, cy, a, b)
         self._draw_agents(now)
         self._draw_hover()
         if self.side:
             self.side.update()
+
+    def _draw_coarser(self, f: int, cx: int, cy: int, a, b) -> None:
+        """Until the sharp chunk is uploaded show the same area from a coarser level (the coarsest is tiny, always affordable)."""
+        g = f * 2
+        while g <= LEVELS[-1]:
+            pcx, pcy, u0, v0, u1, v1 = self.pyr.parent(f, cx, cy, g)
+            tex = self._chunk_tex(g, pcx, pcy, force=g == LEVELS[-1])
+            if tex is not None:
+                dpg.draw_image(tex, a, b, uv_min=(u0, v0), uv_max=(u1, v1), parent=self.canvas)
+                return
+            g *= 2
 
     def _draw_agents(self, now: float) -> None:
         w, vp, dl = self.world, self.vp, self.canvas

@@ -1,3 +1,5 @@
+import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -133,14 +135,100 @@ def test_poll_reads_sources_concurrently_and_survives_failures():
         def events(self, since):
             if self.boom:
                 raise RuntimeError("down")
-            return self.bus.since(since)
+            return self.bus.payload(since)
 
     class NoEvents:
         agent_id = "n"
 
     wm = WorldModel()
     wm.poll([Src("ok"), Src("bad", True), NoEvents()])
+    deadline = time.time() + 3
+    while [t.id for t in wm.tracks()] != ["ok"] and time.time() < deadline:
+        time.sleep(0.01)
     assert [t.id for t in wm.tracks()] == ["ok"]
+
+
+def test_poll_does_not_wait_for_a_hung_agent():
+    release = threading.Event()
+
+    class Hung:
+        agent_id = "hung"
+
+        def events(self, since):
+            release.wait(5)
+            return {"events": []}
+
+    class Fast:
+        agent_id = "fast"
+
+        def events(self, since):
+            b = ev.EventBus()
+            b.emit(ev.Move(map=0, x=1, y=1))
+            return b.payload(since)
+
+    wm = WorldModel()
+    t0 = time.time()
+    wm.poll([Hung(), Fast()])
+    assert time.time() - t0 < 1.0                                       # no barrier on the slowest agent
+    wm.poll([Hung(), Fast()])                                           # the hung one is not resubmitted while in flight
+    release.set()
+
+
+def test_restart_with_same_id_resets_track_and_replays():
+    wm = WorldModel()
+    old = ev.EventBus()
+    old.emit(ev.Move(map=0, x=1, y=1))
+    old.emit(ev.BattleStart(species="X"))
+    old.emit(ev.Learn(kind="wall", map=0, x=1, y=1, dir="UP"))
+    for _ in range(5):
+        old.emit(ev.Move(map=0, x=2, y=2))
+    wm.ingest("a", old.since(0), old.epoch)
+    other = ev.EventBus()
+    other.emit(ev.Learn(kind="wall", map=0, x=9, y=9, dir="UP"))
+    wm.ingest("b", other.since(0), other.epoch)
+    assert wm.track("a").battle is not None and wm.track("a").last_seq == 8
+    new = ev.EventBus()                                                  # the agent rebooted: seq starts again at 1
+    new.emit(ev.Move(map=3, x=7, y=7))
+    new.emit(ev.Learn(kind="wall", map=0, x=1, y=1, dir="UP"))           # a replayed fact
+    wm.ingest("a", new.payload(8)["events"], new.epoch)
+    t = wm.track("a")
+    assert (t.map, t.x, t.y) == (3, 7, 7) and t.battle is None and list(t.path) == [(3, 7, 7)] and t.prev is None
+    assert t.last_seq == 2
+    by = {(v.kind, v.x): v for v in wm.learned()}
+    assert by[("wall", 1)].agent == "a" and by[("wall", 1)].also == ()    # not re-credited, no phantom co-learner
+    assert by[("wall", 9)].agent == "b"
+
+
+def test_restart_detected_through_poll_with_stale_cursor():
+    old, new = ev.EventBus(), ev.EventBus()
+    for _ in range(5):
+        old.emit(ev.Move(map=0, x=1, y=1))
+    for i in range(7):
+        new.emit(ev.Move(map=1, x=i, y=0))                              # the new boot is already past the old cursor
+
+    class Src:
+        agent_id = "a"
+        bus = old
+
+        def events(self, since):
+            return self.bus.payload(since)
+    src = Src()
+    wm = WorldModel(clock=lambda: 0.0)
+    wm._read_one(src)
+    assert wm.track("a").last_seq == 5
+    src.bus = new
+    wm._read_one(src)
+    t = wm.track("a")
+    assert t.last_seq == 7 and t.map == 1 and len(t.path) == 7          # re-polled from 0: nothing lost
+
+
+def test_plan_caps_chunks_and_coarser_fallback_maps_exactly():
+    base = np.zeros((11488 // 4, 5632 // 4, 3), dtype=np.uint8)
+    p = Pyramid(base)
+    f, cs = p.plan(1.0, (0, 0, 1408, 2872), max_chunks=4)
+    assert len(cs) <= 4 and f > 1                                        # zoomed out over a lot of map: a coarser level
+    pcx, pcy, u0, v0, u1, v1 = p.parent(1, 1, 1, 2)
+    assert (pcx, pcy) == (0, 0) and u0 == pytest.approx(512 / 704) and v0 == 0.5 and u1 == pytest.approx(1.0) and v1 == pytest.approx(1.0)
 
 
 def test_battle_lifecycle_and_stadium_cap():

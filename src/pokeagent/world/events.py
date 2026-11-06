@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import threading
 import time
+import uuid
 from collections import deque
 from dataclasses import asdict, dataclass, fields
 from typing import Any, ClassVar
@@ -150,6 +151,7 @@ class EventBus:
     def __init__(self, capacity: int = DEFAULT_CAPACITY, clock=time.time) -> None:
         self._buf: deque[Event] = deque(maxlen=max(1, capacity))
         self._seq = 0
+        self.epoch = uuid.uuid4().hex      # one per bus (= per agent boot): a client seeing it change must start over
         self._clock = clock
         self._lock = threading.Lock()
 
@@ -169,3 +171,8 @@ class EventBus:
         with self._lock:
             items = [e for e in self._buf if e.seq > seq][:limit]
         return [e.to_dict() for e in items]
+
+    def payload(self, since: int = 0) -> dict[str, Any]:
+        """The ``GET /events`` body: ``{"epoch", "events"}``. A cursor past our newest seq (the client talked to an
+        earlier boot of this agent) gets a full replay instead of silence."""
+        return {"epoch": self.epoch, "events": self.since(0 if since > self._seq else since)}

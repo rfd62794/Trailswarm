@@ -46,9 +46,9 @@ class _Throttle:
     def frame(self):
         return self._src.frame()
 
-    def events(self, since: int = 0) -> list[dict]:
+    def events(self, since: int = 0) -> dict:
         fn = getattr(self._src, "events", None)
-        return fn(since) if fn else []
+        return fn(since) if fn else {"events": []}
 
     def send(self, cmd: str, **args) -> dict:
         return self._src.send(cmd, **args)
@@ -64,7 +64,7 @@ class _AnimatedFake:
         self._bus = EventBus()
         self._pos = [[0, 5, 6], [1, 12, 10], [2, 10, 9], [3, 14, 10]][hash(agent_id) % 4]
 
-    def events(self, since: int = 0) -> list[dict]:
+    def events(self, since: int = 0) -> dict:
         """Wander on a loop (one cell per poll) and fight every 40th step, so --fake shows the world view moving."""
         t, (m, x, y) = self._t, self._pos
         face = ("RIGHT", "DOWN", "LEFT", "UP")[t // 6 % 4]
@@ -76,7 +76,7 @@ class _AnimatedFake:
                                        hp=19, max_hp=19, enemy_hp=12, enemy_max_hp=12))
         if t % 40 == 30:
             self._bus.emit(BattleEnd(result="won", turns=3))
-        return self._bus.since(since)
+        return self._bus.payload(since)
 
     def snapshot(self) -> AgentSnapshot:
         self._t += 1

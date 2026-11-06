@@ -83,29 +83,49 @@ class WorldModel:
         self._feed: deque = deque(maxlen=FEED)        # (agent, event dict, viewer time)
         self._since: dict[str, int] = {}
         self._polled: dict[str, float] = {}
+        self._epoch: dict[str, str] = {}
+        self._inflight: set[str] = set()
         self._rev = 0                                 # bumps whenever the union of learnings changes
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="world-poll")
 
     # -- ingest -----------------------------------------------------------------------
     def _read_one(self, src) -> None:
         aid = src.agent_id
-        now = self._clock()
-        if now - self._polled.get(aid, -1e9) < POLL_S or not hasattr(src, "events"):
-            return
-        self._polled[aid] = now
         try:
             got = src.events(self._since.get(aid, 0))
+            if isinstance(got, list):                       # sources that predate the epoch envelope
+                got = {"events": got}
+            known = self._epoch.get(aid)
+            if known is not None and got.get("epoch") not in (None, known) and self._since.get(aid, 0):
+                got = src.events(0)                        # restarted agent: replay its whole ring, not the tail past our old cursor
+            if got.get("events") or got.get("epoch") != known:
+                self.ingest(aid, got.get("events") or [], got.get("epoch"))
         except Exception:
-            return
-        if got:
-            self.ingest(aid, got)
+            pass
+        finally:
+            with self._lock:
+                self._inflight.discard(aid)
 
     def poll(self, sources: Iterable) -> None:
-        list(self._pool.map(self._read_one, list(sources)))
+        """Hand each due agent to the pool and return at once: a hung agent only ever delays itself."""
+        now = self._clock()
+        for src in list(sources):
+            aid = src.agent_id
+            with self._lock:
+                if aid in self._inflight or now - self._polled.get(aid, -1e9) < POLL_S or not hasattr(src, "events"):
+                    continue
+                self._inflight.add(aid)
+                self._polled[aid] = now
+            self._pool.submit(self._read_one, src)
 
-    def ingest(self, agent_id: str, items: list[dict]) -> None:
+    def ingest(self, agent_id: str, items: list[dict], epoch: str | None = None) -> None:
         now = self._clock()
         with self._lock:
+            if epoch is not None and self._epoch.get(agent_id, epoch) != epoch:
+                self._tracks.pop(agent_id, None)             # the agent restarted: its old track, cursor and battle are void
+                self._since.pop(agent_id, None)
+            if epoch is not None:
+                self._epoch[agent_id] = epoch
             tr = self._tracks.setdefault(agent_id, Track(agent_id))
             for d in items:
                 e = ev.from_dict(d)
@@ -168,6 +188,7 @@ class WorldModel:
         with self._lock:
             self._tracks.pop(agent_id, None)
             self._since.pop(agent_id, None)
+            self._epoch.pop(agent_id, None)
 
     @property
     def rev(self) -> int:
