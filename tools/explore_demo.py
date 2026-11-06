@@ -301,7 +301,7 @@ def main(argv=None) -> int:
             pace = a.box_pace if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
-            hold = agent_view.hold.active() if agent_view is not None else False
+            hold = agent_view.held() if agent_view is not None else False
             if not ctx.paused and not hold and ctx.frame % pace == 0:
                 engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive

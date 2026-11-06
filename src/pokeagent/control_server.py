@@ -8,7 +8,8 @@ with ``{"ok": true}``.
 
 ``press`` carries an optional ``source`` (default ``"human"``). Agents MUST call
 ``HumanHold.touch()`` (see ``pokeagent.human_hold``) for ``source == "human"`` presses so the agent
-stops deciding while a human steers; ``hold_release`` ends the hold immediately.
+stops deciding while a human steers; ``hold_release`` ends the hold immediately. ``claude_hold`` (seconds 1..600) is
+the same for a Claude lease (``source:"claude"`` presses refresh it); ``macro`` runs a screen-verified procedure.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 PAUSE, RESUME, SPEED, PRESS, STEER = "pause", "resume", "speed", "press", "steer"
 HAND_TO, SAVE_STATE, LOAD_STATE, HOLD_RELEASE = "hand_to", "save_state", "load_state", "hold_release"
+CLAUDE_HOLD, MACRO, MACRO_CANCEL = "claude_hold", "macro", "macro_cancel"   # intervene/: lease + screen-verified macros (see pokeagent.intervene)
 
 # name -> (required args, optional args), each {arg: type}
 COMMAND_ARGS: dict[str, tuple[dict[str, type], dict[str, type]]] = {
@@ -41,6 +43,9 @@ COMMAND_ARGS: dict[str, tuple[dict[str, type], dict[str, type]]] = {
     HAND_TO: ({"driver": str}, {}),
     SAVE_STATE: ({"name": str}, {}),
     LOAD_STATE: ({"name": str}, {}),
+    CLAUDE_HOLD: ({"seconds": int}, {}),
+    MACRO: ({"name": str}, {"args": dict}),
+    MACRO_CANCEL: ({}, {}),
 }
 
 
@@ -61,7 +66,9 @@ def _check_args(cmd: str, args: dict) -> str | None:
         return "speed: n must be one of 1, 2, 4, 8"
     if cmd == PRESS and args["button"] not in BUTTONS:
         return f"press: button must be one of {', '.join(BUTTONS)}"
-    if cmd in (SAVE_STATE, LOAD_STATE) and not NAME_RE.match(args["name"]):
+    if cmd == CLAUDE_HOLD and not 1 <= args["seconds"] <= 600:
+        return "claude_hold: seconds must be 1..600"
+    if cmd in (SAVE_STATE, LOAD_STATE, MACRO) and not NAME_RE.match(args["name"]):
         return f"{cmd}: name must match [A-Za-z0-9_-]{{1,64}}"
     return None
 
@@ -174,7 +181,7 @@ class ControlServer:
             out = self.handlers[name](**args) or {}
             if "error" in out:  # e.g. the emulator thread did not pick the command up in time
                 return 504, {**out, "ok": False}
-            return 200, {**out, "ok": True}
+            return 200, {"ok": True, **out}  # a handler may report ok=False (a macro that stopped)
         except Exception as exc:
             return 500, {"ok": False, "error": str(exc)}
 

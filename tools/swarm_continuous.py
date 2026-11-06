@@ -221,6 +221,10 @@ class Supervisor:
             if s.handle is None or w is None or s.handle.poll() is not None or s.idx in self._unowned:
                 continue
             reason = w.check()
+            skipped = getattr(w, "skipped", "")
+            if skipped and not getattr(w, "skip_logged", False):
+                self.log(f"slot {s.idx} stall check skipped: {skipped}")
+            w.skip_logged = bool(skipped)
             if reason:
                 self.log(f"slot {s.idx} stalled: {reason} (last position {w.last_pos})")
                 if self.on_stall:
