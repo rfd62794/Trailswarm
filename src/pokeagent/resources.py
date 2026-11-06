@@ -226,4 +226,8 @@ def spawn_lock(root: Path, wait_s: float = 0.0):
     try:
         yield
     finally:
-        path.unlink(missing_ok=True)
+        try:  # a supervisor handoff may have re-pointed the lock at its successor: then it is not ours to release
+            if path.read_text().strip() == str(os.getpid()):
+                path.unlink(missing_ok=True)
+        except OSError:
+            pass

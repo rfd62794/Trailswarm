@@ -7,6 +7,7 @@ TRAIN_LEVEL_BY_GOAL is the fallback when the ROM tables or the party are missing
 """
 from __future__ import annotations
 
+from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import trainers
 from pokeagent.knowledge.readiness import Readiness, assess
@@ -19,9 +20,15 @@ CAP_ABOVE_TABLE = 5
 _cache: dict = {}
 
 
+MT_MOON_FLOOR_GOALS = frozenset({"mt_moon_b1f", "mt_moon_b2f", "through_mt_moon"})  # still the Mt Moon stage, not Misty's
+
+
 def stage_goal(goals: dict) -> str | None:
-    """The table goal the next unmet campaign goal leads up to (None once past the last)."""
+    """The table goal the next unmet campaign goal leads up to (None once past the last). The cave floors belong to
+    the Mt Moon stage: 2026-11-05 they read as Misty's (L24) because to_mt_moon had already landed on entering 1F."""
     unmet = next((i for i, g in enumerate(GOALS) if not goals.get(g)), len(GOALS))
+    if unmet < len(GOALS) and GOALS[unmet] in MT_MOON_FLOOR_GOALS:
+        return "to_mt_moon"
     return next((g for g in sorted(TRAIN_LEVEL_BY_GOAL, key=GOALS.index) if GOALS.index(g) >= unmet), None)
 
 
@@ -55,3 +62,8 @@ def required_level(goals: dict, floor: int = 8, party: list | None = None) -> tu
 def train_level_for(goals: dict, floor: int = 8, party: list | None = None) -> int:
     """Level wanted for the next unmet goal's stage (see required_level)."""
     return required_level(goals, floor, party)[0]
+
+
+def gate_for(map_id: int, need: int) -> int:
+    """The training level the planner may enforce on this map: none (0) inside a dungeon, ``need`` elsewhere."""
+    return 0 if map_id in DUNGEON_MAPS else need

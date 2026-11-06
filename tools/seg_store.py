@@ -9,13 +9,19 @@ runs' own goal_frames.jsonl (doc["calib"]); until enough data exists it is FRAME
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
+import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from functools import lru_cache
+
+from pokeagent.campaign import agent_capabilities, selectable
 from pokeagent.goals import GOALS
 from pokeagent.segment_names import BEST_SUFFIX
 
@@ -58,11 +64,72 @@ def save(root: Path, doc: dict) -> None:
     os.replace(tmp, p)
 
 
+@lru_cache(maxsize=8)
+def _selectable(caps: frozenset) -> tuple[str, ...]:
+    return tuple(g for g in GOALS if selectable(g, caps))
+
+
+def selectable_goals() -> tuple[str, ...]:
+    """The goals a segment may target (campaign.selectable): reachable through the chain AND with a verified detector.
+    Surf/Cut-gated goals and everything after them, and unverified goals, are never scheduled or split."""
+    return _selectable(frozenset(agent_capabilities()))
+
+
+LOCK_WAIT_S = 10.0
+LOCK_STALE_S = 60.0
+
+
+@contextlib.contextmanager
+def locked(root: Path):
+    """Read-modify-write of runs/segments.json under a short lock: yields the doc as it is ON DISK right now and saves it
+    on a clean exit, so two supervisors (a rolling upgrade, a second swarm) can never overwrite each other's ingest."""
+    lock = root / "runs" / "segments.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    end = time.monotonic() + LOCK_WAIT_S
+    while True:
+        try:
+            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            with contextlib.suppress(OSError):
+                if time.time() - lock.stat().st_mtime > LOCK_STALE_S:
+                    lock.unlink()  # a crashed writer's leftover
+                    continue
+            if time.monotonic() > end:
+                raise TimeoutError(f"{lock} is held; another supervisor is writing the curriculum")
+            time.sleep(0.05)
+    try:
+        doc = load(root)
+        yield doc
+        save(root, doc)
+    finally:
+        with contextlib.suppress(OSError):
+            lock.unlink()
+
+
+def remove_tree(root: Path, path: Path, log=print) -> bool:
+    """Delete a kept dir, but only inside runs/segments (never anything else); failures are logged, not swallowed."""
+    base = (root / "runs" / "segments").resolve()
+    target = Path(path).resolve()
+    if base not in target.parents:
+        log(f"curriculum: refusing to delete {path}: outside {base}")
+        return False
+    if not target.exists():
+        return True
+    errors: list[str] = []
+    shutil.rmtree(target, onexc=lambda f, p, e: errors.append(f"{p}: {e!r}"))
+    if errors:
+        log(f"curriculum: could not fully delete {target}: {errors[0]}")
+    return not target.exists()
+
+
 def layout(doc: dict) -> list[Segment]:
-    """Every leaf segment in chain order; a split goal is replaced by its sub-segments."""
+    """Every leaf segment in chain order; a split goal is replaced by its sub-segments. Only selectable goals get a
+    segment; an unverified goal in between is covered by the next one (it starts from the last selectable checkpoint)."""
     out: list[Segment] = []
-    for i, g in enumerate(GOALS):
-        start = GOALS[i - 1] if i else "bedroom"
+    prev_goal = "bedroom"
+    for g in selectable_goals():
+        start, prev_goal = prev_goal, g
         subs = doc["splits"].get(g)
         if not subs:
             out.append(Segment(g, g, start, g, g, None))

@@ -16,9 +16,8 @@ import shutil
 import time
 from pathlib import Path
 
-from pokeagent.goals import GOALS
 from pokeagent.segment_names import BEST_SUFFIX
-from seg_store import KEEP_ATTEMPTS, fps, input_path, job_dir, layout, stat
+from seg_store import KEEP_ATTEMPTS, fps, input_path, job_dir, layout, remove_tree, stat
 
 ABORTED_BELOW = 0.9    # an unsolved run that used less of its step budget than this was cut short
 CONFIRM_SLACK = 1.02   # the replay may be up to 2% slower and still count (it should be identical)
@@ -52,9 +51,10 @@ def _resolve(doc: dict, meta: dict) -> tuple[str | None, str | None]:
     g = meta.get("stop_at_goal")
     if not g or meta.get("window") or g in doc["splits"]:  # a watched (windowed) run may play differently: no stats
         return None, None
-    i = GOALS.index(g)
-    want = GOALS[i - 1] if i else None
-    return (g, None) if meta.get("start") in ((want,) if want else ("baseline", "bedroom")) else (None, None)
+    seg = next((x for x in layout(doc) if x.key == g), None)   # None: not a selectable goal (never a segment target)
+    if seg is None:
+        return None, None
+    return (g, None) if meta.get("start") in ((seg.start,) if seg.start != "bedroom" else ("baseline", "bedroom")) else (None, None)
 
 
 def calibrate(doc: dict, run: Path) -> None:
@@ -142,7 +142,7 @@ def record_confirm(root: Path, doc: dict, seg, cand_run: str, att: dict) -> str:
         if b.get("state") and Path(b["state"]).exists():
             ck = root / "runs" / "checkpoints"; ck.mkdir(parents=True, exist_ok=True)
             shutil.copy(b["state"], ck / f"{seg.end}{BEST_SUFFIX}.state")
-        drop_kept(b)  # the replay is done: the kept memory snapshot, start copy and candidate state are dead weight
+        drop_kept(root, b)  # the replay is done: the kept memory snapshot, start copy and candidate state are dead weight
         st["confirmed"] = dict(b)
         return "confirmed"
     b["rejected"] = True
@@ -150,13 +150,13 @@ def record_confirm(root: Path, doc: dict, seg, cand_run: str, att: dict) -> str:
     return "rejected"
 
 
-def drop_kept(b: dict) -> None:
+def drop_kept(root: Path, b: dict, log=print) -> None:
     for k in ("input", "start", "state"):
         if b.get(k):
             if k == "state":
                 Path(b[k]).unlink(missing_ok=True)
             else:
-                shutil.rmtree(Path(b[k]).parent, ignore_errors=True)  # the job dir holds both
+                remove_tree(root, Path(b[k]).parent, log)  # the job dir holds both
         b[k] = None
 
 
@@ -167,7 +167,7 @@ def release_input(root: Path, doc: dict, tag: str | None) -> None:
     d = job_dir(root, tag)
     held = {str(Path(s["best"]["input"]).parent) for s in doc["stats"].values() if s.get("best") and s["best"].get("input")}
     if str(d) not in held:
-        shutil.rmtree(d, ignore_errors=True)
+        remove_tree(root, d)
 
 
 def _quiet(run: Path, quiet_s: float) -> bool:

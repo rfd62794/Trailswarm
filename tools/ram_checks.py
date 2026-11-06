@@ -164,8 +164,9 @@ def battle(rig: Rig) -> Result:
     ev = f"wild {nm} L{en.level} on Route 1"
     r.check(e.read(0xD057) == 1 and e.read(0xD05A) == 0, ["wIsInBattle", "wBattleType"], f"{ev}: wIsInBattle 1 (wild), wBattleType 0")
     r.check(e.read(0xCFD8) == en.species == e.read(0xCFE5), ["wEnemyMonSpecies2", "wEnemyMonSpecies", "wEnemyMon"], f"{ev}: species copies agree")
-    r.check(e.read(0xD059) == en.species, ["wCurOpponent"], f"{ev}: wCurOpponent == species",
-            f"wCurOpponent reads {e.read(0xD059)} at the command menu while species is {en.species}")
+    # wCurOpponent is the TRAINER id (200 + class) and stays 0 in wild battles (found by tools/ram_discover.py, 2026-11-05)
+    r.check(e.read(0xD059) == 0, ["wCurOpponent"], f"{ev}: wCurOpponent 0 in a wild battle (trainer battles: 200 + class)",
+            f"wCurOpponent reads {e.read(0xD059)} in a wild battle; expected 0")
     r.check(2 <= en.level <= 5 and 0 < en.hp <= en.max_hp, ["wEnemyMonLevel", "wEnemyMonHP", "wEnemyMonMaxHP"], f"{ev}: HP {en.hp}/{en.max_hp}")
     row = rig.kb["species_by_dex"][str(rig.kb["dex_of_internal"][str(en.species)])]
     r.check(read_enemy_base_stats(e) == rig.base(en.species), ["wEnemyMonBaseStats"], f"{ev}: base stats {rig.base(en.species)} == kb")
@@ -224,4 +225,25 @@ def facing_and_hram(rig: Rig) -> Result:
     return r
 
 
-ALL = [party_struct, stat_exp_levelled, player_progress, map_header, battle, menus_and_ui, facing_and_hram]
+def discovered(rig: Rig) -> Result:
+    """Replay-verify the best mined RAM-discovery candidates (runs with ram_events.jsonl); proves labels they confirm.
+    Pure: results only. tools/verify_ram.py records ``rig.findings`` unless --dry-run."""
+    from pokeagent.ramlab import findings as F
+    from pokeagent.ramlab import pipeline
+    from pokeagent.ramlab.labels import load_entries
+    root = Path(__file__).resolve().parent.parent
+    r = Result()
+    if not list((root / "runs").glob("*/ram_events.jsonl")):
+        return r
+    found, _, _ = pipeline.verify_top([root / "runs"], root / "roms" / "Pokemon Red.gb", rig.states)
+    rig.findings = found
+    entries = load_entries()
+    already = {e["name"] for e in entries if e.get("verified")}
+    F.apply_to_map(entries, {"findings": found})        # the same gate the CLI uses (size, region, byte coverage)
+    r.ok.update({e["name"]: e["evidence"] for e in entries if e.get("verified") and e["name"] not in already})
+    r.failed += [f"{f['addr']} {f['name']} ({f['event']}): {f['evidence'][:100]}" for f in found
+                 if not f["verified"] and f["replay"]["witnesses"] and f["replay"]["passed"] * 3 < f["replay"]["witnesses"] * 2]
+    return r
+
+
+ALL = [party_struct, stat_exp_levelled, player_progress, map_header, battle, menus_and_ui, facing_and_hram, discovered]

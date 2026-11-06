@@ -23,11 +23,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PORT_BASE = int(os.environ.get("POKEAGENT_SWARM_PORT_BASE", 8800))  # scratch swarms use a high base
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
 from swarm_proc import TreeProc  # noqa: E402
+import swarm_handoff  # noqa: E402
 from swarm_watch import ProgressWatch, record_stall  # noqa: E402
 from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
@@ -57,7 +59,8 @@ def weakest_segment(n: int) -> str | None:
     """The n-th refill takes the next-weakest goal (consistency < 70%); None when everything is consistent."""
     try:
         import overnight
-        cons = {g: c for g, c in overnight.consistency().items() if c is not None and c < 0.7}
+        from pokeagent.campaign import selectable
+        cons = {g: c for g, c in overnight.consistency().items() if c is not None and c < 0.7 and selectable(g)}  # no Surf goals for agents without Surf
     except Exception:
         return None
     weak = sorted(cons, key=cons.get)[:3]
@@ -67,8 +70,10 @@ def weakest_segment(n: int) -> str | None:
 class Launcher:
     """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
 
-    def __init__(self, share_frames: bool, roles_mode: bool = False, port_base: int = 8800):
-        self.share_frames, self.roles_mode, self.handles, self.port_base = share_frames, roles_mode, [], port_base
+    def __init__(self, share_frames: bool, roles_mode: bool = False, ram_diff_slots: int = 0, port_base: int | None = None):
+        self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
+        self.ram_diff_slots = ram_diff_slots  # slots 0..N-1 record event RAM diffs (tools/ram_discover.py); default none
+        self.port_base = PORT_BASE if port_base is None else port_base
 
     def _port(self) -> int:
         used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
@@ -86,7 +91,7 @@ class Launcher:
         port = self._port()
         cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
-               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
@@ -94,7 +99,7 @@ class Launcher:
 
 
 def make_watch(cfg: dict):
-    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer")
+    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer", since_wall=cfg.get("started_wall"))
 
 
 def touch_lock() -> None:
@@ -105,14 +110,27 @@ def touch_lock() -> None:
 def run_continuous(a) -> int:
     import swarm_continuous as sc
     stack = contextlib.ExitStack(); atexit.register(stack.close)
+    adopted = None
+    if resources.lock_held(ROOT):  # a live supervisor: ask it to hand its agents over (rolling upgrade, no drain)
+        print("a supervisor holds runs/spawn.lock: asking it to hand over its agents (30 s)...")
+        adopted = swarm_handoff.request_handoff(ROOT)
+        if adopted is None:
+            print("not starting: no handoff (no answer in 30 s, or another upgrade is in flight); no double supervision")
+            return 1
     try:
-        stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        if adopted is not None:  # the old supervisor already pointed the lock at us; we supervise its agents regardless
+            swarm_handoff.acquire_after_handoff(stack, ROOT, [x["pid"] for x in adopted.get("agents", [])], print)
+        else:
+            stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
     except resources.LockBusy as e:
         print(f"not starting: {e}"); return 1
-    n, why = plan_agents(ROOT, max(1, a.agents))
-    print(why)
-    if n == 0:
-        print("no room for more agents; not starting a swarm"); return 0
+    if adopted is not None:
+        n = a.agents or len(adopted.get("agents", [])) or 4  # requested count; else keep what was running
+    else:
+        n, why = plan_agents(ROOT, max(1, a.agents or 4))
+        print(why)
+        if n == 0:
+            print("no room for more agents; not starting a swarm"); return 0
     shared = ROOT / a.maps
     roles = ["trainer", "explorer"] if a.roles else None
     segment = weakest_segment if a.segment == "auto" else (lambda _n: a.segment) if a.segment else None
@@ -128,23 +146,28 @@ def run_continuous(a) -> int:
         room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
         return sup[0].running() + room
 
-    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.port_base), merge_file_into, limit, steps=a.steps,
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
                              segment_ok=lambda g: bool(segment_args(g)), plan=plan))
+    if adopted is not None:
+        sup[0].adopt(adopted)
+        swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
+    stack.close()  # release runs/spawn.lock now (also when we handed our own agents on to a newer supervisor)
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--agents", type=int, default=4)
+    ap.add_argument("--agents", type=int, default=None, help="slot count (default 4; with --upgrade, the adopted agent count)")
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
-    ap.add_argument("--port-base", type=int, default=8800, help="--continuous: first control port to try (100 ports)")
+    ap.add_argument("--port-base", type=int, default=PORT_BASE,
+                    help="--continuous: first control port to try (100 ports); default POKEAGENT_SWARM_PORT_BASE or 8800")
     ap.add_argument("--plan", choices=["curriculum"], default=None,
                     help="--continuous: curriculum = pick each slot's segment by need (tools/segments.py shows the table)")
     ap.add_argument("--segment", default=None,
@@ -155,8 +178,13 @@ def main() -> int:
                     help="fix the starter for every agent (default: rotate bulbasaur/charmander/squirtle)")
     ap.add_argument("--share-frames", action="store_true",
                     help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
+    ap.add_argument("--ram-diff-slots", type=int, default=0, metavar="N",
+                    help="the first N agent slots record event RAM diffs for tools/ram_discover.py (default 0 = off)")
     ap.add_argument("--continuous", action="store_true",
                     help="keep --agents running: merge each agent's memory as it exits, then start a replacement")
+    ap.add_argument("--upgrade", "--adopt", action="store_true", dest="upgrade",
+                    help="--continuous: take over a running supervisor's agents (no drain); also happens automatically "
+                         "when a live supervisor holds the lock. --agents changes the slot count gradually")
     ap.add_argument("--duration", type=float, default=None, help="--continuous: stop refilling after this many hours")
     ap.add_argument("--stop-now", action="store_true", help="--continuous: on stop, kill running agents instead of letting them finish")
     a = ap.parse_args()
@@ -184,7 +212,7 @@ def main() -> int:
             stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
         except resources.LockBusy as e:
             print(f"not starting: {e}"); return 1
-        n, why = plan_agents(ROOT, a.agents)
+        n, why = plan_agents(ROOT, a.agents or 4)
         print(why)
         if n == 0:
             print("no room for more agents; not starting a swarm"); return 0
@@ -207,7 +235,7 @@ def main() -> int:
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
                    "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(ports[i]),
                    "--box-pace", str([8, 16, 30][i % 3])] + (["--frame-share"] if a.share_frames else []) \
-                   + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
+                   + (["--ram-diff"] if i < a.ram_diff_slots else []) + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
             if role:
                 print(f"agent {i}: role {role}, starting from {Path(role_args[1]).name}")
             log = (swarm_dir / f"agent{i}.log").open("w")

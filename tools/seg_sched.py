@@ -10,6 +10,7 @@ step budget instead of one huge run.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import shutil
 import time
@@ -44,15 +45,30 @@ class Curriculum:
         self.picked = {k: 0 for k in SHARES}
         self.confirming: set[str] = set()
         self.session = int(clock())
-        seg_janitor.sweep(self.root, self.doc, clock())
+        self._depth = 0
+        with self.txn():
+            seg_janitor.sweep(self.root, self.doc, clock(), log=log)
+
+    @contextlib.contextmanager
+    def txn(self):
+        """Every change to segments.json is read-modify-write under ss.locked: self.doc is re-read from disk on entry, so a
+        second supervisor's ingest is never overwritten. Nested use joins the outer transaction."""
+        if self._depth:
+            yield self.doc
+            return
+        with ss.locked(self.root) as doc:
+            self.doc, self._depth = doc, 1
+            try:
+                yield doc
+            finally:
+                self._depth = 0
 
     # --- bookkeeping -------------------------------------------------------------------------------------
     def refresh(self, finished: set[str] = frozenset(), failed: set[str] = frozenset()) -> None:
-        n = seg_ingest.ingest(self.root, self.doc, finished, self.quiet_s, failed)
-        for g in seg_split.maybe_split(self.doc):
-            self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
-        if n or finished:
-            ss.save(self.root, self.doc)
+        with self.txn():
+            seg_ingest.ingest(self.root, self.doc, finished, self.quiet_s, failed)
+            for g in seg_split.maybe_split(self.doc):
+                self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
 
     def groups(self) -> dict[str, list]:
         segs = [s for s in ss.layout(self.doc) if ss.ckpt(self.root, s.start)]
@@ -115,27 +131,51 @@ class Curriculum:
         return None
 
     def next_job(self, n: int) -> dict | None:
-        self.refresh()
-        pc = self.pending_confirm()
-        if pc:
-            job = self._confirm(*pc)
-        else:
-            pick = self.choose()
-            if pick is None:
-                return None
-            kind, seg = pick
-            st = ss.stat(self.doc, seg.key)
-            job = self._job(seg, kind, n, ss.ckpt(self.root, seg.start), st)
-            st["jobs"] = st.get("jobs", 0) + 1
-        ss.save(self.root, self.doc)
+        with self.txn():
+            self.refresh()
+            pc = self.pending_confirm()
+            if pc:
+                job = self._confirm(*pc)
+            else:
+                pick = self.choose()
+                if pick is None:
+                    return None
+                kind, seg = pick
+                st = ss.stat(self.doc, seg.key)
+                job = self._job(seg, kind, n, ss.ckpt(self.root, seg.start), st)
+                st["jobs"] = st.get("jobs", 0) + 1
         self.log(f"curriculum: {job['kind']} {job['key']} from {Path(job['start']).name}, {job['steps']} steps")
         return job
+
+    # --- Supervisor hooks (kept here so swarm_continuous.py stays small) ------------------------------------
+    def configure(self, cfg: dict, n: int) -> dict:
+        """Apply the next job to a slot config: its segment, step budget and (for a replay) the old seed/starter/pace."""
+        job = self.next_job(n)
+        if job:
+            cfg.update({k: job[k] for k in ("seed", "starter", "box_pace", "explore_rate") if job.get(k) is not None})
+            cfg.update(steps=job["steps"], segment=job["key"], job=job)
+        return cfg
+
+    def maps_source(self, cfg: dict, shared: Path) -> Path:
+        """A confirm replay starts from its ORIGINAL map memory; everything else from the freshest shared one."""
+        job = cfg.get("job") or {}
+        return Path(job["maps_in"]) if job.get("maps_in") else shared
+
+    def adopted(self, cfg: dict) -> None:
+        """A handed-over agent keeps running its job: a replay in flight must not be issued a second time."""
+        job = cfg.get("job")
+        if job and job.get("kind") == "confirm":
+            self.confirming.add(job["key"])
 
     def on_start(self, cfg: dict) -> None:
         """Keep what a replay of this job's solve needs: its starting memory and the EXACT start-state file (the run is
         launched from that copy, so path + sha256 on record are what it really used)."""
         job = cfg.get("job")
-        if not job or job["kind"] == "confirm":
+        if not job:
+            return
+        if not Path(job["start"]).is_file():
+            raise FileNotFoundError(f"curriculum job {job['tag']}: start state {job['start']} does not exist")
+        if job["kind"] == "confirm":
             return
         d = ss.job_dir(self.root, job["tag"])
         d.mkdir(parents=True, exist_ok=True)

@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(ROOT / "src"))
 from build_ram_map import DATA, write_map  # noqa: E402
 from ram_checks import ALL, Rig  # noqa: E402
 
@@ -69,6 +70,9 @@ def main() -> int:
         rig.emu.close()
     if not args.dry_run:
         write_map(args.map, entries)
+        if getattr(rig, "findings", None):
+            from pokeagent.ramlab import pipeline
+            pipeline.record_findings(rig.findings)
     print(f"\nnewly verified this run: {flipped}\n\n{region_table(entries)}\n\nFAILED CHECKS ({len(failed)}):")
     print("\n".join(f"  - {f}" for f in failed) or "  (none)")
     return 0

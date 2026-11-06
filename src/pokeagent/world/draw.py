@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image, ImageDraw
 
-from pokeagent.atlas import sprites
+from pokeagent.atlas import inplace, inplace_render, sprites
 from pokeagent.atlas.overlay import LAYERS, PALETTE, overlay
 from pokeagent.atlas.rom_maps import MapHeader
 from pokeagent.atlas.world import CELL, WorldLayout
@@ -54,7 +54,7 @@ def draw_objects(im: Image.Image, layout: WorldLayout, headers: dict[int, MapHea
     """Static NPCs, trainers and item balls of ``maps`` from the ROM's object data, standing facing down."""
     for m in sorted(maps):
         hd = headers.get(m)
-        if hd is None or m not in layout.places:
+        if hd is None or m not in layout.places or m in layout.pins:
             continue
         for o in hd.objects:
             try:
@@ -75,6 +75,9 @@ def draw_agent(im: Image.Image, dr: ImageDraw.ImageDraw, layout: WorldLayout, t:
     im.alpha_composite(book.image(sprites.PLAYER, t.facing, phase, col), (int(x) - 1, int(y) - 1))
     cx, cy = int(x) + CELL // 2, int(y)
     dr.text((cx + 10, cy - 2), t.id[-6:], fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 255))
+    tag = inplace.badge(layout, t.map)
+    if tag:
+        dr.text((cx - 4, cy + 18), tag, fill=(255, 235, 150, 255), stroke_width=1, stroke_fill=(0, 0, 0, 255))
     if t.battle and t.battle.ended_at is None:                       # battle badge: crossed swords + enemy species
         for a, b in (((cx - 7, cy - 22), (cx + 7, cy - 8)), ((cx + 7, cy - 22), (cx - 7, cy - 8))):
             dr.line([a, b], fill=(255, 255, 255, 255), width=4)
@@ -86,18 +89,26 @@ def draw_agent(im: Image.Image, dr: ImageDraw.ImageDraw, layout: WorldLayout, t:
 def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], book: SpriteBook, now: float,
                  model: dict | None = None, headers: dict[int, MapHeader] | None = None,
                  layers: tuple[str, ...] = (), objects: bool = True, trails: bool = True,
-                 crop: tuple[int, int, int, int] | None = None, scale: float = 1.0) -> np.ndarray:
+                 crop: tuple[int, int, int, int] | None = None, scale: float = 1.0, interiors: str = "inset",
+                 plan: inplace.Plan | None = None) -> np.ndarray:
     """The world with the chosen learning ``layers`` (default none), trails, ROM objects of the agents' maps and every agent.
 
     ``crop`` (x0, y0, x1, y1 in world px) and ``scale`` keep exports of a region small; drawing happens at full size first."""
     ids = [t.id for t in tracks]
     img = overlay(base, layout, model or {}, headers or {}, [], tuple(layers)) if layers else base
+    vl, shown, imgs = None, set(), inplace_render.InteriorImages(book.rom, headers or {})
+    if plan is not None and interiors != "inset":
+        shown = inplace.shown_set(interiors, plan.anchors, scale, inside=tuple(t.map for t in tracks if t.placed),
+                                  hidden=plan.hidden)
+        vl = inplace.view_layout(layout, plan.anchors, plan.xf(interiors), shown)
     if crop:
         x0, y0, x1, y1 = (v // CELL * CELL for v in crop)
         shift = (-x0, -y0)
-        img = img[y0:y1, x0:x1]
+        img = inplace_render.compose(img, vl, plan.anchors, shown, imgs, None, (x0, y0, x1, y1)) if vl else img[y0:y1, x0:x1]
     else:
         shift = (0, 0)
+        img = inplace_render.compose(img, vl, plan.anchors, shown, imgs) if vl else img
+    layout = vl or layout
     im = Image.fromarray(np.ascontiguousarray(img)).convert("RGBA")
     if shift != (0, 0):                                      # draw in world coordinates on a translated canvas
         layout = _shifted(layout, *shift)
@@ -117,8 +128,11 @@ def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], boo
 def _shifted(layout: WorldLayout, dx: int, dy: int) -> WorldLayout:
     """A layout whose to_world is translated by (dx, dy) px (for crops); cells stay whole when dx, dy are multiples of CELL."""
     from dataclasses import replace
-    places = {m: replace(p, x=p.x + dx // CELL, y=p.y + dy // CELL) for m, p in layout.places.items()}
-    return replace(layout, places=places)
+    cx, cy = dx // CELL, dy // CELL
+    places = {m: replace(p, x=p.x + cx, y=p.y + cy) for m, p in layout.places.items()}
+    warp = replace(layout.warp, dx=layout.warp.dx + cx, dy=layout.warp.dy + cy) if layout.warp else None
+    return replace(layout, places=places, warp=warp, pins={m: (x + cx, y + cy) for m, (x, y) in layout.pins.items()},
+                   xf={m: t._replace(ox=t.ox + cx, oy=t.oy + cy) for m, t in layout.xf.items()})
 
 
 def blend(img: np.ndarray, rgba: np.ndarray, x: int, y: int) -> None:

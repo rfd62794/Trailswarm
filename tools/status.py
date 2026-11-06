@@ -122,6 +122,17 @@ def _trainee_line(dirs: list[Path]) -> str:
     return "magikarp: no run has bought one yet; background goals: " + ", ".join(f"{g}=no" for g in SIDE_GOALS)
 
 
+def _campaign_line(ms: dict) -> str:
+    """Ladder length, how many goals have a RAM detector, how far the best run got (the full list is too long to print)."""
+    from pokeagent.campaign import load_campaign, selectable
+    specs = load_campaign()
+    unv = sum(1 for g in specs if g["detector"] == "unverified")
+    furthest = max((i for i, g in enumerate(specs) if ms.get(g["id"])), default=-1)
+    at = specs[furthest]["id"] if furthest >= 0 else "none"
+    return (f"campaign: {len(specs)} goals ({len(specs) - unv} detected, {unv} unverified, "
+            f"{sum(1 for g in specs if selectable(g['id']))} selectable); furthest reached: {at}")
+
+
 def main() -> int:
     if not RUNS.exists():
         print("no runs/ data in this checkout (runs/ is gitignored; run the swarm here first)")
@@ -158,6 +169,7 @@ def main() -> int:
               f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
         print(f"items picked up ({dirs[-1].name}): {_items_picked(dirs[-1])}")
     print(_trainee_line(dirs))
+    print(_campaign_line(ms))
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from segments import summary

@@ -53,6 +53,7 @@ class ExplorerContext:
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
     anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
+    ram_diff: Any = None  # explorer.ram_diff.RamDiffer (None = event RAM diffs off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
     step: int = 0
@@ -143,6 +144,20 @@ class ExplorerContext:
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
+    cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo
+    ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
+    cave_catch_balls: dict = field(default_factory=dict)  # species -> balls thrown this run (battle_run caps it inside dungeons)
+    topup_presses: int = 0  # presses in the current cave_topup potion sequence (0 = not started)
+    topup_potions0: int = 0
+    topup_cooldown_until: int = 0
+    cave_runs: int = 0  # RUN presses chosen only because we are in a dungeon, this battle (battle_run caps it)
+    dir_fail: int = 0  # consecutive direction presses that left the position unchanged (LoopGuard)
+    dir_fail_pos: tuple | None = None
+    rope_presses: int = 0  # presses spent in the current escape-rope sequence (cave_escape); 0 = not started
+    rope_cooldown_until: int = 0  # step before which a failed rope try is not repeated
+    item_attempts: int = 0  # item-list confirmations this battle (item_use.MAX_ITEM_ATTEMPTS caps it)
+    item_blocked: set = field(default_factory=set)  # item ids that cannot help this battle ("won't have any effect")
     proc: dict | None = None
     proc_done: set = field(default_factory=set)
     proc_due: list = field(default_factory=list)

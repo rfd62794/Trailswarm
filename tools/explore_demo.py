@@ -38,22 +38,16 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
     party_hp,
 )
 from pokeagent.explorer.press import Presser  # noqa: E402
-from pokeagent.goals import GOALS, check_goals  # noqa: E402
+from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
+from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
 from pokeagent.segment_names import state_goal  # noqa: E402
+from pokeagent.statemeta import _git_sha  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from explore_plan import ControlServer, png_bytes  # noqa: E402
 
 __all__ = ["DIRS", "box_open", "box_text", "frame_lines", "is_menu", "main"]  # probe_pc.py's imports
-
-
-def _git_sha() -> str:
-    try:
-        import subprocess
-        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip()
-    except Exception:
-        return ""
 
 
 KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", "s": "B",
@@ -71,6 +65,7 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    add_ram_diff_flag(ap)
     ap.add_argument("--frame-share", action="store_true",
                     help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
@@ -101,7 +96,7 @@ def main(argv=None) -> int:
     (run_dir / "meta.json").write_text(json.dumps({"start": state_goal(Path(a.state).stem) if a.state else "baseline",
                                                     "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag, "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace, "starter": a.starter, "seed": a.seed,
                                                     "frame_share": a.frame_share, "train_level": a.train_level,
-                                                    "window": not a.headless, "git_sha": _git_sha()}))
+                                                    "window": not a.headless, "git_sha": _git_sha() or ""}))
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
@@ -133,6 +128,15 @@ def main(argv=None) -> int:
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
+    a.ram_diff and start_ram_diff(ctx, emu, run_dir, a.state, a.rom)  # fail-soft: runs unrecorded on any error
+    from pokeagent.atlas.ladders import rom_ladders
+    ctx.ladders = rom_ladders(a.rom)
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    ctx.cave_plan = rom_cave_planner(a.rom)
+    from pokeagent.atlas.collision import rom_walkable_ids
+    mem.rom_walkable = rom_walkable_ids(a.rom)
+    from pokeagent.atlas.collision import rom_tile_pairs
+    mem.rom_pairs = rom_tile_pairs(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None
@@ -293,7 +297,7 @@ def main(argv=None) -> int:
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, ctx)
                 dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
-                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nGOALS:  " + goals_brief(g)
                               + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
                               f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
@@ -307,7 +311,7 @@ def main(argv=None) -> int:
             pace = a.box_pace if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
-            hold = agent_view.hold.active() if agent_view is not None else False
+            hold = agent_view.held() if agent_view is not None else False
             if not ctx.paused and not hold and ctx.frame % pace == 0:
                 engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive

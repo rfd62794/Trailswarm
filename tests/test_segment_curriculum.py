@@ -368,22 +368,140 @@ def test_reset_splits_drops_pieces_and_keeps_parent_history():
 
 
 # --- janitor -------------------------------------------------------------------------------------------------
+def _age(path, t=1):
+    import os
+    for p in [path, *path.rglob("*")]:
+        os.utime(p, (t, t))
+
+
 def test_janitor_removes_stale_unreferenced_job_dirs_only(tmp_path):
     import os
 
     import seg_janitor
     root = mkroot(tmp_path)
-    old, held, fresh = (mkjob(root, t) for t in ("seg:a:1-0", "seg:b:1-1", "seg:c:1-2"))
+    old, held, fresh, busy = (mkjob(root, t) for t in ("seg:a:1-0", "seg:b:1-1", "seg:c:1-2", "seg:d:1-3"))
     cand = root / "runs/segments/states/x.cand.state"
     cand.parent.mkdir(parents=True)
     cand.write_bytes(b"c")
-    for p in (old, held, cand):
-        os.utime(p, (1, 1))                                  # ancient
+    for p in (old, held, busy):
+        _age(p)
+    os.utime(cand, (1, 1))
+    os.utime(busy / "maps.json", None)                       # an old dir whose newest FILE is fresh: a running job
     doc = ss.empty_doc()
     ss.stat(doc, "b")["best"] = {"input": str(held / "maps.json"), "frames": 1}
-    gone = seg_janitor.sweep(root, doc, now=os.path.getmtime(fresh) + 1)
+    now = os.path.getmtime(fresh / "maps.json") + 1
+    would = seg_janitor.sweep(root, doc, now=now, dry_run=True)
+    assert set(would) == {old.name, "x.cand.state"} and old.exists() and cand.exists()   # dry run deletes nothing
+    gone = seg_janitor.sweep(root, doc, now=now)
     assert set(gone) == {old.name, "x.cand.state"}
-    assert held.exists() and fresh.exists() and not old.exists()
+    assert held.exists() and fresh.exists() and busy.exists() and not old.exists()
+
+
+def test_remove_tree_refuses_paths_outside_runs_segments(tmp_path):
+    root = mkroot(tmp_path)
+    outside = tmp_path / "keep"
+    outside.mkdir()
+    logs = []
+    assert ss.remove_tree(root, outside, logs.append) is False
+    assert outside.exists() and "refusing" in logs[0]
+    assert ss.remove_tree(root, root / "runs" / "segments", logs.append) is False     # the base itself is not a kept dir
+
+
+# --- campaign gating ------------------------------------------------------------------------------------------
+def _ladder():
+    from pokeagent import campaign
+    ids = campaign.goal_ids()
+    gated = next(g["id"] for g in campaign.load_campaign() if g.get("needs") and g["detector"] != "unverified")
+    unverified = next(g["id"] for g in campaign.load_campaign()[:ids.index(gated)] if g["detector"] == "unverified")
+    return campaign, ids, gated, unverified
+
+
+def test_layout_skips_gated_and_unverified_goals_and_bridges_the_gap():
+    campaign, ids, gated, unverified = _ladder()
+    keys = [s.key for s in ss.layout(ss.empty_doc())]
+    assert gated not in keys and unverified not in keys and keys == [g for g in ids if campaign.selectable(g)]
+    nxt = ids[ids.index(unverified) + 1]
+    seg = next(s for s in ss.layout(ss.empty_doc()) if s.key == nxt)
+    assert seg.start == [g for g in keys if ids.index(g) < ids.index(unverified)][-1]    # starts from the last selectable one
+
+
+def test_scheduler_never_picks_gated_or_unverified_goals(tmp_path):
+    campaign, ids, gated, unverified = _ladder()
+    root = mkroot(tmp_path, ("bedroom", *ids))             # every checkpoint exists, so only gating can exclude a goal
+    c = seg_sched.Curriculum(root, log=lambda m: None)
+    picked = {s.key for _ in range(120) if (p := c.choose()) for s in [p[1]]}
+    assert picked and not picked & {gated, unverified}
+    assert not {s.key for g in c.groups().values() for s in g} & {gated, unverified}
+
+
+def test_gated_and_unverified_goals_are_never_split(tmp_path):
+    campaign, ids, gated, unverified = _ladder()
+    doc = ss.empty_doc()
+    for g in (gated, unverified):
+        st = ss.stat(doc, g)
+        st["attempts"], st["n"] = _flaky(2), 20
+    assert seg_split.maybe_split(doc) == [] and doc["splits"] == {}
+
+
+def test_capability_unlocks_a_gated_goal(monkeypatch):
+    campaign, ids, gated, unverified = _ladder()
+    monkeypatch.setenv("POKEAGENT_CAPS", ",".join(campaign.goal_spec(gated)["needs"]))
+    assert gated in [s.key for s in ss.layout(ss.empty_doc())]
+
+
+# --- concurrent supervisors / handoff ---------------------------------------------------------------------------
+def test_two_supervisors_do_not_clobber_each_others_ingest(tmp_path):
+    root = mkroot(tmp_path, ("bedroom",))
+    a = seg_sched.Curriculum(root, log=lambda m: None, quiet_s=0)
+    b = seg_sched.Curriculum(root, log=lambda m: None, quiet_s=0)      # both loaded the empty doc
+    mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    a.refresh()                                                          # A ingests and saves
+    mkrun(root, "explore-b", meta(tag="seg:potion:2-0"), [{"goal": "potion", "step": 30, "frame": 800}])
+    b.refresh()                                                          # B started from a stale doc, must re-read first
+    doc = ss.load(root)
+    assert ss.stat(doc, "potion")["n"] == 2 and set(doc["ingested"]) == {"explore-a", "explore-b"}
+
+
+def test_stale_lock_is_broken_and_live_lock_times_out(tmp_path, monkeypatch):
+    import os
+    root = mkroot(tmp_path)
+    lock = root / "runs" / "segments.lock"
+    lock.write_text("")
+    os.utime(lock, (1, 1))
+    with ss.locked(root):
+        pass                                                             # stale lock taken over
+    lock.write_text("")
+    monkeypatch.setattr(ss, "LOCK_WAIT_S", 0.2)
+    try:
+        with ss.locked(root):
+            raise AssertionError("should not get the lock")
+    except TimeoutError:
+        pass
+
+
+def test_adopted_replay_is_not_issued_twice(tmp_path):
+    root = mkroot(tmp_path)
+    mkjob(root, "seg:potion:1-0")
+    mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    c = seg_sched.Curriculum(root, log=lambda m: None, quiet_s=0)
+    c.refresh()
+    assert c.pending_confirm() is not None
+    c.adopted({"job": {"kind": "confirm", "key": "potion"}})            # the old supervisor's replay is still running
+    assert c.pending_confirm() is None
+
+
+def test_on_start_refuses_a_missing_start_state(tmp_path):
+    root = mkroot(tmp_path)
+    c = seg_sched.Curriculum(root, log=lambda m: None)
+    own = tmp_path / "own.json"
+    own.write_text("{}")
+    for kind in ("unsolved", "confirm"):
+        cfg = {"own": own, "job": {"kind": kind, "tag": "seg:x:1", "start": str(tmp_path / "gone.state")}}
+        try:
+            c.on_start(cfg)
+            raise AssertionError("expected FileNotFoundError")
+        except FileNotFoundError:
+            pass
 
 
 def test_sub_segment_attempts_are_ingested_by_tag(tmp_path):

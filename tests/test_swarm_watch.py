@@ -128,3 +128,16 @@ def test_hung_clock_starts_at_first_transition_and_unfound_run_dir_waits_out_gra
     lost = sw.ProgressWatch(tmp_path / "nowhere", 99, since_wall=0, clock=c2)
     c2.t = 100
     assert lost.check() is None  # run dir not found yet: grace, not hung
+
+
+def test_dungeon_gets_a_longer_window(tmp_path):
+    d, c, w = watch(tmp_path)
+    with open(d / "transitions.jsonl", "a") as f:
+        for i in range(1000):
+            f.write(json.dumps({"to": [0x3D, i % 3, 0], "button": "A"}) + "\n")  # Mt Moon B2F, looping
+    assert w.check() is None and w.window_now() == sw.DUNGEON_WINDOW_PRESSES
+    with open(d / "transitions.jsonl", "a") as f:
+        for i in range(600):
+            f.write(json.dumps({"to": [0x3D, i % 3, 0], "button": "A"}) + "\n")
+    r = w.check()
+    assert r and f"last {sw.DUNGEON_WINDOW_PRESSES} presses" in r  # still caught, just later

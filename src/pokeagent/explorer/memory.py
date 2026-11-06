@@ -9,7 +9,8 @@ from pathlib import Path
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
-from pokeagent.explorer.memory_purge import purge_npc_walls
+from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
+from pokeagent.explorer.memory_tiles import TilesMixin
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
 
@@ -20,7 +21,7 @@ from pokeagent.explorer.perceive import DIRS
 WHITEOUT_LANDINGS = {(1, 23, 26): 41, (0, 5, 6): 37}
 
 
-class MapMemory(NavMixin, WarpsMixin):
+class MapMemory(NavMixin, WarpsMixin, TilesMixin):
     """Per-map memory in the runs/maps.json schema; the demo's version, merged with the old framework one.
 
     ``record_paths`` keeps the old framework module's ``paths`` edges (``m(id)["paths"]``); the demo passes
@@ -34,8 +35,11 @@ class MapMemory(NavMixin, WarpsMixin):
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
         self.temp_blocked: dict = {}  # (map, x, y) -> step it expires: a wanderer NPC's tile, routing only, never saved
         self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
+        self.rom_pairs = None  # tileset -> frozenset of blocked (stand, ahead) tile pairs (atlas.collision.rom_tile_pairs)
+        self.rom_walkable = None  # tileset -> frozenset of ROM-walkable tile ids (atlas.collision), wired by the demo; ROM wins over learning
         self.purge_bad_warps()
         self.purged_npc_walls = purge_npc_walls(self.data)  # false walls learned against wandering NPCs
+        self.purged_enclosed_walls = purge_enclosed_walls(self.data)  # ... and behind a full-screen page
 
     def purge_bad_warps(self):
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
@@ -121,16 +125,6 @@ class MapMemory(NavMixin, WarpsMixin):
         return "moved"
 
     # --- tile types: which 2x2 tile-id blocks are solid, learned per tileset, so a bookshelf is never bumped twice ---
-    def learn_tiles(self, tileset: int, ahead: list[int], walkable: bool):
-        t = self.data.setdefault("tile_types", {}).setdefault(str(tileset), {})
-        key = ",".join(f"{b:02X}" for b in ahead)
-        e = t.setdefault(key, {"solid": 0, "walkable": 0})
-        e["walkable" if walkable else "solid"] += 1
-
-    def known_solid(self, tileset: int, ahead: list[int]) -> bool:
-        e = self.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in ahead))
-        return bool(e) and e["solid"] >= 3 and e["walkable"] == 0
-
     def render_memory(self, map_id: int, x: int, y: int, npcs: set, radius: int = 6) -> legend.Rendered:
         """What the agent REMEMBERS around it, in world-legend glyphs (see explorer.legend for the kinds).
         There is no live tilemap here, so block-id kinds (grass, tile-type walls) come only from what

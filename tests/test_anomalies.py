@@ -51,7 +51,7 @@ def test_npc_in_doorway_resets_when_it_steps_off_or_is_static():
     d2 = ad.Detectors()  # a guard that never moves (not in wanderers) is not trapped
     o = obs(sprites={2: (13, 5, 5)})
     o.wanderers = set()
-    assert not [f for _ in range(40) for f in d2.update(o)]
+    assert not [f for _ in range(40) for f in d2.update(o) if f.type.startswith("npc")]  # (40 UP presses in place also fire stuck_tile)
 
 
 def test_npc_blocking_path_needs_repeated_pressing_into_a_wanderer():
@@ -129,7 +129,7 @@ def test_frozen_screen_needs_varied_buttons_unchanged_screen_and_no_box():
         out += d.update(obs(step=i, button=seq[i % 3], screen_sig=5))
     assert kinds(out) == ["frozen_screen"]
     d = ad.Detectors()  # bumping one wall repeatedly is just a wall
-    assert not run(d, 80, button="UP", screen_sig=5)
+    assert "frozen_screen" not in kinds(run(d, 80, button="UP", screen_sig=5))  # (stuck_tile fires here too, by design)
     d = ad.Detectors()  # screen changes
     assert not [f for i in range(80) for f in d.update(obs(step=i, button=seq[i % 3], screen_sig=i))]
     d = ad.Detectors()  # joypad ignored (cutscene): presses are not accepted
@@ -298,3 +298,24 @@ def test_anomaly_wait_is_registered_and_idle_without_a_monitor(tmp_path):
     ctx = ExplorerContext(emu=FakeEmulator(), mem=MapMemory(tmp_path / "m.json"), opts=ExplorerOptions(), run_dir=tmp_path)
     ctx.refresh()
     assert not AnomalyWait().applies(ctx)
+
+
+def test_stuck_tile_fires_once_after_the_failed_press_threshold_with_a_diagnosis():
+    d = ad.Detectors()
+    out = []
+    for i in range(ad.FAILED_TILE_PRESSES):
+        out += d.update(obs(step=i, button=("UP", "DOWN", "LEFT")[i % 3], blocked_here=("UP",)))
+    assert "stuck_tile" not in kinds(out)
+    f = [x for x in d.update(obs(step=99, button="UP", blocked_here=("UP", "LEFT"))) if x.type == "stuck_tile"]
+    assert len(f) == 1 and sum(f[0].details["failed"].values()) == ad.FAILED_TILE_PRESSES + 1
+    assert f[0].details["learned_blocked"] == ["UP", "LEFT"] and f[0].details["joy_ignore"] == 0
+    assert "stuck_tile" not in kinds(d.update(obs(step=100, button="UP")))  # once per tile
+
+
+def test_stuck_tile_ignores_moves_boxes_battles_and_other_buttons():
+    d = ad.Detectors()
+    for i in range(80):
+        assert "stuck_tile" not in kinds(d.update(obs(step=i, button="A")))                  # not a direction
+        assert "stuck_tile" not in kinds(d.update(obs(step=i, prev=(0, 5, 7))))              # it moved
+        assert "stuck_tile" not in kinds(d.update(obs(step=i, box=True)))
+        assert "stuck_tile" not in kinds(d.update(obs(step=i, battle=True)))

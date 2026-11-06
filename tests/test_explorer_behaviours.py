@@ -195,7 +195,7 @@ def test_selector_picks_the_first_applicable_in_order(tmp_path):
 
 def test_default_order_is_the_old_agent_step_order():
     names = [b.name for b in default_behaviours()]
-    assert names == ["settle", "guards", "party_order", "readiness", "anomaly_wait", "replay_interrupt", "battle", "switch_out", "catch", "battle_moves",
+    assert names == ["settle", "guards", "party_order", "readiness", "anomaly_wait", "replay_interrupt", "battle", "switch_out", "catch", "battle_moves", "cave_escape", "cave_topup",
                      "naming_keyboard", "beat_start", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
                      "stall_guard", "heal", "explore_burst", "pickup", "plan_goal", "frontier"]
     assert no_press("x").button == ""

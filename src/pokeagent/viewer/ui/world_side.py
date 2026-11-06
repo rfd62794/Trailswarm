@@ -5,6 +5,7 @@ import time
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.atlas import inplace
 from pokeagent.atlas.overlay import LAYERS
 from pokeagent.viewer.panels.render import frame_rgba
 from pokeagent.viewer.ui_scale import get_scale, px
@@ -71,6 +72,16 @@ class WorldSide:
                 dpg.add_checkbox(label="NPCs", callback=lambda s, a, u: setattr(view, "npcs", a))
                 dpg.add_button(label="Fit", callback=lambda s, a, u: view.vp.fit())
                 dpg.add_button(label="1:1", callback=lambda s, a, u: view.vp.one_to_one(get_scale()))
+            with dpg.group(horizontal=True):
+                dpg.add_text("Interiors")
+                names = {v: k for k, v in inplace.LABELS.items()}
+                dpg.add_combo(list(names), default_value=inplace.LABELS[view.interiors.mode], width=px(200), tag="world_mode_combo",
+                              callback=lambda s, a, u: view.interiors.set_mode(names[a]))
+            with dpg.group(horizontal=True):
+                dpg.add_checkbox(label="edit layout", callback=lambda s, a, u: setattr(view.interiors.edit, "on", a))
+                dpg.add_button(label="Reset interior", callback=lambda s, a, u: view.interiors.reset())
+                dpg.add_button(label="Reset all", callback=lambda s, a, u: view.interiors.reset(True))
+            dpg.add_text("edit: drag an interior = move, Ctrl+wheel = scale (saved to runs/atlas/layout_overrides.json)", wrap=px(340))
             dpg.add_separator()
             self.strip_title = dpg.add_text("Stadium")
             self.slots_parent = dpg.add_group()
