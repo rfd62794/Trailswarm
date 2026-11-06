@@ -62,6 +62,12 @@ def campaign_reachable(goal: str, capabilities=None) -> bool:
     return False
 
 
+def is_unverified(goal: str) -> bool:
+    """No RAM detector of its own: its value is inferred from later goals, so it is never recorded as reached by a run."""
+    spec = goal_spec(goal)
+    return spec is not None and spec["detector"] == UNVERIFIED
+
+
 def selectable(goal: str, capabilities=None) -> bool:
     """May the segment picker send an agent at this goal? Reachable through the chain and detectable in RAM."""
     spec = goal_spec(goal)

@@ -21,6 +21,7 @@ from pathlib import Path
 
 from functools import lru_cache
 
+from pokeagent import checkpoint_goals as cg
 from pokeagent.campaign import agent_capabilities, selectable
 from pokeagent.goals import GOALS
 from pokeagent.segment_names import BEST_SUFFIX
@@ -212,6 +213,14 @@ def ckpt(root: Path, name: str) -> Path | None:
         return p if p.exists() else None
     d = root / "runs" / "checkpoints"
     return next((p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state") if p.exists()), None)
+
+
+def ckpt_valid(root: Path, name: str) -> bool:
+    """May checkpoint ``name`` start a segment? Only if every earlier selectable goal was complete when it was written
+    (sidecar), or - for an old checkpoint with no sidecar - has a checkpoint of its own (no gap in the chain)."""
+    if name == "bedroom":
+        return ckpt(root, name) is not None
+    return cg.valid(name, ckpt(root, name), selectable_goals(), lambda g: ckpt(root, g) is not None)
 
 
 def chain(doc: dict) -> dict:

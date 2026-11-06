@@ -585,3 +585,64 @@ def test_held_lock_never_crashes_the_supervisor_path(tmp_path, monkeypatch):
     (root / "runs" / "segments.lock").unlink()
     assert c.configure({"slot": 0, "steps": 400, "segment": None}, 2)["job"]["key"] == "potion"   # recovered
     c.on_finish({"job": job}, 0)
+
+
+# --- out-of-order checkpoints (live incident: bike_shop.state made `bicycle` the frontier) ----------------------------
+def _chain_root(tmp_path, upto):
+    """Checkpoints for the first `upto` selectable goals (a legacy contiguous chain) plus the stray bike_shop.state."""
+    order = ss.selectable_goals()
+    assert "bike_shop" in order and "bicycle" in order and upto < order.index("bike_shop") - 3
+    root = mkroot(tmp_path, ("bedroom", *order[:upto], "bike_shop"))
+    return root, order
+
+
+def test_stray_bike_shop_checkpoint_does_not_become_the_frontier(tmp_path):
+    root, order = _chain_root(tmp_path, 20)
+    c = seg_sched.Curriculum(root, log=lambda m: None)
+    groups = c.groups()
+    assert [s.key for s in groups["frontier"]] == [order[20]]            # the earliest goal still missing
+    picked = {s.key for _ in range(200) if (p := c.choose()) for s in [p[1]]}
+    assert picked and not picked & {"bicycle", "bike_shop", "bike_voucher"}
+    assert all(ss.ckpt_valid(root, s.start) for g in groups.values() for s in g)
+
+
+def test_checkpoint_with_sidecar_missing_earlier_goals_is_rejected(tmp_path):
+    from pokeagent import checkpoint_goals as cg
+    root, order = _chain_root(tmp_path, 20)
+    state = root / "runs/checkpoints/bike_shop.state"
+    cg.write_completed(state, ["potion", "bike_shop"])                    # it only completed two goals
+    assert not ss.ckpt_valid(root, "bike_shop")
+    cg.write_completed(state, order[: order.index("bike_shop") + 1])      # now it really did everything before it
+    assert ss.ckpt_valid(root, "bike_shop")
+
+
+def test_legacy_chain_without_gap_is_valid_and_a_gap_is_not(tmp_path):
+    root, order = _chain_root(tmp_path, 20)
+    assert ss.ckpt_valid(root, order[19]) and not ss.ckpt_valid(root, "bike_shop")
+    (root / "runs/checkpoints" / f"{order[5]}.state").unlink()           # punch a hole in the chain
+    assert not ss.ckpt_valid(root, order[19])
+
+
+def test_sub_segment_checkpoint_needs_only_goals_before_its_parent(tmp_path):
+    from pokeagent import checkpoint_goals as cg
+    order = ss.selectable_goals()
+    g = order[3]
+    assert cg.required(f"{g}@25", order) == list(order[:3]) and cg.required(g, order) == list(order[:4])
+
+
+def test_end_state_sidecar_travels_with_the_checkpoint(tmp_path):
+    from pokeagent import checkpoint_goals as cg
+    root = mkroot(tmp_path, ("bedroom",))
+    mkjob(root, "seg:potion:1-0")
+    d = mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    cg.write_completed(d / "end.state", ["potion"])
+    doc = ss.empty_doc()
+    seg_ingest.ingest(root, doc, quiet_s=0)
+    assert cg.read_completed(root / "runs/checkpoints/potion.state") == {"potion"}
+    assert cg.read_completed(Path(ss.stat(doc, "potion")["best"]["state"])) == {"potion"}
+    assert not cg.sidecar(d / "end.state").exists()
+
+
+def test_completed_goals_uses_detectors_and_assumed_start_goals():
+    from pokeagent import checkpoint_goals as cg
+    assert cg.completed_goals({"b": True, "c": False}, {"a"}, ["a", "b", "c"]) == ["a", "b"]

@@ -11,6 +11,7 @@ from __future__ import annotations
 from pokeagent import campaign
 from pokeagent.magikarp import gyarados_goal, magikarp_goal_settled
 
+is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
 GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 25 ids are the hand-coded ones below
 
 def goals_brief(goals: dict) -> str:

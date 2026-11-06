@@ -16,6 +16,7 @@ import shutil
 import time
 from pathlib import Path
 
+from pokeagent import checkpoint_goals as cg
 from pokeagent.segment_names import BEST_SUFFIX
 from seg_store import KEEP_ATTEMPTS, fps, input_path, job_dir, layout, remove_tree, stat
 
@@ -100,6 +101,7 @@ def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | 
     if end.exists() and not (ck / f"{seg.end}.state").exists():
         ck.mkdir(parents=True, exist_ok=True)
         shutil.copy(end, ck / f"{seg.end}.state")  # sub-segments get their start checkpoint from the first solve
+        cg.copy_sidecar(end, ck / f"{seg.end}.state")
     cur = st["best"]
     if (cur is not None and att["frames"] >= cur["frames"]) or att["outside"]:
         return  # not faster, or someone else's presses were in it: not a route we can stand behind
@@ -109,6 +111,7 @@ def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | 
     has_state = end.exists()
     if has_state:
         shutil.copy(end, cand)
+        cg.copy_sidecar(end, cand)
     inp = input_path(root, tag) if tag else None
     job = _job_record(root, tag)
     st["best"] = {**{k: att[k] for k in ("frames", "steps", "run", "seed", "starter", "explore_rate", "box_pace", "budget")},
@@ -142,6 +145,7 @@ def record_confirm(root: Path, doc: dict, seg, cand_run: str, att: dict) -> str:
         if b.get("state") and Path(b["state"]).exists():
             ck = root / "runs" / "checkpoints"; ck.mkdir(parents=True, exist_ok=True)
             shutil.copy(b["state"], ck / f"{seg.end}{BEST_SUFFIX}.state")
+            cg.copy_sidecar(Path(b["state"]), ck / f"{seg.end}{BEST_SUFFIX}.state")
         drop_kept(root, b)  # the replay is done: the kept memory snapshot, start copy and candidate state are dead weight
         st["confirmed"] = dict(b)
         return "confirmed"
@@ -155,6 +159,7 @@ def drop_kept(root: Path, b: dict, log=print) -> None:
         if b.get(k):
             if k == "state":
                 Path(b[k]).unlink(missing_ok=True)
+                cg.sidecar(Path(b[k])).unlink(missing_ok=True)
             else:
                 remove_tree(root, Path(b[k]).parent, log)  # the job dir holds both
         b[k] = None
@@ -216,6 +221,7 @@ def ingest(root: Path, doc: dict, finished_tags: set[str] = frozenset(), quiet_s
             record_attempt(root, doc, seg, att, run, tag)
             n += 1
         release_input(root, doc, tag)
-        (run / "end.state").unlink(missing_ok=True)  # kept only for candidates (record_attempt copied it)
+        (run / "end.state").unlink(missing_ok=True)
+        cg.sidecar(run / "end.state").unlink(missing_ok=True)  # kept only for candidates (record_attempt copied it)
     doc["ingested"] = doc["ingested"][-4000:]
     return n
