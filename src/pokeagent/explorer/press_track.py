@@ -21,7 +21,11 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     name, source, before, after, tm, box_before, box_after, text, extra, goals_before, result, bag_pre = fr.name, fr.source, fr.before, fr.after, fr.tm, fr.box_before, fr.box_after, fr.text, fr.extra, fr.goals_before, fr.result, fr.bag_pre
     ctx.mem.visit(after[0], after[1], after[2], ctx.step)
     if after != before:  # a move: momentum memory for choose() - in-memory only, never written to maps.json
-        if name in DIRS:
+        entered = after[0] != before[0]
+        if entered:
+            ctx.last_dir = None  # a new map: the direction we came in on says nothing about the new one
+            ctx.recent_tiles.pop(after[0], None)  # tiles stood on in an earlier visit are stale (reset on entry)
+        elif name in DIRS:
             ctx.last_dir = name
         stood = ctx.recent_tiles.setdefault(after[0], [])
         stood.append((after[1], after[2]))
