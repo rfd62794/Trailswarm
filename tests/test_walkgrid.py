@@ -64,3 +64,14 @@ def test_single_floor_planner_and_mt_moon_ladder_room():
     plan = rom_planner()
     assert plan(0x3C, (23, 3), [(27, 3)]) == ["RIGHT"] * 4
     assert plan(0x3D, (15, 24), [(5, 7)]) is None   # the 94-cell pocket really is cut off on B2F
+
+
+@needs_rom
+def test_a_person_just_bumped_stays_blocked_even_when_it_is_the_only_way(tmp_path):
+    """Mt Moon B2F (12,9): 31 UP presses into a trainer on the straight line; the temp block must survive the object-free pass."""
+    plan = rom_cave_planner()
+    start = (0x3D, 12, 9)
+    straight = plan(start, {(0x3D, 12, 3)})
+    assert straight and straight[0] == "UP"
+    detour = plan(start, {(0x3D, 12, 3)}, blocked={0x3D: {(12, 8)}})
+    assert detour is None or detour[0] != "UP"          # never the bumped tile again while the block lasts

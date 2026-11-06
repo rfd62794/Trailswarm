@@ -103,7 +103,7 @@ def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
         # Passes, strictest first: learned walls + temporary blocks + static objects; then ROM + objects; then ROM only (a
         # trainer or NPC standing in a corridor is something to talk to or fight, not a wall). Warp tiles are never stepped on
         # in passing. Learned walls and NPC blocks can therefore delay a ROM route but never remove it.
-        for obstacles, w in ((warps | objs | set(blocked), set(walls)), (warps | objs, set()), (warps, set())):
+        for obstacles, w in ((warps | objs | set(blocked), set(walls)), (warps | objs | set(blocked), set()), (warps | set(blocked), set()), (warps, set())):
             path = bfs(grid, start, goals, obstacles - keep, w, jumps, tiles, pairs)
             if path is not None:
                 return path
@@ -117,7 +117,8 @@ def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B
     ``start`` is (map, x, y), ``goals`` a set of (map, x, y) cells (stepping onto one ends the route, so an exit warp can be a
     goal), ``walls``/``blocked`` map a floor id to learned "x,y,DIR" strings / temporarily occupied (x, y) cells. Returns the
     buttons for the whole chain (floor changes included) or None. Same pass order as ``rom_planner``: learned walls and
-    NPC blocks first, then static objects only, then the bare ROM, so learned data never removes a ROM route."""
+    NPC blocks first, then without the learned walls, then without the static objects (a person in a corridor is
+    talked to or fought, but the tile the agent just bumped stays blocked for its 240 frames), and last the bare ROM, so learned data never removes a ROM route."""
     try:
         rom = rom_maps.load(rom_path)
     except OSError:
@@ -173,7 +174,8 @@ def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B
         goals, start = {tuple(g) for g in goals}, tuple(start)
         if start[0] not in heads:
             return None
-        for solid, w, b in ((objs, walls or {}, blocked or {}), (objs, {}, {}), ({}, {}, {})):
+        walls, blocked = walls or {}, blocked or {}
+        for solid, w, b in ((objs, walls, blocked), (objs, {}, blocked), ({}, {}, blocked), ({}, {}, {})):
             path = search(start, goals, solid, w, b)
             if path is not None:
                 return path
