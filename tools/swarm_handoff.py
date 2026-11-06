@@ -20,7 +20,7 @@ from swarm_lock import acquire_after_handoff, adopt_lock, lock_holder, transfer_
 from swarm_slot import Slot
 
 ANSWER_S = 30.0
-EXTRA_S = 5.0  # grace for an old supervisor that had already committed (lock moved) when we withdrew
+COMMIT_CAP_S = 120.0  # an old supervisor that already moved the lock to us may take this long to write its answer
 
 
 class ProcHandle:
@@ -79,6 +79,19 @@ def read_adopt(swarm_dir: Path, pid: int) -> dict | None:
     return read_json(adopt_path(swarm_dir, pid))
 
 
+def take_adopt(swarm_dir: Path, pid: int) -> dict | None:
+    """Consume the answer by atomic rename: exactly one of {requester takes it, old supervisor rolls it back} wins."""
+    src = adopt_path(swarm_dir, pid)
+    taken = src.with_name(src.name + ".taken")
+    try:
+        os.rename(src, taken)
+    except OSError:
+        return None
+    data = read_json(taken)
+    taken.unlink(missing_ok=True)
+    return data
+
+
 def _run_dir(root: Path, seed: int, started_wall: float) -> str | None:
     try:
         from swarm_watch import find_run_dir
@@ -131,6 +144,9 @@ def hand_over(sup) -> bool:
                 agents.append(_record(sup, s))
         write_atomic(adopt_path(sup.swarm_dir, pid),
                      {"from_pid": os.getpid(), "to_pid": pid, "next_seq": sup.seq, "agents": agents})
+        if not still_asked() and _roll_back_answer(sup, pid):  # withdrawn/dead during a slow commit, and not yet taken
+            sup.log(f"handoff to pid {pid} withdrawn during commit; lock restored, still supervising")
+            return False
     except Exception as e:  # nothing was handed over: undo the lock move and carry on as the supervisor
         transfer_lock(sup.root, os.getpid(), expect=pid)
         adopt_path(sup.swarm_dir, pid).unlink(missing_ok=True)
@@ -143,6 +159,19 @@ def hand_over(sup) -> bool:
     return True
 
 
+def _roll_back_answer(sup, pid: int) -> bool:
+    """Atomically retract our answer. False = the requester already took it, so the handoff stands."""
+    src = adopt_path(sup.swarm_dir, pid)
+    aside = src.with_name(src.name + ".rolledback")
+    try:
+        os.rename(src, aside)
+    except OSError:
+        return False
+    transfer_lock(sup.root, os.getpid(), expect=pid)
+    aside.unlink(missing_ok=True)
+    return True
+
+
 def request_handoff(root: Path, wait_s: float = ANSWER_S, clock: Callable[[], float] = time.monotonic,
                     sleep: Callable[[float], None] = time.sleep, pid: int | None = None,
                     alive: Callable[[int], bool] | None = None) -> dict | None:
@@ -152,21 +181,27 @@ def request_handoff(root: Path, wait_s: float = ANSWER_S, clock: Callable[[], fl
     runs = Path(root) / "runs"
     req, mine = runs / "swarm.handoff", adopt_path(runs / "swarm", pid)
     mine.unlink(missing_ok=True)  # only OUR stale answer; other requesters' files are never touched
+    held = lock_holder(root)
+    old = int(held) if held and held.isdigit() else 0  # the supervisor we are asking
     if not claim(req, pid, alive):
         return None  # a live requester is mid-request: no concurrent handoffs
     end = clock() + wait_s
     while clock() < end:
-        data = read_adopt(mine.parent, pid)
+        data = take_adopt(mine.parent, pid)
         if data is not None:
             return data
         sleep(1.0)
     withdraw(req, pid)  # atomic rename: a late old supervisor now sees no claim
-    data = read_adopt(mine.parent, pid)  # answered before it saw the withdrawal? then we adopt
-    if data is None and lock_holder(root) == str(pid):  # it had already moved the lock: its answer is about to land
-        end = clock() + EXTRA_S
-        while data is None and clock() < end:
-            sleep(1.0)
-            data = read_adopt(mine.parent, pid)
+    # An old supervisor that already moved the lock to us is committing (merges, records) and will answer, however
+    # slowly; it rolls the lock back itself if it notices the withdrawal. Wait while the lock is ours and it lives.
+    end = clock() + COMMIT_CAP_S
+    while True:
+        data = take_adopt(mine.parent, pid)
+        if data is not None or lock_holder(root) != str(pid) or not old or not alive(old) or clock() >= end:
+            break
+        sleep(1.0)
+    if data is None and lock_holder(root) == str(pid):
+        print(f"WARNING: runs/spawn.lock names this process (pid {pid}) but supervisor {old} gave no answer")
     return data
 
 

@@ -451,6 +451,7 @@ def test_withdraw_is_atomic_rename_and_late_answer_after_lock_move_is_adopted(tm
     runs = tmp_path / "runs"
     sd = runs / "swarm"
     sd.mkdir(parents=True)
+    (runs / "spawn.lock").write_text("999")  # the old supervisor holds the lock
     t = [0.0]
     moved = []
 
@@ -462,7 +463,83 @@ def test_withdraw_is_atomic_rename_and_late_answer_after_lock_move_is_adopted(tm
         elif moved:
             (sd / f"adopt-{NEW}.json").write_text(json.dumps({"agents": [], "next_seq": 5}))
 
-    got = sh.request_handoff(tmp_path, wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep)
+    got = sh.request_handoff(tmp_path, wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep, alive=lambda p: True)
     assert got == {"agents": [], "next_seq": 5}
     assert not (runs / "swarm.handoff").exists()
     assert [p.name for p in runs.iterdir() if "handoff" in p.name] == []  # no stray withdrawn/tomb files
+
+
+def _slow_commit_world(tmp_path, answer_at, old_alive=True):
+    runs = tmp_path / "runs"
+    (runs / "swarm").mkdir(parents=True)
+    (runs / "spawn.lock").write_text("999")
+    t = [0.0]
+
+    def sleep(_s):
+        t[0] += 1
+        if t[0] >= 30:
+            (runs / "spawn.lock").write_text(str(NEW))  # old supervisor moves the lock, then commits slowly
+        if answer_at and t[0] >= answer_at:
+            (runs / "swarm" / f"adopt-{NEW}.json").write_text(json.dumps({"agents": [], "next_seq": 9}))
+
+    return t, sleep, lambda p: old_alive
+
+
+def test_answer_landing_after_old_grace_is_still_adopted(tmp_path):
+    t, sleep, alive = _slow_commit_world(tmp_path, answer_at=90)  # 60 s after the wait ended
+    got = sh.request_handoff(tmp_path, wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep, alive=alive)
+    assert got == {"agents": [], "next_seq": 9}
+
+
+def test_requester_stops_waiting_when_old_supervisor_dies_or_cap_hit(tmp_path, capsys):
+    t, sleep, alive = _slow_commit_world(tmp_path, answer_at=None, old_alive=False)
+    assert sh.request_handoff(tmp_path, wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep, alive=alive) is None
+    assert t[0] < 40 and "WARNING" in capsys.readouterr().out
+    t, sleep, alive = _slow_commit_world(tmp_path / "b", answer_at=None)
+    assert sh.request_handoff(tmp_path / "b", wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep, alive=alive) is None
+    assert 150 <= t[0] <= 152  # 30 s wait + 120 s cap
+
+
+def test_old_side_rolls_back_when_claim_withdrawn_after_writing_answer(tmp_path, monkeypatch):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+    live = sys.modules["swarm_handoff"]
+    real = live.write_atomic
+
+    def write_then_withdraw(path, *a, **k):
+        real(path, *a, **k)
+        if path.name.startswith("adopt-"):
+            w.sup.handoff_file.unlink()  # requester gave up during the slow commit
+
+    monkeypatch.setattr(live, "write_atomic", write_then_withdraw)
+    w.sup.tick()
+    assert (tmp_path / "runs" / "spawn.lock").read_text() == str(os.getpid())
+    assert sh.read_adopt(w.sup.swarm_dir, NEW) is None and not w.sup.handed_over and w.sup.running() == 2
+
+
+def test_old_side_keeps_handoff_if_requester_already_took_the_answer(tmp_path, monkeypatch):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+    live = sys.modules["swarm_handoff"]
+    real = live.write_atomic
+
+    def write_then_take_and_withdraw(path, *a, **k):
+        real(path, *a, **k)
+        if path.name.startswith("adopt-"):
+            assert sh.take_adopt(path.parent, NEW) is not None  # requester consumed it
+            w.sup.handoff_file.unlink()
+
+    monkeypatch.setattr(live, "write_atomic", write_then_take_and_withdraw)
+    w.sup.tick()
+    assert w.sup.handed_over and (tmp_path / "runs" / "spawn.lock").read_text() == str(NEW)
+
+
+def test_stale_replacer_lock_broken_by_rename_aside(tmp_path):
+    req = tmp_path / "swarm.handoff"
+    rl = tmp_path / "swarm.handoff.replace"
+    req.write_text(json.dumps({"pid": 111}))  # dead claim
+    rl.write_text("")
+    old = rl.stat().st_mtime - 120
+    os.utime(rl, (old, old))
+    assert sh.claim(req, NEW, lambda p: False) is True
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["swarm.handoff"]  # no tomb or lock left

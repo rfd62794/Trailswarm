@@ -74,10 +74,12 @@ def replacer_lock(req: Path):
         except FileExistsError:
             try:
                 if time.time() - path.stat().st_mtime > STALE_REPLACER_S:
-                    path.unlink(missing_ok=True)  # its holder died mid-replace
+                    tomb = path.with_name(f"{path.name}.stale.{os.getpid()}")
+                    os.rename(path, tomb)  # atomic: exactly one breaker wins; never delete a fresh lock by name
+                    tomb.unlink(missing_ok=True)
                     continue
             except OSError:
-                continue
+                continue  # vanished or lost the break race: look again
             yield False
             return
         os.close(fd)
