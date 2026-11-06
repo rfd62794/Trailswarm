@@ -68,7 +68,7 @@ def test_goal_in_window_is_healthy_and_trainer_is_exempt(tmp_path):
     d, c, w = watch(tmp_path)
     add(d, [(i % 3, 0) for i in range(300)])
     w.check()
-    (tmp_path / "runs" / "milestones.json").write_text(json.dumps({"potion": [{"run": d.name, "step": 5}]}))
+    (d / "goal_frames.jsonl").write_text(json.dumps({"goal": "potion", "step": 5, "frame": 9}) + chr(10))
     w.check()
     add(d, [(i % 3, 0) for i in range(500)])
     assert w.check() is None  # a goal landed 500 presses ago: inside the window
@@ -105,3 +105,26 @@ def test_stall_record_has_last_position(tmp_path):
     sw.record_stall(tmp_path / "runs" / "swarm", 2, 7, "why", w)
     row = json.loads((tmp_path / "runs" / "swarm" / "stalls.jsonl").read_text())
     assert row["pos"] == [13, 4, 5] and row["slot"] == 2 and row["run"] == "explore-1-1"
+
+
+def test_startup_grace_before_first_transition(tmp_path):
+    d, c, w = watch(tmp_path)  # run dir exists but no transition yet (slow ROM / checkpoint load)
+    c.t = 170
+    assert w.check() is None
+    c.t = 185
+    assert "no first transition" in w.check()
+
+
+def test_hung_clock_starts_at_first_transition_and_unfound_run_dir_waits_out_grace(tmp_path):
+    d, c, w = watch(tmp_path)
+    c.t = 170
+    add(d, [(0, 0)])
+    assert w.check() is None  # first transition lands late; the 120 s clock starts now
+    c.t = 250
+    assert w.check() is None
+    c.t = 295
+    assert "hung: no new transition" in w.check()
+    c2 = Clock()
+    lost = sw.ProgressWatch(tmp_path / "nowhere", 99, since_wall=0, clock=c2)
+    c2.t = 100
+    assert lost.check() is None  # run dir not found yet: grace, not hung

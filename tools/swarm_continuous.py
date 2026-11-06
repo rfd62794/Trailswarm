@@ -17,10 +17,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from swarm_watch import record_stall  # noqa: E402
-
 STARTERS = ["bulbasaur", "charmander", "squirtle"]
 BOX_PACES = [8, 16, 30]
 FAST_S = 60.0
@@ -49,6 +45,7 @@ class Supervisor:
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
                  heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None,
                  watch: Callable[[dict], Any] | None = None, watch_s: float = 15.0,
+                 on_stall: Callable[..., None] | None = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = lambda m: print(m, flush=True), fast_s: float = FAST_S, pause_s: float = PAUSE_S):
         self.root, self.shared, self.launch, self.merge, self.limit = Path(root), Path(shared), launch, merge, limit
@@ -57,6 +54,7 @@ class Supervisor:
         self.deadline, self.firsts, self.clock, self.sleep, self.log = deadline, firsts, clock, sleep, log
         self.fast_s, self.pause_s = fast_s, pause_s
         self.heartbeat, self.segment_ok, self.watch_factory, self.watch_s = heartbeat, segment_ok, watch, watch_s
+        self.on_stall = on_stall
         self.watchers: dict[int, Any] = {}
         self.next_watch = 0.0
         self.solved: dict[str, float] = {}
@@ -220,7 +218,8 @@ class Supervisor:
             reason = w.check()
             if reason:
                 self.log(f"slot {s.idx} stalled: {reason} (last position {w.last_pos})")
-                record_stall(self.swarm_dir, s.idx, s.cfg["seed"], reason, w)
+                if self.on_stall:
+                    self.on_stall(self.swarm_dir, s.idx, s.cfg["seed"], reason, w)
                 s.handle.kill()  # the whole process tree we launched
                 self._finish(s, "stalled")
 

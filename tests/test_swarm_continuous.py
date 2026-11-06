@@ -49,7 +49,7 @@ class World:
             shared.write_text(json.dumps(d))
 
         self.sup = sc.Supervisor(tmp_path, self.shared, n, launch, merge, lambda: limit, clock=lambda: self.t,
-                                 sleep=lambda s: None, log=self.logs.append, stop_file=tmp_path / "swarm.stop", **kw)
+                                 sleep=lambda s: None, log=self.logs.append, on_stall=_load('swarm_watch').record_stall, stop_file=tmp_path / "swarm.stop", **kw)
 
     def live(self):
         return [p for p in self.procs if p.rc is None]

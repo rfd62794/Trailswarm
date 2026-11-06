@@ -1,6 +1,7 @@
 """Progress watchdog for swarm agents: spot an agent that is alive but stuck, so its slot can be freed and refilled.
 
-An agent is STALLED when (a) it has made no new transition for HUNG_S seconds (hung), or (b) over its last
+An agent is STALLED when (a) it has made no new transition for HUNG_S seconds (hung; the clock starts at its FIRST transition,
+and START_GRACE_S covers the time before one exists), or (b) over its last
 WINDOW_PRESSES presses it reached no new goal AND fewer than MIN_NEW_TILES tiles it had not visited before
 (a stuck loop, e.g. mashing A on Route 3). Trainers are exempt from (b): standing still to level up is their job.
 It reads the agent's own runs/explore-*/transitions.jsonl (found by seed), never the agent process.
@@ -15,6 +16,7 @@ from typing import Callable
 WINDOW_PRESSES = 600
 MIN_NEW_TILES = 6
 HUNG_S = 120.0
+START_GRACE_S = 180.0  # before the first transition: ROM / checkpoint load, run dir not created yet
 WATCH_S = 15.0
 
 
@@ -33,15 +35,15 @@ def find_run_dir(root: Path, seed: int, since_wall: float) -> Path | None:
 class ProgressWatch:
     def __init__(self, root: Path, seed: int, trainer: bool = False, since_wall: float | None = None,
                  clock: Callable[[], float] = time.monotonic, window: int = WINDOW_PRESSES,
-                 min_new: int = MIN_NEW_TILES, hung_s: float = HUNG_S):
+                 min_new: int = MIN_NEW_TILES, hung_s: float = HUNG_S, grace_s: float = START_GRACE_S):
         self.root, self.seed, self.trainer, self.clock = Path(root), seed, trainer, clock
         self.since = time.time() if since_wall is None else since_wall
-        self.window, self.min_new, self.hung_s = window, min_new, hung_s
+        self.window, self.min_new, self.hung_s, self.grace_s = window, min_new, hung_s, grace_s
         self.run_dir: Path | None = None
         self.offset = self.presses = self.goals_seen = self.goal_at = 0
         self.first_seen: dict[tuple, int] = {}
         self.last_pos: list | None = None
-        self.last_growth = clock()
+        self.born = self.last_growth = clock()
 
     def _read_new(self) -> None:
         path = self.run_dir / "transitions.jsonl"
@@ -66,11 +68,12 @@ class ProgressWatch:
             self.first_seen.setdefault(tuple(to), self.presses)
 
     def _goal_count(self) -> int:
+        """Goals this run reached: one line per goal in its own goal_frames.jsonl (written the moment a goal lands)."""
         try:
-            ms = json.loads((self.root / "runs" / "milestones.json").read_text())
-        except (OSError, ValueError):
+            with open(self.run_dir / "goal_frames.jsonl", "rb") as f:
+                return sum(1 for line in f if line.strip())
+        except OSError:
             return self.goals_seen
-        return sum(1 for v in ms.values() for e in v if e.get("run") == self.run_dir.name)
 
     def check(self) -> str | None:
         """None while healthy, else a one-line reason."""
@@ -81,6 +84,11 @@ class ProgressWatch:
             goals = self._goal_count()
             if goals > self.goals_seen:
                 self.goals_seen, self.goal_at = goals, self.presses
+        if self.presses == 0:
+            waited = self.clock() - self.born
+            if waited > self.grace_s:
+                return f"hung: no first transition after {waited:.0f}s"
+            return None
         idle = self.clock() - self.last_growth
         if idle > self.hung_s:
             return f"hung: no new transition for {idle:.0f}s"
