@@ -93,3 +93,17 @@ Output stable JSON (sorted keys) so Claude can diff results between calls.
 ## 8. Report
 
 Test tail, line counts, one example JSON output per CLI command, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-05 20:16 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05 (live surgery tools for Claude); dep World Legend merged
+<!-- queue:end -->
