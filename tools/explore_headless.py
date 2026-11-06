@@ -24,6 +24,7 @@ from pokeagent.explorer.engine import Engine  # noqa: E402
 from pokeagent.explorer.memory import MapMemory  # noqa: E402
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open  # noqa: E402
 from pokeagent.explorer.press import Presser  # noqa: E402
+from pokeagent.explorer.seeding import idle_frames  # noqa: E402
 from pokeagent.explorer.text_pace import prompt_waiting  # noqa: E402
 from pokeagent.goals import check_goals  # noqa: E402
 
@@ -40,6 +41,7 @@ def run(args) -> dict:
     mem = MapMemory(work / "maps.json", record_paths=False)
     emu = PyBoyEmulator(Path(args.rom), headless=True)
     emu.tick(60); emu.load_state(Path(args.state)); emu.tick(30)
+    emu.tick(idle_frames(args.seed))  # --seed shifts the game's RNG (seed 0/None: unchanged)
     if args.hurt:  # lead mon at 3 HP: the party needs healing from the first step
         emu._pyboy.memory[0xD16C], emu._pyboy.memory[0xD16D] = 0, args.hurt
     count = {"frames": 0}
