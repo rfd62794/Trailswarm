@@ -51,7 +51,8 @@ def test_magikarp_trainee_belongs_last_inside_the_cave_first_outside(tmp_path):
 
 def test_cave_run_for_wild_cave_fights_except_catch_targets_and_after_the_cap(tmp_path, monkeypatch):
     monkeypatch.setattr(br, "ROM_KB", {"dex_of_internal": {"107": 41, "34": 1}})
-    ctx = make_ctx(tmp_path, {0xD35E: 0x3B, 0xD2F7 + 5: 0b00000001}); ctx.refresh()  # dex 41 owned
+    hp = {0xD163: 1, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 40}  # fighter 30/40: healthy enough to start a catch
+    ctx = make_ctx(tmp_path, {0xD35E: 0x3B, 0xD2F7 + 5: 0b00000001, **hp}); ctx.refresh()  # dex 41 owned
     assert br.cave_run(ctx, 1, 107)           # ZUBAT, owned
     assert br.cave_run(ctx, 1, 34)            # not owned but no ball in the bag: nothing to catch it with, so run too
     assert not br.cave_run(ctx, 1, 34, balls=3)  # a catch target (ball + unowned dex entry) is fought/caught
@@ -200,3 +201,40 @@ def test_stand_tile_is_the_bottom_left_of_the_players_cell():
     from pokeagent.explorer.perceive import stand_tile
     tm = bytearray(360); tm[9 * 20 + 8] = 0x05; tm[8 * 20 + 8] = 0x99
     assert stand_tile(bytes(tm)) == 0x05
+
+
+def test_cave_catch_budget_one_sequence_per_species_only_with_a_healthy_fighter(tmp_path, monkeypatch):
+    monkeypatch.setattr(br, "ROM_KB", {"dex_of_internal": {"107": 41, "34": 1}})
+    hp = {0xD163: 1, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 40}
+    ctx = make_ctx(tmp_path, {0xD35E: 0x3B, **hp}); ctx.refresh()
+    assert br.cave_catch_allowed(ctx, 107) and not br.cave_run(ctx, 1, 107, balls=3)   # new species, fit fighter: catch it
+    ctx.cave_catch_balls[107] = 1
+    assert br.cave_catch_allowed(ctx, 107)                                  # a started sequence finishes
+    ctx.cave_catch_balls[107] = br.MAX_CAVE_BALLS
+    assert not br.cave_catch_allowed(ctx, 107) and br.cave_run(ctx, 1, 107, balls=3)  # two balls spent: run like an owned one
+    assert br.cave_catch_allowed(ctx, 34)                                   # another species still gets its own sequence
+    ctx.emu.set(0xD16D, 10); ctx.refresh()                                  # fighter at 25%: do not START one
+    assert not br.cave_catch_allowed(ctx, 34) and br.cave_run(ctx, 1, 34, balls=3)
+    ctx.emu.set(0xD35E, 0x0E); ctx.refresh()
+    assert br.cave_catch_allowed(ctx, 107) and br.cave_catch_allowed(ctx, 34)  # outside a dungeon nothing changes
+
+
+def test_catch_throws_the_ball_by_name_and_counts_it(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours import catch as catch_mod
+    from pokeagent.explorer.behaviours.battle import BattleView
+    from pokeagent.explorer.behaviours.catch import Catch
+    from pokeagent.explorer.behaviours.item_use import BAG_COUNT, BAG_START, LIST_SCROLL, MENU_ITEM
+    from test_battle_types import put_box
+    monkeypatch.setattr(catch_mod, "ROM_KB", {"dex_of_internal": {"107": 41}, "name_of_internal": {"107": "ZUBAT"}})
+    bag = {BAG_COUNT: 3, BAG_START: 0x0B, BAG_START + 1: 1, BAG_START + 2: 0xEA, BAG_START + 3: 1, BAG_START + 4: 0x04, BAG_START + 5: 4}
+    mem = {0xD35E: 0x3B, 0xD057: 1, 0xCFE6: 0, 0xCFE7: 3, 0xCFF4: 0, 0xCFF5: 20, 0xD163: 1, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 40,
+           MENU_ITEM: 0, LIST_SCROLL: 0, **bag}
+    ctx = make_ctx(tmp_path, mem)
+    put_box(ctx, [">ANTIDOTE", "x 1", "TM34", "x 1"])             # the ball is the third row: off screen, cursor on ANTIDOTE
+    ctx.refresh()
+    ctx.bv = BattleView(kind=1, hp=30, mx=40, species=107, e_lvl=8, cur=">ANTIDOTE")
+    d = Catch().step(ctx)
+    assert (d.button, d.rule) == ("DOWN", "item_list_scroll")      # scrolls toward POKe BALL; the old code would have pressed A here
+    ctx.emu.set(MENU_ITEM, 2)
+    d = Catch().step(ctx)
+    assert (d.button, d.rule) == ("A", "item_use") and ctx.cave_catch_balls == {107: 1}

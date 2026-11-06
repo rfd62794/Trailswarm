@@ -50,6 +50,7 @@ class CaveTopUp(BehaviourBase):
         have = bag_contents(ctx.emu).get(POTION, 0)
         if ctx.topup_presses == 0:
             ctx.topup_potions0 = have
+            ctx.log(f"[cave top-up: start, fighter HP {party_hp(ctx.emu)}, {have} POTION(s)]", "res")
         if ctx.view.m not in DUNGEON_MAPS or have < ctx.topup_potions0 or have == 0:
             if ctx.topup_presses and have < ctx.topup_potions0:
                 ctx.log(f"[cave top-up: POTION used, fighter HP now {party_hp(ctx.emu)}]", "res")
