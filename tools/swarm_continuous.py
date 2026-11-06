@@ -40,7 +40,7 @@ class Supervisor:
                  limit: Callable[[], int], steps: int = 400, starter: str | None = None, roles: list[str] | None = None,
                  segment: Callable[[int], str | None] | None = None, stop_file: Path | None = None,
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
-                 heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None,
+                 heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None, plan: Any = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = lambda m: print(m, flush=True), fast_s: float = FAST_S, pause_s: float = PAUSE_S):
         self.root, self.shared, self.launch, self.merge, self.limit = Path(root), Path(shared), launch, merge, limit
@@ -48,7 +48,7 @@ class Supervisor:
         self.stop_file = Path(stop_file) if stop_file else self.root / "runs" / "swarm.stop"
         self.deadline, self.firsts, self.clock, self.sleep, self.log = deadline, firsts, clock, sleep, log
         self.fast_s, self.pause_s = fast_s, pause_s
-        self.heartbeat, self.segment_ok = heartbeat, segment_ok
+        self.heartbeat, self.segment_ok, self.plan = heartbeat, segment_ok, plan  # plan: seg_sched.Curriculum
         roles = roles or ["exploiter", "explorer"]
         self.slots = [Slot(i, roles[i % len(roles)]) for i in range(n)]
         self.seq = self.finished = self.merged = 0
@@ -80,6 +80,14 @@ class Supervisor:
     def _config(self, slot: Slot) -> dict:
         n = self.seq
         self.seq += 1
+        cfg = self._base_config(slot, n)
+        job = self.plan.next_job(n) if self.plan else None
+        if job:  # curriculum job: its own segment, start checkpoint, step budget (a confirm replays an old seed/starter)
+            cfg.update({k: job[k] for k in ("seed", "starter", "box_pace", "explore_rate") if job.get(k) is not None})
+            cfg.update(steps=job["steps"], segment=job["key"], job=job)
+        return cfg
+
+    def _base_config(self, slot: Slot, n: int) -> dict:
         return {"slot": slot.idx, "seq": n, "seed": 1000 + n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
                 "starter": self.starter or STARTERS[n % 3], "steps": self.steps,
                 "segment": self.segment(n) if self.segment else None,
@@ -88,11 +96,15 @@ class Supervisor:
     def _start(self, slot: Slot) -> None:
         cfg = self._config(slot)
         self.swarm_dir.mkdir(parents=True, exist_ok=True)
-        if self.shared.exists():
-            shutil.copy(self.shared, cfg["own"])  # the freshest merged memory: learning compounds
+        job = cfg.get("job") or {}
+        src = Path(job["maps_in"]) if job.get("maps_in") else self.shared  # a confirm replay needs its ORIGINAL memory
+        if src.exists():
+            shutil.copy(src, cfg["own"])  # the freshest merged memory: learning compounds
+        if self.plan:
+            self.plan.on_start(cfg)
         cfg["hash"] = self._digest(cfg["own"])
         slot.cfg, slot.started = cfg, self.clock()
-        if cfg["segment"] and self.segment_ok and not self.segment_ok(cfg["segment"]):
+        if cfg["segment"] and not cfg.get("job") and self.segment_ok and not self.segment_ok(cfg["segment"]):
             self.log(f"WARNING segment {cfg['segment']}: no checkpoint, running a full agent")
         try:
             slot.handle = self.launch(cfg)
@@ -148,6 +160,8 @@ class Supervisor:
             if keep:
                 note += f", kept in {self._keep(cfg['own'])} for --merge-only"
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
+        if self.plan:
+            self.plan.on_finish(cfg, rc)
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
         too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
         if too_fast and not self.stopping:
@@ -167,7 +181,7 @@ class Supervisor:
             if s.handle is None:
                 continue
             rc = s.handle.poll()
-            if rc is None and self.clock() - s.started > max(240, self.steps * 1.2):
+            if rc is None and self.clock() - s.started > max(240, s.cfg.get("steps", self.steps) * 1.2):
                 s.handle.kill()
                 rc = "killed (timeout)"
             if rc is not None:

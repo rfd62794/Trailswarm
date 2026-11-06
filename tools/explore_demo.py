@@ -40,6 +40,7 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.goals import GOALS, check_goals  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
+from pokeagent.segment_names import state_goal  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from explore_plan import ControlServer, png_bytes  # noqa: E402
@@ -75,6 +76,9 @@ def main(argv=None) -> int:
     ap.add_argument("--frame-every", type=int, default=2,
                     help="render+publish every Nth tick when frame-sharing (render cost only, no extra game frames)")
     ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
+    ap.add_argument("--stop-at-map", type=lambda v: int(v, 0), default=None,
+                    help="end the run on first entry into this map id (a split sub-segment; see tools/segments.py)")
+    ap.add_argument("--tag", default=None, help="opaque label stored in meta.json (the curriculum links a run to its job)")
     ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
@@ -94,8 +98,8 @@ def main(argv=None) -> int:
     run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
     run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
-    (run_dir / "meta.json").write_text(json.dumps({"start": Path(a.state).stem if a.state else "baseline",
-                                                    "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed,
+    (run_dir / "meta.json").write_text(json.dumps({"start": state_goal(Path(a.state).stem) if a.state else "baseline",
+                                                    "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag, "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace, "starter": a.starter, "seed": a.seed,
                                                     "frame_share": a.frame_share, "train_level": a.train_level,
                                                     "window": not a.headless, "git_sha": _git_sha()}))
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
@@ -123,8 +127,8 @@ def main(argv=None) -> int:
     decisions = DecisionLog(run_dir / "decisions.jsonl")
     ctx = ExplorerContext(
         emu=emu, mem=mem, log=log, run_dir=run_dir, trans=trans, explore_run=explore_run,
-        opts=ExplorerOptions(starter=a.starter, state_stem=Path(a.state).stem if a.state else "", steps=a.steps,
-                             stop_at_goal=a.stop_at_goal, headless=a.headless, box_pace=a.box_pace,
+        opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", steps=a.steps,
+                             stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps))
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids

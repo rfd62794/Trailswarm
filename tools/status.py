@@ -8,6 +8,7 @@ Prints the done-condition metrics; targets stay with Robert in DIRECTION.md.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from pokeagent.goals import GOALS, SIDE_GOALS
@@ -157,6 +158,13 @@ def main() -> int:
               f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
         print(f"items picked up ({dirs[-1].name}): {_items_picked(dirs[-1])}")
     print(_trainee_line(dirs))
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from segments import summary
+        print("segment curriculum (tools/segments.py):")
+        print("\n".join("  " + ln for ln in summary(ROOT, do_ingest=False)))
+    except Exception as e:  # the report must never break status
+        print(f"segment curriculum: unavailable ({e!r})")
     return 0
 
 
