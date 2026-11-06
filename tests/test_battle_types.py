@@ -23,6 +23,9 @@ FAKE_KB = {
         "1": {"name": "TACKLE", "power": 35, "type": "NORMAL", "accuracy": 0.95, "pp": 35},
         "4": {"name": "EMBER", "power": 40, "type": "FIRE", "accuracy": 0.9, "pp": 25},
         "7": {"name": "WATER GUN", "power": 40, "type": "WATER", "accuracy": 1.0, "pp": 25},
+        "45": {"name": "GROWL", "power": 0, "type": "NORMAL", "accuracy": 1.0, "pp": 40, "effect": 18},
+        "82": {"name": "DRAGON RAGE", "power": 1, "type": "DRAGON", "accuracy": 1.0, "pp": 10, "effect": 41},
+        "162": {"name": "SUPER FANG", "power": 1, "type": "NORMAL", "accuracy": 0.9, "pp": 10, "effect": 40},
         "13": {"name": "QUICK ATTACK", "power": 40, "type": "NORMAL", "accuracy": 1.0, "pp": 30},
     },
     "type_chart": [
@@ -241,3 +244,70 @@ def test_move_choose_decision_carries_the_rule_string(tmp_path, monkeypatch):
     assert pm["move"] == "EMBER" and pm["move_type"] == "FIRE"
     assert pm["def_types"] == ["GRASS", "POISON"] and pm["def_key"] == "GRASS/POISON"
     assert pm["enemy_max"] == 30 and pm["enemy_hp"] == 20
+
+
+def _hp_drop(ctx, move, **pm):
+    ctx.pending_move = {"species": 25, "move": move, "enemy_hp": 20, "enemy_max": 30, "def_key": "GRASS/POISON",
+                        "def_types": ["GRASS", "POISON"], "move_type": (kbattle.move_by_name(move) or {}).get("type"),
+                        "step": ctx.step, "typed": kbattle.is_typed_attack(move), **pm}
+    ctx.emu.set(0xCFE7, 15)  # enemy HP fell 20 -> 15 (poison tick or a hit)
+    put_box(ctx, ("FIGHT", "TYPE/", "NORMAL", "29/30", "TACKLE", ">GROWL"))
+    ctx.bv = BattleView(kind=1, hp=10, mx=20, species=25, my_sp=4, my_lvl=5, e_lvl=3, cur=">FIGHT")
+    ctx.refresh()
+    BattleMoves().step(ctx)
+
+
+@pytest.mark.parametrize("move", ["GROWL", "DRAGON RAGE", "SUPER FANG"])
+def test_status_and_fixed_damage_moves_do_not_feed_type_ledgers(tmp_path, monkeypatch, move):
+    monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
+    monkeypatch.setattr(bms, "ROM_KB", FAKE_KB)
+    ctx = make_ctx(tmp_path, memory={BATTLE: 1, 0xCFE5: 25, 0xCFE6: 0, 0xCFF4: 0, 0xCFF5: 30,
+                                     0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20,
+                                     0xD01C: 45, 0xD01D: 82, 0xD01E: 162, 0xD01F: 1, 0xD02D: 9, 0xD02E: 9, 0xD02F: 9, 0xD030: 9})
+    _hp_drop(ctx, move)
+    assert ctx.pending_effect is None
+    assert "damage_by_type" not in ctx.mem.data
+
+
+def test_typed_damage_move_still_feeds_ledgers(tmp_path, monkeypatch):
+    monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
+    monkeypatch.setattr(bms, "ROM_KB", FAKE_KB)
+    ctx = make_ctx(tmp_path, memory={BATTLE: 1, 0xCFE5: 25, 0xCFE6: 0, 0xCFF4: 0, 0xCFF5: 30,
+                                     0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20,
+                                     0xD01C: 4, 0xD01D: 45, 0xD01E: 82, 0xD01F: 1, 0xD02D: 9, 0xD02E: 9, 0xD02F: 9, 0xD030: 9})
+    _hp_drop(ctx, "EMBER")
+    assert ctx.pending_effect["move"] == "EMBER"
+    assert "EMBER|GRASS/POISON" in ctx.mem.data["damage_by_type"]
+
+
+def test_new_hit_finalizes_unfinished_pending_effect_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
+    monkeypatch.setattr(bms, "ROM_KB", FAKE_KB)
+    ctx = make_ctx(tmp_path, memory={BATTLE: 1, 0xCFE5: 25, 0xCFE6: 0, 0xCFF4: 0, 0xCFF5: 30,
+                                     0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20,
+                                     0xD01C: 4, 0xD01D: 45, 0xD01E: 82, 0xD01F: 1, 0xD02D: 9, 0xD02E: 9, 0xD02F: 9, 0xD030: 9})
+    ctx.pending_effect = {"move": "TACKLE", "move_type": "NORMAL", "def_types": ["GRASS", "POISON"], "step": 0}
+    _hp_drop(ctx, "EMBER")
+    assert ctx.mem.data["type_effect"]["NORMAL>>GRASS/POISON"]["neutral"] == 1
+    assert ctx.pending_effect["move"] == "EMBER"
+
+
+def test_repeated_identical_line_after_box_close_is_scanned_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
+    ctx = make_ctx(tmp_path, memory={0xCFE5: 25, 0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20})
+    ctx.dialog = ["Enemy PIDGEY used QUICK ATTACK!"]
+    scan_battle_text(ctx)
+    ctx.dialog = ["Enemy PIDGEY used QUICK ATTACK!"]  # press.py replaced the list when the box reopened
+    scan_battle_text(ctx)
+    assert ctx.mem.data["threat_by_species"]["25"]["n"] == 2
+
+
+def test_rotated_capped_dialog_is_not_rescanned(tmp_path, monkeypatch):
+    monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
+    ctx = make_ctx(tmp_path, memory={0xCFE5: 25, 0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20})
+    ctx.dialog = ["Enemy PIDGEY used QUICK ATTACK!"] + [f"line {i}" for i in range(11)]
+    scan_battle_text(ctx)
+    assert ctx.mem.data["threat_by_species"]["25"]["n"] == 1
+    ctx.dialog.append("more"); del ctx.dialog[:-12]  # the first entry rotated off, as press.py caps at 12
+    scan_battle_text(ctx)
+    assert ctx.mem.data["threat_by_species"]["25"]["n"] == 1

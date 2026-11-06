@@ -56,23 +56,32 @@ def _finalize_pending_effect(ctx: ExplorerContext) -> None:
     ctx.pending_effect = None
 
 
+def _unseen(ctx: ExplorerContext, dlg: list) -> list:
+    """Dialog entries not parsed yet. A new list object (press.py swaps it when a box reopens) is all new, even
+    if its first line repeats the old last one; the same list is matched against the snapshot we scanned, allowing
+    for the 12-entry cap having rotated old entries off the front."""
+    prev = ctx.fx_seen
+    if dlg is ctx.fx_src:
+        for shift in range(len(prev)):  # largest overlap first: prev[shift:] is a prefix of dlg
+            keep = prev[shift:]
+            if dlg[:len(keep)] == keep:
+                return dlg[len(keep):]
+    ctx.fx_src = dlg
+    return list(dlg)
+
+
 def scan_battle_text(ctx: ExplorerContext) -> None:
     """Parse newly arrived battle text: our moves' results -> type_effect, enemy moves -> threat.
 
-    ctx.dialog is an append-only stream of text-box contents; fx_mark is the scan cursor so each
-    entry is parsed once (a reset dialog simply fails the mark lookup and is rescanned whole).
+    ctx.dialog is a capped stream of text-box contents (replaced by a new list when a box reopens); fx_src and
+    fx_seen are the scan cursor so each entry is parsed once.
     """
     dlg = ctx.dialog
     if not dlg:
         return
-    start = 0
-    if ctx.fx_mark is not None:
-        for i in range(len(dlg) - 1, -1, -1):
-            if dlg[i] == ctx.fx_mark:
-                start = i + 1
-                break
-    blob = " ".join(e.replace(" | ", " ") for e in dlg[start:])
-    ctx.fx_mark = dlg[-1]
+    new = _unseen(ctx, dlg)
+    ctx.fx_seen = list(dlg)
+    blob = " ".join(e.replace(" | ", " ") for e in new)
     for ev in battle_events(blob):
         if ev[0] == "used":
             _finalize_pending_effect(ctx)  # a new attack means the last one's result text is done

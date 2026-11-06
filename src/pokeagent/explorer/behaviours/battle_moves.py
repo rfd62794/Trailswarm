@@ -5,8 +5,10 @@ import re
 
 from pokeagent.explorer.battle import (
     enemy_max_hp, enemy_types, move_by_name, move_rule, move_scores, norm_name, observed_damage,
+    is_typed_attack,
 )
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.behaviours.battle import _finalize_pending_effect
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 
@@ -35,7 +37,7 @@ class BattleMoves(BehaviourBase):
             rec = ctx.mem.data.setdefault("damage_dealt", {}).setdefault(key, [])
             rec.append(dealt); del rec[:-20]
             # Generalised lesson: fraction of the enemy's max HP per hit, keyed move + defender types.
-            if pm.get("enemy_max"):
+            if pm.get("typed") and pm.get("enemy_max"):
                 dk = ctx.mem.data.setdefault("damage_by_type", {}).setdefault(f"{pm['move']}|{pm.get('def_key', '?')}", [])
                 dk.append(round(dealt / pm["enemy_max"], 4)); del dk[:-20]
             # The result message may still be scrolling: the battle-text scan counts super/weak/none;
@@ -43,7 +45,8 @@ class BattleMoves(BehaviourBase):
             fx = ctx.fx_last_fx
             seen = bool(fx and fx.get("step", -1) >= pm.get("step", 0)
                         and norm_name(fx.get("move", "")) == norm_name(pm["move"]))
-            if pm.get("move_type") and pm.get("def_types") and not seen:
+            if pm.get("typed") and pm.get("move_type") and pm.get("def_types") and not seen:
+                _finalize_pending_effect(ctx)  # never overwrite a result still awaiting its message
                 ctx.pending_effect = {"move": pm["move"], "move_type": pm["move_type"],
                                       "def_types": pm["def_types"], "step": ctx.step}
         # The move menu reads: TYPE/ | NORMAL | 29/30 | TACKLE | >TAIL WHIP  -> moves are the lines AFTER the PP line
@@ -103,7 +106,7 @@ class BattleMoves(BehaviourBase):
                 ctx.move_tag = tag
                 ctx.pending_move = {"species": species, "move": chosen, "enemy_hp": enemy_hp,
                                     "enemy_max": enemy_max, "def_key": def_key, "def_types": defs,
-                                    "move_type": (move_by_name(chosen) or {}).get("type"), "step": ctx.step}
+                                    "move_type": (move_by_name(chosen) or {}).get("type"), "step": ctx.step, "typed": is_typed_attack(chosen)}
                 ctx.last_move_choice = chosen  # a 'no PP left' text next loop marks this move unusable
                 ename = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), f"#{species}")
                 why = f"BATTLE vs {ename} L{ctx.emu.read(0xCFF3)}: {tag}"

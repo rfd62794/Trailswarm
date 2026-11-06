@@ -114,7 +114,8 @@ class ExplorerContext:
     no_pp: set = field(default_factory=set)
     pending_move: dict | None = None
     pending_effect: dict | None = None  # our landed attack still awaiting its result message (battle text)
-    fx_mark: str | None = None  # battle-text scan cursor: last dialog entry already parsed
+    fx_src: list | None = None  # battle-text scan cursor: the dialog list object last scanned ...
+    fx_seen: list = field(default_factory=list)  # ... and a snapshot of its entries already parsed
     fx_last: dict | None = None  # last 'used' event seen {'side': 'ours'|'enemy', 'move': name}
     fx_last_fx: dict | None = None  # last result message attributed to our move {'move', 'effect', 'step'}
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')

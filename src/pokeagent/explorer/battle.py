@@ -62,6 +62,16 @@ def move_by_name(name: str) -> dict | None:
     return None
 
 
+FIXED_DAMAGE_EFFECTS = (0x28, 0x29)  # ROM move effects: SUPER FANG (half HP), fixed damage (DRAGON RAGE, SONICBOOM, ...)
+
+
+def is_typed_attack(name: str) -> bool:
+    """A ROM move whose damage follows the type chart: power > 0 and not a fixed-damage effect.
+    Status moves (GROWL) and fixed-damage moves must not feed the type-effect or damage-by-type ledgers."""
+    mv = move_by_name(name)
+    return bool(mv) and mv.get("power", 0) > 0 and mv.get("effect", 0) not in FIXED_DAMAGE_EFFECTS
+
+
 def move_value(name: str) -> float:
     """Cartridge value of a move by name (power x accuracy, status moves 0); used when learning/forgetting moves."""
     mv = move_by_name(name)
@@ -129,6 +139,9 @@ def record_type_effect(data: dict, move_type: str | None, def_types: list[str], 
                        *, chart: dict | None = None, step: int = 0) -> None:
     """Count one observed type matchup after one of our attacks.
 
+    The ledger key is always ``"<MOVE TYPE>>><DEF TYPE1>[/<DEF TYPE2>]"``, e.g. ``FIRE>>GRASS/POISON``
+    (``>>`` separates attacker and defender; ``/`` joins a dual type); written only here, read only
+    through ``learned_effect`` and the ``chart_disagreements`` entries' ``key``.
     ``data['type_effect']['FIRE>>GRASS/POISON']`` keeps super/weak/none/neutral tallies plus ``n``;
     ``learned_effect`` reads the majority. ``data['chart_disagreements']`` logs observations the ROM
     chart did not predict - a check on the drained table, expected to stay empty.
