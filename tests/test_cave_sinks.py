@@ -238,3 +238,20 @@ def test_catch_throws_the_ball_by_name_and_counts_it(tmp_path, monkeypatch):
     ctx.emu.set(MENU_ITEM, 2)
     d = Catch().step(ctx)
     assert (d.button, d.rule) == ("A", "item_use") and ctx.cave_catch_balls == {107: 1}
+
+
+def test_catch_does_not_start_on_a_party_prompt_screen(tmp_path, monkeypatch):
+    """A ball throw never opens a party prompt, so 'Use item on which POKeMON?' must not enter the catch rule."""
+    from pokeagent.explorer.behaviours import catch as catch_mod
+    from pokeagent.explorer.behaviours.battle import BattleView
+    from pokeagent.explorer.behaviours.catch import Catch
+    from pokeagent.explorer.behaviours.item_use import BAG_COUNT, BAG_START
+    from test_battle_types import put_box
+    monkeypatch.setattr(catch_mod, "ROM_KB", {"dex_of_internal": {"107": 41}, "name_of_internal": {"107": "ZUBAT"}})
+    mem = {0xD35E: 0x3B, 0xD057: 1, 0xCFE6: 0, 0xCFE7: 3, 0xCFF4: 0, 0xCFF5: 20, 0xD163: 1, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 40,
+           BAG_COUNT: 1, BAG_START: 0x04, BAG_START + 1: 4}
+    ctx = make_ctx(tmp_path, mem)
+    put_box(ctx, ["Use item on which", "POKEMON?"])
+    ctx.refresh()
+    ctx.bv = BattleView(kind=1, hp=30, mx=40, species=107, e_lvl=8, cur="")
+    assert Catch().step(ctx) is None and not ctx.cave_catch_balls

@@ -183,3 +183,19 @@ def test_a_person_on_the_only_next_tile_makes_the_route_wait_instead_of_bumping(
     button, why = rom_route_step({}, "through_mt_moon", pos, plan, ((0x3C, 24, 3),), cache)   # the NPC stands at (24,3)
     assert button == "" and "waiting" in why                    # a no-press step: the person gets time to walk away
     assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"          # block decayed: go
+
+
+def test_a_person_who_never_moves_is_walled_after_a_few_wait_cycles_and_the_route_goes_around():
+    from pokeagent.explorer.cave_route import WAIT_CYCLES, rom_route_step
+    plan, cache = StubPlan(), {}
+    pos, npc = (0x3C, 23, 3), ((0x3C, 24, 3),)
+    answers = []
+    for _ in range(WAIT_CYCLES + 1):
+        answers.append(rom_route_step({}, "through_mt_moon", pos, plan, npc, cache))     # blocked: wait
+        answers.append(rom_route_step({}, "through_mt_moon", pos, plan, npc, cache))     # still blocked: same episode
+        rom_route_step({}, "through_mt_moon", pos, plan, (), cache)                       # the block decayed: a real press
+    waits = [a for a in answers if a and a[0] == ""]
+    assert len(waits) >= WAIT_CYCLES                       # it did wait the first cycles ...
+    assert (0x3C, "23,3,RIGHT") in cache["edges"]          # ... then hard-walled the edge for its window
+    assert answers[-2][0] == "RIGHT" and "around" in answers[-2][1]   # and asked the planner for another way
+    assert any("23,3,RIGHT" in h.get(0x3C, ()) for h in plan.hard_seen[-2:])
