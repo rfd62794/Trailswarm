@@ -132,6 +132,22 @@ def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
     return added, gone
 
 
+def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=None) -> list[str]:
+    """Apply a registry re-scan. An agent whose registry entry is gone has exited: forget its card at once
+    (``model.prune`` would keep it as 'lost' for 60 s), and its World-view track too (``world``: a WorldModel;
+    any track without a live source is dropped, so dots/trails of dead agents never linger). Returns the dropped ids."""
+    _added, gone = merge_sources(holder["sources"], fresh)
+    for aid in gone:
+        model.forget(aid)
+    if world is not None:
+        for aid in world.ids():
+            if aid not in holder["sources"]:
+                world.forget(aid)
+    holder["entries"].clear()
+    holder["entries"].update(new_entries)
+    return gone
+
+
 def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False) -> int:
     root = Path(root)
     sources, entries = _sources_for(root, fake)
@@ -148,10 +164,8 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
             if not fake and ticks % 60 == 0:
                 try:
                     fresh, new_entries = _sources_for(root, fake)
-                    merge_sources(holder["sources"], fresh)
-                    holder["entries"].clear()
-                    holder["entries"].update(new_entries)
-                    model.prune()
+                    refresh_sources(holder, model, fresh, new_entries, world)
+                    model.prune()  # cards only: a lost-but-registered agent keeps its map track and event cursor
                 except Exception:
                     if not warned:  # once: a persistent failure must not flood the log every 2 s
                         log.exception("agent re-discovery failed (further failures suppressed)")

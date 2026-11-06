@@ -120,3 +120,25 @@ def test_model_forget_and_prune():
     m.forget("b")
     m.forget("b")
     assert m.ids() == []
+
+
+def test_refresh_sources_forgets_exited_agents_immediately():
+    from pokeagent.viewer.app import refresh_sources
+    from pokeagent.viewer.model import ViewerModel
+    m = ViewerModel()
+    m._last_ok.update({"a": 1.0, "b": 1.0})  # both seen once
+    holder = {"sources": {"a": object(), "b": object()}, "entries": {"a": {}, "b": {}}}
+    gone = refresh_sources(holder, m, {"a": object()}, {"a": {"id": "a"}})
+    assert gone == ["b"] and m.ids() == ["a"] and list(holder["sources"]) == ["a"] and list(holder["entries"]) == ["a"]
+
+
+def test_refresh_sources_drops_dead_agents_from_the_world_view():
+    from pokeagent.viewer.app import refresh_sources
+    from pokeagent.viewer.model import ViewerModel
+    from pokeagent.world.model import WorldModel
+    w = WorldModel()
+    for aid in ("a", "b", "old"):
+        w.ingest(aid, [])
+    holder = {"sources": {"a": object(), "b": object()}, "entries": {}}
+    refresh_sources(holder, ViewerModel(), {"a": object()}, {"a": {"id": "a"}}, w)
+    assert w.ids() == ["a"]
