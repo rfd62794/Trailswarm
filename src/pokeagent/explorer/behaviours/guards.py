@@ -13,6 +13,9 @@ from pokeagent.explorer.demos import grade_replay
 from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN, box_open
 
 
+DIR_FAIL_BACKOUT = 6  # direction presses in a row that moved nothing (no box, no fight) before B backs out of the screen
+
+
 class LoopGuard(BehaviourBase):
     name = "guards"
 
@@ -27,6 +30,17 @@ class LoopGuard(BehaviourBase):
         gnow = tuple(sorted(ctx.goal_steps))
         if ctx.shake_goals_150 != gnow:  # a goal landed: restart the 150-press window (it went dead after goal 1)
             ctx.shake_goals_150 = gnow; hist.clear(); hist.append(pw)
+        # An unrecognised full-screen page (Pokedex entry opened by a stall escalation's START + menu exploration, 2026-11-05)
+        # swallows every direction press while no box or battle is detected: back out with B instead of mashing A / walking.
+        if ctx.last_press in DIRS and ctx.dir_fail_pos == pw and ctx.emu.read(0xD057) == 0 and not ctx.view.box:
+            ctx.dir_fail += 1
+        else:
+            ctx.dir_fail = 0
+        ctx.dir_fail_pos = pw
+        if ctx.dir_fail >= DIR_FAIL_BACKOUT:
+            ctx.shake = 0
+            if ctx.dir_fail % DIR_FAIL_BACKOUT == 0:
+                return Decision("B", "unknown_screen_back_out", f"{ctx.dir_fail} direction presses moved nothing: B in case a page is open")
         if ctx.shake > 0:
             tm_s = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
             ctx.shake -= 1

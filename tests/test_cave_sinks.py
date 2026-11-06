@@ -110,3 +110,17 @@ def test_person_in_the_way_temp_blocks_only_in_dungeons(tmp_path, map_id, blocke
     record_interaction(ctx, PressFrame("RIGHT", "agent", "t", before=(map_id, 5, 6), after=(map_id, 5, 6)))
     assert ((map_id, 6, 6) in ctx.mem.temp_blocked) is blocked
     assert not any("6,6,RIGHT" in k or k.startswith("5,6,RIGHT") for k in ctx.mem.m(map_id)["blocked"])  # never a wall
+
+
+def test_loop_guard_backs_out_of_an_unrecognised_page_with_b(tmp_path):
+    """Mt Moon B2F: START (stall escalation) -> menu A opened a Pokedex page; every direction press then failed."""
+    from pokeagent.explorer.behaviours.guards import DIR_FAIL_BACKOUT, LoopGuard
+    ctx = make_ctx(tmp_path)
+    decisions = []
+    for _ in range(DIR_FAIL_BACKOUT + 1):
+        ctx.refresh(); ctx.last_press = "UP"
+        decisions.append(LoopGuard().step(ctx))
+    assert [d.rule for d in decisions if d] == ["unknown_screen_back_out"] and ctx.shake == 0
+    ctx.emu.set(0xD362, 6); ctx.refresh()  # the player moved: the counter restarts
+    ctx.last_press = "UP"
+    assert LoopGuard().step(ctx) is None and ctx.dir_fail == 0
