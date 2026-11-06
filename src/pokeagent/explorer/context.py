@@ -81,6 +81,7 @@ class ExplorerContext:
     burst_maps: set = field(default_factory=set)
     catch_attempt: dict | None = None
     catch_mode: bool = False
+    readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
     dialog: list = field(default_factory=list)
     declined_balls: dict = field(default_factory=dict)  # (map, x, y, facing) of a ball whose starter offer we said NO to -> species
     episode: dict | None = None

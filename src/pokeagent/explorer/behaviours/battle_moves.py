@@ -83,17 +83,20 @@ class BattleMoves(BehaviourBase):
             def score(mv):
                 return observed_damage(ctx.mem.data, species, mv, def_key, enemy_max)
             tried = [mv for mv in pool if score(mv)[0]]
-            ks = move_scores(ctx.emu)  # cartridge knowledge: power x type chart x STAB x accuracy, 0 when out of PP
+            ks = move_scores(ctx.emu, catching=ctx.catch_mode)  # cartridge knowledge: power x type chart x STAB x accuracy, 0 when out of PP
             norm0 = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
             known = {norm0(k): v for k, v in ks.items()}
+            tags = {norm0(k): v[1] for k, v in ks.items()}
+            nonhit = {k for k, t in tags.items() if "[" in t and any(x in t for x in ("stat-down", "heal", "foe already", "fight ends"))}
             if known and any(known.get(norm0(mv), (0, ""))[0] > 0 for mv in pool):
                 # Willing to try: a damaging move never used against this species gets one trial (x1.3 bonus)
                 def kscore(mv):
                     base = known.get(norm0(mv), (0, ""))[0]
                     return base * (1.3 if base > 0 and mv not in tried else 1.0)
-                if ctx.catch_mode:  # weaken without a KO: the weakest move that still does damage
-                    target = min((mv for mv in pool if kscore(mv) > 0), key=kscore)
-                    ctx.move_reason = "weakest hit, catching"
+                if ctx.catch_mode:  # a sleep / paralyse move first (it raises the catch rate), else the weakest damaging hit
+                    status = [mv for mv in pool if "catch-status" in tags.get(norm0(mv), "")]
+                    target = max(status, key=kscore) if status else min((mv for mv in pool if kscore(mv) > 0 and norm0(mv) not in nonhit), key=kscore)
+                    ctx.move_reason = "status before the catch" if status else "weakest hit, catching"
                 else:
                     target = max(pool, key=lambda mv: (kscore(mv), score(mv)[1]))
                     ctx.move_reason = "" if target in tried else "first try"
