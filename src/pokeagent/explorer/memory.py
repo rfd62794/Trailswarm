@@ -47,6 +47,18 @@ class MapMemory(NavMixin):
             d.get("warps", {}).pop(key, None)
             d.get("warp_cand", {}).pop(key, None)  # or learn() would re-add it on the next sighting
 
+    def forget_warp(self, map_id: int, key: str):
+        """Drop a learned warp that a press just disproved (we walked on in the same map) and tombstone it in
+        bad_warps so learn() and the swarm merge never bring it back. A stale warp (learned from Oak's forced walk:
+        Pallet (9,11) UP -> the lab) made the planner's shortest route to the lab a 2-step ping-pong forever."""
+        d = self.m(map_id)
+        d["warps"].pop(key, None)
+        d.get("warp_cand", {}).pop(key, None)
+        d.get("warp_taken", {}).pop(key, None)
+        bad = self.data.setdefault("bad_warps", [])
+        if f"{map_id}:{key}" not in bad:
+            bad.append(f"{map_id}:{key}")
+
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
 
@@ -66,6 +78,8 @@ class MapMemory(NavMixin):
             edge = paths.setdefault(key, {"to": [m1, x1, y1], "count": 0})
             edge["to"] = [m1, x1, y1]
             edge["count"] += 1
+        if key in self.m(m0)["warps"] and m1 == m0 and (x1, y1) != (x0, y0) and self.m(m0)["warps"][key][0] != m0:
+            self.forget_warp(m0, key)  # the press walked us along the same map: this was never a door
         if m1 != m0:
             w = self.m(m0)["warps"]
             if WHITEOUT_LANDINGS.get((m1, x1, y1), m0) != m0:
