@@ -38,6 +38,13 @@ def consistency(last_n: int = 16) -> dict[str, float]:
         return {}
 
 
+def is_attempt(i: int, si: int, stop: int, furthest: int) -> bool:
+    """Was a run an attempt at goal index i? It started upstream (si < i), was not stopped before it, and either started
+    within one rung of it, stopped at it, or the goal is at most one past the furthest checkpoint (a 128-goal ladder
+    must not count every full run as a failed attempt at goals it never could have reached)."""
+    return si < i <= stop and (i <= si + 2 or stop == i or i <= furthest + 1)
+
+
 def _consistency(last_n: int = 16) -> dict[str, float]:
     """Per goal: of the recent runs that STARTED before it (first press map/goal state), the share that reached it.
     A run counts as 'attempting' a goal when it has at least 20 presses and its start was upstream of the goal."""
@@ -57,6 +64,7 @@ def _consistency(last_n: int = 16) -> dict[str, float]:
         si = -1 if st in ("baseline", "bedroom") else GOALS.index(st) if st in GOALS else GOALS.index("to_route1") if st == "team_best" else None
         stop = GOALS.index(meta["stop_at_goal"]) if meta.get("stop_at_goal") in GOALS else len(GOALS)
         return si, stop
+    fi = max((GOALS.index(g) for g in GOALS if (ROOT / "runs" / "checkpoints" / f"{g}.state").exists()), default=-1)
     for i, g in enumerate(GOALS):
         # an ATTEMPT at goal i: the run started upstream of it (start index < i) and was not stopped before it
         tries = []
@@ -66,7 +74,7 @@ def _consistency(last_n: int = 16) -> dict[str, float]:
                 started_done = set(json.loads((p / "meta.json").read_text()).get("initial_goals", []))
             except Exception:
                 started_done = set()
-            if si is not None and si < i and stop >= i and g not in started_done:
+            if si is not None and is_attempt(i, si, stop, fi) and g not in started_done:
                 tries.append(p.name)
         tries = tries[-last_n:]
         out[g] = round(sum(1 for e in ms.get(g, []) if e["run"] in tries) / max(1, len(tries)), 2) if len(tries) >= 3 else None

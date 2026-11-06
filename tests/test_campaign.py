@@ -159,3 +159,25 @@ def test_brief_truncates_the_long_ladder():
     line = campaign.brief({k: True for k in goals.GOALS[:30]}, goals.GOALS)
     assert line.startswith(f"30/{len(goals.GOALS)} done") and line.count("-") == 6 and len(line) < 160
     assert campaign.brief({k: True for k in goals.GOALS}, goals.GOALS).endswith("done")
+
+
+def test_overnight_attempt_rule_ignores_far_goals():
+    tools = str(ROOT / "tools")
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    import overnight
+    n = len(goals.GOALS)
+    assert not overnight.is_attempt(60, -1, n, 24)             # a full run from the bedroom was never an attempt at goal 60
+    assert overnight.is_attempt(1, -1, n, -1) and overnight.is_attempt(25, -1, n, 24)
+    assert overnight.is_attempt(30, 29, n, 24) and overnight.is_attempt(31, 29, n, 24)
+    assert not overnight.is_attempt(33, 29, n, 24)
+    assert overnight.is_attempt(33, 29, 33, 24)                # stopped at it
+    assert not overnight.is_attempt(5, 5, n, 24) and not overnight.is_attempt(10, 2, 8, 24)
+
+
+def test_snapshot_goals_come_in_ladder_order():
+    from pokeagent.adapters import explorer_snapshot as es
+    key = lambda k: (goals.GOALS.index(k) if k in goals.GOALS else len(goals.GOALS), k)
+    names = ["to_route5", "potion", "gyarados", "beat_champion", "to_bill"]
+    assert sorted(names, key=key) == ["potion", "to_bill", "to_route5", "beat_champion", "gyarados"]
+    assert es.GOALS is goals.GOALS
