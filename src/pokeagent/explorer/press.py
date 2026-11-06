@@ -143,14 +143,21 @@ class Presser:
         if rd is None:
             self._press(fr)
             return
-        rd.begin(ctx)
+        try:  # recording must never end a run
+            rd.begin(ctx)
+        except Exception as e:
+            ctx.ram_diff = None
+            ctx.log(f"[ram diff off: {e!r}]", "res")
+            self._press(fr)
+            return
         try:
             self._press(fr)
         finally:
-            try:  # recording must never end a run
+            try:
                 rd.end(ctx, fr)
             except Exception as e:
-                ctx.log(f"[ram diff failed: {e!r}]", "res")
+                ctx.ram_diff = None
+                ctx.log(f"[ram diff off: {e!r}]", "res")
 
     def _press(self, fr: PressFrame) -> None:
         ctx = self.ctx

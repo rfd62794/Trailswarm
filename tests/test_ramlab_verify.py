@@ -6,7 +6,7 @@ from pokeagent.ramlab.mine import mine
 from pokeagent.ramlab.verify import judge, passed, run_checks
 
 ENTRIES = [
-    {"name": "wPlayerMoney", "addr": "0xD347", "size": 3, "region": "items", "verified": False},
+    {"name": "wPlayerMoney", "addr": "0xD347", "size": 1, "region": "items", "verified": False},
     {"name": "wTileMap", "addr": "0xC3A0", "size": 360, "region": "text", "verified": False},
 ]
 
@@ -44,12 +44,28 @@ def setup(tmp_path, monkeypatch):
 
 
 def test_judge_and_pass_rule():
-    ok = judge("inc1", {}, 1, [1, 1, 2], [1, 1, 1])
-    assert ok == {"in_sync": True, "event_ok": True, "control_clean": True}
+    j = judge("inc1", {}, 1, [1, 1, 2], [1, 1, 1])
+    assert j == {"in_sync": True, "event_ok": True, "control_clean": True}
     assert judge("inc1", {}, 1, [1, 1, 2], [1, 2, 2])["control_clean"] is False
     assert judge("inc1", {}, 5, [1, 1, 2], [1, 1, 1])["in_sync"] is False
-    assert passed([ok, ok]) and not passed([ok])                # one witness is not enough
-    assert not passed([ok, ok, {**ok, "event_ok": False}, {**ok, "event_ok": False}])
+    a, b = {**j, "run": "a"}, {**j, "run": "b"}
+    assert passed([a, b]) and not passed([a])                    # one witness is not enough
+    assert not passed([a, {**a, "step": 2}])                     # two witnesses from ONE run are not enough
+    assert not passed([a, {**b, "control_clean": False}])        # time-driven does not verify
+    assert not passed([a, b, {**a, "event_ok": False}, {**b, "event_ok": False}])
+
+
+def cand(kind, examples):
+    from pokeagent.ramlab.mine import Candidate
+    return Candidate("e", 1, 5, 1, 0, 1, kind, 1, 2, 1, examples)
+
+
+def test_weak_kinds_never_verify():
+    from pokeagent.ramlab.verify import weak_kind
+    assert weak_kind(cand("const:185", [(0, 185)]))
+    assert weak_kind(cand("zero", [(1, 0), (1, 0)])) and not weak_kind(cand("zero", [(201, 0), (202, 0)]))
+    assert weak_kind(cand("copy:battle_kind", [(0, 1), (0, 2)])) and not weak_kind(cand("copy:enemy_species", [(0, 165)]))
+    assert not weak_kind(cand("inc1", [(1, 2)])) and not weak_kind(cand("set_bit:0", [(0, 1)]))
 
 
 def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
@@ -59,15 +75,15 @@ def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
     labels = LabelIndex(ENTRIES)
     good, _ = run_checks(cands, recs, runs, FakeReplayer(), labels)
     assert good[0]["verified"] and good[0]["status"] == "confirms" and good[0]["label"] == "wPlayerMoney"
-    assert "press-driven" in good[0]["evidence"]
+    assert "press-driven" in good[0]["evidence"] and "2 run(s)" in good[0]["evidence"]
     leaky, _ = run_checks(cands, recs, runs, FakeReplayer(leaky=True), labels)
-    assert leaky[0]["verified"] and "time-driven" in leaky[0]["evidence"]
+    assert not leaky[0]["verified"] and "time-driven" in leaky[0]["evidence"]       # unverified, but not a failure
+    assert leaky[0]["replay"]["passed"] == leaky[0]["replay"]["witnesses"]
     for bad in (FakeReplayer(drift=True), FakeReplayer(dead=True)):
         res, _ = run_checks(cands, recs, runs, bad, labels)
         assert not res[0]["verified"]
     entries = [dict(e) for e in ENTRIES]
-    data = {"findings": good}
-    assert F.apply_to_map(entries, data) == 1
+    assert F.apply_to_map(entries, {"findings": good}) == 1
     assert good[0]["flipped_label"] and "e.g. 1->2" in good[0]["evidence"]
     assert entries[0]["verified"] and "replay" in entries[0]["evidence"] and not entries[1].get("verified")
     entries2 = [dict(e) for e in ENTRIES]
@@ -75,9 +91,21 @@ def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
     assert F.apply_to_map(entries2, {"findings": res}) == 0 and not entries2[0].get("verified")
 
 
+def test_apply_to_map_region_and_byte_coverage_rules():
+    def f(label, addr):
+        return {"verified": True, "status": "confirms", "label": label, "addr": addr, "evidence": "x"}
+    entries = [{"name": "wAudioThing", "addr": "0xC0EF", "size": 1, "region": "audio", "verified": False},
+               {"name": "wMoney3", "addr": "0xD347", "size": 3, "region": "items", "verified": False},
+               {"name": "wOne", "addr": "0xD100", "size": 1, "region": "map", "verified": False}]
+    data = {"findings": [f("wAudioThing", "0xC0EF"), f("wMoney3", "0xD347"), f("wOne", "0xD100")]}
+    assert F.apply_to_map(entries, data) == 1 and entries[2]["verified"]            # audio and a 1/3-covered array held back
+    data["findings"] += [f("wMoney3", "0xD348"), f("wMoney3", "0xD349")]
+    assert F.apply_to_map(entries, data) == 1 and entries[1]["verified"] and not entries[0]["verified"]
+
+
 def test_big_labels_are_not_flipped(tmp_path):
     entries = [{"name": "wTileMap", "addr": "0xC3A0", "size": 360, "region": "text", "verified": False}]
-    f = {"verified": True, "status": "confirms", "label": "wTileMap", "evidence": "x"}
+    f = {"verified": True, "status": "confirms", "label": "wTileMap", "addr": "0xC3A0", "evidence": "x"}
     assert F.apply_to_map(entries, {"findings": [f]}) == 0
 
 

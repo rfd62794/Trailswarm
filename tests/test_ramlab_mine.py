@@ -67,7 +67,7 @@ def test_label_join():
     idx = LabelIndex(ENTRIES)
     assert idx.join("money", 0xD348)[0] == "confirms" and idx.join("money", 0xD348)[1].name == "wPlayerMoney"
     assert idx.join("battle_start", 0xD059)[0] == "confirms"
-    assert idx.join("money", 0xD059)[0] == "labelled"             # a label, but money should not touch it
+    assert idx.join("map_change", 0xD059)[0] == "labelled"             # a label, but money should not touch it
     assert idx.join("battle_start", 0xD123) == ("new", None)      # no label
     assert idx.join("battle_start", 0xD001)[0] == "new"           # unused region counts as unknown
     assert idx.join("text_open", 0xC400)[0] == "confirms"

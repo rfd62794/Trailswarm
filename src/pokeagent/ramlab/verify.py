@@ -1,10 +1,10 @@
 """Auto-verification: replay the recorded witnesses of a candidate and assert the predicted change.
 
-Per witness (run, step): the replayed pre-state must match the recorded 'before' byte (the replay is in sync)
-and the press must produce the predicted kind of change. A control replay of the same stretch WITHOUT the press
-says whether the change is press-driven or time-driven (a menu/text box keeps opening on its own after an
-earlier press); that is reported in the evidence, not required. A finding is verified only when >= MIN_WITNESSES
-witnesses are all in sync and at least two thirds reproduce the change.
+Per witness (run, step): the replayed pre-state must match the recorded 'before' byte (the replay is in sync),
+the press must produce the predicted kind of change, and a control replay of the same stretch WITHOUT the press
+must not (press-driven). A finding is verified only when >= MIN_WITNESSES witnesses are all in sync, at least
+two thirds pass both parts, the passing witnesses span >= MIN_RUNS distinct runs, and the kind of change says
+more than a constant (see ``weak_kind``). Time-driven or weak findings stay unverified (not failed).
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from pokeagent.ramlab.mine import Candidate
 from pokeagent.ramlab.replay import Unreplayable, load_trace
 
 MIN_WITNESSES = 2
+MIN_RUNS = 2
 
 
 def judge(kind: str, vals: dict, recorded_before: int, ev: list[int], ct: list[int]) -> dict:
@@ -30,13 +31,27 @@ def judge(kind: str, vals: dict, recorded_before: int, ev: list[int], ct: list[i
 
 
 def passed(results: list[dict]) -> bool:
-    ok = [r for r in results if r["in_sync"] and r["event_ok"]]
-    return len(results) >= MIN_WITNESSES and all(r["in_sync"] for r in results) and len(ok) * 3 >= len(results) * 2
+    ok = [r for r in results if r["in_sync"] and r["event_ok"] and r["control_clean"]]
+    return (len(results) >= MIN_WITNESSES and all(r["in_sync"] for r in results) and len(ok) * 3 >= len(results) * 2
+            and len({r.get("run") for r in ok}) >= MIN_RUNS)
+
+
+def weak_kind(c: Candidate) -> bool:
+    """A bare constant says little: set to N, cleared to 0 from one fixed value, or a copy of a value <= 3."""
+    head = c.kind.split(":")[0]
+    if head == "const":
+        return True
+    if head == "zero":
+        return len({b for b, _ in c.examples if b}) < 2
+    if head == "copy":
+        return all(a <= 3 for _, a in c.examples)
+    return False
 
 
 def evidence_text(c: Candidate, results: list[dict]) -> str:
     ok = sum(r["event_ok"] for r in results)
     drive = "press-driven" if all(r["control_clean"] for r in results) else "time-driven (also changes without the press)"
+    drive += f", {len({r.get('run') for r in results})} run(s)"
     eg = ", ".join(f"{b}->{a}" for b, a in dict.fromkeys(c.examples[:6]).keys())
     return (f"{c.event}: byte {describe(c.kind)} [e.g. {eg}] ({c.support} occurrences in {c.runs} run(s), specificity {c.specificity}, "
             f"consistency {c.consistency}); replay: {ok}/{len(results)} witnesses reproduce it, {drive}")
@@ -87,18 +102,18 @@ def run_checks(cands: list[Candidate], records: list[dict], runs_dir: dict[str, 
             addrs = sorted({c.addr for c, *_ in items})
             ev, ct = replayer.branches(pres[step], press, gap, addrs)
             for c, rec, before in items:
-                results[c.key()].append(judge(c.kind, rec.get("vals", {}), before, ev[c.addr], ct[c.addr]))
+                results[c.key()].append({**judge(c.kind, rec.get("vals", {}), before, ev[c.addr], ct[c.addr]), "run": run})
     findings = []
     for c in cands:
         res = results.get(c.key(), [])
         status, lb = labels.join(c.event, c.addr)
-        ok = passed(res)
+        ok = passed(res) and not weak_kind(c)
         findings.append({
             "addr": f"0x{c.addr:04X}", "event": c.event, "kind": c.kind, "status": status,
             "label": lb.name if lb else "", "label_size": lb.size if lb else 0, "name": finding_name(c.event, c.addr, lb), "verified": ok,
             "evidence": evidence_text(c, res) if res else notes.get(c.key(), "no replayable witness"),
             "stats": {"support": c.support, "runs": c.runs, "specificity": c.specificity, "consistency": c.consistency,
                       "score": c.score},
-            "replay": {"witnesses": len(res), "passed": sum(r["event_ok"] for r in res),
+            "replay": {"witnesses": len(res), "passed": sum(r["event_ok"] for r in res), "press_driven": sum(r["event_ok"] and r["control_clean"] for r in res),
                        "in_sync": sum(r["in_sync"] for r in res)}})
     return findings, [{"key": k, "note": n} for k, n in notes.items()]

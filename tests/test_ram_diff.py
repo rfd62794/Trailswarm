@@ -30,30 +30,28 @@ def test_changed_offsets_finds_exact_bytes():
     assert changed_offsets(bytes(a), bytes(a)) == []
 
 
-def test_noise_learning_drops_always_changing_bytes(tmp_path):
-    class Ticker(FakeEmulator):
-        def tick(self, n):
-            self.memory[0xC010] = (self.memory.get(0xC010, 0) + 1) % 256   # a frame timer
-            super().tick(n)
-    emu = Ticker()
-    rd = RamDiffer(tmp_path / "ram_events.jsonl")
-    assert rd.learn_noise(emu, rounds=10) == 1
-    assert offset(0xC010) in rd.noisy
+def test_noise_is_learned_from_the_first_presses_and_applied_retroactively(tmp_path):
+    emu = FakeEmulator()
+    rd = RamDiffer(tmp_path / "ram_events.jsonl", warm=5, step_every=1)
     ctx = ctx_for(emu, tmp_path)
+    for i in range(5):                                   # 0xC010 (a timer) changes on every one of the first presses
+        rd.begin(ctx)
+        emu.memory[0xC010] = i + 1; emu.memory[0xD362] = 100 + i
+        rd.end(ctx, fr())
+    assert offset(0xC010) in rd.noisy and offset(0xD362) in rd.noisy    # both change every press
+    assert emu.frames == 0                                              # nothing was emulated to learn it
     rd.begin(ctx)
-    emu.memory[0xC010] += 1; emu.memory[0xD400] = 7
-    emu.memory[0xD057] = 1                              # battle starts: an event
+    emu.memory[0xC010] = 99; emu.memory[0xD400] = 7; emu.memory[0xD057] = 1   # battle starts
     rd.end(ctx, fr())
     rd.close()
-    recs = [json.loads(x) for x in (tmp_path / "ram_events.jsonl").read_text().splitlines() if '"ev"' in x]
-    addrs = {d[0] for d in recs[0]["d"]}
-    assert 0xC010 not in addrs and {0xD400, 0xD057} <= addrs
-    assert "battle_start" in recs[0]["ev"]
+    recs = [json.loads(x) for x in (tmp_path / "ram_events.jsonl").read_text().splitlines()]
+    assert len(recs) == 6 and all(0xC010 not in {d[0] for d in r["d"]} for r in recs)
+    assert {d[0] for d in recs[-1]["d"]} == {0xD400, 0xD057} and "battle_start" in recs[-1]["ev"]
 
 
 def test_records_are_bounded(tmp_path):
     emu = FakeEmulator()
-    rd = RamDiffer(tmp_path / "ram_events.jsonl", max_changed=5, max_records=3)
+    rd = RamDiffer(tmp_path / "ram_events.jsonl", max_changed=5, max_records=3, warm=0)
     ctx = ctx_for(emu, tmp_path)
     for i in range(6):
         rd.begin(ctx)
@@ -65,11 +63,12 @@ def test_records_are_bounded(tmp_path):
     recs = [json.loads(x) for x in (tmp_path / "ram_events.jsonl").read_text().splitlines()]
     assert len(recs) == 3
     assert all(len(r["d"]) <= 5 and r["n"] > 5 for r in recs)
+    assert rd.off and rd.presses == 3                       # capped: later presses are not even snapshotted
 
 
 def test_plain_presses_sampled_as_step(tmp_path):
     emu = FakeEmulator()
-    rd = RamDiffer(tmp_path / "e.jsonl", step_every=4)
+    rd = RamDiffer(tmp_path / "e.jsonl", step_every=4, warm=0)
     ctx = ctx_for(emu, tmp_path)
     for i in range(8):
         rd.begin(ctx); emu.memory[0xD362] = i; rd.end(ctx, fr())
@@ -101,7 +100,7 @@ def test_emulator_press_hook_and_trace(tmp_path):
 
 def test_truncation_keeps_the_rarest_bytes(tmp_path):
     emu = FakeEmulator()
-    rd = RamDiffer(tmp_path / "e.jsonl", max_changed=3, step_every=1)
+    rd = RamDiffer(tmp_path / "e.jsonl", max_changed=3, step_every=1, warm=0)
     ctx = ctx_for(emu, tmp_path)
     for i in range(5):                                   # 0xC000-0xC009 change on every press: common
         rd.begin(ctx)
@@ -124,10 +123,40 @@ def test_start_ram_diff_keeps_a_private_copy_of_the_start_state(tmp_path):
     st = tmp_path / "cp.state"; st.write_bytes(b"state-bytes")
     run = tmp_path / "run"; run.mkdir()
     ctx = NS(ram_diff=None)
-    rd = start_ram_diff(ctx, FakeEmulator(), run, str(st), "Pokemon Red.gb")
+    emu = FakeEmulator()
+    rd = start_ram_diff(ctx, emu, run, str(st), "Pokemon Red.gb")
+    emu_frames_unchanged = emu.frames == 0
     rd.close()
     assert ctx.ram_diff is rd and (run / "ram_start.state").read_bytes() == b"state-bytes"
     st.write_bytes(b"overwritten by a goal checkpoint")
     meta, _ = load_trace(run)
-    assert meta["start"] == "cp" and meta["lead_ticks"] == 30
+    assert meta["start"] == "cp" and meta["lead_ticks"] == 30 and emu_frames_unchanged
     assert start_state(meta, tmp_path, run) == run / "ram_start.state"
+
+
+def test_recording_failures_never_raise(tmp_path):
+    from pokeagent.explorer.ram_diff import start_ram_diff
+    ctx = NS(ram_diff="x")
+    assert start_ram_diff(ctx, FakeEmulator(), tmp_path / "missing" / "dir", None, "r.gb") is None and ctx.ram_diff is None
+    emu = FakeEmulator()
+    emu.on_press = None
+    rd = RamDiffer(tmp_path / "e.jsonl", warm=0)
+    rd.attach(emu)
+    class Boom(FakeEmulator):
+        def read_range(self, start, length):
+            raise RuntimeError("emulator went away")
+    rd.begin(NS(emu=Boom(), goal_steps={}))           # must not raise
+    assert rd.off and emu.on_press is None            # recording switched itself off and detached the hook
+    rd.end(NS(emu=emu, goal_steps={}, last_text="", step=1), fr())
+    rd.close()
+
+
+def test_trace_is_capped(tmp_path):
+    emu = FakeEmulator(); emu.on_press = None; emu.frames = 0
+    rd = RamDiffer(tmp_path / "e.jsonl", max_trace=3, warm=0)
+    rd.attach(emu)
+    for _ in range(3):
+        emu.on_press(Button.A, 8, 16)
+    assert rd.off and emu.on_press is None
+    rd.close()
+    assert len((tmp_path / "ram_trace.jsonl").read_text().splitlines()) == 1 + 3

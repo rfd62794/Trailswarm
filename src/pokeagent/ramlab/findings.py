@@ -39,14 +39,25 @@ def upsert(data: dict, entry: dict, bucket: str = "findings") -> None:
     rows.sort(key=lambda r: (r["addr"], r["event"]))
 
 
+NO_AUTO_REGIONS = {"audio", "scratch"}
+
+
 def apply_to_map(entries: list[dict], data: dict) -> int:
-    """Flip ram_map.json labels to verified for verified findings that confirm a precise (<= 8 byte) label.
-    Never downgrades; returns how many labels flipped."""
+    """Flip ram_map.json labels to verified for verified findings that confirm a label. Never downgrades.
+    Not for audio/scratch regions, labels over 8 bytes, or multi-byte labels unless every byte is covered by
+    verified findings. Returns how many labels flipped."""
     by_name = {e["name"]: e for e in entries}
+    covered: dict[str, set[int]] = {}
+    for f in data["findings"]:
+        if f.get("verified") and f["status"] == "confirms":
+            covered.setdefault(f.get("label", ""), set()).add(int(f["addr"], 16))
     flipped = 0
     for f in data["findings"]:
         e = by_name.get(f.get("label", ""))
-        if not (f.get("verified") and f["status"] == "confirms" and e and e["size"] <= 8):
+        if not (f.get("verified") and f["status"] == "confirms" and e and e["size"] <= 8 and e["region"] not in NO_AUTO_REGIONS):
+            continue
+        base = int(e["addr"], 16)
+        if e["size"] > 1 and not set(range(base, base + e["size"])) <= covered.get(e["name"], set()):
             continue
         if not e.get("verified"):
             e["verified"], e["evidence"] = True, f["evidence"]

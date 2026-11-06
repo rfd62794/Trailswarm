@@ -10,7 +10,7 @@
    "label_size": 8,
    "name": "wChannelCommandPointers",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 93->0] (180 occurrences in 12 run(s), specificity 0.967, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 93->0] (180 occurrences in 12 run(s), specificity 0.967, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 180,
     "runs": 12,
@@ -21,9 +21,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC026",
@@ -33,8 +33,8 @@
    "label": "wChannelSoundIDs",
    "label_size": 4,
    "name": "wChannelSoundIDs",
-   "verified": true,
-   "evidence": "battle_start: byte set to 240 [e.g. 235->240] (162 occurrences in 12 run(s), specificity 0.972, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 240 [e.g. 235->240] (162 occurrences in 12 run(s), specificity 0.972, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 162,
     "runs": 12,
@@ -45,9 +45,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC027",
@@ -57,8 +57,8 @@
    "label": "wChannelSoundIDs",
    "label_size": 4,
    "name": "wChannelSoundIDs",
-   "verified": true,
-   "evidence": "battle_start: byte set to 240 [e.g. 235->240] (162 occurrences in 12 run(s), specificity 0.972, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 240 [e.g. 235->240] (162 occurrences in 12 run(s), specificity 0.972, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 162,
     "runs": 12,
@@ -69,6 +69,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -81,7 +82,7 @@
    "label_size": 4,
    "name": "wChannelSoundIDs",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 235->0] (177 occurrences in 12 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 235->0] (177 occurrences in 12 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 177,
     "runs": 12,
@@ -92,6 +93,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -104,7 +106,7 @@
    "label_size": 4,
    "name": "wChannelFlags1",
    "verified": true,
-   "evidence": "battle_start: byte clears bit 2 [e.g. 4->0] (173 occurrences in 12 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte clears bit 2 [e.g. 4->0] (173 occurrences in 12 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 173,
     "runs": 12,
@@ -115,9 +117,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC056",
@@ -127,8 +129,8 @@
    "label": "wChannelVibratoExtents",
    "label_size": 4,
    "name": "wChannelVibratoExtents",
-   "verified": true,
-   "evidence": "battle_start: byte set to 33 [e.g. 17->33] (181 occurrences in 12 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 33 [e.g. 17->33] (181 occurrences in 12 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 181,
     "runs": 12,
@@ -139,9 +141,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC057",
@@ -151,8 +153,8 @@
    "label": "wChannelVibratoExtents",
    "label_size": 4,
    "name": "wChannelVibratoExtents",
-   "verified": true,
-   "evidence": "battle_start: byte set to 17 [e.g. 0->17] (179 occurrences in 12 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 17 [e.g. 0->17] (179 occurrences in 12 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 179,
     "runs": 12,
@@ -163,6 +165,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -174,8 +177,8 @@
    "label": "wChannelVibratoDelayCounterReloadValues",
    "label_size": 4,
    "name": "wChannelVibratoDelayCounterReloadValues",
-   "verified": true,
-   "evidence": "battle_start: byte set to 6 [e.g. 4->6] (178 occurrences in 12 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 6 [e.g. 4->6] (178 occurrences in 12 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 178,
     "runs": 12,
@@ -186,9 +189,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC06F",
@@ -198,8 +201,8 @@
    "label": "wChannelVibratoDelayCounterReloadValues",
    "label_size": 4,
    "name": "wChannelVibratoDelayCounterReloadValues",
-   "verified": true,
-   "evidence": "battle_start: byte set to 8 [e.g. 0->8] (176 occurrences in 12 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 8 [e.g. 0->8] (176 occurrences in 12 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 176,
     "runs": 12,
@@ -210,6 +213,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -221,8 +225,8 @@
    "label": "wChannelNoteSpeeds",
    "label_size": 4,
    "name": "wChannelNoteSpeeds",
-   "verified": true,
-   "evidence": "battle_start: byte copies the event battle_kind [e.g. 12->1] (184 occurrences in 12 run(s), specificity 0.989, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte copies the event battle_kind [e.g. 12->1] (184 occurrences in 12 run(s), specificity 0.989, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 184,
     "runs": 12,
@@ -233,9 +237,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC0E6",
@@ -245,8 +249,8 @@
    "label": "wMusicWaveInstrument",
    "label_size": 1,
    "name": "wMusicWaveInstrument",
-   "verified": true,
-   "evidence": "battle_start: byte copies the event battle_kind [e.g. 3->1] (157 occurrences in 12 run(s), specificity 0.97, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte copies the event battle_kind [e.g. 3->1] (157 occurrences in 12 run(s), specificity 0.97, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 157,
     "runs": 12,
@@ -257,9 +261,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC0EF",
@@ -269,8 +273,8 @@
    "label": "wAudioROMBank",
    "label_size": 1,
    "name": "wAudioROMBank",
-   "verified": true,
-   "evidence": "battle_start: byte set to 8 [e.g. 2->8] (184 occurrences in 12 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 8 [e.g. 2->8] (184 occurrences in 12 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 184,
     "runs": 12,
@@ -281,9 +285,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC0F0",
@@ -293,8 +297,8 @@
    "label": "wAudioSavedROMBank",
    "label_size": 1,
    "name": "wAudioSavedROMBank",
-   "verified": true,
-   "evidence": "battle_start: byte set to 8 [e.g. 2->8] (182 occurrences in 12 run(s), specificity 0.953, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 8 [e.g. 2->8] (182 occurrences in 12 run(s), specificity 0.953, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 182,
     "runs": 12,
@@ -305,9 +309,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xC122",
@@ -318,7 +322,7 @@
    "label_size": 1,
    "name": "wSprite02StateData1ImageIndex",
    "verified": true,
-   "evidence": "text_close: byte increases [e.g. 255->20, 255->24, 24->255, 255->28, 20->255, 20->24] (295 occurrences in 14 run(s), specificity 0.909, consistency 0.936); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte increases [e.g. 255->20, 255->24, 24->255, 255->28, 20->255, 20->24] (295 occurrences in 14 run(s), specificity 0.909, consistency 0.936); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 295,
     "runs": 14,
@@ -329,6 +333,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -341,7 +346,7 @@
    "label_size": 1,
    "name": "wSprite02StateData1ImageIndex",
    "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 20->255, 28->16, 24->255, 28->255, 16->255] (305 occurrences in 14 run(s), specificity 0.91, consistency 0.974); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 20->255, 28->16, 24->255, 28->255, 16->255] (305 occurrences in 14 run(s), specificity 0.91, consistency 0.974); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 305,
     "runs": 14,
@@ -352,6 +357,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -364,7 +370,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite08YCoord",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 160->76] (367 occurrences in 14 run(s), specificity 0.892, consistency 0.984); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 160->76] (367 occurrences in 14 run(s), specificity 0.892, consistency 0.984); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 367,
     "runs": 14,
@@ -375,6 +381,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -387,7 +394,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite08YCoord",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 92->60, 0->72, 76->12, 76->160] (341 occurrences in 19 run(s), specificity 0.888, consistency 0.985); replay: 2/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 92->60, 0->72, 76->12, 76->160] (341 occurrences in 19 run(s), specificity 0.888, consistency 0.985); replay: 2/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 341,
     "runs": 19,
@@ -398,6 +405,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -410,7 +418,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite09YCoord",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 160->76] (404 occurrences in 14 run(s), specificity 0.886, consistency 0.985); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 160->76] (404 occurrences in 14 run(s), specificity 0.886, consistency 0.985); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 404,
     "runs": 14,
@@ -421,6 +429,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -433,7 +442,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite09YCoord",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 92->60, 0->56, 76->12, 76->160] (374 occurrences in 19 run(s), specificity 0.881, consistency 0.987); replay: 2/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 92->60, 0->56, 76->12, 76->160] (374 occurrences in 19 run(s), specificity 0.881, consistency 0.987); replay: 2/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 374,
     "runs": 19,
@@ -444,6 +453,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -456,7 +466,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite10YCoord",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 160->84] (396 occurrences in 14 run(s), specificity 0.89, consistency 0.985); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 160->84] (396 occurrences in 14 run(s), specificity 0.89, consistency 0.985); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 396,
     "runs": 14,
@@ -467,6 +477,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -479,7 +490,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite10YCoord",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 100->68, 0->64, 84->20, 84->160] (358 occurrences in 19 run(s), specificity 0.884, consistency 0.986); replay: 2/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 100->68, 0->64, 84->20, 84->160] (358 occurrences in 19 run(s), specificity 0.884, consistency 0.986); replay: 2/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 358,
     "runs": 19,
@@ -490,6 +501,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -502,7 +514,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite11YCoord",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 160->84] (386 occurrences in 14 run(s), specificity 0.892, consistency 0.984); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 160->84] (386 occurrences in 14 run(s), specificity 0.892, consistency 0.984); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 386,
     "runs": 14,
@@ -513,6 +525,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -525,7 +538,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite11YCoord",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 100->68, 0->72, 84->20, 84->160] (345 occurrences in 19 run(s), specificity 0.886, consistency 0.986); replay: 2/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 100->68, 0->72, 84->20, 84->160] (345 occurrences in 19 run(s), specificity 0.886, consistency 0.986); replay: 2/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 345,
     "runs": 19,
@@ -536,6 +549,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -547,8 +561,8 @@
    "label": "wShadowOAMSprite16XCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite16XCoord",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 200->160, 104->152, 0->200, 200->162] (191 occurrences in 18 run(s), specificity 0.975, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 200->160, 104->152, 0->200, 200->162] (191 occurrences in 18 run(s), specificity 0.975, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 191,
     "runs": 18,
@@ -559,6 +573,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -570,8 +585,8 @@
    "label": "wShadowOAMSprite17XCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite17XCoord",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 200->160, 112->160, 0->200, 200->162] (191 occurrences in 18 run(s), specificity 0.975, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 200->160, 112->160, 0->200, 200->162] (191 occurrences in 18 run(s), specificity 0.975, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 191,
     "runs": 18,
@@ -582,6 +597,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -593,8 +609,8 @@
    "label": "wShadowOAMSprite18XCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite18XCoord",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 208->168, 104->152, 0->208, 208->170] (191 occurrences in 18 run(s), specificity 0.976, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 208->168, 104->152, 0->208, 208->170] (191 occurrences in 18 run(s), specificity 0.976, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 191,
     "runs": 18,
@@ -605,6 +621,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -616,8 +633,8 @@
    "label": "wShadowOAMSprite19XCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite19XCoord",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 208->168, 112->160, 0->208, 208->170] (191 occurrences in 18 run(s), specificity 0.976, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 208->168, 112->160, 0->208, 208->170] (191 occurrences in 18 run(s), specificity 0.976, consistency 0.979); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 191,
     "runs": 18,
@@ -628,6 +645,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -639,8 +657,8 @@
    "label": "wShadowOAMSprite20XCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite20XCoord",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 208->168, 0->208, 0->182, 208->170] (188 occurrences in 18 run(s), specificity 0.98, consistency 0.995); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 208->168, 0->208, 0->182, 208->170] (188 occurrences in 18 run(s), specificity 0.98, consistency 0.995); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 188,
     "runs": 18,
@@ -651,6 +669,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -662,8 +681,8 @@
    "label": "wShadowOAMSprite21YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite21YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (151 occurrences in 12 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (151 occurrences in 12 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 151,
     "runs": 12,
@@ -674,6 +693,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -685,8 +705,8 @@
    "label": "wShadowOAMSprite22YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite22YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (147 occurrences in 12 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (147 occurrences in 12 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 147,
     "runs": 12,
@@ -697,6 +717,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -708,8 +729,8 @@
    "label": "wShadowOAMSprite24YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite24YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -720,6 +741,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -731,8 +753,8 @@
    "label": "wShadowOAMSprite24YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite24YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (159 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (159 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 159,
     "runs": 12,
@@ -743,6 +765,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -754,8 +777,8 @@
    "label": "wShadowOAMSprite25YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite25YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -766,6 +789,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -777,8 +801,8 @@
    "label": "wShadowOAMSprite25YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite25YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (158 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (158 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 158,
     "runs": 12,
@@ -789,6 +813,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -800,8 +825,8 @@
    "label": "wShadowOAMSprite26YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite26YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -812,6 +837,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -823,8 +849,8 @@
    "label": "wShadowOAMSprite26YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite26YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (158 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (158 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 158,
     "runs": 12,
@@ -835,6 +861,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -846,8 +873,8 @@
    "label": "wShadowOAMSprite27YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite27YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -858,6 +885,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -869,8 +897,8 @@
    "label": "wShadowOAMSprite27YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite27YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (156 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (156 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 156,
     "runs": 12,
@@ -881,6 +909,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -892,8 +921,8 @@
    "label": "wShadowOAMSprite28YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite28YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -904,6 +933,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -915,8 +945,8 @@
    "label": "wShadowOAMSprite28YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite28YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (162 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (162 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 162,
     "runs": 12,
@@ -927,6 +957,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -938,8 +969,8 @@
    "label": "wShadowOAMSprite29YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite29YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -950,6 +981,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -961,8 +993,8 @@
    "label": "wShadowOAMSprite29YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite29YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (162 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (162 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 162,
     "runs": 12,
@@ -973,6 +1005,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -984,8 +1017,8 @@
    "label": "wShadowOAMSprite30YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite30YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -996,6 +1029,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1007,8 +1041,8 @@
    "label": "wShadowOAMSprite30YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite30YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (161 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (161 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 161,
     "runs": 12,
@@ -1019,6 +1053,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1030,8 +1065,8 @@
    "label": "wShadowOAMSprite31YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite31YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -1042,6 +1077,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1053,8 +1089,8 @@
    "label": "wShadowOAMSprite31YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite31YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (159 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (159 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 159,
     "runs": 12,
@@ -1065,6 +1101,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1076,8 +1113,8 @@
    "label": "wShadowOAMSprite32YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite32YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -1088,6 +1125,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1099,8 +1137,8 @@
    "label": "wShadowOAMSprite32YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite32YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (157 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (157 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 157,
     "runs": 12,
@@ -1111,6 +1149,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1122,8 +1161,8 @@
    "label": "wShadowOAMSprite33YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite33YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -1134,6 +1173,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1145,8 +1185,8 @@
    "label": "wShadowOAMSprite33YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite33YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (152 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (152 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 152,
     "runs": 12,
@@ -1157,6 +1197,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1168,8 +1209,8 @@
    "label": "wShadowOAMSprite34YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite34YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (149 occurrences in 15 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 149,
     "runs": 15,
@@ -1180,6 +1221,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1191,8 +1233,8 @@
    "label": "wShadowOAMSprite34YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite34YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (150 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (150 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 12,
@@ -1203,6 +1245,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1214,8 +1257,8 @@
    "label": "wShadowOAMSprite35YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite35YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 15,
@@ -1226,6 +1269,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1237,8 +1281,8 @@
    "label": "wShadowOAMSprite35YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite35YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (157 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (157 occurrences in 12 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 157,
     "runs": 12,
@@ -1249,6 +1293,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1260,8 +1305,8 @@
    "label": "wShadowOAMSprite36YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite36YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.958, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 15,
@@ -1272,6 +1317,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1283,8 +1329,8 @@
    "label": "wShadowOAMSprite36YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite36YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (155 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (155 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 155,
     "runs": 12,
@@ -1295,6 +1341,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1306,8 +1353,8 @@
    "label": "wShadowOAMSprite37YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite37YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 15,
@@ -1318,6 +1365,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1329,8 +1377,8 @@
    "label": "wShadowOAMSprite37YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite37YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (153 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (153 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 153,
     "runs": 12,
@@ -1341,6 +1389,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1352,8 +1401,8 @@
    "label": "wShadowOAMSprite38YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite38YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 15,
@@ -1364,6 +1413,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1375,8 +1425,8 @@
    "label": "wShadowOAMSprite38YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite38YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (150 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (150 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 12,
@@ -1387,6 +1437,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1398,8 +1449,8 @@
    "label": "wShadowOAMSprite39YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite39YCoord",
-   "verified": true,
-   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 160 [e.g. 0->160] (150 occurrences in 15 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 150,
     "runs": 15,
@@ -1410,6 +1461,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1421,8 +1473,8 @@
    "label": "wShadowOAMSprite39YCoord",
    "label_size": 1,
    "name": "wShadowOAMSprite39YCoord",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (148 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 160->0] (148 occurrences in 12 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 148,
     "runs": 12,
@@ -1433,6 +1485,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1444,8 +1497,8 @@
    "label": "wShadowOAMEnd",
    "label_size": 256,
    "name": "wShadowOAMEnd",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 127->122, 64->122, 44->122] (771 occurrences in 17 run(s), specificity 0.856, consistency 0.973); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 127->122, 64->122, 44->122] (771 occurrences in 17 run(s), specificity 0.856, consistency 0.973); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 771,
     "runs": 17,
@@ -1456,6 +1509,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1467,8 +1521,8 @@
    "label": "wShadowOAMEnd",
    "label_size": 256,
    "name": "wShadowOAMEnd",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 127->122, 65->122, 44->122] (820 occurrences in 19 run(s), specificity 0.844, consistency 0.978); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 127->122, 65->122, 44->122] (820 occurrences in 19 run(s), specificity 0.844, consistency 0.978); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 820,
     "runs": 19,
@@ -1479,6 +1533,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1490,8 +1545,8 @@
    "label": "wShadowOAMEnd",
    "label_size": 256,
    "name": "wShadowOAMEnd",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 127->122, 44->122] (1001 occurrences in 19 run(s), specificity 0.829, consistency 0.98); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 127->122, 44->122] (1001 occurrences in 19 run(s), specificity 0.829, consistency 0.98); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1001,
     "runs": 19,
@@ -1502,6 +1557,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1514,7 +1570,7 @@
    "label_size": 256,
    "name": "wShadowOAMEnd",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 122->44] (683 occurrences in 15 run(s), specificity 0.833, consistency 0.978); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 122->44] (683 occurrences in 15 run(s), specificity 0.833, consistency 0.978); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 683,
     "runs": 15,
@@ -1525,6 +1581,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1537,7 +1594,7 @@
    "label_size": 256,
    "name": "wShadowOAMEnd",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 122->44, 142->44] (615 occurrences in 18 run(s), specificity 0.842, consistency 0.982); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 122->44, 142->44] (615 occurrences in 18 run(s), specificity 0.842, consistency 0.982); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 615,
     "runs": 18,
@@ -1548,6 +1605,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1560,7 +1618,7 @@
    "label_size": 256,
    "name": "wShadowOAMEnd",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 122->44, 147->44] (554 occurrences in 16 run(s), specificity 0.862, consistency 0.996); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 122->44, 147->44] (554 occurrences in 16 run(s), specificity 0.862, consistency 0.996); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 554,
     "runs": 16,
@@ -1571,6 +1629,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1583,7 +1642,7 @@
    "label_size": 360,
    "name": "wTileMap",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 127->55, 127->44] (492 occurrences in 15 run(s), specificity 0.891, consistency 0.992); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 127->55, 127->44] (492 occurrences in 15 run(s), specificity 0.891, consistency 0.992); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 492,
     "runs": 15,
@@ -1594,6 +1653,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1606,7 +1666,7 @@
    "label_size": 360,
    "name": "wTileMap",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 127->52, 127->44] (516 occurrences in 16 run(s), specificity 0.894, consistency 0.99); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 127->52, 127->44] (516 occurrences in 16 run(s), specificity 0.894, consistency 0.99); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 516,
     "runs": 16,
@@ -1617,6 +1677,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1629,7 +1690,7 @@
    "label_size": 360,
    "name": "wTileMap",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 127->81] (583 occurrences in 16 run(s), specificity 0.889, consistency 0.983); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 127->81] (583 occurrences in 16 run(s), specificity 0.889, consistency 0.983); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 583,
     "runs": 16,
@@ -1640,6 +1701,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1652,7 +1714,7 @@
    "label_size": 360,
    "name": "wTileMap",
    "verified": true,
-   "evidence": "menu_open: byte decreases [e.g. 130->127, 132->127, 129->127] (1868 occurrences in 19 run(s), specificity 0.838, consistency 0.999); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "evidence": "menu_open: byte decreases [e.g. 130->127, 132->127, 129->127] (1868 occurrences in 19 run(s), specificity 0.838, consistency 0.999); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1868,
     "runs": 19,
@@ -1663,6 +1725,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -1675,7 +1738,7 @@
    "label_size": 360,
    "name": "wTileMap",
    "verified": true,
-   "evidence": "menu_open: byte decreases [e.g. 145->127, 172->127, 244->127] (1856 occurrences in 19 run(s), specificity 0.841, consistency 0.976); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "evidence": "menu_open: byte decreases [e.g. 145->127, 172->127, 244->127] (1856 occurrences in 19 run(s), specificity 0.841, consistency 0.976); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1856,
     "runs": 19,
@@ -1686,6 +1749,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -1697,8 +1761,8 @@
    "label": "wTileMap",
    "label_size": 360,
    "name": "wTileMap",
-   "verified": true,
-   "evidence": "menu_open: byte set to 127 [e.g. 132->127, 168->127] (1763 occurrences in 18 run(s), specificity 0.8, consistency 0.999); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "menu_open: byte set to 127 [e.g. 132->127, 168->127] (1763 occurrences in 18 run(s), specificity 0.8, consistency 0.999); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1763,
     "runs": 18,
@@ -1709,6 +1773,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1720,8 +1785,8 @@
    "label": "wTileMap",
    "label_size": 360,
    "name": "wTileMap",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 44->122, 127->122] (870 occurrences in 17 run(s), specificity 0.838, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 44->122, 127->122] (870 occurrences in 17 run(s), specificity 0.838, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 870,
     "runs": 17,
@@ -1732,6 +1797,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -1743,8 +1809,8 @@
    "label": "wTileMap",
    "label_size": 360,
    "name": "wTileMap",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 44->122, 127->122] (875 occurrences in 17 run(s), specificity 0.836, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 44->122, 127->122] (875 occurrences in 17 run(s), specificity 0.836, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 875,
     "runs": 17,
@@ -1755,6 +1821,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -1766,8 +1833,8 @@
    "label": "wTileMap",
    "label_size": 360,
    "name": "wTileMap",
-   "verified": true,
-   "evidence": "text_open: byte set to 122 [e.g. 80->122, 44->122, 127->122] (914 occurrences in 17 run(s), specificity 0.832, consistency 0.997); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 122 [e.g. 80->122, 44->122, 127->122] (914 occurrences in 17 run(s), specificity 0.832, consistency 0.997); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 914,
     "runs": 17,
@@ -1778,6 +1845,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -1789,8 +1857,8 @@
    "label": "wTextDest",
    "label_size": 2,
    "name": "wTextDest",
-   "verified": true,
-   "evidence": "text_open: byte set to 185 [e.g. 241->185] (612 occurrences in 16 run(s), specificity 0.854, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte set to 185 [e.g. 241->185] (612 occurrences in 16 run(s), specificity 0.854, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 612,
     "runs": 16,
@@ -1801,9 +1869,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCC4A",
@@ -1814,7 +1882,7 @@
    "label_size": 1,
    "name": "wMenuWrappingEnabled",
    "verified": true,
-   "evidence": "menu_open: byte sets bit 0 [e.g. 0->1] (1579 occurrences in 4 run(s), specificity 0.898, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte sets bit 0 [e.g. 0->1] (1579 occurrences in 4 run(s), specificity 0.898, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1579,
     "runs": 4,
@@ -1825,6 +1893,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    },
    "flipped_label": true
@@ -1837,8 +1906,8 @@
    "label": "wPredefBC",
    "label_size": 2,
    "name": "wPredefBC",
-   "verified": true,
-   "evidence": "menu_open: byte increases [e.g. 5->40, 232->43, 231->43, 0->43, 195->40] (1876 occurrences in 19 run(s), specificity 0.649, consistency 0.995); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte increases [e.g. 5->40, 232->43, 231->43, 0->43, 195->40] (1876 occurrences in 19 run(s), specificity 0.649, consistency 0.995); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1876,
     "runs": 19,
@@ -1849,6 +1918,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -1861,7 +1931,7 @@
    "label_size": 1,
    "name": "wTrainerHeaderFlagBit",
    "verified": true,
-   "evidence": "text_close: byte cleared to 0 [e.g. 7->0, 3->0] (556 occurrences in 11 run(s), specificity 0.895, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte cleared to 0 [e.g. 7->0, 3->0] (556 occurrences in 11 run(s), specificity 0.895, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 556,
     "runs": 11,
@@ -1872,6 +1942,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1884,7 +1955,7 @@
    "label_size": 1,
    "name": "wTrainerHeaderFlagBit",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 0->3] (555 occurrences in 11 run(s), specificity 0.895, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 0->3] (555 occurrences in 11 run(s), specificity 0.895, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 555,
     "runs": 11,
@@ -1895,6 +1966,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1907,7 +1979,7 @@
    "label_size": 1,
    "name": "wAILayer2Encouragement",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 2->0, 1->0, 3->0, 4->0] (142 occurrences in 11 run(s), specificity 0.985, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 2->0, 1->0, 3->0, 4->0] (142 occurrences in 11 run(s), specificity 0.985, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 142,
     "runs": 11,
@@ -1918,6 +1990,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1929,8 +2002,8 @@
    "label": "wPlayerSelectedMove",
    "label_size": 1,
    "name": "wPlayerSelectedMove",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 33->0] (127 occurrences in 11 run(s), specificity 0.989, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 33->0] (127 occurrences in 11 run(s), specificity 0.989, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 127,
     "runs": 11,
@@ -1941,6 +2014,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1953,7 +2027,7 @@
    "label_size": 1,
    "name": "wEnemySelectedMove",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 39->0, 33->0, 16->0] (141 occurrences in 11 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 39->0, 33->0, 16->0] (141 occurrences in 11 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 141,
     "runs": 11,
@@ -1964,6 +2038,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -1976,7 +2051,7 @@
    "label_size": 2,
    "name": "wLastSwitchInEnemyMonHP",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 16->0, 15->0, 20->0, 18->0] (181 occurrences in 11 run(s), specificity 0.99, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 16->0, 15->0, 20->0, 18->0] (181 occurrences in 11 run(s), specificity 0.99, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 181,
     "runs": 11,
@@ -1987,9 +2062,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCCF5",
@@ -1999,8 +2074,8 @@
    "label": "wPartyFoughtCurrentEnemyFlags",
    "label_size": 1,
    "name": "wPartyFoughtCurrentEnemyFlags",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 1->0] (173 occurrences in 11 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 1->0] (173 occurrences in 11 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 173,
     "runs": 11,
@@ -2011,6 +2086,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2022,8 +2098,8 @@
    "label": "wWhichTrade",
    "label_size": 1,
    "name": "wWhichTrade",
-   "verified": true,
-   "evidence": "battle_end: byte cleared to 0 [e.g. 5->0] (126 occurrences in 16 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte cleared to 0 [e.g. 5->0] (126 occurrences in 16 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 126,
     "runs": 16,
@@ -2034,6 +2110,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2045,8 +2122,8 @@
    "label": "wTrainerInfoTextBoxWidth",
    "label_size": 1,
    "name": "wTrainerInfoTextBoxWidth",
-   "verified": true,
-   "evidence": "battle_end: byte cleared to 0 [e.g. 248->0] (197 occurrences in 17 run(s), specificity 0.969, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte cleared to 0 [e.g. 248->0] (197 occurrences in 17 run(s), specificity 0.969, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 197,
     "runs": 17,
@@ -2057,6 +2134,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2068,8 +2146,8 @@
    "label": "wTrainerInfoTextBoxNextRowOffset",
    "label_size": 1,
    "name": "wTrainerInfoTextBoxNextRowOffset",
-   "verified": true,
-   "evidence": "battle_end: byte cleared to 0 [e.g. 115->0] (204 occurrences in 16 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte cleared to 0 [e.g. 115->0] (204 occurrences in 16 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 204,
     "runs": 16,
@@ -2080,6 +2158,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2091,8 +2170,8 @@
    "label": "wTrainerInfoTextBoxNextRowOffset",
    "label_size": 1,
    "name": "wTrainerInfoTextBoxNextRowOffset",
-   "verified": true,
-   "evidence": "text_close: byte cleared to 0 [e.g. 115->0, 0->12] (202 occurrences in 16 run(s), specificity 0.985, consistency 0.995); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte cleared to 0 [e.g. 115->0, 0->12] (202 occurrences in 16 run(s), specificity 0.985, consistency 0.995); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 202,
     "runs": 16,
@@ -2103,9 +2182,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCD47",
@@ -2115,8 +2194,8 @@
    "label": "wSlotMachineWheel3BottomTile",
    "label_size": 1,
    "name": "wSlotMachineWheel3BottomTile",
-   "verified": true,
-   "evidence": "battle_end: byte clears bit 0 [e.g. 1->0] (198 occurrences in 17 run(s), specificity 0.964, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte clears bit 0 [e.g. 1->0] (198 occurrences in 17 run(s), specificity 0.964, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 198,
     "runs": 17,
@@ -2127,6 +2206,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2139,7 +2219,7 @@
    "label_size": 1,
    "name": "wSlotMachineWheel3BottomTile",
    "verified": true,
-   "evidence": "battle_start: byte sets bit 0 [e.g. 0->1] (172 occurrences in 11 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte sets bit 0 [e.g. 0->1] (172 occurrences in 11 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 172,
     "runs": 11,
@@ -2150,6 +2230,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2161,8 +2242,8 @@
    "label": "wJoyIgnore",
    "label_size": 1,
    "name": "wJoyIgnore",
-   "verified": true,
-   "evidence": "battle_end: byte decrements by 1 [e.g. 0->255] (215 occurrences in 18 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte decrements by 1 [e.g. 0->255] (215 occurrences in 18 run(s), specificity 0.986, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 215,
     "runs": 18,
@@ -2173,6 +2254,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2184,8 +2266,8 @@
    "label": "wJoyIgnore",
    "label_size": 1,
    "name": "wJoyIgnore",
-   "verified": true,
-   "evidence": "text_close: byte set to 255 [e.g. 0->255] (218 occurrences in 18 run(s), specificity 0.986, consistency 0.995); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte set to 255 [e.g. 0->255] (218 occurrences in 18 run(s), specificity 0.986, consistency 0.995); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 218,
     "runs": 18,
@@ -2196,9 +2278,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCF09",
@@ -2208,8 +2290,8 @@
    "label": "wBankswitchHomeTemp",
    "label_size": 1,
    "name": "wBankswitchHomeTemp",
-   "verified": true,
-   "evidence": "battle_end: byte set to 3 [e.g. 14->3] (158 occurrences in 15 run(s), specificity 0.981, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 3 [e.g. 14->3] (158 occurrences in 15 run(s), specificity 0.981, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 158,
     "runs": 15,
@@ -2220,6 +2302,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2232,7 +2315,7 @@
    "label_size": 1,
    "name": "wSpriteIndex",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 7->0, 3->0] (578 occurrences in 13 run(s), specificity 0.881, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 7->0, 3->0] (578 occurrences in 13 run(s), specificity 0.881, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 578,
     "runs": 13,
@@ -2243,6 +2326,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2255,7 +2339,7 @@
    "label_size": 1,
    "name": "wSpriteIndex",
    "verified": true,
-   "evidence": "text_open: byte increases [e.g. 0->3] (635 occurrences in 17 run(s), specificity 0.89, consistency 0.957); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte increases [e.g. 0->3] (635 occurrences in 17 run(s), specificity 0.89, consistency 0.957); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 635,
     "runs": 17,
@@ -2266,6 +2350,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2278,7 +2363,7 @@
    "label_size": 1,
    "name": "wEnemyHPBarColor",
    "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 2->0, 1->0] (132 occurrences in 11 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte cleared to 0 [e.g. 2->0, 1->0] (132 occurrences in 11 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 132,
     "runs": 11,
@@ -2289,6 +2374,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2300,8 +2386,8 @@
    "label": "wCurPartySpecies",
    "label_size": 1,
    "name": "wCurPartySpecies",
-   "verified": true,
-   "evidence": "menu_open: byte increases [e.g. 123->176, 178->234, 3->178, 36->178] (1571 occurrences in 13 run(s), specificity 0.851, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte increases [e.g. 123->176, 178->234, 3->178, 36->178] (1571 occurrences in 13 run(s), specificity 0.851, consistency 0.998); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1571,
     "runs": 13,
@@ -2312,6 +2398,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2324,7 +2411,7 @@
    "label_size": 1,
    "name": "wFontLoaded",
    "verified": true,
-   "evidence": "text_close: byte clears bit 0 [e.g. 1->0] (895 occurrences in 18 run(s), specificity 0.846, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte clears bit 0 [e.g. 1->0] (895 occurrences in 18 run(s), specificity 0.846, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 895,
     "runs": 18,
@@ -2335,6 +2422,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    },
    "flipped_label": true
@@ -2347,8 +2435,8 @@
    "label": "wFontLoaded",
    "label_size": 1,
    "name": "wFontLoaded",
-   "verified": true,
-   "evidence": "text_open: byte sets bit 0 [e.g. 0->1] (920 occurrences in 18 run(s), specificity 0.85, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte sets bit 0 [e.g. 0->1] (920 occurrences in 18 run(s), specificity 0.85, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 920,
     "runs": 18,
@@ -2359,6 +2447,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2370,8 +2459,8 @@
    "label": "wAudioFadeOutControl",
    "label_size": 1,
    "name": "wAudioFadeOutControl",
-   "verified": true,
-   "evidence": "battle_end: byte decreases [e.g. 0->243] (215 occurrences in 18 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte decreases [e.g. 0->243] (215 occurrences in 18 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 215,
     "runs": 18,
@@ -2382,9 +2471,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCFC7",
@@ -2395,7 +2484,7 @@
    "label_size": 1,
    "name": "wAudioFadeOutControl",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 0->243] (211 occurrences in 18 run(s), specificity 0.991, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 0->243] (211 occurrences in 18 run(s), specificity 0.991, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 211,
     "runs": 18,
@@ -2406,6 +2495,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2417,8 +2507,8 @@
    "label": "wAudioFadeOutCounter",
    "label_size": 1,
    "name": "wAudioFadeOutCounter",
-   "verified": true,
-   "evidence": "battle_end: byte decreases [e.g. 10->5, 8->0] (179 occurrences in 18 run(s), specificity 0.982, consistency 0.994); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte decreases [e.g. 10->5, 8->0] (179 occurrences in 18 run(s), specificity 0.982, consistency 0.994); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 179,
     "runs": 18,
@@ -2429,9 +2519,9 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xCFC9",
@@ -2442,7 +2532,7 @@
    "label_size": 1,
    "name": "wAudioFadeOutCounter",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 8->0, 10->0] (175 occurrences in 18 run(s), specificity 0.981, consistency 0.994); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 8->0, 10->0] (175 occurrences in 18 run(s), specificity 0.981, consistency 0.994); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 175,
     "runs": 18,
@@ -2453,6 +2543,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2464,8 +2555,8 @@
    "label": "wUpdateSpritesEnabled",
    "label_size": 1,
    "name": "wUpdateSpritesEnabled",
-   "verified": true,
-   "evidence": "battle_end: byte set to 1 [e.g. 255->1] (206 occurrences in 16 run(s), specificity 0.951, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 1 [e.g. 255->1] (206 occurrences in 16 run(s), specificity 0.951, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 206,
     "runs": 16,
@@ -2476,6 +2567,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2487,8 +2579,8 @@
    "label": "wUpdateSpritesEnabled",
    "label_size": 1,
    "name": "wUpdateSpritesEnabled",
-   "verified": true,
-   "evidence": "battle_start: byte set to 255 [e.g. 1->255] (177 occurrences in 11 run(s), specificity 0.946, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte set to 255 [e.g. 1->255] (177 occurrences in 11 run(s), specificity 0.946, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 177,
     "runs": 11,
@@ -2499,6 +2591,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2510,8 +2603,8 @@
    "label": "wUpdateSpritesEnabled",
    "label_size": 1,
    "name": "wUpdateSpritesEnabled",
-   "verified": true,
-   "evidence": "text_close: byte set to 1 [e.g. 255->1, 1->255] (233 occurrences in 18 run(s), specificity 0.956, consistency 0.927); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte set to 1 [e.g. 255->1, 1->255] (233 occurrences in 18 run(s), specificity 0.956, consistency 0.927); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 233,
     "runs": 18,
@@ -2522,6 +2615,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2533,8 +2627,8 @@
    "label": "wBattleMonSpecies",
    "label_size": 1,
    "name": "wBattleMonSpecies",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 177->0] (177 occurrences in 11 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 177->0] (177 occurrences in 11 run(s), specificity 0.988, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 177,
     "runs": 11,
@@ -2545,6 +2639,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2556,8 +2651,8 @@
    "label": "wIsInBattle",
    "label_size": 1,
    "name": "wIsInBattle",
-   "verified": true,
-   "evidence": "battle_end: byte cleared to 0 [e.g. 2->0] (213 occurrences in 17 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte cleared to 0 [e.g. 2->0] (213 occurrences in 17 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 213,
     "runs": 17,
@@ -2568,6 +2663,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2579,8 +2675,8 @@
    "label": "wIsInBattle",
    "label_size": 1,
    "name": "wIsInBattle",
-   "verified": true,
-   "evidence": "battle_start: byte copies the event battle_kind [e.g. 0->2] (214 occurrences in 18 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_start: byte copies the event battle_kind [e.g. 0->2] (214 occurrences in 18 run(s), specificity 0.96, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 214,
     "runs": 18,
@@ -2591,6 +2687,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2603,7 +2700,7 @@
    "label_size": 1,
    "name": "wIsInBattle",
    "verified": true,
-   "evidence": "text_close: byte cleared to 0 [e.g. 2->0] (209 occurrences in 17 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte cleared to 0 [e.g. 2->0] (209 occurrences in 17 run(s), specificity 0.959, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 209,
     "runs": 17,
@@ -2614,6 +2711,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2625,8 +2723,8 @@
    "label": "wPartyGainExpFlags",
    "label_size": 1,
    "name": "wPartyGainExpFlags",
-   "verified": true,
-   "evidence": "battle_start: byte cleared to 0 [e.g. 1->0] (172 occurrences in 11 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "battle_start: byte cleared to 0 [e.g. 1->0] (172 occurrences in 11 run(s), specificity 0.987, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 172,
     "runs": 11,
@@ -2637,6 +2735,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2648,8 +2747,8 @@
    "label": "wCurOpponent",
    "label_size": 1,
    "name": "wCurOpponent",
-   "verified": true,
-   "evidence": "battle_end: byte cleared to 0 [e.g. 202->0, 201->0, 203->0] (34 occurrences in 13 run(s), specificity 0.994, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte cleared to 0 [e.g. 202->0, 201->0, 203->0] (34 occurrences in 13 run(s), specificity 0.994, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 34,
     "runs": 13,
@@ -2660,20 +2759,20 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
-   },
-   "flipped_label": true
+   }
   },
   {
    "addr": "0xD059",
    "event": "money",
    "kind": "zero",
-   "status": "labelled",
+   "status": "confirms",
    "label": "wCurOpponent",
    "label_size": 1,
    "name": "wCurOpponent",
    "verified": true,
-   "evidence": "money: byte cleared to 0 [e.g. 201->0, 203->0] (30 occurrences in 13 run(s), specificity 0.993, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "money: byte cleared to 0 [e.g. 201->0, 203->0] (30 occurrences in 13 run(s), specificity 0.993, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 30,
     "runs": 13,
@@ -2684,19 +2783,21 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
-   }
+   },
+   "flipped_label": true
   },
   {
    "addr": "0xD059",
    "event": "text_close",
    "kind": "dec",
-   "status": "labelled",
+   "status": "confirms",
    "label": "wCurOpponent",
    "label_size": 1,
    "name": "wCurOpponent",
    "verified": true,
-   "evidence": "text_close: byte decreases [e.g. 0->202, 0->201, 201->0, 0->203] (61 occurrences in 14 run(s), specificity 0.999, consistency 0.508); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte decreases [e.g. 0->202, 0->201, 201->0, 0->203] (61 occurrences in 14 run(s), specificity 0.999, consistency 0.508); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 61,
     "runs": 14,
@@ -2707,6 +2808,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2718,8 +2820,8 @@
    "label": "wSubAnimTransform",
    "label_size": 1,
    "name": "wSubAnimTransform",
-   "verified": true,
-   "evidence": "menu_open: byte decreases [e.g. 24->0, 30->0, 2->0, 20->26, 32->26] (1614 occurrences in 11 run(s), specificity 0.921, consistency 0.996); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte decreases [e.g. 24->0, 30->0, 2->0, 20->26, 32->26] (1614 occurrences in 11 run(s), specificity 0.921, consistency 0.996); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1614,
     "runs": 11,
@@ -2730,6 +2832,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -2741,8 +2844,8 @@
    "label": "wPredefBank",
    "label_size": 1,
    "name": "wPredefBank",
-   "verified": true,
-   "evidence": "menu_open: byte set to 3 [e.g. 30->3, 1->3] (1913 occurrences in 19 run(s), specificity 0.635, consistency 0.997); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte set to 3 [e.g. 30->3, 1->3] (1913 occurrences in 19 run(s), specificity 0.635, consistency 0.997); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1913,
     "runs": 19,
@@ -2753,6 +2856,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2764,8 +2868,8 @@
    "label": "wNumberOfNoRandomBattleStepsLeft",
    "label_size": 1,
    "name": "wNumberOfNoRandomBattleStepsLeft",
-   "verified": true,
-   "evidence": "battle_end: byte set to 3 [e.g. 0->3] (171 occurrences in 17 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte set to 3 [e.g. 0->3] (171 occurrences in 17 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 171,
     "runs": 17,
@@ -2776,6 +2880,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2787,8 +2892,8 @@
    "label": "wNumberOfNoRandomBattleStepsLeft",
    "label_size": 1,
    "name": "wNumberOfNoRandomBattleStepsLeft",
-   "verified": true,
-   "evidence": "text_close: byte set to 3 [e.g. 0->3] (167 occurrences in 17 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte set to 3 [e.g. 0->3] (167 occurrences in 17 run(s), specificity 0.983, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 167,
     "runs": 17,
@@ -2799,6 +2904,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2811,7 +2917,7 @@
    "label_size": 1,
    "name": "wLetterPrintingDelayFlags",
    "verified": true,
-   "evidence": "menu_open: byte clears bit 1 [e.g. 3->1] (1778 occurrences in 18 run(s), specificity 0.67, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte clears bit 1 [e.g. 3->1] (1778 occurrences in 18 run(s), specificity 0.67, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1778,
     "runs": 18,
@@ -2822,6 +2928,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2834,7 +2941,7 @@
    "label_size": 1,
    "name": "wPlayerMovingDirection",
    "verified": true,
-   "evidence": "battle_start: byte increases [e.g. 0->2, 0->8, 0->1, 0->4] (176 occurrences in 11 run(s), specificity 0.99, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "battle_start: byte increases [e.g. 0->2, 0->8, 0->1, 0->4] (176 occurrences in 11 run(s), specificity 0.99, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 176,
     "runs": 11,
@@ -2845,6 +2952,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2856,8 +2964,8 @@
    "label": "wStatusFlags2",
    "label_size": 1,
    "name": "wStatusFlags2",
-   "verified": true,
-   "evidence": "battle_end: byte sets bit 0 [e.g. 0->1] (180 occurrences in 17 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte sets bit 0 [e.g. 0->1] (180 occurrences in 17 run(s), specificity 0.957, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 180,
     "runs": 17,
@@ -2868,6 +2976,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -2880,7 +2989,7 @@
    "label_size": 1,
    "name": "wStatusFlags2",
    "verified": true,
-   "evidence": "text_close: byte sets bit 0 [e.g. 0->1] (176 occurrences in 17 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte sets bit 0 [e.g. 0->1] (176 occurrences in 17 run(s), specificity 0.956, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 176,
     "runs": 17,
@@ -2891,6 +3000,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    },
    "flipped_label": true
@@ -2904,7 +3014,7 @@
    "label_size": 1,
    "name": "wStatusFlags5",
    "verified": true,
-   "evidence": "menu_open: byte sets bit 6 [e.g. 0->64] (1580 occurrences in 5 run(s), specificity 0.886, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte sets bit 6 [e.g. 0->64] (1580 occurrences in 5 run(s), specificity 0.886, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1580,
     "runs": 5,
@@ -2915,6 +3025,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2927,7 +3038,7 @@
    "label_size": 2,
    "name": "wTrainerHeaderPtr",
    "verified": true,
-   "evidence": "text_close: byte increases [e.g. 97->133, 49->133] (556 occurrences in 11 run(s), specificity 0.891, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte increases [e.g. 97->133, 49->133] (556 occurrences in 11 run(s), specificity 0.891, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 556,
     "runs": 11,
@@ -2938,6 +3049,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -2950,7 +3062,7 @@
    "label_size": 2,
    "name": "wTrainerHeaderPtr",
    "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 49->37, 37->97, 61->37, 133->49] (571 occurrences in 12 run(s), specificity 0.893, consistency 0.991); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "evidence": "text_open: byte decreases [e.g. 49->37, 37->97, 61->37, 133->49] (571 occurrences in 12 run(s), specificity 0.893, consistency 0.991); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 571,
     "runs": 12,
@@ -2961,6 +3073,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -2972,8 +3085,8 @@
    "label": "wBoxMonNicksEnd",
    "label_size": 256,
    "name": "wBoxMonNicksEnd",
-   "verified": true,
-   "evidence": "menu_open: byte decreases [e.g. 237->241, 228->162, 112->202, 241->228] (1503 occurrences in 10 run(s), specificity 0.709, consistency 0.985); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte decreases [e.g. 237->241, 228->162, 112->202, 241->228] (1503 occurrences in 10 run(s), specificity 0.709, consistency 0.985); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1503,
     "runs": 10,
@@ -2984,6 +3097,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -2995,8 +3109,8 @@
    "label": "wBoxMonNicksEnd",
    "label_size": 256,
    "name": "wBoxMonNicksEnd",
-   "verified": true,
-   "evidence": "menu_open: byte decreases [e.g. 196->77, 53->32, 1->93, 77->53] (1503 occurrences in 10 run(s), specificity 0.709, consistency 0.986); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "menu_open: byte decreases [e.g. 196->77, 53->32, 1->93, 77->53] (1503 occurrences in 10 run(s), specificity 0.709, consistency 0.986); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1503,
     "runs": 10,
@@ -3007,6 +3121,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -3019,7 +3134,7 @@
    "label_size": 1,
    "name": "hSpriteOffset2",
    "verified": true,
-   "evidence": "text_close: byte increases [e.g. 0->64, 240->32, 0->32, 0->16] (452 occurrences in 6 run(s), specificity 0.878, consistency 0.996); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte increases [e.g. 0->64, 240->32, 0->32, 0->16] (452 occurrences in 6 run(s), specificity 0.878, consistency 0.996); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 452,
     "runs": 6,
@@ -3030,6 +3145,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3041,8 +3157,8 @@
    "label": "hSpriteOffset2",
    "label_size": 1,
    "name": "hSpriteOffset2",
-   "verified": true,
-   "evidence": "text_open: byte decreases [e.g. 240->0, 64->0, 32->0] (481 occurrences in 7 run(s), specificity 0.883, consistency 0.983); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte decreases [e.g. 240->0, 64->0, 32->0] (481 occurrences in 7 run(s), specificity 0.883, consistency 0.983); replay: 2/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 481,
     "runs": 7,
@@ -3053,6 +3169,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -3064,8 +3181,8 @@
    "label": "hOAMBufferOffset",
    "label_size": 1,
    "name": "hOAMBufferOffset",
-   "verified": true,
-   "evidence": "text_close: byte set to 16 [e.g. 80->16, 0->80, 48->16, 0->16] (861 occurrences in 15 run(s), specificity 0.839, consistency 0.988); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte set to 16 [e.g. 80->16, 0->80, 48->16, 0->16] (861 occurrences in 15 run(s), specificity 0.839, consistency 0.988); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 861,
     "runs": 15,
@@ -3076,6 +3193,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3087,8 +3205,8 @@
    "label": "hOAMBufferOffset",
    "label_size": 1,
    "name": "hOAMBufferOffset",
-   "verified": true,
-   "evidence": "text_open: byte cleared to 0 [e.g. 64->0, 16->0, 32->0] (803 occurrences in 16 run(s), specificity 0.831, consistency 0.929); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte cleared to 0 [e.g. 64->0, 16->0, 32->0] (803 occurrences in 16 run(s), specificity 0.831, consistency 0.929); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 803,
     "runs": 16,
@@ -3099,6 +3217,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3110,8 +3229,8 @@
    "label": "hWY",
    "label_size": 1,
    "name": "hWY",
-   "verified": true,
-   "evidence": "text_close: byte set to 144 [e.g. 0->144] (990 occurrences in 17 run(s), specificity 0.814, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "verified": false,
+   "evidence": "text_close: byte set to 144 [e.g. 0->144] (990 occurrences in 17 run(s), specificity 0.814, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 990,
     "runs": 17,
@@ -3122,6 +3241,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3133,8 +3253,8 @@
    "label": "hWY",
    "label_size": 1,
    "name": "hWY",
-   "verified": true,
-   "evidence": "text_open: byte cleared to 0 [e.g. 144->0, 0->144] (1092 occurrences in 19 run(s), specificity 0.827, consistency 0.837); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte cleared to 0 [e.g. 144->0, 0->144] (1092 occurrences in 19 run(s), specificity 0.827, consistency 0.837); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 1092,
     "runs": 19,
@@ -3145,6 +3265,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3157,7 +3278,7 @@
    "label_size": 1,
    "name": "hJoy5",
    "verified": true,
-   "evidence": "text_close: byte increases [e.g. 0->2, 0->1] (610 occurrences in 14 run(s), specificity 0.773, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte increases [e.g. 0->2, 0->1] (610 occurrences in 14 run(s), specificity 0.773, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 610,
     "runs": 14,
@@ -3168,6 +3289,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3180,7 +3302,7 @@
    "label_size": 1,
    "name": "hSavedROMBank",
    "verified": true,
-   "evidence": "menu_open: byte increases [e.g. 30->15, 30->37] (1834 occurrences in 18 run(s), specificity 0.802, consistency 0.957); replay: 2/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte increases [e.g. 30->15, 30->37] (1834 occurrences in 18 run(s), specificity 0.802, consistency 0.957); replay: 2/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1834,
     "runs": 18,
@@ -3191,6 +3313,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 2,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -3203,7 +3326,7 @@
    "label_size": 1,
    "name": "hAutoBGTransferEnabled",
    "verified": true,
-   "evidence": "text_close: byte clears bit 0 [e.g. 1->0] (958 occurrences in 17 run(s), specificity 0.824, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte clears bit 0 [e.g. 1->0] (958 occurrences in 17 run(s), specificity 0.824, consistency 1.0); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 958,
     "runs": 17,
@@ -3214,6 +3337,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3226,7 +3350,7 @@
    "label_size": 1,
    "name": "hAutoBGTransferEnabled",
    "verified": true,
-   "evidence": "text_open: byte sets bit 0 [e.g. 0->1] (908 occurrences in 18 run(s), specificity 0.818, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "evidence": "text_open: byte sets bit 0 [e.g. 0->1] (908 occurrences in 18 run(s), specificity 0.818, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 908,
     "runs": 18,
@@ -3237,6 +3361,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 2,
     "in_sync": 3
    }
   },
@@ -3249,7 +3374,7 @@
    "label_size": 1,
    "name": "hVBlankOccurred",
    "verified": true,
-   "evidence": "text_close: byte sets bit 0 [e.g. 0->1] (975 occurrences in 18 run(s), specificity 0.803, consistency 0.982); replay: 3/3 witnesses reproduce it, press-driven",
+   "evidence": "text_close: byte sets bit 0 [e.g. 0->1] (975 occurrences in 18 run(s), specificity 0.803, consistency 0.982); replay: 3/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 975,
     "runs": 18,
@@ -3260,6 +3385,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 3,
     "in_sync": 3
    }
   },
@@ -3271,8 +3397,8 @@
    "label": "hTileAnimations",
    "label_size": 1,
    "name": "hTileAnimations",
-   "verified": true,
-   "evidence": "battle_end: byte increases [e.g. 0->2] (174 occurrences in 17 run(s), specificity 0.951, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "battle_end: byte increases [e.g. 0->2] (174 occurrences in 17 run(s), specificity 0.951, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 174,
     "runs": 17,
@@ -3283,6 +3409,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3294,8 +3421,8 @@
    "label": "hStartTileID",
    "label_size": 3,
    "name": "hStartTileID",
-   "verified": true,
-   "evidence": "text_open: byte increases [e.g. 0->49, 207->49] (189 occurrences in 18 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press)",
+   "verified": false,
+   "evidence": "text_open: byte increases [e.g. 0->49, 207->49] (189 occurrences in 18 run(s), specificity 0.992, consistency 1.0); replay: 3/3 witnesses reproduce it, time-driven (also changes without the press), 3 run(s)",
    "stats": {
     "support": 189,
     "runs": 18,
@@ -3306,6 +3433,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 3,
+    "press_driven": 0,
     "in_sync": 3
    }
   }
@@ -3320,7 +3448,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite08XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 64->120, 176->136, 8->72, 0->176] (212 occurrences in 17 run(s), specificity 0.943, consistency 0.943); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 64->120, 176->136, 8->72, 0->176] (212 occurrences in 17 run(s), specificity 0.943, consistency 0.943); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 212,
     "runs": 17,
@@ -3331,6 +3459,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3343,7 +3472,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite10XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 64->120, 184->144, 8->72, 0->184] (215 occurrences in 18 run(s), specificity 0.948, consistency 0.944); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 64->120, 184->144, 8->72, 0->184] (215 occurrences in 18 run(s), specificity 0.948, consistency 0.944); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 215,
     "runs": 18,
@@ -3354,6 +3483,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3366,7 +3496,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite12XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 120->152, 192->152, 72->152, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.97); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 120->152, 192->152, 72->152, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.97); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 197,
     "runs": 18,
@@ -3377,6 +3507,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3389,7 +3520,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite13XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 128->160, 192->152, 80->160, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.964); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 128->160, 192->152, 80->160, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.964); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 197,
     "runs": 18,
@@ -3400,6 +3531,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3412,7 +3544,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite14XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 120->152, 192->152, 72->152, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.97); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 120->152, 192->152, 72->152, 0->192] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.97); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 197,
     "runs": 18,
@@ -3423,6 +3555,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3435,7 +3568,7 @@
    "label_size": 1,
    "name": "wShadowOAMSprite15XCoord",
    "verified": false,
-   "evidence": "text_open: byte decreases [e.g. 128->160, 200->160, 80->160, 0->200] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.964); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte decreases [e.g. 128->160, 200->160, 80->160, 0->200] (197 occurrences in 18 run(s), specificity 0.964, consistency 0.964); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 197,
     "runs": 18,
@@ -3446,6 +3579,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3458,7 +3592,7 @@
    "label_size": 256,
    "name": "wShadowOAMEnd",
    "verified": false,
-   "evidence": "menu_open: byte increases [e.g. 124->17] (1656 occurrences in 11 run(s), specificity 0.832, consistency 0.982); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte increases [e.g. 124->17] (1656 occurrences in 11 run(s), specificity 0.832, consistency 0.982); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1656,
     "runs": 11,
@@ -3469,6 +3603,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3481,7 +3616,7 @@
    "label_size": 1,
    "name": "wWhichPokemon",
    "verified": false,
-   "evidence": "menu_open: byte increases [e.g. 1->0, 0->2] (1556 occurrences in 10 run(s), specificity 0.857, consistency 0.996); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte increases [e.g. 1->0, 0->2] (1556 occurrences in 10 run(s), specificity 0.857, consistency 0.996); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1556,
     "runs": 10,
@@ -3492,6 +3627,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   },
@@ -3504,7 +3640,7 @@
    "label_size": 1,
    "name": "wUnusedMoveAnimByte",
    "verified": false,
-   "evidence": "menu_open: byte sets bit 6 [e.g. 1->0, 0->64] (1596 occurrences in 9 run(s), specificity 0.895, consistency 0.989); replay: 1/3 witnesses reproduce it, press-driven",
+   "evidence": "menu_open: byte sets bit 6 [e.g. 1->0, 0->64] (1596 occurrences in 9 run(s), specificity 0.895, consistency 0.989); replay: 1/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1596,
     "runs": 9,
@@ -3515,6 +3651,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 1,
+    "press_driven": 1,
     "in_sync": 3
    }
   },
@@ -3527,7 +3664,7 @@
    "label_size": 1,
    "name": "hVBlankOccurred",
    "verified": false,
-   "evidence": "text_open: byte clears bit 0 [e.g. 0->1, 1->0] (1056 occurrences in 18 run(s), specificity 0.813, consistency 0.984); replay: 0/3 witnesses reproduce it, press-driven",
+   "evidence": "text_open: byte clears bit 0 [e.g. 0->1, 1->0] (1056 occurrences in 18 run(s), specificity 0.813, consistency 0.984); replay: 0/3 witnesses reproduce it, press-driven, 3 run(s)",
    "stats": {
     "support": 1056,
     "runs": 18,
@@ -3538,6 +3675,7 @@
    "replay": {
     "witnesses": 3,
     "passed": 0,
+    "press_driven": 0,
     "in_sync": 3
    }
   }

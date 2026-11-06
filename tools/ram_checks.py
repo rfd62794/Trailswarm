@@ -226,20 +226,23 @@ def facing_and_hram(rig: Rig) -> Result:
 
 
 def discovered(rig: Rig) -> Result:
-    """Replay-verify the best mined RAM-discovery candidates (runs with ram_events.jsonl); proves labels they confirm."""
+    """Replay-verify the best mined RAM-discovery candidates (runs with ram_events.jsonl); proves labels they confirm.
+    Pure: results only. tools/verify_ram.py records ``rig.findings`` unless --dry-run."""
     from pokeagent.ramlab import findings as F
     from pokeagent.ramlab import pipeline
+    from pokeagent.ramlab.labels import load_entries
     root = Path(__file__).resolve().parent.parent
     r = Result()
     if not list((root / "runs").glob("*/ram_events.jsonl")):
         return r
     found, _, _ = pipeline.verify_top([root / "runs"], root / "roms" / "Pokemon Red.gb", rig.states)
-    pipeline.record_findings(found)
-    for f in found:
-        if f["verified"] and f["status"] == "confirms" and f["label"] and f["label_size"] <= 8:
-            r.ok.setdefault(f["label"], f["evidence"])
-        elif not f["verified"] and f["replay"]["witnesses"]:
-            r.failed.append(f"{f['addr']} {f['name']} ({f['event']}): {f['evidence'][:100]}")
+    rig.findings = found
+    entries = load_entries()
+    already = {e["name"] for e in entries if e.get("verified")}
+    F.apply_to_map(entries, {"findings": found})        # the same gate the CLI uses (size, region, byte coverage)
+    r.ok.update({e["name"]: e["evidence"] for e in entries if e.get("verified") and e["name"] not in already})
+    r.failed += [f"{f['addr']} {f['name']} ({f['event']}): {f['evidence'][:100]}" for f in found
+                 if not f["verified"] and f["replay"]["witnesses"] and f["replay"]["passed"] * 3 < f["replay"]["witnesses"] * 2]
     return r
 
 

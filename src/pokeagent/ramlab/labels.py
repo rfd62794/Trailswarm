@@ -16,10 +16,10 @@ HINTS: dict[str, str] = {
     "map_change": r"CurMap|Coord|LastMap|Tileset|MapHeight|MapWidth|MapConn|Warp|DestinationMap|CurMapScript|BlockMap|ViewPointer|Sprite|NumSprites|Overworld|Channel|Audio|Music|Sound|Sfx|Pitch|Duty|Vibrato|Frequency|Volume",
     "item_gain": r"NumBagItems|BagItems|ItemQuantity|CurItem",
     "item_use": r"NumBagItems|BagItems|ItemQuantity|CurItem",
-    "money": r"PlayerMoney",
+    "money": r"PlayerMoney|CurOpponent",  # trainer battles pay out, and clear the trainer id, on the same press
     "party_change": r"PartyCount|PartySpecies|PartyMon|PartyMons",
     "text_open": r"TextBox|TileMap|FontLoaded|JoyIgnore|Text|Letter|d730|StatusFlags|Menu",
-    "text_close": r"TextBox|TileMap|FontLoaded|JoyIgnore|Text|Letter|d730|StatusFlags|Menu",
+    "text_close": r"CurOpponent|TextBox|TileMap|FontLoaded|JoyIgnore|Text|Letter|d730|StatusFlags|Menu",
     "menu_open": r"Menu|ListScroll|ListCount|TopMenu|MaxMenu|CurrentMenu|ItemList|Cursor",
     "story_flag": r"EventFlags|Flags|Obtained|Beat",
     "heal": r"PartyMon\d*(HP|Status)|BattleMonHP|Status",

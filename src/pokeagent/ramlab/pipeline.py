@@ -67,7 +67,7 @@ def record_findings(findings: list[dict], path: Path = F.FINDINGS_PATH) -> dict:
     (verified, or not yet replayable) under 'findings'. A verified finding is never displaced."""
     data = F.load(path)
     for f in findings:
-        refuted = not f["verified"] and f["replay"]["witnesses"] > 0
+        refuted = not f["verified"] and f["replay"]["witnesses"] > 0 and f["replay"]["passed"] * 3 < f["replay"]["witnesses"] * 2
         F.upsert(data, f, "failed" if refuted else "findings")
     won = {(f["event"], f["addr"]) for f in data["findings"] if f.get("verified")}
     data["failed"] = [x for x in data["failed"] if (x["event"], x["addr"]) not in won]
