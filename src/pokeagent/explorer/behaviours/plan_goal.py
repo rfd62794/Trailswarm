@@ -52,6 +52,7 @@ class PlanGoal(BehaviourBase):
                 ctx.log(f"[readiness] {clamp}", "res")
         need = self._budgeted(ctx, goals_now_all, need, verdict)
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
+        ctx.train_need = need  # frontier reads it to seek grass while below the target
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},

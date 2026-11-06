@@ -45,11 +45,18 @@ def readiness_for(goals: dict, party: list | None) -> Readiness | None:
     return _cache[key]
 
 
+def before_route2(goals: dict) -> bool:
+    """True until Route 2 has been reached: to_viridian, oaks_parcel and deliver_parcel only ask for the floor level."""
+    return not goals.get("to_route2")
+
+
 def required_level(goals: dict, floor: int = 8, party: list | None = None) -> tuple[int, str]:
     """(level wanted, clamp note). The readiness verdict is clamped to the table value + CAP_ABOVE_TABLE (a sane grind
     distance: a counter catch is the answer past it); the --train-level flag (`floor`) stays a hard floor above the clamp."""
     goal = stage_goal(goals)
     if goal is None:
+        return floor, ""
+    if before_route2(goals):  # the Brock target must not hold the run on Route 1 before Viridian (2026-11-06: 1,700 steps)
         return floor, ""
     verdict, table = readiness_for(goals, party), TRAIN_LEVEL_BY_GOAL[goal]
     if not verdict:
