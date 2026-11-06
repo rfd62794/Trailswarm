@@ -142,6 +142,8 @@ class ExplorerContext:
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    item_attempts: int = 0  # item-list confirmations this battle (item_use.MAX_ITEM_ATTEMPTS caps it)
+    item_blocked: set = field(default_factory=set)  # item ids that cannot help this battle ("won't have any effect")
     proc: dict | None = None
     proc_done: set = field(default_factory=set)
     proc_due: list = field(default_factory=list)
