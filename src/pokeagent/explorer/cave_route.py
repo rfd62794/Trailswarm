@@ -91,6 +91,12 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
     if not buttons:
         c["last"] = None
         return None
+    dx, dy = DIRS.get(buttons[0], (0, 0))
+    if (pos[0], pos[1] + dx, pos[2] + dy) in set(blocked_now):
+        # The only way on runs through a tile a person just stood on (they blocked our last press): wait for them to move
+        # instead of bumping again (31 RIGHT presses at Mt Moon 1F (6,23)); the block decays and the press is retried.
+        c["last"] = None
+        return "", f"goal {stage}: ROM route blocked by a person at the next tile - waiting for them to move"
     c["last"] = (pos, buttons[0])
     return buttons[0], f"goal {stage}: ROM route, {len(buttons)} steps across floors"
 

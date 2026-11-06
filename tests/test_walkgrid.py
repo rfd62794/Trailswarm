@@ -173,3 +173,13 @@ def test_a_hard_wall_on_the_only_path_makes_the_planner_fall_back_and_the_route_
     assert not cache["edges"]
     assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"  # expired: the ROM route is back
 
+
+
+def test_a_person_on_the_only_next_tile_makes_the_route_wait_instead_of_bumping():
+    from pokeagent.explorer.cave_route import rom_route_step
+    plan, cache = StubPlan(), {}
+    pos = (0x3C, 23, 3)
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"
+    button, why = rom_route_step({}, "through_mt_moon", pos, plan, ((0x3C, 24, 3),), cache)   # the NPC stands at (24,3)
+    assert button == "" and "waiting" in why                    # a no-press step: the person gets time to walk away
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"          # block decayed: go
