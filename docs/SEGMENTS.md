@@ -17,6 +17,18 @@ many variants of the same segment are tried and graded without replaying the who
 | S6 | Route 1 to Viridian City | to_route1 checkpoint | map 0x01 seen | - | - | not yet reached by any agent |
 | S7 | Viridian Mart: Oak's Parcel | to_viridian checkpoint | bag has 0x46 | - | - | goals.json goal 6 |
 | S8 | Back to Oak: Pokedex | oaks_parcel checkpoint | START menu shows POKeDEX | - | - | goals.json goal 7 |
+| S9 | Pewter to Route 3 | beat_brock checkpoint | map 0x0E seen | - | - | push east out of Pewter (connection E) |
+| S10 | Route 3 to Route 4 | to_route3 checkpoint | map 0x0F seen | - | - | push north along Route 3 (connection N); ledge tiles and trainers on the way |
+| S11 | Route 4 west to Mt Moon 1F | to_route4 checkpoint | map 0x3B seen | - | - | entrance warp (18,5); the Pokecenter 0x44 door (11,5) is on the way and heals |
+| S12 | Mt Moon 1F to B1F | to_mt_moon checkpoint | map 0x3C seen | - | - | a ladder maze: exploration + learned warps, never scripted |
+| S13 | Mt Moon B1F to B2F | mt_moon_b1f checkpoint | map 0x3D seen | - | - | B1F warp (17,11) leads down; the fossil room is optional |
+| S14 | B2F back up and out | mt_moon_b2f checkpoint | on Route 4 (0x0F) at x >= 24 after B2F | - | - | the exit warp lands at (24,5), east of the cave; leaving by the west entrance (18,5) does not count |
+| S15 | Route 4 east to Cerulean | through_mt_moon checkpoint | map 0x03 seen | - | - | push east on Route 4 (connection E) |
+| S16 | Cerulean Pokecenter | to_cerulean checkpoint | map 0x40 seen | - | - | door at Cerulean (19,17); walk in (heals when weak) |
+| S17 | Cerulean Gym: Misty | heal_cerulean checkpoint | wObtainedBadges bit1 (0xD356 & 2) | - | - | gym door (30,19) -> map 0x41; train on Route 24 first when the lead is under the train level |
+| S18 | Route 24 (Nugget Bridge) | beat_misty checkpoint | map 0x23 seen | - | - | Cerulean's north connection; bridge trainers |
+| S19 | Route 25 to Bill's house | nugget_bridge checkpoint | map 0x58 seen | - | - | push east from Route 24 into Route 25 (0x24); the house is the warp at (45,3) |
+| S20 | Bill: S.S. TICKET | to_bill checkpoint | bag has item 0x3F | - | - | talk to Bill through the transformation sequence |
 
 Grading a segment variant: fewer presses wins when the end condition is met; a variant that loses HP it did
 not need to lose, or that triggered a stall, ranks below one that did not (review_runs.py reports waste per

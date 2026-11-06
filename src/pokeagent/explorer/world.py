@@ -7,7 +7,7 @@ from typing import Callable
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
-POKECENTER_MAPS = (41, 58)  # Viridian (41) and Pewter (58, "Welcome... JIGGLY") Pokecenters
+POKECENTER_MAPS = (41, 58, 0x44, 0x40)  # Viridian (41), Pewter (58, "Welcome... JIGGLY"), Mt Moon/Route 4 (0x44), Cerulean (0x40) Pokecenters
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 
