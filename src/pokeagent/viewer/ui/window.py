@@ -44,6 +44,7 @@ class ViewerWindow:
         self._speed = 1
         self._paused = False
         self._throttle = steering.KeyThrottle()
+        self._gate = steering.PressGate()
         self._shown_focus: str | None = None
         self._grid: GridView | None = None
         self._focus_view: FocusView | None = None
@@ -129,8 +130,8 @@ class ViewerWindow:
             self._send_one(hit[0], "press", button=hit[1], source="human")
 
     def hotkey(self, name: str) -> None:
-        """P / T: transport hotkeys, focus view only (grid view reaches no agent)."""
-        if self.focus.focused is not None:
+        """P / T: transport hotkeys, focus view only, one toggle per physical press."""
+        if self.focus.focused is not None and self._gate.allow(name):
             self.toggle_pause() if name == "pause" else self.cycle_speed()
 
     def escape(self) -> None:
@@ -210,19 +211,30 @@ class ViewerWindow:
         for view in (self._grid, self._focus_view):
             if view is not None and dpg.does_item_exist(view.area):
                 dpg.delete_item(view.area)
+                is_grid = view is self._grid
                 view.area = dpg.add_child_window(parent=self._win, before=BAR_TAG, width=vw - 8,
                                                  height=avail, border=False, no_scrollbar=True,
-                                                 tag="grid_area" if view is self._grid else "focus_area")
+                                                 show=self.area_visible(is_grid),
+                                                 tag="grid_area" if is_grid else "focus_area")
                 view.cards = {}
                 view.card = None
                 view._sig = None
 
     # -- frame loop ----------------------------------------------------------------
+    def area_visible(self, is_grid: bool) -> bool:
+        """Which card area shows in the current mode (also used when areas are recreated on resize)."""
+        return is_grid == (self.focus.focused is None)
+
+    def drop_lost_focus(self) -> None:
+        if self.focus.focused is not None and self.focus.focused not in self.model.ids():
+            self.leave_focus()  # the focused agent was lost/pruned: back to the grid
+
     def _title(self, fps: float | None = None) -> str:
         mode = f"focus {self.focus.focused}" if self.focus.focused else "grid"
         return f"PokeAgent viewer [{mode}]" + (f" - {fps:.0f} fps" if fps is not None else "")
 
     def tick(self) -> None:
+        self.drop_lost_focus()
         focused = self.focus.focused
         if focused != self._shown_focus:  # the title always names the view (and what steers)
             self._shown_focus = focused

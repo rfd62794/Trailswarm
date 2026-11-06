@@ -31,3 +31,18 @@ def press_target(key: str, focused: str | None, throttle: KeyThrottle) -> tuple[
     if button is None or focused is None or not throttle.allow(key):
         return None
     return focused, button
+
+
+class PressGate:
+    """One action per physical key press: a held key emits events every frame, each resetting
+    the gap, so only an event after ``gap_s`` of silence counts as a new press."""
+
+    def __init__(self, gap_s: float = 0.3, clock: Callable[[], float] = time.monotonic) -> None:
+        self.gap_s, self._clock = gap_s, clock
+        self._last: dict[str, float] = {}
+
+    def allow(self, key: str) -> bool:
+        now = self._clock()
+        last = self._last.get(key)
+        self._last[key] = now
+        return last is None or now - last > self.gap_s

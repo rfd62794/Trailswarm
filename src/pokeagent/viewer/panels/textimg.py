@@ -33,7 +33,7 @@ def _font(px: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-SEES_GRID = (20, 18)  # (cols, rows): overworld map is 10 wide, battle lines up to 20 chars
+SEES_GRID = (22, 18)  # (cols, rows): overworld map is 10 wide, battle you/enemy lines are 21 chars
 _ROW_PX = 16  # default row pitch (display px) when a panel has no explicit grid
 
 

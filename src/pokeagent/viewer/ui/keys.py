@@ -28,14 +28,20 @@ def handler(fn, *args):
 def install(host) -> None:
     """Register key handlers on ``host`` (the viewer window) inside a handler registry."""
 
+    def typing() -> bool:
+        return any(dpg.is_item_active(t) for t in _TEXT_ITEMS if dpg.does_item_exist(t))
+
     def button(key_name: str):
-        if any(dpg.is_item_active(t) for t in _TEXT_ITEMS if dpg.does_item_exist(t)):
-            return
-        host.key_button(key_name)
+        if not typing():
+            host.key_button(key_name)
+
+    def hotkey(name: str):
+        if not typing():
+            host.hotkey(name)
 
     with dpg.handler_registry(show=True, tag="viewer_keys"):
         for name, dpg_key in _DPG_KEYS.items():
             dpg.add_key_press_handler(dpg_key, callback=handler(button, name))
         dpg.add_key_press_handler(dpg.mvKey_Escape, callback=handler(host.escape))
-        dpg.add_key_press_handler(dpg.mvKey_P, callback=handler(host.hotkey, "pause"))
-        dpg.add_key_press_handler(dpg.mvKey_T, callback=handler(host.hotkey, "speed"))
+        dpg.add_key_press_handler(dpg.mvKey_P, callback=handler(hotkey, "pause"))
+        dpg.add_key_press_handler(dpg.mvKey_T, callback=handler(hotkey, "speed"))
