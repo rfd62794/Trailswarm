@@ -209,13 +209,16 @@ def test_watchdog_waiting_for_first_transition_is_also_skipped(tmp_path):
     assert w.check() is None and w.skipped == "claude hold"
 
 
-def test_snapshot_extra_battle_block_uses_the_party_slot_for_our_species(tmp_path):
+def test_snapshot_extra_battle_block_never_mixes_two_pokemon(tmp_path):
     from pokeagent.intervene.names import species_name
     view, _, emu = _view(tmp_path)
     emu.memory.update({0xD057: 1, 0xD163: 1, 0xD16B: 0xB2, 0xCC2F: 0,           # wild battle, party of one, slot 0 in the fight
-                       0xD014: 0, 0xD016: 11, 0xD022: 24, 0xD024: 57,           # wBattleMon: species byte reads 0, 11/57 HP, L24
+                       0xD16D: 17, 0xD18C: 5, 0xD18E: 17,                       # party mon: L5, 17/17
+                       0xD014: 0, 0xD016: 11, 0xD022: 24, 0xD024: 57,           # wBattleMon not loaded yet: species 0, stale L24 11/57
                        0xCFE5: 0x6D, 0xCFE7: 8, 0xCFF3: 12, 0xCFF5: 20})       # wEnemyMon: 8/20 HP, L12
     b = view.snapshot().extra["battle"]
     assert b["kind"] == "wild" and view.snapshot().extra["mode"] == "battle"
-    assert b["you"] == {"species": species_name(0xB2), "level": 24, "hp": 11, "max": 57}
+    assert b["you"] == {"species": species_name(0xB2), "level": 5, "hp": 17, "max": 17}  # from the party, not the stale struct
     assert b["enemy"] == {"species": species_name(0x6D), "level": 12, "hp": 8, "max": 20}
+    emu.memory[0xD014] = 0xB2  # battle loaded: the struct is authoritative
+    assert view.snapshot().extra["battle"]["you"] == {"species": species_name(0xB2), "level": 24, "hp": 11, "max": 57}

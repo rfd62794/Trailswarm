@@ -29,15 +29,18 @@ class Tracker:
         self.boxes.append(text)
 
 
-def _mon(m, species: int | None = None) -> dict:
-    return {"species": species_name(m.species or species or 0), "level": m.level, "hp": m.hp, "max": m.max_hp}
+def _mon(m) -> dict:
+    return {"species": species_name(m.species), "level": m.level, "hp": m.hp, "max": m.max_hp}
 
 
-def _active_species(emu) -> int:
-    """Our battler's species from the party slot in the fight: wBattleMon's own species byte reads 0 during battles."""
-    party = read_party(emu)
-    slot = emu.read(PLAYER_MON)
-    return party[slot].species if slot < len(party) else 0
+def _our_mon(emu) -> dict:
+    """Our battler. wBattleMon reads species 0 (stale level/HP from the last fight) until the new battle loads; then the
+    party slot in the fight (wPlayerMonNumber) is the honest source, so the digest never mixes two Pokemon."""
+    me = read_battle_mon(emu)
+    if me.species:
+        return _mon(me)
+    party, slot = read_party(emu), emu.read(PLAYER_MON)
+    return _mon(party[slot]) if slot < len(party) else _mon(me)
 
 
 def build(ctx, emu, tracker: Tracker, box_text: str) -> dict:
@@ -50,7 +53,7 @@ def build(ctx, emu, tracker: Tracker, box_text: str) -> dict:
     try:
         out["bag"] = {item_name(i): q for i, q in read_bag(emu)}
         if scr.in_battle:
-            out["battle"] = {"kind": KINDS.get(emu.read(0xD057), "battle"), "you": _mon(read_battle_mon(emu), _active_species(emu)),
+            out["battle"] = {"kind": KINDS.get(emu.read(0xD057), "battle"), "you": _our_mon(emu),
                              "enemy": _mon(read_enemy_mon(emu))}
     except Exception:
         pass
