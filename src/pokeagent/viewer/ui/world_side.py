@@ -77,6 +77,11 @@ class WorldSide:
                 names = {v: k for k, v in inplace.LABELS.items()}
                 dpg.add_combo(list(names), default_value=inplace.LABELS["auto"], width=px(170),
                               callback=lambda s, a, u: setattr(view.interiors, "mode", names[a]))
+            with dpg.group(horizontal=True):
+                dpg.add_checkbox(label="edit layout", callback=lambda s, a, u: setattr(view.interiors, "editing", a))
+                dpg.add_button(label="Reset interior", callback=lambda s, a, u: view.interiors.reset())
+                dpg.add_button(label="Reset all", callback=lambda s, a, u: view.interiors.reset(True))
+            dpg.add_text("edit: drag an interior = move, Ctrl+wheel = scale (saved to runs/atlas/layout_overrides.json)", wrap=px(340))
             dpg.add_separator()
             self.strip_title = dpg.add_text("Stadium")
             self.slots_parent = dpg.add_group()

@@ -11,11 +11,13 @@ from typing import Callable
 
 from pokeagent.atlas.anchor import Anchor, anchor_interiors
 from pokeagent.atlas.fit import build_xforms, walk_cells
+from pokeagent.atlas.overrides import Overrides
 from pokeagent.atlas.rom_maps import MapHeader, map_name
 from pokeagent.atlas.world import WorldLayout, Xform
 
-MODES = ("auto", "inplace", "inplace_full", "inset")
-LABELS = {"auto": "auto", "inplace": "in place (fit)", "inplace_full": "in place (full size)", "inset": "inset"}
+MODES = ("auto", "inplace", "inplace_full", "stretch", "inset")
+LABELS = {"auto": "auto", "inplace": "in place (fit)", "inplace_full": "in place (full size)",
+          "stretch": "in place (stretch world)", "inset": "inset"}
 AUTO_ZOOM = 0.75               # screen px per world px at which auto shows every interior
 
 
@@ -24,13 +26,14 @@ class Plan:
     anchors: dict[int, Anchor]
     fit: dict[int, Xform]
     full: dict[int, Xform]
+    hidden: frozenset[int] = frozenset()
 
     def xf(self, mode: str) -> dict[int, Xform]:
         return self.full if mode == "inplace_full" else self.fit
 
 
 def plan_interiors(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayout, model: dict | None = None,
-                   walk_cache: dict | None = None) -> Plan:
+                   walk_cache: dict | None = None, overrides: Overrides | None = None) -> Plan:
     cache = walk_cache if walk_cache is not None else {}
 
     def walk(m: int):
@@ -39,7 +42,17 @@ def plan_interiors(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayou
         return cache[m]
 
     anchors = anchor_interiors(headers, layout, model)
-    return Plan(anchors, build_xforms(anchors, layout, walk, True), build_xforms(anchors, layout, walk, False))
+    ov = overrides
+    if ov is not None and ov.inset_only:                       # user keeps these (and the floors hanging off them) in the inset grid
+        anchors = {m: a for m, a in anchors.items() if not set(chain(anchors, m)) & ov.inset_only}
+    adj = (lambda m, t: ov.adjust(m, t, anchors[m].entry)) if ov is not None else None
+    fit, full = build_xforms(anchors, layout, walk, True, adj), build_xforms(anchors, layout, walk, False, adj)
+    for m in (ov.interiors if ov is not None else ()):          # a per-interior mode beats the global fit/full choice
+        if ov.mode_of(m) == "inplace_full" and m in full:
+            fit[m] = full[m]
+        elif ov.mode_of(m) == "inplace" and m in fit:
+            full[m] = fit[m]
+    return Plan(anchors, fit, full, ov.hidden if ov is not None else frozenset())
 
 
 def chain(anchors: dict[int, Anchor], m: int) -> list[int]:
@@ -52,12 +65,12 @@ def chain(anchors: dict[int, Anchor], m: int) -> list[int]:
 
 
 def shown_set(mode: str, anchors: dict[int, Anchor], zoom: float, hover: int | None = None, selected: int | None = None,
-              inside: tuple[int, ...] = ()) -> set[int]:
+              inside: tuple[int, ...] = (), hidden: frozenset[int] = frozenset()) -> set[int]:
     if mode == "inset":
         return set()
-    if mode in ("inplace", "inplace_full") or zoom >= AUTO_ZOOM:
-        return set(anchors)
-    return {c for m in (hover, selected, *inside) if m is not None for c in chain(anchors, m)}
+    if mode in ("inplace", "inplace_full", "stretch") or zoom >= AUTO_ZOOM:
+        return set(anchors) - hidden
+    return {c for m in (hover, selected, *inside) if m is not None for c in chain(anchors, m)} - hidden
 
 
 def z_order(anchors: dict[int, Anchor], shown: set[int], top: int | None = None) -> list[int]:
@@ -73,6 +86,9 @@ def _door(layout: WorldLayout, anchors: dict[int, Anchor], xf: dict[int, Xform],
     a = anchors[m]
     if a.parent not in anchors:
         p = layout.places[a.parent]
+        if layout.warp is not None:
+            wx, wy = layout.warp.cell(p.x + a.via[0], p.y + a.via[1])
+            return round(wx), round(wy)
         return p.x + a.via[0], p.y + a.via[1]
     if a.parent in shown:
         t = xf[a.parent]

@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from pokeagent.atlas.warp import Warp
 
 from pokeagent.atlas.rom_maps import MapHeader
 
@@ -46,6 +49,7 @@ class WorldLayout:
     pins: dict[int, tuple[int, int]] = field(default_factory=dict)    # in-place views: interior shown only as its door cell
     xf: dict[int, Xform] = field(default_factory=dict)                # in-place views: interior painted at this transform
     z: dict[int, int] = field(default_factory=dict)                   # in-place views: draw rank (higher = on top)
+    warp: "Warp | None" = None       # stretched world: outdoor places are logical cells, this maps them to world cells
 
     def to_world(self, map_id: int, x: int, y: int) -> tuple[int, int]:
         """Top-left pixel of cell (x, y) of ``map_id`` on the world image."""
@@ -55,6 +59,9 @@ class WorldLayout:
             t = self.xf[map_id]
             return round((t.ox + x * t.s) * CELL), round((t.oy + y * t.s) * CELL)
         p = self.places[map_id]
+        if self.warp is not None and not p.interior:
+            wx, wy = self.warp.cell(p.x + x, p.y + y)
+            return round(wx * CELL), round(wy * CELL)
         return (p.x + x) * CELL, (p.y + y) * CELL
 
     @property

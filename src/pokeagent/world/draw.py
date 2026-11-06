@@ -98,7 +98,8 @@ def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], boo
     img = overlay(base, layout, model or {}, headers or {}, [], tuple(layers)) if layers else base
     vl, shown = None, set()
     if plan is not None and interiors != "inset":
-        shown = inplace.shown_set(interiors, plan.anchors, scale, inside=tuple(t.map for t in tracks if t.placed))
+        shown = inplace.shown_set(interiors, plan.anchors, scale, inside=tuple(t.map for t in tracks if t.placed),
+                                  hidden=plan.hidden)
         vl = inplace.view_layout(layout, plan.anchors, plan.xf(interiors), shown)
     if crop:
         x0, y0, x1, y1 = (v // CELL * CELL for v in crop)
@@ -129,7 +130,8 @@ def _shifted(layout: WorldLayout, dx: int, dy: int) -> WorldLayout:
     from dataclasses import replace
     cx, cy = dx // CELL, dy // CELL
     places = {m: replace(p, x=p.x + cx, y=p.y + cy) for m, p in layout.places.items()}
-    return replace(layout, places=places, pins={m: (x + cx, y + cy) for m, (x, y) in layout.pins.items()},
+    warp = replace(layout.warp, dx=layout.warp.dx + cx, dy=layout.warp.dy + cy) if layout.warp else None
+    return replace(layout, places=places, warp=warp, pins={m: (x + cx, y + cy) for m, (x, y) in layout.pins.items()},
                    xf={m: t._replace(ox=t.ox + cx, oy=t.oy + cy) for m, t in layout.xf.items()})
 
 

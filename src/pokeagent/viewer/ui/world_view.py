@@ -137,14 +137,16 @@ class WorldView:
 
     def _wheel(self, delta) -> None:
         m = self._mouse()
-        if m and self.pyr:
+        if m and self.pyr and not self.interiors.edit_wheel(delta):
             self.vp.step_zoom_at(m[0], m[1], 1 if float(delta) > 0 else -1)
 
     def _click(self) -> None:
         self._down_at = self._mouse()
+        self.interiors.press()
 
     def _release(self) -> None:
         m, d = self._mouse(), self._down_at
+        self.interiors.release()
         self._down_at = self._last_mouse = None
         if m and d and abs(m[0] - d[0]) < 4 and abs(m[1] - d[1]) < 4 and self.world:
             aid = pick(self._points, self.vp, *m)
@@ -166,7 +168,9 @@ class WorldView:
         m = self._mouse()
         if m and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
             if self._last_mouse:
-                self.vp.pan(m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
+                d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
+                if not self.interiors.edit_drag(*d):
+                    self.vp.pan(*d)
             self._last_mouse = m
         else:
             self._last_mouse = None
@@ -193,12 +197,14 @@ class WorldView:
             (self.world, self.pyr), self._loaded = self._loaded, None
             self.vp = Viewport(*self.world.layout.size_px, self.vp.screen_w, self.vp.screen_h)
             self.vp.fit()
+            self._built_for, self._pending = None, None
             self.status = ""
         if self.pyr is None:
             dpg.draw_text((20, 20), self.status, size=ui_scale.px(18), parent=dl)
             return
         if self._pending is not None:
             self.pyr, self._pending = self._pending, None
+        self.interiors.tick_world()
         self._maybe_rebuild(now)
         self._drag()
         vp, self._uploads = self.vp, 0

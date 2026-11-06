@@ -99,8 +99,12 @@ def locate(layout, wx: float, wy: float) -> tuple[int, int, int] | None:
     if inside:
         return inside
     cx, cy = int(wx // CELL), int(wy // CELL)
+    below = wy >= layout.outdoor_height * CELL
+    if layout.warp is not None and not below:                  # stretched outdoors: back to logical cells
+        ux, uy = layout.warp.uncell(wx / CELL, wy / CELL)
+        cx, cy = int(ux // 1), int(uy // 1)
     for m, p in layout.places.items():
-        if m in layout.pins or m in layout.xf:
+        if m in layout.pins or m in layout.xf or (layout.warp is not None and p.interior != below):
             continue
         if p.x <= cx < p.x + p.w and p.y <= cy < p.y + p.h:
             return m, cx - p.x, cy - p.y

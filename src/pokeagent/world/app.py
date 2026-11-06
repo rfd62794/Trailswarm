@@ -8,7 +8,7 @@ from pathlib import Path
 from pokeagent.world.model import WorldModel
 
 
-MODE_ALIAS = {"inset": "inset", "inplace": "inplace", "inplace-full": "inplace_full", "auto": "auto"}
+MODE_ALIAS = {"inset": "inset", "inplace": "inplace", "inplace-full": "inplace_full", "auto": "auto", "stretch": "stretch"}
 
 
 def png(args: argparse.Namespace) -> int:
@@ -47,5 +47,5 @@ def add_parser(sub) -> None:
     p.add_argument("--layers", default="", help="comma list of learning layers for --png (heat,walls,warps,disagree,...)")
     p.add_argument("--scale", type=float, default=1.0, help="output scale for --png")
     p.add_argument("--interiors", choices=list(MODE_ALIAS), default="inset",
-                   help="--png: interiors inset (grid), inplace (fit to building), inplace-full, or auto")
+                   help="--png: interiors inset (grid), inplace (fit to building), inplace-full, auto, or stretch (stretch the outdoor world so rooms fit full size)")
     p.set_defaults(func=main)

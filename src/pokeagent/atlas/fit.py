@@ -70,24 +70,34 @@ def choose_scale(w: float, h: float, fw: float, fh: float) -> float:
 
 
 def build_xforms(anchors: dict[int, Anchor], layout: WorldLayout, walk_of: Callable[[int], np.ndarray | None],
-                 fit: bool = True) -> dict[int, Xform]:
-    """Transform of every anchored interior. ``fit=False``: full size on the door; ``fit``: scaled into the footprint."""
+                 fit: bool = True, adjust: Callable[[int, Xform], Xform] | None = None) -> dict[int, Xform]:
+    """Transform of every anchored interior, in world cells. ``fit=False``: full size on the door; ``fit``: scaled into the
+    footprint. A stretched layout (``layout.warp``) moves doors and footprints through the warp first. ``adjust`` (user
+    overrides) is applied to each transform before the floors that hang off it are placed."""
+    wp = layout.warp
+    ident = (lambda c: c)
+    fx, fy = (wp.x.fwd, wp.y.fwd) if wp else (ident, ident)
+    ddx, ddy = (wp.dx, wp.dy) if wp else (0, 0)
     out: dict[int, Xform] = {}
     for m in sorted(anchors, key=lambda k: (anchors[k].depth, k)):
         a, p = anchors[m], layout.places[m]
-        if not fit:
-            out[m] = Xform(float(a.x), float(a.y), 1.0)
-        elif a.parent in out:                                   # another floor: same scale, lined up on the stair tile
+        if a.parent in out:                                     # another floor: same scale, lined up on the stair tile
             t = out[a.parent]
-            out[m] = Xform(t.ox + (a.via[0] - a.entry[0]) * t.s, t.oy + (a.via[1] - a.entry[1]) * t.s, t.s)
+            t = Xform(t.ox + (a.via[0] - a.entry[0]) * t.s, t.oy + (a.via[1] - a.entry[1]) * t.s, t.s)
         else:
             par = layout.places[a.parent]
-            x0, y0, x1, y1 = footprint(walk_of(a.parent), a.via)
-            s = choose_scale(p.w, p.h, x1 - x0, y1 - y0)
-            ox, oy = par.x + a.via[0] - a.entry[0] * s, par.y + a.via[1] - a.entry[1] * s
-            if p.w * s <= x1 - x0:                              # keep a fitting interior inside its building
-                ox = min(max(ox, par.x + x0), par.x + x1 - p.w * s)
-            if p.h * s <= y1 - y0:
-                oy = min(max(oy, par.y + y0), par.y + y1 - p.h * s)
-            out[m] = Xform(ox, oy, s)
+            door = (fx(par.x + a.via[0]) + ddx, fy(par.y + a.via[1]) + ddy)
+            s, ox, oy = 1.0, door[0] - a.entry[0], door[1] - a.entry[1]
+            if fit:
+                x0, y0, x1, y1 = footprint(walk_of(a.parent), a.via)
+                X0, X1 = fx(par.x + x0) + ddx, fx(par.x + x1) + ddx
+                Y0, Y1 = fy(par.y + y0) + ddy, fy(par.y + y1) + ddy
+                s = choose_scale(p.w, p.h, X1 - X0, Y1 - Y0)
+                ox, oy = door[0] - a.entry[0] * s, door[1] - a.entry[1] * s
+                if p.w * s <= X1 - X0:                          # keep a fitting interior inside its building
+                    ox = min(max(ox, X0), X1 - p.w * s)
+                if p.h * s <= Y1 - Y0:
+                    oy = min(max(oy, Y0), Y1 - p.h * s)
+            t = Xform(ox, oy, s)
+        out[m] = adjust(m, t) if adjust else t
     return out
