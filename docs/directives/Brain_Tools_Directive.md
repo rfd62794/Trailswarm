@@ -110,4 +110,5 @@ Test tail, line counts, one example JSON output per CLI command, anything that d
 - 2026-11-05 20:16 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05 (live surgery tools for Claude); dep World Legend merged
 - 2026-11-05 20:16 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dep merged
 - 2026-11-05 20:16 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-tools-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q6W56MBEFZ7JEWAC7DG7H4
+- 2026-11-05 20:21 · dispatcher · launched pid=19908; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-tools-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
