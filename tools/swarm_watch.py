@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 WINDOW_PRESSES = 600
+DUNGEON_WINDOW_PRESSES = 1500  # caves: long fights and back-tracking between ladders are progress, not a stuck loop
 MIN_NEW_TILES = 6
 HUNG_S = 120.0
 START_GRACE_S = 180.0  # before the first transition: ROM / checkpoint load, run dir not created yet
@@ -75,6 +76,10 @@ class ProgressWatch:
         except OSError:
             return self.goals_seen
 
+    def window_now(self) -> int:
+        """The stall window for where the agent is now: longer inside dungeons (never shorter than the configured one)."""
+        return max(self.window, DUNGEON_WINDOW_PRESSES) if _in_dungeon(self.last_pos) else self.window
+
     def check(self) -> str | None:
         """None while healthy, else a one-line reason."""
         if self.run_dir is None:
@@ -92,12 +97,18 @@ class ProgressWatch:
         idle = self.clock() - self.last_growth
         if idle > self.hung_s:
             return f"hung: no new transition for {idle:.0f}s"
-        if self.trainer or self.presses < self.window or self.presses - self.goal_at < self.window:
+        window = self.window_now()
+        if self.trainer or self.presses < window or self.presses - self.goal_at < window:
             return None
-        new = sum(1 for i in self.first_seen.values() if i > self.presses - self.window)
+        new = sum(1 for i in self.first_seen.values() if i > self.presses - window)
         if new < self.min_new:
-            return f"no new goal and only {new} new tiles in the last {self.window} presses"
+            return f"no new goal and only {new} new tiles in the last {window} presses"
         return None
+
+
+def _in_dungeon(pos) -> bool:
+    from pokeagent.explorer.world import DUNGEON_MAPS
+    return bool(pos) and pos[0] in DUNGEON_MAPS
 
 
 def record_stall(swarm_dir: Path, slot: int, seed: int, reason: str, watch: ProgressWatch | None) -> None:
