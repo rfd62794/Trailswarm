@@ -15,6 +15,7 @@ from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, reco
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle_run import cave_run
+from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
@@ -128,6 +129,9 @@ class Battle(BehaviourBase):
             ctx.in_battle = True
             ctx.box_streak = 0
             scan_battle_text(ctx)
+            bring = bring_out_press(ctx, lines_now)  # fainted lead: choose a Pokemon that can fight, not slot 0 again
+            if bring is not None:
+                return bring
             if ctx.pending_effect and ctx.step - ctx.pending_effect["step"] > PENDING_EFFECT_MAX_STEPS:
                 _finalize_pending_effect(ctx)  # the result text never came: count the hit neutral
             kind = ctx.emu.read(0xD057)
@@ -175,9 +179,11 @@ class Battle(BehaviourBase):
             gn = check_goals(ctx.emu, ctx)
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(0xCFE5)))
-            if kind == 1 and (weak or hurry or cave_run(ctx, kind, species)) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
+            if kind == 1 and (weak or hurry or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""
                 if ">RUN" in run_line:
+                    if not (weak or hurry):
+                        ctx.cave_runs += 1  # a cave-only run: capped per battle (a failed escape must not loop)
                     return Decision("A", "flee_run", f"BATTLE wild, HP {hp}/{mx}: RUN{tnote}")
                 cur = next((ln for ln in lines_now if ">" in ln), "")
                 if "FIGHT" in cur or "PKMN" in cur:

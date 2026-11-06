@@ -82,9 +82,9 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             ctx.mem.temp_blocked[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
         if "ahead_tiles" in extra and after[0] == before[0]:
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
-                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person
+                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False, stand=extra.get("stand_tile"))  # a real wall, not a person
             elif result.startswith("moved"):
-                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=True)
+                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=True, stand=extra.get("stand_tile"))
         ctx.last_fail = fail_key if (name in DIRS and after == before) else None
         if after[0] != before[0]:
             ctx.settle = 30  # fade already waited out; a short pause so the watcher sees the arrival

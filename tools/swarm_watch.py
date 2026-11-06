@@ -5,13 +5,19 @@ and START_GRACE_S covers the time before one exists), or (b) over its last
 WINDOW_PRESSES presses it reached no new goal AND fewer than MIN_NEW_TILES tiles it had not visited before
 (a stuck loop, e.g. mashing A on Route 3). Trainers are exempt from (b): standing still to level up is their job.
 It reads the agent's own runs/explore-*/transitions.jsonl (found by seed), never the agent process.
+A run under a Claude lease (``claude_hold.json`` in its run dir, written by the agent) is never stalled: the check is skipped
+(``skipped == "claude hold"``, which the swarm logs) and the clocks restart, so it is not killed the moment the lease ends.
 """
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from pokeagent.intervene.lease import lease_active  # noqa: E402  (a Claude lease on a run: do not kill it)
 
 WINDOW_PRESSES = 600
 DUNGEON_WINDOW_PRESSES = 1500  # caves: long fights and back-tracking between ladders are progress, not a stuck loop
@@ -45,6 +51,7 @@ class ProgressWatch:
         self.first_seen: dict[tuple, int] = {}
         self.last_pos: list | None = None
         self.born = self.last_growth = clock()
+        self.skipped = ""  # why the last check() did not judge the run ("" = it did)
 
     def _read_new(self) -> None:
         path = self.run_dir / "transitions.jsonl"
@@ -89,6 +96,11 @@ class ProgressWatch:
             goals = self._goal_count()
             if goals > self.goals_seen:
                 self.goals_seen, self.goal_at = goals, self.presses
+        self.skipped = ""
+        if self.run_dir is not None and lease_active(self.run_dir):
+            self.skipped = "claude hold"
+            self.born = self.last_growth = self.clock()
+            return None
         if self.presses == 0:
             waited = self.clock() - self.born
             if waited > self.grace_s:

@@ -8,7 +8,7 @@ ESCAPE ROPE by RAM row (item_use) -> A -> USE. Any unexpected state is backed ou
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
-from pokeagent.explorer.behaviours.item_use import bag_index, item_list_open, item_step
+from pokeagent.explorer.behaviours.item_use import bag_index, item_list_open, item_step, party_prompt_open
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.world import DUNGEON_MAPS
@@ -28,19 +28,23 @@ def wants_rope(ctx: ExplorerContext) -> bool:
             and not any(bag.get(i, 0) for i in HEAL_ITEMS) and ctx.rope_cooldown_until <= ctx.step)
 
 
-def rope_press(ctx: ExplorerContext, lines: list[str]) -> Decision:
-    """The next press of the rope sequence for whatever menu is on screen."""
-    if item_list_open(lines):
-        if bag_index(ctx.emu, ESCAPE_ROPE) is None:
-            return Decision("B", "rope_missing", "ESCAPE ROPE is gone from the bag: closing the list")
-        return item_step(ctx, lines, "", ESCAPE_ROPE, "ESCAPE ROPE", "cave HP critical")
+def rope_press(ctx: ExplorerContext, lines: list[str], item_id: int = ESCAPE_ROPE, name: str = "ESCAPE ROPE",
+               why: str = "cave HP critical", party_target: int | None = None) -> Decision:
+    """The next press of an overworld item-use sequence (the rope, or cave_topup's POTION) for the menu on screen."""
+    if any("TOSS" in ln for ln in lines):  # the USE/TOSS box sits OVER the item list (whose 'x N' rows stay visible): answer it first
+        return Decision("UP" if any(ln.lstrip(">").strip().startswith("TOSS") and ln.startswith(">") for ln in lines) else "A",
+                        "rope_use", f"{name}: choosing USE")
+    if item_list_open(lines) or party_prompt_open(lines):
+        if item_list_open(lines) and bag_index(ctx.emu, item_id) is None:
+            return Decision("B", "rope_missing", f"{name} is gone from the bag: closing the list")
+        return item_step(ctx, lines, "", item_id, name, why, party_target)
     if any(ln == "USE" or ln == ">USE" for ln in lines):
-        return Decision("A" if any(ln == ">USE" for ln in lines) else "UP", "rope_use", "ESCAPE ROPE: choosing USE")
+        return Decision("A" if any(ln == ">USE" for ln in lines) else "UP", "rope_use", f"{name}: choosing USE")
     if any("OPTION" in ln for ln in lines):  # the START menu
         on_item = any(ln.startswith(">ITEM") for ln in lines)
         return Decision("A" if on_item else "DOWN", "rope_open_item" if on_item else "rope_menu_down", "START menu: to ITEM")
     if not lines:
-        return Decision("START", "rope_start", "cave HP critical, no healing: opening the START menu for ESCAPE ROPE")
+        return Decision("START", "rope_start", f"{why}: opening the START menu for {name}")
     return Decision("B", "rope_back_out", "unexpected screen during the rope sequence: backing out")
 
 

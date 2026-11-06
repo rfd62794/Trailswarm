@@ -39,7 +39,7 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
 )
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
-from pokeagent.goals import GOALS, check_goals  # noqa: E402
+from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
 from pokeagent.statemeta import _git_sha  # noqa: E402
 
@@ -132,6 +132,12 @@ def main(argv=None) -> int:
     a.ram_diff and start_ram_diff(ctx, emu, run_dir, a.state, a.rom)  # fail-soft: runs unrecorded on any error
     from pokeagent.atlas.ladders import rom_ladders
     ctx.ladders = rom_ladders(a.rom)
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    ctx.cave_plan = rom_cave_planner(a.rom)
+    from pokeagent.atlas.collision import rom_walkable_ids
+    mem.rom_walkable = rom_walkable_ids(a.rom)
+    from pokeagent.atlas.collision import rom_tile_pairs
+    mem.rom_pairs = rom_tile_pairs(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None
@@ -292,7 +298,7 @@ def main(argv=None) -> int:
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, ctx)
                 dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
-                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nGOALS:  " + goals_brief(g)
                               + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
                               f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
@@ -306,7 +312,7 @@ def main(argv=None) -> int:
             pace = (a.frames_per_step if a.adaptive_pace else a.box_pace) if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
-            hold = agent_view.hold.active() if agent_view is not None else False
+            hold = agent_view.held() if agent_view is not None else False
             if not ctx.paused and not hold and ctx.frame % pace == 0:
                 engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
