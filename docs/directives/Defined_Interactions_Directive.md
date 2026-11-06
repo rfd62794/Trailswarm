@@ -1,7 +1,8 @@
 # PokeAgent: defined interactions - typed, memorised conversations; heal only when needed; fastest safe text pace
 
 **Read first:** `src/pokeagent/explorer/memory.py` (`interactions`, `npcs`, `beats`), `explorer/dialog.py`,
-`behaviours/heal.py`, `behaviours/advance_dialog.py`, `behaviours/procedures.py`, `behaviours/replay_beat.py`,
+`src/pokeagent/explorer/behaviours/heal.py`, `.../behaviours/advance_dialog.py`, `.../behaviours/procedures.py`,
+`.../behaviours/replay_beat.py`,
 `docs/KNOWLEDGE.md`. **Depends on:** the Mt Moon -> Cerulean goals branch merged (it adds `ctx.center_intent`).
 **Builder:** a Claude builder on the laptop with the ROM, `kb/` and checkpoint copies (gitignored).
 **Do not list the tree recursively**; use `git ls-files`.
@@ -46,8 +47,9 @@ at a fixed `--box-pace 6` frames regardless of how fast each box can actually go
    choices seen, the button sequence that completed it fastest, and its outcome. Expose them in the decision log
    and (if Brain Tools is merged) via `brain_find --type <type>`.
 4. **Fastest safe text pace**: first, a one-time procedure `set_text_speed_fast` (START -> OPTION -> TEXT SPEED
-   FAST -> back; verify the option byte on the ROM - find its address in `src/pokeagent/data/ram_map.json`,
-   wOptions, and confirm it changes). Then replace the fixed `box_pace` with an adaptive rule: press A as soon as
+   FAST -> back; verify the option byte on the ROM - ram_map.json has only wOptions* cursor labels, so take the
+   text-speed byte (wOptions) address from pret pokered.sym (symbols branch) and add it to ram_map overrides;
+   confirm it changes). Then replace the fixed `box_pace` with an adaptive rule: press A as soon as
    the box is waiting for input (the down-arrow prompt tile in the text box, or the text fully printed - verify the
    prompt tile id on the ROM) instead of after a fixed frame count; keep a per-screen-kind learned minimum frames
    (box / menu / yes-no / battle text) that never dropped an input, shrinking it while presses keep working and
