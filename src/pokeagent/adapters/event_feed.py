@@ -108,5 +108,5 @@ class EventFeed:
             x, y = int(a[0]), int(a[1])
         except (ValueError, IndexError):
             return
-        dest = [int(v) for v in val] if kind == "warp" and isinstance(val, list) else None
+        dest = [int(v) for v in val] if kind in ("warp", "jump") and isinstance(val, list) else None
         self.bus.emit(ev.Learn(kind=kind, map=mid, x=x, y=y, dir=a[2] if len(a) > 2 else "", dest=dest))
