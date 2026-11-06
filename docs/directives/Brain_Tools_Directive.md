@@ -99,11 +99,13 @@ Test tail, line counts, one example JSON output per CLI command, anything that d
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
+| Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 20:16 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05 (live surgery tools for Claude); dep World Legend merged
+- 2026-11-05 20:16 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dep merged
 <!-- queue:end -->
