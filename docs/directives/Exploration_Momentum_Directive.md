@@ -83,7 +83,7 @@ Test tail, line counts, the corridor/two-frontier test traces, and anything that
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-exploration-momentum-directive |
 | Base branch | - |
@@ -98,4 +98,5 @@ Test tail, line counts, the corridor/two-frontier test traces, and anything that
 - 2026-11-05 18:50 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-exploration-momentum-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q1XRRSEGBMEVFSPW4FYZ5K
 - 2026-11-05 18:52 · dispatcher · launched pid=16012; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-exploration-momentum-directive; provisioned: uv sync --frozen
 - 2026-11-05 19:21 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 18 min est. n/a
+- 2026-11-05 19:33 · robert-claude-laptop · Review → Done — note: merged via PR #36 (d7ca7ec, merge of main + Devin work); Sonnet review MERGE-WITH-FOLLOWUPS; ROM A/B: viridian -224, parcel -304 presses; reversal target missed (36%) because reversals come from plan_goal (Pallet deliver_parcel ping-pong) and shake_walk - follow-up fix dispatched
 <!-- queue:end -->
