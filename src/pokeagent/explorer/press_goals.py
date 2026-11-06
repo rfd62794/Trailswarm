@@ -36,7 +36,9 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             pass
     for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
         if goals[g] and g not in ctx.goal_steps and g not in ctx.initial_goals:
-            ctx.goal_steps[g] = ctx.step; ctx.log(f"*** GOAL REACHED: {g} at step {ctx.step} ***", "res")
+            ctx.goal_steps[g] = ctx.step; ctx.log(f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
+            with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
+                fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
