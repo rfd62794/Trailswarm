@@ -12,6 +12,7 @@ from pokeagent.ramlab.records import load_all
 from pokeagent.ramlab.replay import Replayer
 from pokeagent.ramlab.verify import run_checks
 
+RECHECK = (0xD059,)           # wCurOpponent: the hand-written check failed on a wild battle; always re-test from the data
 SKIP_EVENTS = {"goal"}           # fires with whatever else happened that step: no specific meaning to test
 
 
@@ -42,10 +43,15 @@ def mine_runs(roots: list[Path], min_support: int = 3, entries: list[dict] | Non
 
 
 def verify_top(roots: list[Path], rom: Path, states: Path, top: int = 40, min_support: int = 3,
-               entries: list[dict] | None = None) -> tuple[list[dict], list[dict], list[Candidate]]:
+               entries: list[dict] | None = None, include: tuple[int, ...] = RECHECK) -> tuple[list[dict], list[dict], list[Candidate]]:
     """Mine, take the top candidates, replay-verify them. Returns (findings, notes, candidates)."""
     records, metas, labels, cands = mine_runs(roots, min_support, entries)
     chosen = select(cands, labels, top)
+    have = {c.key() for c in chosen}
+    for addr in include:                     # always test these addresses, whatever their rank
+        extra = [c for c in cands if c.addr == addr and c.event not in SKIP_EVENTS and c.key() not in have][:3]
+        chosen += extra
+        have |= {c.key() for c in extra}
     runs_dir = {r: Path(m["dir"]) for r, m in metas.items() if (Path(m["dir"]) / "ram_trace.jsonl").is_file()}
     with tempfile.TemporaryDirectory(prefix="ramlab_") as tmp:
         rep = Replayer(rom, states, Path(tmp))

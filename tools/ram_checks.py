@@ -164,8 +164,9 @@ def battle(rig: Rig) -> Result:
     ev = f"wild {nm} L{en.level} on Route 1"
     r.check(e.read(0xD057) == 1 and e.read(0xD05A) == 0, ["wIsInBattle", "wBattleType"], f"{ev}: wIsInBattle 1 (wild), wBattleType 0")
     r.check(e.read(0xCFD8) == en.species == e.read(0xCFE5), ["wEnemyMonSpecies2", "wEnemyMonSpecies", "wEnemyMon"], f"{ev}: species copies agree")
-    r.check(e.read(0xD059) == en.species, ["wCurOpponent"], f"{ev}: wCurOpponent == species",
-            f"wCurOpponent reads {e.read(0xD059)} at the command menu while species is {en.species}")
+    # wCurOpponent is the TRAINER id (200 + class) and stays 0 in wild battles (found by tools/ram_discover.py, 2026-11-05)
+    r.check(e.read(0xD059) == 0, ["wCurOpponent"], f"{ev}: wCurOpponent 0 in a wild battle (trainer battles: 200 + class)",
+            f"wCurOpponent reads {e.read(0xD059)} in a wild battle; expected 0")
     r.check(2 <= en.level <= 5 and 0 < en.hp <= en.max_hp, ["wEnemyMonLevel", "wEnemyMonHP", "wEnemyMonMaxHP"], f"{ev}: HP {en.hp}/{en.max_hp}")
     row = rig.kb["species_by_dex"][str(rig.kb["dex_of_internal"][str(en.species)])]
     r.check(read_enemy_base_stats(e) == rig.base(en.species), ["wEnemyMonBaseStats"], f"{ev}: base stats {rig.base(en.species)} == kb")

@@ -56,7 +56,7 @@ def flag_entries(roots: list[Path]) -> list[dict]:
 
 def cmd_verify(a, roots) -> int:
     entries = load_entries(Path(a.map))
-    findings, notes, chosen = pipeline.verify_top(roots, Path(a.rom), Path(a.states), a.top, a.min_support, entries)
+    findings, notes, chosen = pipeline.verify_top(roots, Path(a.rom), Path(a.states), a.top, a.min_support, entries, tuple(a.include))
     for f in findings:
         print(f"{'VERIFIED' if f['verified'] else 'not    '} {f['addr']} {f['name']:26s} {f['event']:13s} {f['status']:9s} "
               f"replay {f['replay']['passed']}/{f['replay']['witnesses']}")
@@ -66,8 +66,8 @@ def cmd_verify(a, roots) -> int:
         return 0
     data = pipeline.record_findings(findings)
     data["flags"] = flag_entries(roots)
-    F.save(data)
     flipped = F.apply_to_map(entries, data)
+    F.save(data)
     write_map(Path(a.map), entries)
     print(f"\n{sum(f['verified'] for f in findings)}/{len(findings)} verified; {flipped} ram_map labels newly verified")
     return 0
@@ -90,6 +90,8 @@ def main() -> int:
     ap.add_argument("--rom", default=str(ROOT / "roms" / "Pokemon Red.gb"))
     ap.add_argument("--states", default=str(ROOT / "runs" / "checkpoints"))
     ap.add_argument("--map", default=str(DATA / "ram_map.json"))
+    ap.add_argument("--include", type=lambda v: int(v, 16), nargs="*", default=list(pipeline.RECHECK),
+                    help="hex addresses to test whatever their rank (default: wCurOpponent 0xD059)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     return {"mine": cmd_mine, "verify": cmd_verify, "report": cmd_report}[a.cmd](a, a.runs)

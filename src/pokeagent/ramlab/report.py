@@ -38,11 +38,11 @@ def place_rows(bits: list[FlagBit], names: dict | None = None, limit: int = 25) 
 def build(entries: list[dict], data: dict, bits: list[FlagBit], n_records: int, n_runs: int, flipped: int = 0,
           names: dict | None = None) -> str:
     fs = data["findings"]
-    confirmed = [f for f in fs if f["verified"] and f["status"] == "confirms"]
+    confirmed = [f for f in fs if f.get("flipped_label")]
     new = sorted((f for f in fs if f["status"] == "new"), key=lambda f: -f["stats"]["score"])
     failed = data["failed"]
     out = [f"RAM discovery: {n_records} event records from {n_runs} run(s); {flipped} label(s) newly verified this pass", "",
-           f"NEWLY CONFIRMED labels ({len(confirmed)} replay-verified findings that confirm a label):"]
+           f"NEWLY CONFIRMED labels ({len(confirmed)} ram_map labels moved to verified by discovery):"]
     out += [finding_line(f) for f in confirmed] or ["  (none)"]
     out += ["", f"NEW FINDINGS ({len(new)}; verified = replay-confirmed, ? = mined but not yet confirmed):"]
     out += [("  [verified] " if f["verified"] else "  [?]        ") + finding_line(f).lstrip() for f in new[:25]] or ["  (none)"]

@@ -18,7 +18,7 @@ def finding(name, status, verified, score=1.0, event="money"):
 def test_report_sections_and_coverage():
     entries = [{"name": "a", "addr": "0xD000", "size": 2, "region": "items", "verified": True},
                {"name": "b", "addr": "0xD002", "size": 1, "region": "items", "verified": False}]
-    data = {"findings": [finding("wPlayerMoney", "confirms", True), finding("unk_D123", "new", False, 2.0)],
+    data = {"findings": [{**finding("wPlayerMoney", "confirms", True), "flipped_label": True}, finding("unk_D123", "new", False, 2.0)],
             "failed": [{**finding("wX", "confirms", False), "evidence": "replay: 0/3"}], "flags": []}
     bits = flag_bits([{"run": "r", "map": 0, "x": 5, "y": 6, "text": "hi", "d": [[0xD74B, 0, 1]]}])
     txt = report.build(entries, data, bits, 10, 2, flipped=1)

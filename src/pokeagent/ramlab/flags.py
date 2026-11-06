@@ -64,7 +64,8 @@ def describe(fb: FlagBit, names: dict | None = None) -> str:
     """'Route 1 (10,12): "Hi! I work at a POKe MART"' from the most common place and text."""
     (mid, x, y), _ = fb.places.most_common(1)[0]
     text = fb.texts.most_common(1)[0][0] if fb.texts else ""
-    return f"{map_name(mid, names)} ({x},{y})" + (f': "{text}"' if text else "")
+    kind = "trainer beaten" if "for winning" in text else "item/gift" if "received" in text.lower() or " got " in text else ""
+    return (f"[{kind}] " if kind else "") + f"{map_name(mid, names)} ({x},{y})" + (f': "{text}"' if text else "")
 
 
 def by_place(bits: list[FlagBit]) -> dict[tuple, list[str]]:

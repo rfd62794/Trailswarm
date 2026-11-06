@@ -68,6 +68,7 @@ def test_verify_gate_flips_only_on_a_passing_replay(tmp_path, monkeypatch):
     entries = [dict(e) for e in ENTRIES]
     data = {"findings": good}
     assert F.apply_to_map(entries, data) == 1
+    assert good[0]["flipped_label"] and "e.g. 1->2" in good[0]["evidence"]
     assert entries[0]["verified"] and "replay" in entries[0]["evidence"] and not entries[1].get("verified")
     entries2 = [dict(e) for e in ENTRIES]
     res, _ = run_checks(cands, recs, runs, FakeReplayer(dead=True), labels)

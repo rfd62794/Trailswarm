@@ -37,7 +37,8 @@ def passed(results: list[dict]) -> bool:
 def evidence_text(c: Candidate, results: list[dict]) -> str:
     ok = sum(r["event_ok"] for r in results)
     drive = "press-driven" if all(r["control_clean"] for r in results) else "time-driven (also changes without the press)"
-    return (f"{c.event}: byte {describe(c.kind)} ({c.support} occurrences in {c.runs} run(s), specificity {c.specificity}, "
+    eg = ", ".join(f"{b}->{a}" for b, a in dict.fromkeys(c.examples[:6]).keys())
+    return (f"{c.event}: byte {describe(c.kind)} [e.g. {eg}] ({c.support} occurrences in {c.runs} run(s), specificity {c.specificity}, "
             f"consistency {c.consistency}); replay: {ok}/{len(results)} witnesses reproduce it, {drive}")
 
 

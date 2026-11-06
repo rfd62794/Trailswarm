@@ -31,6 +31,8 @@ def upsert(data: dict, entry: dict, bucket: str = "findings") -> None:
         if (row["event"], row["addr"]) == (entry["event"], entry["addr"]):
             if row.get("verified") and not entry.get("verified"):
                 return
+            if row.get("flipped_label"):
+                entry["flipped_label"] = True
             rows[i] = entry
             return
     rows.append(entry)
@@ -48,6 +50,7 @@ def apply_to_map(entries: list[dict], data: dict) -> int:
             continue
         if not e.get("verified"):
             e["verified"], e["evidence"] = True, f["evidence"]
+            f["flipped_label"] = True
             flipped += 1
         elif not e.get("evidence"):
             e["evidence"] = f["evidence"]
