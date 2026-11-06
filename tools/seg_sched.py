@@ -85,16 +85,16 @@ class Curriculum:
                 self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
 
     def groups(self) -> dict[str, list]:
-        segs = [s for s in ss.layout(self.doc) if ss.ckpt(self.root, s.start)]
+        segs = [s for s in ss.layout(self.doc) if ss.ckpt_valid(self.root, s.start)]   # in-order checkpoints only
         st = lambda s: ss.stat(self.doc, s.key)  # noqa: E731
         unsolved = sorted((s for s in segs if not ss.is_solved(st(s))),
                           key=lambda s: (ss.rate(st(s)) or 0.0, st(s)["n"]))
         per = ss.fps(self.doc)
         polish = sorted((s for s in segs if ss.is_solved(st(s))), key=lambda s: -ss.potential_gain(st(s), per))  # most to win first
-        all_ = ss.layout(self.doc)
-        ends = [i for i, s in enumerate(all_) if ss.ckpt(self.root, s.end)]
-        nxt = all_[ends[-1] + 1] if ends and ends[-1] + 1 < len(all_) else None
-        frontier = [nxt] if nxt is not None and ss.ckpt(self.root, nxt.start) else []
+        # frontier: the EARLIEST segment whose end checkpoint is not (validly) there yet, once its start is valid. A stray
+        # checkpoint further up the ladder (a goal reached out of order) never moves it.
+        nxt = next((s for s in ss.layout(self.doc) if not ss.ckpt_valid(self.root, s.end)), None)
+        frontier = [nxt] if nxt is not None and ss.ckpt_valid(self.root, nxt.start) else []
         return {"unsolved": unsolved, "frontier": frontier, "polish": polish}
 
     def choose(self) -> tuple[str, object] | None:

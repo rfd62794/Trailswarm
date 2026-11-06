@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 import os
 
+from pokeagent.checkpoint_goals import completed_goals, write_completed
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
+from pokeagent.goals import GOALS, check_goals
 
 CUR_MAP = 0xD35E  # wCurMap
 
@@ -15,6 +17,7 @@ def save_end_state(ctx: ExplorerContext) -> None:
     try:
         tmp = ctx.run_dir / f"end.{os.getpid()}.tmp"
         ctx.emu.save_state(tmp); os.replace(tmp, ctx.run_dir / "end.state")
+        write_completed(ctx.run_dir / "end.state", completed_goals(check_goals(ctx.emu, ctx), ctx.initial_goals, GOALS))
     except Exception as e:
         ctx.log(f"[end state save failed: {e!r}]", "res")
 

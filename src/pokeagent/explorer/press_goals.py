@@ -10,6 +10,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
+from pokeagent.checkpoint_goals import completed_goals, write_completed
 from pokeagent.goals import GOALS, check_goals
 
 
@@ -43,6 +44,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
+                write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS))  # curriculum order check
             except Exception as e:
                 ctx.log(f"[checkpoint save failed: {e!r}]", "res")
             gp = Path("runs/milestones.json")
