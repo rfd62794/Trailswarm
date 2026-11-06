@@ -107,7 +107,10 @@ class ProgressWatch:
 
 
 def _in_dungeon(pos) -> bool:
-    from pokeagent.explorer.world import DUNGEON_MAPS
+    try:
+        from pokeagent.explorer.world import DUNGEON_MAPS
+    except ImportError:  # never let the watchdog crash the supervisor tick: fall back to the normal window
+        return False
     return bool(pos) and pos[0] in DUNGEON_MAPS
 
 
