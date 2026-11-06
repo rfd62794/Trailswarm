@@ -136,11 +136,13 @@ did not fit.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-world-legend-and-ledges-directive |
 | Base branch | - |
 | Base commit | f5c1047073fb4336a70d5a49a1040a6f8af46941 |
+| Head commit | 66fabea8c33fe4e29f2721c1665c49012613303e |
+| Head remote | rfd62794/pokeagent |
 | Model | swe-2-flash-max |
 
 **Status log**
@@ -148,4 +150,5 @@ did not fit.
 - 2026-11-05 18:44 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dependency E1 merged
 - 2026-11-05 18:44 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q1KASTARBPE78XRN6D04HS
 - 2026-11-05 18:49 · dispatcher · launched pid=21576; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; provisioned: uv sync --frozen
+- 2026-11-05 19:16 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 9 min est. n/a
 <!-- queue:end -->
