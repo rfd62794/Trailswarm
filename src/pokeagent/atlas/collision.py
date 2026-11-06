@@ -11,6 +11,16 @@ from pokeagent.atlas import rom_maps
 TILESET_TABLE, ENTRY, NUM_TILESETS = 0xC7BE, 12, 24
 
 
+def walkable_ids(rom: bytes, tileset: int) -> frozenset:
+    """The walkable tile ids of ``tileset`` read from the ROM bytes (empty for an unknown tileset)."""
+    ids: set[int] = set()
+    if 0 <= tileset < NUM_TILESETS:
+        o = rom[TILESET_TABLE + ENTRY * tileset + 5] | rom[TILESET_TABLE + ENTRY * tileset + 6] << 8
+        while o < len(rom) and rom[o] != 0xFF and len(ids) < 256:
+            ids.add(rom[o]); o += 1
+    return frozenset(ids)
+
+
 def rom_walkable_ids(rom_path: str = "roms/Pokemon Red.gb"):
     """``tileset -> frozenset of walkable tile ids`` (empty set for an unknown tileset); None when the ROM is unreadable."""
     try:
@@ -21,11 +31,6 @@ def rom_walkable_ids(rom_path: str = "roms/Pokemon Red.gb"):
 
     def walkable(tileset: int) -> frozenset:
         if tileset not in cache:
-            ids: set[int] = set()
-            if 0 <= tileset < NUM_TILESETS:
-                o = rom[TILESET_TABLE + ENTRY * tileset + 5] | rom[TILESET_TABLE + ENTRY * tileset + 6] << 8
-                while o < len(rom) and rom[o] != 0xFF and len(ids) < 256:
-                    ids.add(rom[o]); o += 1
-            cache[tileset] = frozenset(ids)
+            cache[tileset] = walkable_ids(rom, tileset)
         return cache[tileset]
     return walkable

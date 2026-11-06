@@ -12,8 +12,9 @@ from typing import Callable
 import numpy as np
 
 from pokeagent.atlas.anchor import Anchor
-from pokeagent.atlas.rom_maps import BANK, MapHeader
-from pokeagent.atlas.tiles import load_tileset, tileset_entry
+from pokeagent.atlas.collision import walkable_ids
+from pokeagent.atlas.rom_maps import MapHeader
+from pokeagent.atlas.tiles import load_tileset
 from pokeagent.atlas.world import WorldLayout, Xform
 
 SCALES = (1.0, 0.75, 0.5)
@@ -24,13 +25,7 @@ LIMIT_W, LIMIT_H = 7, 9        # flood reach from the door: cells sideways, cell
 
 def walk_cells(rom: bytes, hd: MapHeader) -> np.ndarray:
     """(h*2, w*2) bool: cell walkable by the tileset collision list (bottom-left tile of each 2x2 step, as the game does)."""
-    bank, _bs, _gfx = tileset_entry(rom, hd.tileset)
-    e = 0xC7BE + 12 * hd.tileset
-    ptr = rom[e + 5] | rom[e + 6] << 8
-    o, ids = bank * BANK - BANK + ptr, set()
-    while o < len(rom) and rom[o] != 0xFF and len(ids) < 256:
-        ids.add(rom[o])
-        o += 1
+    ids = walkable_ids(rom, hd.tileset)  # home-bank collision list (atlas.collision): one source of truth
     bs = load_tileset(rom, hd.tileset).blockset
     blocks = np.frombuffer(hd.blocks(rom), dtype=np.uint8)
     if blocks.size < hd.w * hd.h:

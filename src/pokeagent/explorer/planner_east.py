@@ -6,7 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
-from pokeagent.explorer.cave_route import ladder_step
+from pokeagent.explorer.cave_route import ladder_step, rom_route_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
 from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -98,6 +98,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if stage in TRAIN_OUTSIDE_STAGES and pos[0] not in CAVE and 0 < level < need and mx and hp / mx >= 0.5:
         # too weak for the cave (and Route 4's trainers): grind Route 3 first
         return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
+    if pos[0] in CAVE:  # the whole dungeon is in the ROM: route across floors first, learned walls only delay it
+        rom = rom_route_step(maps, stage, pos, goals.get("_cave_plan"), goals.get("_blocked_now", ()))
+        if rom:
+            return rom
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
     if not training:
         p = g.path(pos, target)
