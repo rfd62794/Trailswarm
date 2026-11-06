@@ -131,3 +131,49 @@ def test_viewer_opens_on_the_full_world_by_default(monkeypatch, tmp_path):
     (tmp_path / "p.json").write_text(json.dumps({"prefs": {"mode": "inplace"}}))
     monkeypatch.setattr(export.Overrides, "load", staticmethod(lambda *a, **k: real(tmp_path / "p.json", None)))
     assert export.load_for_view() == "compact-world" and seen == ["compact"]   # picked fit earlier: compact world
+
+
+def test_layout_failure_never_returns_a_compact_layout_and_asks_for_the_full_world(monkeypatch):
+    from pokeagent.viewer.ui import world_interiors as wi
+    H, Lfull = world()
+    Lc = compact_layout(Lfull, {14})
+    full = SimpleNamespace(layout=Lfull, rom=b"", headers=H, compact=False, source=None)
+    compact = SimpleNamespace(layout=Lc, rom=b"", headers=H, compact=True, source=full)
+    monkeypatch.setattr(wi.inplace, "plan_interiors", lambda *a, **k: (_ for _ in ()).throw(ValueError("boom")))
+    layer = wi.InteriorLayer(SimpleNamespace(world=compact, wm=SimpleNamespace(rev=0, union_model=lambda: {})))
+    out = layer.layout(1.0, ())
+    assert out is Lfull and all(p.x != OFF for p in out.places.values())               # agents in rooms stay on-canvas
+    assert layer.swap.force_full                                                          # and the full world gets loaded
+    from pokeagent.viewer.ui.world_stretch import kind_for
+    layer.mode = "inplace"
+    layer.set_mode("inplace")
+    assert not layer.swap.force_full                                                      # choosing a mode again retries
+
+
+def test_stretch_failure_does_not_overwrite_the_saved_mode(monkeypatch, tmp_path):
+    from pokeagent.viewer.ui import world_stretch as ws
+    monkeypatch.setattr(ws, "dpg", SimpleNamespace(does_item_exist=lambda *a: False))
+    ov = Overrides.load(tmp_path / "u.json", None)
+    ov.set_mode("stretch")
+    layer = SimpleNamespace(view=SimpleNamespace(), ov=ov, mode="stretch", set_mode=lambda m: pytest.fail("must not persist"))
+    swap = ws.StretchSwap(layer)
+    swap._done = ("stretch", None, "boom", "sig")
+    swap._adopt()
+    assert layer.mode == "auto" and ov.mode == "stretch"                                  # this session only
+    assert swap.failed_sig == "sig" and "failed" in swap.message[0]
+
+
+def test_interior_image_renders_are_budgeted_per_frame(monkeypatch):
+    calls = []
+    monkeypatch.setattr(inplace_render, "load_tileset", lambda rom, i: object())
+    monkeypatch.setattr(inplace_render, "render_map", lambda rom, hd, ts: calls.append(hd) or np.zeros((2, 2, 3), np.uint8))
+    H = {m: SimpleNamespace(tileset=0) for m in range(20)}
+    imgs = inplace_render.InteriorImages(b"", H)
+    imgs.begin_frame(8)
+    got = [imgs.get(m) for m in range(20)]
+    assert sum(g is not None for g in got) == 8 and len(calls) == 8                      # the rest wait for later frames
+    imgs.begin_frame(8)
+    assert imgs.get(0) is not None and len(calls) == 8                                    # cached ones are free
+    assert sum(imgs.get(m) is not None for m in range(20)) == 16
+    imgs.begin_frame(None)
+    assert all(imgs.get(m) is not None for m in range(20))                                # PNG export: unlimited

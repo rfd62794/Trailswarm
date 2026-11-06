@@ -23,9 +23,18 @@ class InteriorImages:
         self.rom, self.headers = rom, headers
         self._ts: dict[int, Tileset] = {}
         self._img: dict[int, np.ndarray] = {}
+        self.limit: int | None = None      # live view: at most this many new renders per frame (None = unlimited)
+        self._new = 0
 
-    def get(self, m: int) -> np.ndarray:
+    def begin_frame(self, limit: int | None) -> None:
+        self.limit, self._new = limit, 0
+
+    def get(self, m: int) -> np.ndarray | None:
+        """The interior's image; None when the per-frame render budget is spent (it is drawn once a later frame renders it)."""
         if m not in self._img:
+            if self.limit is not None and self._new >= self.limit:
+                return None
+            self._new += 1
             hd = self.headers[m]
             if hd.tileset not in self._ts:
                 self._ts[hd.tileset] = load_tileset(self.rom, hd.tileset)

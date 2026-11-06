@@ -214,7 +214,7 @@ def test_layer_failure_falls_back_to_plain_layout_once(monkeypatch):
         calls.append(1)
         raise ValueError("bad override")
     monkeypatch.setattr(wi.inplace, "plan_interiors", boom)
-    view = SimpleNamespace(world=SimpleNamespace(layout=L, rom=b"", headers=H), wm=SimpleNamespace(rev=0, union_model=lambda: {}))
+    view = SimpleNamespace(world=SimpleNamespace(layout=L, rom=b"", headers=H, source=None), wm=SimpleNamespace(rev=0, union_model=lambda: {}))
     layer = wi.InteriorLayer(view)
     assert layer.layout(1.0, ()) is L and layer.shown == set() and layer.vl is None
     assert layer.layout(1.0, ()) is L and len(calls) == 1          # same inputs: not retried every frame

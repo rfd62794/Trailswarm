@@ -46,6 +46,7 @@ class StretchSwap:
         self.sigs: dict[str, object] = {}      # kind -> what the cached stretched world was built from
         self.failed_sig = None
         self.building = False
+        self.force_full = False                # set when the in-place layout failed: stay on the full world
         self.swapping = False
         self.message = ("", 0.0)
         self._done: tuple | None = None        # (kind, world, pyramid | error text, signature) from the worker
@@ -75,7 +76,7 @@ class StretchSwap:
             return
         if self.building:
             return
-        want, sig = kind_for(L.mode), self.signature()
+        want, sig = ("full" if self.force_full else kind_for(L.mode)), self.signature()
         if want == "stretch" and (sig is None or sig == self.failed_sig):
             return
         fresh = want != "stretch" or self.sigs.get("stretch") == sig
@@ -92,7 +93,7 @@ class StretchSwap:
         self._done = None
         if w is None:                       # the build failed: back to auto, tell the user, don't retry these inputs
             self.failed_sig = sig
-            L.set_mode("auto")
+            L.mode = "auto"                     # this session only: a transient failure must not overwrite the saved choice
             self.message = (f"{kind} world failed ({pyr}); back to auto", time.monotonic() + 8)
             if dpg.does_item_exist(COMBO):
                 dpg.set_value(COMBO, LABELS["auto"])

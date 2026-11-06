@@ -18,9 +18,11 @@ from pokeagent.atlas.world import CELL, WorldLayout
 from pokeagent.viewer import ui_scale
 from pokeagent.viewer.ui.world_edit import EditLayout
 from pokeagent.viewer.ui.world_stretch import StretchSwap
+from pokeagent.world.export import full_world
 from pokeagent.world.pyramid import to_gpu
 
 log = logging.getLogger(__name__)
+MAX_RENDER = 8                 # new interior renders per frame: choosing an in-place mode fills in over a few frames
 MAX_TEX = 400                  # interior textures are small (one per anchored interior and scale); trimmed past this
 
 
@@ -51,6 +53,7 @@ class InteriorLayer:
     def set_mode(self, mode: str) -> None:
         """The Interiors selector: apply now and remember it (saved with the other overrides)."""
         self.mode = mode
+        self.swap.force_full = False
         self.ov.set_mode(mode)
         self.edit.touch()
 
@@ -63,6 +66,7 @@ class InteriorLayer:
             self._logged = msg
             log.exception("in-place interiors disabled (%s)", msg)
         self._failed, self.shown, self.vl = self._sig(), set(), None
+        self.swap.force_full = True              # a compact layout parks anchored rooms off-canvas: go back to the full world
 
     # -- per frame ------------------------------------------------------------------------
     def layout(self, zoom: float, inside: tuple[int, ...]) -> WorldLayout:
@@ -84,7 +88,7 @@ class InteriorLayer:
             return self.vl
         except Exception as exc:
             self._fail("layout", exc)
-            return w.layout
+            return full_world(w).layout          # never a layout whose anchored rooms sit at the off-canvas sentinel
 
     def update_hover(self, mouse) -> None:
         """Hovered interior under the mouse (any anchored one: auto reveals it), None off the map."""
@@ -113,7 +117,10 @@ class InteriorLayer:
         if key not in self._tex:
             if self._images is None:
                 self._images = inplace_render.InteriorImages(w.rom, w.headers)
-            img = inplace_render.interior_tile(self._images.get(m), s, depth)
+            src = self._images.get(m)
+            if src is None:
+                return None                      # over this frame's render budget: not drawn yet
+            img = inplace_render.interior_tile(src, s, depth)
             self._tex[key] = dpg.add_static_texture(img.shape[1], img.shape[0], to_gpu(img), parent="world_tex")
         self._used.add(key)
         return self._tex[key]
@@ -127,13 +134,18 @@ class InteriorLayer:
             return
         try:
             top = self.selected if self.selected in self.shown else self.hover
+            if self._images is None:
+                self._images = inplace_render.InteriorImages(w.rom, w.headers)
+            self._images.begin_frame(MAX_RENDER)
             for m in inplace.z_order(self.plan.anchors, self.shown, top):
                 t, pl = self.vl.xf[m], w.layout.places[m]
                 p0 = v.vp.to_screen(t.ox * CELL, t.oy * CELL)
                 p1 = v.vp.to_screen((t.ox + pl.w * t.s) * CELL, (t.oy + pl.h * t.s) * CELL)
                 off = 6 * v.vp.zoom
                 dpg.draw_rectangle((p0[0] + off, p0[1] + off), (p1[0] + off, p1[1] + off), fill=(0, 0, 0, 120), color=(0, 0, 0, 0), parent=dl)
-                dpg.draw_image(self._texture(m, t.s, self.plan.anchors[m].depth), p0, p1, parent=dl)
+                tex = self._texture(m, t.s, self.plan.anchors[m].depth)
+                if tex is not None:
+                    dpg.draw_image(tex, p0, p1, parent=dl)
         except Exception as exc:
             self._fail("draw", exc)
 

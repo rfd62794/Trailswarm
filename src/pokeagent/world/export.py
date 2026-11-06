@@ -65,7 +65,7 @@ def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track
 
 
 def load_for_view(rom_path: str | Path = "roms/Pokemon Red.gb", cache: Path | None = CACHE, base: str | Path | None = None) -> World:
-    """What the viewer opens with: the compact world (rooms in place) unless the saved Interiors choice is inset."""
+    """What the viewer opens with: the full inset world, unless the saved Interiors choice is an in-place mode (then compact)."""
     from pokeagent.atlas.inplace import DEFAULT_MODE
     w, ov = load_world(rom_path, cache, base), Overrides.load()
     return w if (ov.mode or DEFAULT_MODE) == "inset" else compact_world(w, None, ov)
