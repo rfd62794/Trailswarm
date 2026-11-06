@@ -8,6 +8,7 @@ within FAST_S seconds twice in a row pauses refilling for PAUSE_S and says why (
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import time
@@ -65,6 +66,13 @@ class Supervisor:
             f = {}
         return f"; goal firsts {f}" if f else ""
 
+    @staticmethod
+    def _digest(path: Path) -> str | None:
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            return None
+
     # --- launching ---------------------------------------------------------------------------------------
     def _config(self, slot: Slot) -> dict:
         n = self.seq
@@ -79,6 +87,7 @@ class Supervisor:
         self.swarm_dir.mkdir(parents=True, exist_ok=True)
         if self.shared.exists():
             shutil.copy(self.shared, cfg["own"])  # the freshest merged memory: learning compounds
+        cfg["hash"] = self._digest(cfg["own"])
         slot.cfg, slot.started = cfg, self.clock()
         slot.handle = self.launch(cfg)
         seg = f", segment {cfg['segment']}" if cfg["segment"] else ""
@@ -105,9 +114,12 @@ class Supervisor:
         try:
             if not cfg["own"].exists():
                 raise FileNotFoundError("no memory file")
-            self.merge(self.shared, cfg["own"])
-            self.merged += 1
-            note = "merged"
+            if self._digest(cfg["own"]) == cfg.get("hash"):
+                note = "memory untouched, skipped"  # crashed before saving: nothing to learn from
+            else:
+                self.merge(self.shared, cfg["own"])
+                self.merged += 1
+                note = "merged"
         except Exception as e:  # a crashed agent may leave nothing or a torn file; the swarm carries on
             note = f"not merged ({e!r})"
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice

@@ -32,12 +32,14 @@ class FakeProc:
 
 class World:
     def __init__(self, tmp_path, n=2, limit=99, **kw):
+        self.untouched = False
         self.procs, self.merges, self.logs, self.t = [], [], [], 0.0
         self.shared = tmp_path / "maps.json"
         self.shared.write_text(json.dumps({"v": 0}))
 
         def launch(cfg):
-            cfg["own"].write_text(self.shared.read_text())  # agent saves its memory
+            if not self.untouched:  # the agent saved something new
+                cfg["own"].write_text(self.shared.read_text() + " ")
             return FakeProc(cfg, self)
 
         def merge(shared, own):
@@ -191,3 +193,45 @@ def test_merge_file_into_is_atomic_and_locked(tmp_path):
     dst = sm.merge_file_into(shared, own)
     assert dst["maps"]["1"]["visited"]["1,1"] == 3 and json.loads(shared.read_text())["team_best_level"] == 7
     assert not shared.with_suffix(".lock").exists() and not shared.with_suffix(".json.tmp").exists()
+
+
+def test_untouched_memory_copy_is_skipped_not_merged(tmp_path):
+    w = World(tmp_path, n=1)
+    w.untouched = True
+    w.sup.tick()
+    w.end(w.procs[0], rc=1, after=5)
+    w.sup.tick()
+    assert w.merges == [] and w.sup.merged == 0 and w.sup.finished == 1
+    assert any("untouched, skipped" in line for line in w.logs) and len(w.procs) == 2
+
+
+def test_kill_tree_leaves_no_grandchild(tmp_path):
+    import os
+    import subprocess
+    import time
+    sp = _load("swarm_proc")
+    pidfile = tmp_path / "gc.pid"
+    h = sp.TreeProc([sys.executable, str(TOOLS / "swarm_proc.py"), str(pidfile)])
+    for _ in range(100):
+        if pidfile.exists() and pidfile.read_text():
+            break
+        time.sleep(0.1)
+    gc = int(pidfile.read_text())
+
+    def alive(pid):
+        if os.name == "nt":
+            out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+            return str(pid) in out
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    assert alive(gc)
+    h.kill()
+    for _ in range(50):
+        if not alive(gc):
+            break
+        time.sleep(0.1)
+    assert h.poll() is not None and not alive(gc)

@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
+from swarm_proc import TreeProc  # noqa: E402
 from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
 
@@ -78,8 +79,7 @@ class Launcher:
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
                "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + role_args + segment_args(cfg["segment"])
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
-        h = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
-        h.port = port
+        h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
         return h
 
@@ -91,16 +91,20 @@ def run_continuous(a) -> int:
         stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
     except resources.LockBusy as e:
         print(f"not starting: {e}"); return 1
-    resources.measure_agent_rss(ROOT)
+    n, why = plan_agents(ROOT, max(1, a.agents))
+    print(why)
+    if n == 0:
+        print("no room for more agents; not starting a swarm"); return 0
     shared = ROOT / a.maps
-    n = max(1, a.agents)
     roles = ["trainer", "explorer"] if a.roles else None
     segment = weakest_segment if a.segment == "auto" else (lambda _n: a.segment) if a.segment else None
     sup: list = []
 
     def limit() -> int:  # machine cap minus agents we did not start (a viewer-spawned one counts against us)
-        others = max(0, resources.live_agent_count(ROOT) - sup[0].running())
-        return resources.max_agents(root=ROOT) - others
+        live = resources.live_agent_count(ROOT)
+        pending = max(0, sup[0].running() - live)  # started but not registered yet: still count against the cap
+        room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
+        return sup[0].running() + room
 
     sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
