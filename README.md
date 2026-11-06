@@ -6,7 +6,7 @@ The Python package and CLI are still named `pokeagent` (`uv run pokeagent ...`);
 
 ![World view: agents from an overnight swarm run moving across Kanto](docs/media/world.gif)
 
-*Seven real overnight explore runs replayed on the ROM-rendered Kanto map, Pallet Town to Cerulean, with trails.*
+*Seven real overnight explore runs replayed on the ROM-rendered Kanto map, Pallet Town to Mt Moon, with trails; hollow circles are agents indoors.*
 
 ## Highlights
 
