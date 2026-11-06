@@ -105,6 +105,7 @@ def test_wild_level_ceiling_comes_from_the_drained_grass_table():
 
 
 def test_plan_goal_lifts_the_gate_when_the_budget_is_spent_and_logs_it(monkeypatch):
+    monkeypatch.setattr(kbmod, "ROM_KB", None)                                        # no ceiling rule: only the battle budget
     from pokeagent.explorer.behaviours.plan_goal import PlanGoal
     from pokeagent.goals import GOALS
     goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}                      # next stage: BROCK
