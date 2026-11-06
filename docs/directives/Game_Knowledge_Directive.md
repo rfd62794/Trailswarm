@@ -2,7 +2,9 @@
 
 **Read first:** `docs/KNOWLEDGE.md`, `tools/rom_tables.py` (the existing drain: moves, type chart, names, dex
 order, via pret/pokered symbol offsets), `docs/superpowers/specs/2026-11-05-atlas-overlay-note.md`.
-**Builder:** a Claude builder on the laptop with the ROM present (this needs the cartridge to verify every
+**Depends on:** `Brain_Tools_Directive.md` merged (`pokeagent.brain`, the `pokeagent brain` CLI) for scope item 5 only;
+items 1-4 can proceed without it.
+**Builder:** a Claude builder on the laptop with the ROM, `baselines/bedroom.state` and `kb/` present (all gitignored, laptop-only) (this needs the cartridge to verify every
 offset; Devin's sandbox has no ROM). **Do not list the tree recursively**; use `git ls-files`.
 
 ## 1. Why this exists
