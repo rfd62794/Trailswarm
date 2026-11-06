@@ -119,7 +119,7 @@ class Frontier(BehaviourBase):
         hp_now, mx_now = party_hp(ctx.emu)
         goals_now_all = ctx.goals()
         weak = mx_now and hp_now / mx_now < 0.4
-        training = goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < 8 and not weak
+        training = goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak
         name, why = _memory_step(ctx, m, x, y,
                                  avoid_maps={0x00} if (training and m == 0x0C) else None,
                                  grass="seek" if training else "avoid" if weak else "neutral")
