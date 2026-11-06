@@ -126,6 +126,9 @@ def main(argv=None) -> int:
         opts=ExplorerOptions(starter=a.starter, state_stem=Path(a.state).stem if a.state else "", steps=a.steps,
                              stop_at_goal=a.stop_at_goal, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps))
+    from pokeagent.explorer.anomalies import AnomalyMonitor
+    from pokeagent.atlas.rom_maps import valid_map_ids
+    ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None

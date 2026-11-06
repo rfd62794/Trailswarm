@@ -19,7 +19,8 @@ class Goto(BehaviourBase):
             if (m, x, y) == target:
                 ctx.goto = None; ctx.log(f"[arrived at {target}]", "res")
             else:
-                p = WorldGraph(ctx.mem.data["maps"]).path((m, x, y), lambda n: n == target)
+                g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
+                p = g.path((m, x, y), lambda n: n == target)
                 if p:
                     return Decision(p[0], "goto_step", f"goto {target}: {len(p)} steps left")
                 ctx.goto = None; ctx.log(f"[no known route to {target}; exploring instead]", "res")

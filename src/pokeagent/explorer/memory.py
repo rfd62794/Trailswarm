@@ -31,6 +31,7 @@ class MapMemory(NavMixin, WarpsMixin):
         self.record_paths = record_paths
         self.data = json.loads(self.path.read_text()) if self.path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
+        self.temp_blocked: dict = {}  # (map, x, y) -> step it expires: a wanderer NPC's tile, routing only, never saved
         self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
         self.purge_bad_warps()
 

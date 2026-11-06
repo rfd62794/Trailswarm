@@ -51,6 +51,7 @@ class ExplorerContext:
     opts: ExplorerOptions = field(default_factory=ExplorerOptions)
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
+    anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
     step: int = 0
