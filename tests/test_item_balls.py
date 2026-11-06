@@ -307,3 +307,16 @@ def test_pickup_explores_toward_a_ball_whose_side_tiles_are_unvisited(tmp_path):
 def test_pickup_does_not_explore_toward_a_ball_beyond_the_detour_budget(tmp_path):
     ctx = route_ctx(tmp_path, ball=(5 + PICKUP_DETOUR + 5, 3), player=(5, 5), xs=range(5, 12))
     assert not applies(ctx)
+
+
+def test_pickup_gives_up_on_a_ball_when_its_walking_presses_go_nowhere(tmp_path):
+    ctx = route_ctx(tmp_path)               # player never moves: something unseen blocks the corridor
+    presses = 0
+    for _ in range(12):
+        ctx.refresh()
+        d = Pickup().step(ctx)
+        if d is None:
+            break
+        presses += 1
+    assert d is None and 3 <= presses <= 5 and ctx.pickup_tries[(13, 10, 5)] == 2
+    assert not applies(ctx)

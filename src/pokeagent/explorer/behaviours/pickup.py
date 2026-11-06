@@ -28,6 +28,7 @@ PICKUP_DETOUR = 20  # most steps a pickup may cost from here (the named detour b
 _LAB = 0x28         # Oak's lab: the starter planner owns the balls, and the two left over are not for us
 _BOX_WAIT = 160     # frames after the A press to wait for the dialog box (it opens ~50 frames late on the ROM)
 _ITEM_WAIT = 64     # more frames, once the box is open, for the "found ITEM!" line to finish printing
+_MAX_STUCK = 4      # walking presses in a row that did not move the player (a trainer or ledge in the way)
 _MAX_TRIES = 2      # presses facing a ball that gave no item text before it is skipped this run
 
 
@@ -65,6 +66,8 @@ class Pickup(BehaviourBase):
 
     def step(self, ctx: "ExplorerContext") -> Decision | None:
         self._resolve(ctx)
+        if self._stuck(ctx):
+            return None
         m = ctx.view.m
         ctx.pickup_gone.update((m, bx, by) for _slot, bx, by in items.hidden_balls(ctx.emu))
         live = {(bx, by) for _slot, bx, by in items.item_balls(ctx.emu)}
@@ -78,6 +81,22 @@ class Pickup(BehaviourBase):
                 return None
             ctx.pickup_ball = plan["ball"]
         return self._act(ctx, plan)
+
+    def _stuck(self, ctx: "ExplorerContext") -> bool:
+        """Walking presses that go nowhere (a person or a ledge the map does not know about) end the ball's
+        chance this run, like two empty tries do, instead of pressing into the obstacle for ever."""
+        here = (ctx.view.m, ctx.view.x, ctx.view.y)
+        if ctx.pickup_last is not None and ctx.pickup_last[:3] == here:
+            ctx.pickup_stuck += 1
+        else:
+            ctx.pickup_stuck = 0
+        if ctx.pickup_stuck < _MAX_STUCK:
+            return False
+        ball = ctx.pickup_last[3]
+        ctx.pickup_tries[ball] = _MAX_TRIES
+        ctx.pickup_ball, ctx.pickup_last, ctx.pickup_stuck = None, None, 0
+        ctx.log(f"[pickup: stuck on the way to the ball at ({ball[1]},{ball[2]}); skipping it this run]", "res")
+        return True
 
     def _gated(self, ctx: "ExplorerContext") -> bool:
         """Goals/scenes where a pickup detour is forbidden."""
@@ -121,6 +140,8 @@ class Pickup(BehaviourBase):
         return best
 
     def _act(self, ctx: "ExplorerContext", plan: dict) -> Decision:
+        pos = (ctx.view.m, ctx.view.x, ctx.view.y)
+        ctx.pickup_last = (*pos, plan["ball"]) if pos[1:] != plan.get("spot") else None  # only walking presses
         if "approach" in plan:  # the ball's side tiles are not on the map yet: explore toward it
             ball = plan["ball"]
             ctx.pickup_approach[ball] = ctx.pickup_approach.get(ball, 0) + 1
