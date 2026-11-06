@@ -72,11 +72,13 @@ def test_budget_lifts_after_m_training_steps_but_only_training_steps_count():
     assert why and f"{GRIND_STEPS} steps" in why
 
 
-def test_budget_lifts_when_the_route_ceiling_is_below_the_required_level_minus_two():
+def test_ceiling_rule_keeps_brock_grinding_for_a_l8_lead_and_lifts_for_a_l12_lead():
     b = GrindBudget()
-    assert b.update("beat_brock", level=8, step=0, battles=0, blackouts=0, training=True, ceiling=11, required=12) is None   # 11 >= 10
-    why = b.update("beat_brock", level=8, step=1, battles=0, blackouts=0, training=True, ceiling=5, required=12)
-    assert why and "ceiling L5" in why and "L12" in why
+    # Route 1 tops out at L5: a L8 lead still gains XP there (8 < 5 + 6), whatever level is required
+    assert b.update("beat_brock", level=8, step=0, battles=0, blackouts=0, training=True, ceiling=5) is None
+    assert not b.lifted("beat_brock")
+    why = GrindBudget().update("beat_brock", level=12, step=0, battles=0, blackouts=0, training=True, ceiling=5)
+    assert why and "ceiling L5" in why
 
 
 def test_budget_lifts_after_two_blackouts_in_a_row():

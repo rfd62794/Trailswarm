@@ -58,8 +58,7 @@ class PlanGoal(BehaviourBase):
             return need
         ctx.grind = ctx.grind or GrindBudget()
         why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
-                               training=0 < level < need, ceiling=level_ceiling(goal),
-                               required=need)
+                               training=0 < level < need, ceiling=level_ceiling(goal))
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
         return 0 if ctx.grind.lifted(goal) else need

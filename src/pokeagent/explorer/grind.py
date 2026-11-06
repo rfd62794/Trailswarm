@@ -1,14 +1,14 @@
 """Grind budget: the training gate (planner: 'level < _train_level -> go grind') must not hold the run forever.
 
 Lift the gate for a goal when grinding stops paying: N training battles or M training steps without a level gain on the lead,
-the training route's wild level ceiling below the required level minus 2, or blackouts in a row while training.
+the lead at or above the training route's top wild level + 6 (XP per fight is negligible), or blackouts in a row while training.
 """
 from __future__ import annotations
 
 GRIND_BATTLES = 25
 GRIND_STEPS = 2500
 GRIND_BLACKOUTS = 2
-CEILING_SLACK = 2
+CEILING_MARGIN = 6   # lead this far above the route's top wild level: a fight there gives negligible XP
 
 
 def record_battle_result(ctx, *, won: bool, moved_away: bool) -> None:
@@ -33,7 +33,7 @@ class GrindBudget:
         return self._lifted.get(goal, "")
 
     def update(self, goal: str, *, level: int, step: int, battles: int, blackouts: int, training: bool,
-               ceiling: int | None = None, required: int = 0) -> str | None:
+               ceiling: int | None = None) -> str | None:
         """Feed one planning step; returns the reason the first time the gate for `goal` is lifted, else None."""
         if goal in self._lifted:
             return None
@@ -51,8 +51,8 @@ class GrindBudget:
             why = f"{GRIND_BATTLES} battles without a level gain (stuck at L{level})"
         elif s["steps_in"] >= GRIND_STEPS:
             why = f"{GRIND_STEPS} steps without a level gain (stuck at L{level})"
-        elif ceiling is not None and required and ceiling < required - CEILING_SLACK:
-            why = f"route ceiling L{ceiling} is below the required L{required} minus {CEILING_SLACK}"
+        elif ceiling is not None and level >= ceiling + CEILING_MARGIN:
+            why = f"lead L{level} is {CEILING_MARGIN}+ levels above the route's wild ceiling L{ceiling}: no XP left to grind"
         elif blackouts >= GRIND_BLACKOUTS:
             why = f"{blackouts} blackouts in a row while training"
         if why:
