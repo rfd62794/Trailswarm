@@ -15,12 +15,12 @@ import json
 import shutil
 import sys
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import swarm_handoff  # noqa: E402
+from swarm_slot import Slot  # noqa: E402
 
 STARTERS = ["bulbasaur", "charmander", "squirtle"]
 BOX_PACES = [8, 16, 30]
@@ -30,18 +30,6 @@ POLL_S = 1.0
 SOLVED_FAST_S = 20.0   # a segment run this quick was already trivially solved
 SOLVED_HOLD_S = 600.0  # ...so --segment auto must not pick it again for 10 minutes
 MIN_S_PER_STEP = 0.05  # a clean exit faster than this per step cannot have used its step budget
-
-
-@dataclass
-class Slot:
-    idx: int
-    role: str
-    handle: Any = None
-    cfg: dict = field(default_factory=dict)
-    started: float = 0.0
-    streak: int = 0           # consecutive fast non-zero exits
-    paused_until: float = 0.0
-    retire: bool = False      # removed by a smaller --agents: no refill once its agent is done
 
 
 class Supervisor:
@@ -67,6 +55,7 @@ class Supervisor:
         roles = self.roles = roles or ["exploiter", "explorer"]
         self.handed_over = False
         self.handoff_file = self.root / "runs" / "swarm.handoff"
+        self.ident = swarm_handoff.Ident()
         self.state, self.kill_pid = swarm_handoff.default_state()  # liveness / tree-kill of adopted agents (by pid)
         self.slots = [Slot(i, roles[i % len(roles)]) for i in range(n)]
         self.seq = self.finished = self.merged = 0
@@ -196,9 +185,8 @@ class Supervisor:
         return Path(shutil.move(str(own), str(dest / own.name)))
 
     def tick(self) -> None:
-        if not self.stopping and self.handoff_file.exists():
-            swarm_handoff.hand_over(self)  # a new supervisor asked: pass the agents on, leave them running
-            return
+        if not self.stopping and self.handoff_file.exists() and swarm_handoff.hand_over(self):
+            return  # a new supervisor took the agents over; they keep running
         self._watch_progress()
         if self.heartbeat:
             self.heartbeat()  # keeps runs/spawn.lock fresh: a live swarm's lock must never look 6 h old

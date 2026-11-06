@@ -105,10 +105,16 @@ def run_continuous(a) -> int:
         print("a supervisor holds runs/spawn.lock: asking it to hand over its agents (30 s)...")
         adopted = swarm_handoff.request_handoff(ROOT)
         if adopted is None:
-            print("not starting: the running supervisor did not answer the handoff request in 30 s (no double supervision)")
+            print("not starting: no handoff (no answer in 30 s, or another upgrade is in flight); no double supervision")
             return 1
     try:
-        stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        if adopted is not None:  # the old supervisor already pointed the lock at us: no gap for a third process
+            try:
+                stack.enter_context(swarm_handoff.adopt_lock(ROOT))
+            except resources.LockBusy:
+                stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        else:
+            stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
     except resources.LockBusy as e:
         print(f"not starting: {e}"); return 1
     if adopted is not None:
@@ -136,7 +142,7 @@ def run_continuous(a) -> int:
                              segment_ok=lambda g: bool(segment_args(g))))
     if adopted is not None:
         sup[0].adopt(adopted)
-        (ROOT / "runs" / "swarm" / "adopt.json").unlink(missing_ok=True)
+        swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
     stack.close()  # release runs/spawn.lock now (also when we handed our own agents on to a newer supervisor)
