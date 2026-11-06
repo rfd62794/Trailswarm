@@ -37,6 +37,7 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
     DIRS, TILEMAP, TILEMAP_LEN, ascii_vision, battle_view, box_open, box_text, frame_lines, is_menu, npc_positions,
     party_hp,
 )
+from pokeagent.explorer.seeding import idle_frames
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
 from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
@@ -100,6 +101,7 @@ def main(argv=None) -> int:
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
+    emu.tick(idle_frames(a.seed))  # --seed shifts the game's RNG (seed 0/None: unchanged)
 
     root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
     root.configure(bg="#111")
