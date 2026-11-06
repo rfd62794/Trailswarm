@@ -51,7 +51,7 @@ class PlanGoal(BehaviourBase):
             if clamp:
                 ctx.log(f"[readiness] {clamp}", "res")
         need = self._budgeted(ctx, goals_now_all, need, verdict)
-        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
+        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need,
                              "_center_intent": ctx.center_intent, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)

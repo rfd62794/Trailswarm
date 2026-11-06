@@ -16,6 +16,7 @@ EAST_MAPS = (0x0E, 0x0F, 0x3B, 0x3C, 0x3D, 0x03, 0x40, 0x41, 0x23, 0x24, 0x58, 0
 def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, str] | None:
     """Next button toward the first unmet goal that the learned world already knows how to reach, else None."""
     g = WorldGraph(maps)
+    g.blocked_now = frozenset(goals.get("_blocked_now", ()))  # a wanderer NPC's tile, temporarily
     hp, mx = goals.get("_hp", (0, 0))
     if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C) and not goals.get("_mom_failed"):
         # Weak and near home: Mom heals the party when talked to. She is the one static sprite downstairs

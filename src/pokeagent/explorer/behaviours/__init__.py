@@ -1,6 +1,7 @@
 """The explorer's behaviours, in the demo's priority order (the old ``agent_step`` top to bottom)."""
 from __future__ import annotations
 
+from pokeagent.explorer.behaviours.anomaly_wait import AnomalyWait
 from pokeagent.explorer.behaviours.advance_dialog import AdvanceDialog, NamingKeyboard
 from pokeagent.explorer.behaviours.base import Behaviour, BehaviourBase, Decision, no_press
 from pokeagent.explorer.behaviours.battle import Battle
@@ -20,7 +21,7 @@ from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, Rep
 from pokeagent.explorer.behaviours.switch_out import SwitchOut
 
 __all__ = [
-    "AdvanceDialog", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
+    "AdvanceDialog", "AnomalyWait", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
     "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard", "SwitchOut",
     "default_behaviours", "no_press",
@@ -36,7 +37,7 @@ def default_behaviours() -> list[Behaviour]:
     and finally plain exploration.
     """
     return [
-        SettleWait(), LoopGuard(), PartyOrder(), Readiness(), ReplayInterrupt(),
+        SettleWait(), LoopGuard(), PartyOrder(), Readiness(), AnomalyWait(), ReplayInterrupt(),
         Battle(), SwitchOut(), Catch(), BattleMoves(),
         NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),

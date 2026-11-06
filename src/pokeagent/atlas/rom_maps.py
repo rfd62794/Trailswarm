@@ -114,3 +114,11 @@ def all_headers(d: bytes) -> dict[int, MapHeader]:
         except IndexError:
             continue
     return out
+
+
+def valid_map_ids(rom: str | Path = "roms/Pokemon Red.gb") -> frozenset[int] | None:
+    """Map ids that have a sane header in the ROM table; None when the ROM cannot be read."""
+    try:
+        return frozenset(all_headers(load(rom)))
+    except Exception:
+        return None
