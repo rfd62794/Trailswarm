@@ -58,7 +58,11 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
     edges = c.setdefault("edges", {})            # (floor, "x,y,DIR") -> tick at which the hard wall expires
     if c.get("floor") != pos[0]:
         edges.clear()                            # a floor change clears them: the bump was this floor's
+        c["episodes"], c["waiting"] = {}, None
         c["floor"] = pos[0]
+    eps = c.setdefault("episodes", {})
+    for e in [e for e in eps if (e[0], *map(int, e[1].split(",")[:2])) != pos]:
+        del eps[e]                               # the agent moved off that tile: its wait episodes are over
     for k in [k for k, until in edges.items() if until <= tick]:
         del edges[k]
     hard: dict = {}
@@ -90,7 +94,7 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
         c["key"] = key
         c["path"] = {"cells": cave_plan.follow(pos, buttons), "buttons": list(buttons)} if buttons else None
     if not buttons:
-        c["last"] = None
+        c["last"], c["waiting"] = None, None
         return None
     dx, dy = DIRS.get(buttons[0], (0, 0))
     ahead = (pos[0], pos[1] + dx, pos[2] + dy)
@@ -98,13 +102,12 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
         # The only way on runs through a tile a person just stood on (they blocked our last press): wait for them to move
         # instead of bumping again (31 RIGHT presses at Mt Moon 1F (6,23)); the block decays and the press is retried.
         edge = (pos[0], f"{pos[1]},{pos[2]},{buttons[0]}")
-        if not c.get("waiting"):                      # a new wait episode (the previous ask was a real press)
-            eps = c.setdefault("episodes", {})
+        if c.get("waiting") != (pos, edge):           # a new wait episode: first wait here, or after a real press / other tile
             eps[edge] = eps.get(edge, 0) + 1
             if eps[edge] > WAIT_CYCLES:               # a stationary NPC: stop waiting, route around it for the wall's window
                 edges[edge] = tick + HARD_WALL_ASKS
                 eps.pop(edge, None)
-                c["waiting"], c["path"] = False, None
+                c["waiting"], c["path"] = None, None
                 hard.setdefault(pos[0], set()).add(edge[1])
                 buttons = cave_plan(pos, goals, {m: set(maps.get(str(m), {}).get("blocked", [])) for m in (MT_MOON_1F, MT_MOON_B1F, MT_MOON_B2F)},
                                     temp, hard)
@@ -113,9 +116,9 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
                     return None
                 c["last"] = (pos, buttons[0])
                 return buttons[0], f"goal {stage}: ROM route around a person who did not move, {len(buttons)} steps"
-        c["last"], c["waiting"] = None, True
+        c["last"], c["waiting"] = None, (pos, edge)
         return "", f"goal {stage}: ROM route blocked by a person at the next tile - waiting for them to move"
-    c["waiting"] = False
+    c["waiting"] = None
     c["last"] = (pos, buttons[0])
     return buttons[0], f"goal {stage}: ROM route, {len(buttons)} steps across floors"
 
