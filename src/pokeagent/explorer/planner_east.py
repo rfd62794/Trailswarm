@@ -6,6 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
+from pokeagent.explorer.cave_route import ladder_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
 from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -102,6 +103,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         p = g.path(pos, target)
         if p:
             return p[0], f"goal {stage}: {len(p)} steps toward it over the learned world"
+    if pos[0] in CAVE and stage in ("to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon"):
+        lead = ladder_step(g, maps, stage, pos, goals.get("_ladders"))  # the ROM header's ladder, via the learned tile closest to it
+        if lead:
+            return lead
     if stage == "beat_misty":
         return _misty_step(g, goals, pos)
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
