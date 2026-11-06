@@ -124,4 +124,5 @@ Test tail, line counts, and anything that did not fit.
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05 (type learning); STAB reads party slot 1
 - 2026-11-05 19:43 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates
 - 2026-11-05 19:43 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-types-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4Z8KYRVZ2X524BCHC1H63
+- 2026-11-05 19:45 · dispatcher · launched pid=3080; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-types-directive; provisioned: uv sync --frozen
 <!-- queue:end -->

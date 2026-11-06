@@ -64,7 +64,8 @@ class NavMixin:
             if warp:  # a warp leads off this map: score it by how often we already took it, not by an off-map tile
                 base = d.get("warp_taken", {}).get(f"{x},{y},{name}", 1) * 3
             else:
-                base = d["visited"].get(f"{x + dx},{y + dy}", 0)
+                jump = d.get("jumps", {}).get(f"{x},{y},{name}")  # a ledge: judge it by where it lands, not the hopped tile
+                base = d["visited"].get(f"{jump[0]},{jump[1]}" if jump else f"{x + dx},{y + dy}", 0)
                 if grass == "seek" and tilemap is not None and self.is_grass(tileset, ahead_tiles(tilemap, name)):
                     base = -1  # training: grass first
             score = base + (1 if not warp and tabu and (x + dx, y + dy) in tabu else 0)
@@ -85,8 +86,10 @@ class NavMixin:
     def _frontier(self, d: dict, visited: dict, blocked: set, n: tuple) -> bool:
         """A tile that still has an unexplored side (same predicate the demo's frontier_step used)."""
         for name, (dx, dy) in DIRS.items():
-            if f"{n[1]},{n[2]},{name}" not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited \
-                    and f"{n[1]},{n[2]},{name}" not in d.get("warps", {}):
+            key = f"{n[1]},{n[2]},{name}"
+            if (key not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited
+                    and key not in d.get("warps", {})
+                    and key not in d.get("jumps", {})):  # a ledge tile is hopped over, never visited
                 return True
         return False
 

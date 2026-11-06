@@ -38,6 +38,15 @@ def merge_memory(dst: dict, src: dict) -> dict:
         wt = d.setdefault("warp_taken", {})
         for k, n in s.get("warp_taken", {}).items():
             wt[k] = max(wt.get(k, 0), n)
+        wd = d.setdefault("warp_disproof", {})
+        for k, n in s.get("warp_disproof", {}).items():
+            wd[k] = max(wd.get(k, 0), n)
+        wdt = d.setdefault("warp_disproof_total", {})
+        for k, n in s.get("warp_disproof_total", {}).items():
+            wdt[k] = max(wdt.get(k, 0), n)
+        for name in ("warp_disproof", "warp_disproof_total"):
+            if not d[name]:
+                del d[name]  # keep maps.json free of an empty key
         inter = d.setdefault("interactions", {})
         for k, e in s.get("interactions", {}).items():
             cur = inter.setdefault(k, {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
@@ -127,7 +136,8 @@ def merge_memory(dst: dict, src: dict) -> dict:
     for ref in bw:  # tombstones win over any agent copy that still carries the pollution
         mid, sep, key = ref.partition(":")
         if sep:
-            dst.get("maps", {}).get(mid, {}).get("warps", {}).pop(key, None)
+            md = dst.get("maps", {}).get(mid, {})
+            md.get("warps", {}).pop(key, None); md.get("warp_cand", {}).pop(key, None); md.get("warp_taken", {}).pop(key, None)
     # whiteout respawns (Pokecenter door / home) are never doors from other maps (see explore_demo.WHITEOUT_LANDINGS)
     for mid, d in dst.get("maps", {}).items():
         for key, dest in list(d.get("warps", {}).items()):
