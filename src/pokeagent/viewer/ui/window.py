@@ -23,6 +23,7 @@ from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
+from pokeagent.viewer.view_cap import SpawnGuard
 
 log = logging.getLogger(__name__)
 _BAR_H = 120  # reserved height for the three control-bar rows
@@ -37,6 +38,7 @@ class ViewerWindow:
                  root: Path | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
+        self._spawn_guard = SpawnGuard()
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
         self.selected: str | None = None
@@ -105,10 +107,25 @@ class ViewerWindow:
     def load_state(self, name: str) -> None:
         self.send_to_targets("load_state", name=name or "slot")
 
+    spawn_msg = ""
+
+    def at_agent_cap(self) -> bool:
+        """True when the agent limit is reached: the Spawn button is disabled."""
+        if self.root is None:
+            return False
+        from pokeagent import resources
+        return resources.live_agent_count(self.root) >= resources.max_agents(root=self.root)
+
     def spawn_agent(self, kind: str, args: str) -> None:
-        if self.supervisor is not None:
-            argv = [kind] + (args.split() if args else [])
-            self.supervisor.spawn(*argv)
+        if self.supervisor is None or not self._spawn_guard.begin():
+            return  # no supervisor, a spawn in flight, or a repeat callback inside the 2 s debounce
+        try:
+            self.supervisor.spawn(*([kind] + (args.split() if args else [])))
+            self.spawn_msg = ""
+        except Exception as e:  # SpawnRefused or a launch failure: show it, never crash the UI
+            self.spawn_msg = str(e)
+        finally:
+            self._spawn_guard.end()
 
     def stop_targets(self) -> None:
         if self.supervisor is not None:

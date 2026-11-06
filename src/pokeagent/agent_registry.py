@@ -18,6 +18,10 @@ def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, p
     d = _dir(root)
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{agent_id}.json"
+    for other in d.glob("*.json"):  # a dead agent's file on the same control port is stale: drop it
+        e = _entry(other)
+        if other != path and e.get("port") == port and not process_alive(e.get("pid")):
+            other.unlink(missing_ok=True)
     entry = {"id": agent_id, "kind": kind, "pid": os.getpid() if pid is None else pid, "port": port,
              "frame_slot": frame_slot, "token": token, "started": time.time()}
     tmp = path.with_suffix(".tmp")
@@ -26,6 +30,14 @@ def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, p
         os.chmod(tmp, 0o600)
     os.replace(tmp, path)
     return path
+
+
+def _entry(p: Path) -> dict:
+    try:
+        e = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return e if isinstance(e, dict) else {}
 
 
 def unregister(root: Path, agent_id: str) -> None:
@@ -42,6 +54,10 @@ def list_agents(root: Path) -> list[dict]:
             entry = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(entry, dict) and process_alive(entry.get("pid")):
+        if not isinstance(entry, dict):
+            continue
+        if process_alive(entry.get("pid")):
             out.append(entry)
+        else:  # prune: a dead agent's file would otherwise accumulate forever
+            p.unlink(missing_ok=True)
     return sorted(out, key=lambda e: str(e.get("id", "")))
