@@ -1,6 +1,7 @@
 """Pure readers of the screen and RAM: what the explorer sees (moved unchanged from tools/explore_demo.py)."""
 from __future__ import annotations
 
+from pokeagent.explorer import legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
 from pokeagent.names import load_registry
 from pokeagent.screentext import CHARMAP
@@ -41,33 +42,30 @@ def npc_positions(emu) -> set:
     return {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
 
 
-def ascii_vision(emu, mem, tileset: int) -> list[str]:
+def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
     """Cheap vision: the visible 10x9 map tiles as one character each, from RAM, no image model.
-    @ player, N an NPC (sprite table), # tile ids learned solid, . learned walkable, ? never tried,
-    W a learned warp tile; an open text box replaces the bottom rows with its decoded text."""
+    Kinds and glyphs come from the world legend (explorer.legend + explorer.tilekind); text boxes are
+    NOT part of the map: the dialog pane shows them."""
     tm = emu.read_range(TILEMAP, TILEMAP_LEN)
     m, px, py = emu.read(0xD35E), emu.read(0xD362), emu.read(0xD361)
     d = mem.m(m)
     npcs = {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
-    warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
+    trainers = tilekind.trainer_tiles(d)
+    tile_types = mem.data.get("tile_types", {})
+    grass_ids = mem.data.get("grass_ids", {})
+    kinds = set()
     rows = []
     for r in range(9):
         line = ""
         for c in range(10):
             mx, my = px + (c - 4), py + (r - 4)
             block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
-            if (c, r) == (4, 4):
-                ch = "@"
-            elif (mx, my) in npcs:
-                ch = "N"
-            elif (mx, my) in warps:
-                ch = "W"
-            else:
-                e = mem.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in block))
-                ch = "?" if not e else ("#" if e["solid"] > e["walkable"] else ".")
-            line += ch
+            kind = "you" if (c, r) == (4, 4) else tilekind.classify(
+                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, strict=False)
+            kinds.add(kind)
+            line += legend.glyph(kind, tilekind.ledge_dir(d, mx, my) if kind == "ledge" else None)
         rows.append(line)
-    return rows  # text boxes are NOT part of the map: the dialog pane shows them
+    return legend.Rendered(rows, legend.line(kinds))
 
 
 def battle_view(emu) -> list[str]:

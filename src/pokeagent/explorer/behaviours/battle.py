@@ -45,10 +45,15 @@ class Battle(BehaviourBase):
         if ctx.view.battling:
             if not ctx.in_battle:
                 ctx.battles = ctx.battles + 1; ctx.battle_pos = (m, x, y)
-                if ctx.emu.read(0xD057) == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
+                bflag = ctx.emu.read(0xD057)
+                if bflag == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
                     under = [tm_now[8 * 20 + 8], tm_now[8 * 20 + 9], tm_now[9 * 20 + 8], tm_now[9 * 20 + 9]]
                     ctx.mem.learn_encounter(m, x, y, ctx.emu.read(0xD367), under)
                     ctx.log(f"[wild encounter at ({x},{y}): grass tile learned]", "res")
+                elif bflag == 2:  # trainer battle (verified in the demo): the NPC we faced or that approached is one
+                    ctx.trainer_npc = ctx.mem.mark_trainer(m, x, y, ctx.facing)
+                    if ctx.trainer_npc is not None:
+                        ctx.log(f"[trainer battle: NPC pic {ctx.trainer_npc['pic']} marked trainer]", "res")
             ctx.in_battle = True
             ctx.box_streak = 0
             kind = ctx.emu.read(0xD057)
@@ -118,6 +123,10 @@ class Battle(BehaviourBase):
                 ctx.log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             won = ctx.emu.read(0xD163) > 0 and (m, x, y) == ctx.battle_pos  # a blackout warps you away
+            if won and ctx.trainer_npc is not None:
+                ctx.trainer_npc["beaten"] = True
+                ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
+            ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
