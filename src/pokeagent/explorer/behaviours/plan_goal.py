@@ -7,8 +7,11 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.training import train_level_for
+from pokeagent.explorer.grind import GrindBudget
+from pokeagent.explorer.training import readiness_for, required_level, stage_goal
 from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.knowledge.encounters import level_ceiling
+from pokeagent.knowledge.party import our_party
 from pokeagent.magikarp import BUY_STEP_CAP, MT_MOON_CENTER
 
 
@@ -36,8 +39,20 @@ class PlanGoal(BehaviourBase):
             ctx.center_intent = None  # bought (or no longer possible): the planner may walk out now
         parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in ctx.mem.data.get("items", [])
                        if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
+        party = our_party(ctx.emu) if not ctx.view.battling else []   # real stats and moves; skipped mid-battle
+        party = [c for c in party if c.name != "MAGIKARP"]  # the trainee never fights a boss: readiness judges the real team
+        verdict = readiness_for(goals_now_all, party)
+        if verdict and verdict.text != ctx.readiness_note:
+            ctx.readiness_note = verdict.text
+            ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})", "res")
+        need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
+        if clamp != ctx.clamp_note:
+            ctx.clamp_note = clamp
+            if clamp:
+                ctx.log(f"[readiness] {clamp}", "res")
+        need = self._budgeted(ctx, goals_now_all, need, verdict)
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
-                             "_level": lead_level(ctx.emu), "_train_level": train_level_for(goals_now_all, ctx.opts.train_level),
+                             "_level": lead_level(ctx.emu), "_train_level": need,
                              "_center_intent": ctx.center_intent, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         if planned and "at Mom, talking" in planned[1]:
@@ -46,3 +61,16 @@ class PlanGoal(BehaviourBase):
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
             return Decision(planned[0], "plan_goal", planned[1])
         return None
+
+    @staticmethod
+    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
+        """The training level, or 0 (gate lifted) once the grind budget for this goal is spent."""
+        goal, level = stage_goal(goals), lead_level(ctx.emu)
+        if goal is None:
+            return need
+        ctx.grind = ctx.grind or GrindBudget()
+        why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
+                               training=0 < level < need, ceiling=level_ceiling(goal))
+        if why:
+            ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
+        return 0 if ctx.grind.lifted(goal) else need

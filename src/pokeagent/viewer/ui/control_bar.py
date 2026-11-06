@@ -47,9 +47,10 @@ class ControlBar:
         with dpg.group(horizontal=True, parent=parent):
             dpg.add_combo(["explorer", "rl"], default_value="explorer", tag="spawn_kind", width=90)
             dpg.add_input_text(tag="spawn_args", width=170, hint="args (space separated)")
-            dpg.add_button(label="Spawn", width=56,
+            dpg.add_button(label="Spawn", width=56, tag="spawn_btn",
                            callback=lambda s, a, u: self.host.spawn_agent(
                                dpg.get_value("spawn_kind"), dpg.get_value("spawn_args")))
+            dpg.add_text("", tag="spawn_status")
             dpg.add_button(label="Stop", width=48, callback=lambda s, a, u: self.host.stop_targets())
             dpg.add_button(label="Release", width=64,
                            callback=lambda s, a, u: self.host.send_to_targets("hold_release"))
@@ -62,6 +63,10 @@ class ControlBar:
             dpg.set_item_label(self.pause_btn, "Resume" if self.host.paused() else "Pause")
         if self.steer_box is not None and dpg.does_item_exist(self.steer_box):
             dpg.set_value(self.steer_box, self.host.steering())
+        if dpg.does_item_exist("spawn_btn"):
+            capped = self.host.at_agent_cap()
+            dpg.configure_item("spawn_btn", enabled=not capped)
+            dpg.set_value("spawn_status", self.host.spawn_msg or ("agent limit reached" if capped else ""))
         snaps = self.host.target_snaps()
         for drv, tag in self.hand_btns.items():
             if dpg.does_item_exist(tag):

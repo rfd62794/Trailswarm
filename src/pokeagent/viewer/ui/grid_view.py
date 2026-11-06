@@ -8,6 +8,7 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.viewer.layout import grid
 from pokeagent.viewer.model import ViewerModel
+from pokeagent.viewer.view_cap import page_ids, view_max
 
 
 UPDATE_BUDGET_S = 0.022  # per UI tick; the rest of the cards are refreshed on the following ticks
@@ -23,6 +24,16 @@ class GridView:
         self.cards: dict[str, object] = {}
         self._sig: tuple | None = None
         self._rr = 0
+        self.view_max, self.page = view_max(), 0
+        self.pin: str | None = None
+
+    def _ranked(self) -> list[str]:
+        """Live agents first, then stale, then lost; stable by id so the grid does not reshuffle."""
+        order = {"live": 0, "stale": 1, "lost": 2}
+        return sorted(self.model.ids(), key=lambda a: (order.get(self.model.staleness(a), 3), a))
+
+    def next_page(self, *_a) -> None:
+        self.page += 1
 
     def area_size(self) -> tuple[int, int]:
         if dpg.does_item_exist(self.area):
@@ -32,15 +43,18 @@ class GridView:
 
     def sync(self) -> None:
         """Create/resync cards for the current agent set and area size (cheap no-op otherwise)."""
-        ids = self.model.ids()
+        all_ids = self._ranked()
+        ids, more, self.page = page_ids(all_ids, self.view_max, self.page, self.pin)
         w, h = self.area_size()
-        sig = (tuple(ids), w // 20, h // 20)
+        sig = (tuple(ids), more, w // 20, h // 20)
         if sig == self._sig:
             return
         self._sig = sig
         for card in self.cards.values():
             card.delete()
         self.cards.clear()
+        if dpg.does_item_exist("grid_more"):
+            dpg.delete_item("grid_more")
         if not ids:
             return
         cols, rows, cw, ch = grid(len(ids), w - 8, h - 8)
@@ -61,6 +75,9 @@ class GridView:
                 cell = dpg.add_table_cell(parent=row)
                 self.cards[aid] = self._factory(cell, aid, cw, ch,
                                                  self._on_focus, self._on_select)
+        if more:  # agents beyond the card limit: a button that cycles through them
+            dpg.add_button(parent=self.area, tag="grid_more", callback=self.next_page,
+                           label=f"+{more} more (page {self.page + 1}/{-(-len(all_ids) // self.view_max)})")
 
     def update(self, hold_s_for) -> None:
         """Refresh cards round-robin within a time budget so many agents keep the UI frame rate up;

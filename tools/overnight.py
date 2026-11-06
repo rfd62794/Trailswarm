@@ -21,7 +21,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+from pokeagent import resources
 from pokeagent.goals import GOALS
+
+
+def round_agents(want: int, root: Path = ROOT, **limits) -> int:
+    """Agents for this round: the request clipped to the machine limit (not counting agents already live)."""
+    return max(1, min(want, resources.max_agents(root=root, **limits)))
 
 
 def consistency(last_n: int = 16) -> dict[str, float]:
@@ -89,6 +95,8 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=800)
     a = ap.parse_args()
     log = ROOT / "runs" / "overnight-status.log"
+    a.agents = round_agents(a.agents)
+    print(f"overnight: using {a.agents} agents per round (limit from RAM/CPU/cap; swarm.py re-checks live agents)", flush=True)
     t_end = time.time() + a.hours * 3600
     rnd = 0
     skipped: dict[str, int] = {}

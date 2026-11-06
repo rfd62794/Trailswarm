@@ -114,3 +114,23 @@ blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.
   Mt Moon 1F has been entered. `gyarados` is in `SIDE_GOALS` (reported by check_goals and tools/status.py, never the planner's next goal).
   With a Magikarp in the party, `party_hp`, the training level and the BattleView read the fighter (the battle's active mon, else the strongest
   non-Magikarp), not party slot 0.
+
+## Game knowledge drain (ROM-verified 2026-11-05)
+
+`uv run python tools/rom_tables.py` writes `kb/rom_tables.json` (gitignored) ONLY if every check below passes. Offsets are from
+pret/pokered `pokered.sym` (symbols branch), file offset = bank*0x4000 + (addr - 0x4000). Query with `tools/knowledge.py`
+(moves / catch / train / trainer / map / ready) and `pokeagent.knowledge.*`.
+
+| table | symbol (bank:addr) | layout | check that passed |
+|---|---|---|---|
+| species base data | BaseStats 0e:43de | 28 B per dex no.; level-1 moves @15..18, growth rate @19 | CHARMANDER HP 39 FIRE; PIDGEY NORMAL/FLYING; GEODUDE and ONIX ROCK/GROUND |
+| learnsets + evolutions | EvosMovesPointerTable 0e:705c | 190 pointers by INTERNAL id; evolutions (1 level / 2 item+min level / 3 trade, species), 0, then (level, move) pairs, 0 | CHARMANDER EMBER at 9, evolves at 16; BULBASAUR VINE WHIP at 13 |
+| wild encounters | WildDataPointers 03:4eeb | pointer per MAP id; grass rate, 10 x (level, species), water rate, 10 x (level, species) | Route 1 (0x0C): PIDGEY and RATTATA, levels 2-5 |
+| trainer parties | TrainerDataPointers 0e:5d3b, TrainerNames 0e:59ff | 47 pointers; a class's parties back to back: `level, species..., 0` or `0xFF, (level, species)..., 0`; class ends at the next higher pointer (TrainerAI 0e:652e ends the last) | BROCK = GEODUDE L12, ONIX L14; MISTY = STARYU L18, STARMIE L21 |
+| trainer placement | map object data (rom_maps.py) | object text id bit 6 set -> 2 extra bytes (200 + class, party no.) | Pewter Gym 0x36 holds BROCK party 1 and a JR.TRAINER(M); Mt Moon 1F/B2F list their trainers |
+| items | ItemPrices 01:4608, ItemNames 01:472b | 3-byte BCD price; names 0x50-terminated, item ids 1..83 | POTION 300 (id 0x14) |
+
+Mt Moon (0x3B/0x3C/0x3D) trainers, from the ROM: 1F has HIKER, YOUNGSTER, 2 LASS, SUPER NERD, 2 BUG CATCHER; B1F none; B2F SUPER NERD and 4 ROCKET.
+Move meaning: `knowledge/moves.py` maps each ROM effect byte to an `Effect`; every effect id in the drained moves is covered (test-guarded).
+Party readiness (`knowledge/readiness.py`) replaces the fixed training-level table: it simulates our party (RAM stats, known moves) against the boss
+party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only the fallback when the data or the party is missing.
