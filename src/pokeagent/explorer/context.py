@@ -129,6 +129,9 @@ class ExplorerContext:
     box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
     pace: object = None  # text_pace.PaceLearner, built lazily over mem.data
     text_frames: int = 0  # emulator frames spent pressing through text boxes (fast path only)
+    heal_trips: int = 0  # Pokecenter entries this run (area_grind bounds the 90% top-off trips)
+    last_plan_map: int = -1
+    area_grind: dict = field(default_factory=dict)  # steps / battles spent grinding in place on Route 2 / the Forest, and whether it was lifted
     train_need: int = 8  # the training level plan_goal last computed for this map (0 inside a dungeon)
     buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
     buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
