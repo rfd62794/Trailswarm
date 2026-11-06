@@ -6,6 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
+from pokeagent.explorer.planner_magikarp import magikarp_step
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
@@ -23,7 +24,7 @@ def _on(m: int):
 
 
 # stage -> node predicate for "I have arrived" (None: no place to walk to, exploration handles it)
-TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "to_mt_moon": _on(0x3B), "mt_moon_b1f": _on(0x3C),
+TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on(0x44), "to_mt_moon": _on(0x3B), "mt_moon_b1f": _on(0x3C),
            "mt_moon_b2f": _on(0x3D), "through_mt_moon": lambda n: n[0] == ROUTE4 and n[1] >= EXIT_X,
            "to_cerulean": _on(CERULEAN), "heal_cerulean": _on(0x40), "beat_misty": _on(CERULEAN_GYM),
            "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None}
@@ -70,6 +71,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     target = TARGETS.get(stage)
     if stage is None or target is None:
         return None
+    if stage == "buy_magikarp" and (pos[0] == 0x44 or pos[0] not in POKECENTER_MAPS):
+        step = magikarp_step(g, maps, goals, pos, facing)  # None: not mapped / salesman not found - fall through
+        if step:
+            return step
     if pos[0] in POKECENTER_MAPS:
         if stage == "heal_cerulean" and pos[0] == 0x40:  # the goal IS the nurse: walk up the door column and talk to her
             if pos[1] != 3:
@@ -88,7 +93,7 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         return "DOWN", f"goal {stage}: walking out of the Pokecenter by its door"
     hp, mx = goals.get("_hp", (0, 0))
     need, level = goals.get("_train_level", 8), goals.get("_level", 0)
-    if stage in ("to_route4", "to_mt_moon") and 0 < level < need and mx and hp / mx >= 0.5:
+    if stage in ("to_route4", "buy_magikarp", "to_mt_moon") and 0 < level < need and mx and hp / mx >= 0.5:
         # too weak for the cave (and Route 4's trainers): grind Route 3 first
         return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)

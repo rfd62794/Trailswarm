@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.dialog import magikarp_offer
 from pokeagent.explorer.perceive import is_menu
 
 
@@ -28,7 +29,8 @@ class AdvanceDialog(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         tm_now = ctx.view.tm
-        if ctx.box_streak >= 12 and is_menu(tm_now):
+        offer = magikarp_offer(" ".join(ctx.dialog[-12:]) + " " + " ".join(ctx.view.lines))  # his pitch runs 17 presses before the YES/NO
+        if ctx.box_streak >= 12 and is_menu(tm_now) and not offer:
             return Decision("B", "menu_stuck_b", "a menu has stayed open for 12 presses - pressing B to back out")
         if ctx.box_streak >= 60:
             return Decision("B", "dialog_stuck_b", "a dialog has run 60 presses - pressing B in case it is a hidden prompt")
