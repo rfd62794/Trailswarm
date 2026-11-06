@@ -15,7 +15,7 @@ class Menu(BehaviourBase):
     name = "menu"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        return ctx.view.box and is_menu(ctx.view.tm)
+        return ctx.view.box and is_menu(ctx.view.tm) and ctx.proc is None  # a running procedure drives its own menus
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         tm = ctx.view.tm

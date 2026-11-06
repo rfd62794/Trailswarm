@@ -10,6 +10,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.decisions import DecisionLog, classify_outcome, goal_stage, make_record
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
+from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
@@ -32,6 +33,9 @@ class Engine:
         self.last_decision = decision
         if decision is None or not decision.button:
             return decision  # nothing to do, or a wait: the step is used without a press
+        why_veto = veto(ctx, decision)
+        if why_veto:  # the policy table says this talk teaches nothing: B instead of A (keeps the loop guards counting)
+            decision = Decision("B", "retalk_veto", why_veto, behaviour=decision.behaviour)
         view = ctx.view
         before, box, battle = (view.m, view.x, view.y), view.box, view.battling
         stage, goals_reached = goal_stage(ctx.goals()), len(ctx.goal_steps)

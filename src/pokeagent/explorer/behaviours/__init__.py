@@ -6,6 +6,7 @@ from pokeagent.explorer.behaviours.advance_dialog import AdvanceDialog, NamingKe
 from pokeagent.explorer.behaviours.base import Behaviour, BehaviourBase, Decision, no_press
 from pokeagent.explorer.behaviours.battle import Battle
 from pokeagent.explorer.behaviours.battle_moves import BattleMoves
+from pokeagent.explorer.behaviours.box_settle import BoxSettle, PostTalkSettle
 from pokeagent.explorer.behaviours.catch import Catch
 from pokeagent.explorer.behaviours.cave_escape import CaveEscape
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp
@@ -23,7 +24,7 @@ from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, Rep
 from pokeagent.explorer.behaviours.switch_out import SwitchOut
 
 __all__ = [
-    "AdvanceDialog", "AnomalyWait", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
+    "AdvanceDialog", "AnomalyWait", "Battle", "BoxSettle", "PostTalkSettle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
     "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard", "SwitchOut",
     "default_behaviours", "no_press",
@@ -39,9 +40,9 @@ def default_behaviours() -> list[Behaviour]:
     and finally plain exploration.
     """
     return [
-        SettleWait(), LoopGuard(), PartyOrder(), Readiness(), AnomalyWait(), ReplayInterrupt(),
+        SettleWait(), LoopGuard(), PartyOrder(), PostTalkSettle(), Readiness(), AnomalyWait(), ReplayInterrupt(),
         Battle(), SwitchOut(), Catch(), BattleMoves(), CaveEscape(), CaveTopUp(),
-        NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
+        NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),
         ExploreBurst(), Pickup(), PlanGoal(), Frontier(),
     ]
