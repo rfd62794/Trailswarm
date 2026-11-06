@@ -22,6 +22,7 @@ USER = Path("runs") / "atlas" / "layout_overrides.json"
 MIN_SCALE, MAX_SCALE = 0.25, 2.0
 MAX_BAND, MAX_SHIFT = 16, 500.0
 MODES = ("inplace", "inplace_full", "inset")
+VIEW_MODES = ("auto", "inplace", "inplace_full", "stretch", "inset")      # the World view's Interiors selector (a saved preference)
 
 
 def _num(v, lo: float, hi: float) -> float:
@@ -53,7 +54,7 @@ def _clean_interior(o: dict) -> dict:
 
 def _read_layer(path: Path | None) -> dict:
     """One layer, validated: {"interiors": {int: {...}}, "bands": {"x": {int: int}, "y": {...}}}."""
-    layer: dict = {"interiors": {}, "bands": {"x": {}, "y": {}}}
+    layer: dict = {"interiors": {}, "bands": {"x": {}, "y": {}}, "mode": None}
     if path is None:
         return layer
     try:
@@ -61,6 +62,9 @@ def _read_layer(path: Path | None) -> dict:
         d = d if isinstance(d, dict) else {}
     except (OSError, ValueError):
         return layer
+    prefs = d.get("prefs")
+    if isinstance(prefs, dict) and prefs.get("mode") in VIEW_MODES:
+        layer["mode"] = prefs["mode"]
     ints, bands = d.get("interiors"), d.get("bands")
     if not isinstance(ints, dict):
         ints = {}
@@ -96,7 +100,7 @@ def _read_layer(path: Path | None) -> dict:
 @dataclass
 class Overrides:
     defaults: dict = field(default_factory=lambda: {"interiors": {}, "bands": {"x": {}, "y": {}}})
-    user: dict = field(default_factory=lambda: {"interiors": {}, "bands": {"x": {}, "y": {}}})
+    user: dict = field(default_factory=lambda: {"interiors": {}, "bands": {"x": {}, "y": {}}, "mode": None})
     path: Path | None = None
 
     @classmethod
@@ -106,6 +110,15 @@ class Overrides:
         except Exception:                      # a bad file must never stop the viewer: start with empty layers
             log.exception("layout overrides unreadable; using none")
             return cls(path=user)
+
+    @property
+    def mode(self) -> str | None:
+        """The saved Interiors selector choice (None = never chosen: the default applies)."""
+        return self.user.get("mode")
+
+    def set_mode(self, mode: str) -> None:
+        if mode in VIEW_MODES:
+            self.user["mode"] = mode
 
     # -- merged read view -------------------------------------------------------------
     @property
@@ -162,7 +175,8 @@ class Overrides:
         """Write the user layer only, atomically (temp file + replace)."""
         target = Path(path or self.path or USER)
         target.parent.mkdir(parents=True, exist_ok=True)
-        body = {"interiors": {str(k): v for k, v in sorted(self.user["interiors"].items()) if v},
+        body = {"prefs": {"mode": self.user.get("mode")} if self.user.get("mode") else {},
+                "interiors": {str(k): v for k, v in sorted(self.user["interiors"].items()) if v},
                 "bands": {ax: {str(k): v for k, v in b.items()} for ax, b in self.user["bands"].items()}}
         tmp = target.with_name(target.name + ".tmp")
         tmp.write_text(json.dumps(body, indent=1), encoding="utf-8")

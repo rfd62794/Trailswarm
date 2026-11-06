@@ -75,8 +75,8 @@ class WorldSide:
             with dpg.group(horizontal=True):
                 dpg.add_text("Interiors")
                 names = {v: k for k, v in inplace.LABELS.items()}
-                dpg.add_combo(list(names), default_value=inplace.LABELS["auto"], width=px(200), tag="world_mode_combo",
-                              callback=lambda s, a, u: setattr(view.interiors, "mode", names[a]))
+                dpg.add_combo(list(names), default_value=inplace.LABELS[view.interiors.mode], width=px(200), tag="world_mode_combo",
+                              callback=lambda s, a, u: view.interiors.set_mode(names[a]))
             with dpg.group(horizontal=True):
                 dpg.add_checkbox(label="edit layout", callback=lambda s, a, u: setattr(view.interiors.edit, "on", a))
                 dpg.add_button(label="Reset interior", callback=lambda s, a, u: view.interiors.reset())

@@ -218,7 +218,7 @@ def test_layer_failure_falls_back_to_plain_layout_once(monkeypatch):
     layer = wi.InteriorLayer(view)
     assert layer.layout(1.0, ()) is L and layer.shown == set() and layer.vl is None
     assert layer.layout(1.0, ()) is L and len(calls) == 1          # same inputs: not retried every frame
-    layer.mode = "inplace"
+    layer.mode = "auto"
     layer.layout(1.0, ())
     assert len(calls) == 2                                          # inputs changed: tried again
 

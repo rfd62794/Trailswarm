@@ -1,7 +1,7 @@
 """World view, in-place interiors: plan + mode state, the per-frame view layout and the DPG drawing of the shown interiors.
 
-Interior pixels come from the inset grid (``atlas.inplace_render.interior_tile``) as small cached textures drawn over the
-chunks: a dim over the outdoor map, a shadow, the tinted framed interior. Pure decisions live in ``atlas.inplace``; the
+Interior pixels come from the ROM (``atlas.inplace_render.InteriorImages``) as small cached textures drawn over the chunks:
+a shadow and the tinted, framed interior; the outdoor map itself is never dimmed. Pure decisions live in ``atlas.inplace``; the
 stretch swap and the layout editor are ``world_stretch`` / ``world_edit``. Nothing here may break the map: any failure in the
 per-frame path is logged once and the view falls back to the plain layout with no interiors.
 """
@@ -27,18 +27,19 @@ MAX_TEX = 400                  # interior textures are small (one per anchored i
 class InteriorLayer:
     def __init__(self, view) -> None:
         self.view = view
-        self.mode = "auto"
+        self.ov = Overrides.load()           # defaults + runs/atlas/layout_overrides.json (+ the saved mode choice)
+        self.mode = self.ov.mode or inplace.DEFAULT_MODE     # rooms in place (fit) unless the user chose otherwise
         self.selected: int | None = None
         self.hover: int | None = None
         self.plan: inplace.Plan | None = None
         self.shown: set[int] = set()
         self.vl: WorldLayout | None = None
-        self.ov = Overrides.load()           # defaults + runs/atlas/layout_overrides.json
         self.edit = EditLayout(self)
         self.swap = StretchSwap(self)
         self._rev, self._erev, self._wid = -1, -1, None
         self._walk: dict = {}
         self._tex: dict = {}
+        self._images: inplace_render.InteriorImages | None = None
         self._used: set = set()
         self._failed: tuple | None = None    # input signature whose planning/drawing raised: skipped until it changes
         self._logged = ""
@@ -46,6 +47,12 @@ class InteriorLayer:
     @property
     def eff_mode(self) -> str:
         return "inplace" if self.mode == "stretch" else self.mode
+
+    def set_mode(self, mode: str) -> None:
+        """The Interiors selector: apply now and remember it (saved with the other overrides)."""
+        self.mode = mode
+        self.ov.set_mode(mode)
+        self.edit.touch()
 
     def _sig(self) -> tuple:
         return (self.mode, self.edit.rev, self.view.wm.rev, id(self.view.world))
@@ -104,7 +111,9 @@ class InteriorLayer:
         w = self.view.world
         key = (id(w), m, s, depth)
         if key not in self._tex:
-            img = inplace_render.interior_tile(w.base, w.layout, m, s, depth)
+            if self._images is None:
+                self._images = inplace_render.InteriorImages(w.rom, w.headers)
+            img = inplace_render.interior_tile(self._images.get(m), s, depth)
             self._tex[key] = dpg.add_static_texture(img.shape[1], img.shape[0], to_gpu(img), parent="world_tex")
         self._used.add(key)
         return self._tex[key]
@@ -117,8 +126,6 @@ class InteriorLayer:
         if not self.shown or self.plan is None or self.vl is None or self._failed == self._sig():
             return
         try:
-            a, b = v.vp.to_screen(0, 0), v.vp.to_screen(w.layout.width * CELL, w.layout.outdoor_height * CELL)
-            dpg.draw_rectangle(a, b, fill=(0, 0, 0, int(255 * (1 - inplace_render.DIM))), color=(0, 0, 0, 0), parent=dl)
             top = self.selected if self.selected in self.shown else self.hover
             for m in inplace.z_order(self.plan.anchors, self.shown, top):
                 t, pl = self.vl.xf[m], w.layout.places[m]
