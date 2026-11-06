@@ -1,4 +1,4 @@
-"""Campaign goals: the single source of truth for the 16-goal ladder and its RAM detectors.
+"""Campaign goals: the single source of truth for the 24-goal ladder and its RAM detectors.
 
 tools/{explore_demo,overnight,swarm,review_runs,status}.py all read GOALS from here —
 tests/test_goal_order.py guards against new local copies. goals.json is a stale
@@ -9,7 +9,8 @@ from __future__ import annotations
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle",
          "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
          "to_route2", "to_pewter", "to_gym", "beat_brock",
-         "to_route3", "to_route4", "to_mt_moon", "to_cerulean"]
+         "to_route3", "to_route4", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
+         "heal_cerulean", "beat_misty", "nugget_bridge", "to_bill", "ss_ticket"]
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
 
@@ -20,6 +21,36 @@ def bag_contents(emu) -> dict[int, int]:
         return {}
     raw = emu.read_range(0xD31E, 2 * n)
     return {raw[i]: raw[i + 1] for i in range(0, len(raw), 2)}
+
+
+SS_TICKET = 0x3F  # ROM item-name table: index 0x3F is "S.S.TICKET"
+
+
+def through_mt_moon(emu, st: dict, m: int, seen: set) -> bool:
+    """Crossed Mt Moon: on Route 4 east of the exit warp after B2F was seen (sticky), or Cerulean already seen."""
+    if m == 0x0F and 0x3D in seen and emu.read(0xD362) >= 24:
+        st["through_mt_moon"] = True
+    return bool(st.get("through_mt_moon")) or 0x03 in seen
+
+
+def party_full(emu) -> bool:
+    """Every party Pokemon at full HP (wPartyMonN HP 0xD16C / MaxHP 0xD18D, 44 bytes apart; count at 0xD163)."""
+    n = emu.read(0xD163)
+    if not 0 < n <= 6:
+        return False
+    for i in range(n):
+        hp = (emu.read(0xD16C + 0x2C * i) << 8) | emu.read(0xD16D + 0x2C * i)
+        mx = (emu.read(0xD18D + 0x2C * i) << 8) | emu.read(0xD18E + 0x2C * i)
+        if mx == 0 or hp < mx:
+            return False
+    return True
+
+
+def healed_in_cerulean(emu, st: dict, m: int) -> bool:
+    """heal_cerulean = the whole party is at full HP while standing in the Cerulean Pokecenter (0x40); sticky."""
+    if m == 0x40 and party_full(emu):
+        st["healed_cerulean"] = True
+    return bool(st.get("healed_cerulean"))
 
 
 def check_goals(emu, st: dict) -> dict[str, bool]:
@@ -44,7 +75,17 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # maps.json: 0x0E Route 3 (35x9), 0x0F Route 4 (45x9), 0x3B Mt Moon 1F (cavern tileset, 20x18), 0x03 Cerulean (20x18).
          # Geography (ROM connections): Pewter E-> Route 3 N-> Route 4 (Mt Moon 1F is a warp on Route 4) E-> Cerulean,
          # so the ladder runs route3, route4, mt_moon, cerulean.
-         "to_route3": 0x0E in seen, "to_route4": 0x0F in seen, "to_mt_moon": 0x3B in seen, "to_cerulean": 0x03 in seen}
+         "to_route3": 0x0E in seen, "to_route4": 0x0F in seen, "to_mt_moon": 0x3B in seen,
+         # Mt Moon floors (ROM: Route 4 warps lead to 0x3B and 0x3C; B1F warps lead to 0x3D). The cave counts as crossed
+         # when the player is back on Route 4 EAST of the exit: the exit warp (B1F -> Route 4 warp 2) lands at tile
+         # (24,5); the west entrance is (18,5) and the Mt Moon Pokecenter door (11,5). So: map 0x0F, x >= 24, B2F seen.
+         "mt_moon_b1f": 0x3C in seen, "mt_moon_b2f": 0x3D in seen,
+         "through_mt_moon": through_mt_moon(emu, st, m, seen), "to_cerulean": 0x03 in seen,
+         # Cerulean (ROM warps from 0x03): 0x40 Pokecenter (heal_cerulean needs a full party inside it, not just a visit), 0x41 Gym; 0x23 Route 24 is Cerulean's north connection;
+         # 0x58 Bill's house is the only warp on Route 25 (0x24). CASCADEBADGE = wObtainedBadges bit1 (ROM 17:5736).
+         "heal_cerulean": healed_in_cerulean(emu, st, m), "beat_misty": bool(emu.read(0xD356) & 2),
+         "nugget_bridge": 0x23 in seen, "to_bill": 0x58 in seen,
+         "ss_ticket": SS_TICKET in bag_contents(emu)}
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:
