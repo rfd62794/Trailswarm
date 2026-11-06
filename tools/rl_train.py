@@ -231,7 +231,7 @@ def main() -> int:
 
             agent_view = RlAgentView(env, Path(f'runs/rlstatus_{a.frame_port}.json'),
                                     agent_id=f"rl-{a.frame_port}",
-                                    frame_slot=f"pokeagent_frames_{a.frame_port}",
+                                    frame_slot=env.frame_pub.name if env.frame_pub else "",
                                     segment=a.segment, brain_fn=_brain)
             agent_view.serve(port=0)
             atexit.register(agent_view.close)

@@ -52,7 +52,7 @@ class Agent:
         self.fails = 0        # consecutive failed polls; a tile only goes offline after several
         self.seq = 0          # bumped every time a new frame lands (live-update signal)
         self.photo = None     # keep PhotoImage alive
-        self.sub = FrameSubscriber(port)  # frame slot reader; attaches when the agent publishes
+        self.sub = FrameSubscriber(port, root=Path(__file__).resolve().parents[1])  # frame slot reader; attaches when the agent publishes
 
 
 def poll(agent: Agent, hz: float, stop: threading.Event) -> None:
