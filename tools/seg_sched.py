@@ -10,12 +10,14 @@ step budget instead of one huge run.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import time
 from pathlib import Path
 from typing import Callable
 
 import seg_ingest
+import seg_janitor
 import seg_split
 import seg_store as ss
 
@@ -42,10 +44,11 @@ class Curriculum:
         self.picked = {k: 0 for k in SHARES}
         self.confirming: set[str] = set()
         self.session = int(clock())
+        seg_janitor.sweep(self.root, self.doc, clock())
 
     # --- bookkeeping -------------------------------------------------------------------------------------
-    def refresh(self, finished: set[str] = frozenset()) -> None:
-        n = seg_ingest.ingest(self.root, self.doc, finished, self.quiet_s)
+    def refresh(self, finished: set[str] = frozenset(), failed: set[str] = frozenset()) -> None:
+        n = seg_ingest.ingest(self.root, self.doc, finished, self.quiet_s, failed)
         for g in seg_split.maybe_split(self.doc):
             self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
         if n or finished:
@@ -56,7 +59,8 @@ class Curriculum:
         st = lambda s: ss.stat(self.doc, s.key)  # noqa: E731
         unsolved = sorted((s for s in segs if not ss.is_solved(st(s))),
                           key=lambda s: (ss.rate(st(s)) or 0.0, st(s)["n"]))
-        polish = sorted((s for s in segs if ss.is_solved(st(s))), key=lambda s: -(ss.expected_frames(st(s)) or 0))
+        per = ss.fps(self.doc)
+        polish = sorted((s for s in segs if ss.is_solved(st(s))), key=lambda s: -ss.potential_gain(st(s), per))  # most to win first
         all_ = ss.layout(self.doc)
         ends = [i for i, s in enumerate(all_) if ss.ckpt(self.root, s.end)]
         nxt = all_[ends[-1] + 1] if ends and ends[-1] + 1 < len(all_) else None
@@ -96,7 +100,7 @@ class Curriculum:
         b["tries"] += 1
         self.confirming.add(seg.key)
         stop = ["--stop-at-goal", seg.stop_goal] if seg.stop_goal else ["--stop-at-map", str(seg.stop_map)]
-        return {"key": seg.key, "kind": "confirm", "start": str(ss.ckpt(self.root, seg.start)), "stop": stop,
+        return {"key": seg.key, "kind": "confirm", "start": b["start"], "stop": stop,   # the kept copy, never re-resolved
                 "steps": b.get("budget") or budget(st), "tag": f"confirm:{seg.key}:{b['run']}",
                 "seed": b["seed"], "starter": b["starter"], "explore_rate": b["explore_rate"],
                 "box_pace": b["box_pace"], "maps_in": b["input"]}
@@ -106,7 +110,7 @@ class Curriculum:
             st = ss.stat(self.doc, seg.key)
             b = st["best"]
             if (b and not b["confirmed"] and not b["rejected"] and ss.replayable(b)
-                    and b["tries"] < CONFIRM_TRIES and seg.key not in self.confirming and ss.ckpt(self.root, seg.start)):
+                    and b["tries"] < CONFIRM_TRIES and seg.key not in self.confirming):
                 return seg, st
         return None
 
@@ -128,19 +132,26 @@ class Curriculum:
         return job
 
     def on_start(self, cfg: dict) -> None:
-        """Keep the starting memory of a normal job: if its solve is a new best, the replay needs exactly this file."""
+        """Keep what a replay of this job's solve needs: its starting memory and the EXACT start-state file (the run is
+        launched from that copy, so path + sha256 on record are what it really used)."""
         job = cfg.get("job")
-        if job and job["kind"] != "confirm":
-            p = ss.input_path(self.root, job["tag"])
-            p.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(cfg["own"], p)
+        if not job or job["kind"] == "confirm":
+            return
+        d = ss.job_dir(self.root, job["tag"])
+        d.mkdir(parents=True, exist_ok=True)
+        shutil.copy(cfg["own"], ss.input_path(self.root, job["tag"]))
+        src = Path(job["start"])
+        shutil.copy(src, d / src.name)
+        job["start"] = str(d / src.name)
+        (d / "job.json").write_text(json.dumps({"start_name": src.name, "start_sha": ss.sha256(d / src.name)}), encoding="utf-8")
 
     def on_finish(self, cfg: dict, rc) -> None:
         job = cfg.get("job")
         if not job:
             return
         self.confirming.discard(job["key"])
-        self.refresh({job["tag"]})
+        stalled = {job["tag"]} if rc == "stalled" else set()
+        self.refresh({job["tag"]}, stalled)
         st = ss.stat(self.doc, job["key"])
         self.log(f"curriculum: {job['key']} ({job['kind']}) rc={rc}: {st['solves']}/{st['n']} solved, "
                  f"best {ss.best_frames(st)} frames{' confirmed' if st['confirmed'] else ''}")

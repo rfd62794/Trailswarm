@@ -3,10 +3,13 @@
 A segment is the stretch between two goals (GOALS[i-1] -> GOALS[i]) or, once split, between two map entries inside
 it. Stats are over attempts (one headless segment run each); a segment counts as SOLVED at >= SOLVED_RATE over its
 last WINDOW attempts. Expected frames include the cost of failures: a failed attempt costs the frames it burned
-(steps x FRAMES_PER_STEP) plus FAIL_PENALTY_FRAMES, so a fast-but-flaky route does not beat a steady one.
+(steps x frames-per-press) plus a penalty proportional to what a solve costs (half the segment's median solve, at
+least PENALTY_FLOOR), so a fast-but-flaky route does not beat a steady one. Frames per press is CALIBRATED from the
+runs' own goal_frames.jsonl (doc["calib"]); until enough data exists it is FRAMES_PER_STEP.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -18,8 +21,10 @@ from pokeagent.segment_names import BEST_SUFFIX
 
 WINDOW = 20
 SOLVED_RATE = 0.9
-FAIL_PENALTY_FRAMES = 3600   # one minute of game time charged per failed attempt
-FRAMES_PER_STEP = 12         # failed attempts record steps, not frames; this converts (measured: ~10-19 per press)
+PENALTY_FRAC = 0.5           # a failure also costs this share of the segment's typical solve
+PENALTY_FLOOR = 600          # ...but at least 10 s of game time
+FRAMES_PER_STEP = 10.5       # measured 2026-11-05: 1,115,594 frames / 105,981 presses over real goal_frames deltas
+CALIB_MIN_STEPS = 2000       # presses of evidence before the measured ratio replaces FRAMES_PER_STEP
 KEEP_ATTEMPTS = 60
 
 
@@ -34,7 +39,7 @@ class Segment:
 
 
 def empty_doc() -> dict:
-    return {"version": 1, "ingested": [], "splits": {}, "stats": {}}
+    return {"version": 1, "ingested": [], "splits": {}, "stats": {}, "calib": {"frames": 0, "steps": 0}}
 
 
 def load(root: Path) -> dict:
@@ -90,15 +95,33 @@ def is_solved(st: dict) -> bool:
     return r is not None and len(window(st)) >= WINDOW and r >= SOLVED_RATE
 
 
-def attempt_cost(a: dict) -> int:
-    return a["frames"] if a["solved"] else a["steps"] * FRAMES_PER_STEP + FAIL_PENALTY_FRAMES
+def fps(doc: dict) -> float:
+    """Frames per press: measured from this install's goal_frames deltas once there are enough, else the default."""
+    c = doc.get("calib") or {}
+    return c["frames"] / c["steps"] if c.get("steps", 0) >= CALIB_MIN_STEPS else FRAMES_PER_STEP
 
 
-def expected_frames(st: dict) -> float | None:
+def fail_penalty(st: dict) -> float:
+    solved = sorted(a["frames"] for a in window(st) if a["solved"])
+    return max(PENALTY_FLOOR, PENALTY_FRAC * solved[len(solved) // 2]) if solved else PENALTY_FLOOR
+
+
+def attempt_cost(a: dict, per_step: float, penalty: float) -> float:
+    return a["frames"] if a["solved"] else a["steps"] * per_step + penalty
+
+
+def expected_frames(st: dict, per_step: float = FRAMES_PER_STEP) -> float | None:
     """Mean frames to ONE solve over the window: all attempts' cost (failures included) / solves. None = no solve."""
     w = window(st)
     solves = sum(1 for a in w if a["solved"])
-    return sum(attempt_cost(a) for a in w) / solves if solves else None
+    pen = fail_penalty(st)
+    return sum(attempt_cost(a, per_step, pen) for a in w) / solves if solves else None
+
+
+def potential_gain(st: dict, per_step: float = FRAMES_PER_STEP) -> float:
+    """What polishing could still win: expected frames minus the best known solve (0 when either is unknown)."""
+    e, b = expected_frames(st, per_step), best_frames(st)
+    return max(0.0, e - b) if e is not None and b is not None else 0.0
 
 
 def accepted(st: dict) -> dict | None:
@@ -141,14 +164,25 @@ def chain(doc: dict) -> dict:
             "complete": not missing and bool(rows)}
 
 
+def job_dir(root: Path, tag: str) -> Path:
+    """Everything a job must keep so its solve can be replayed: starting map memory + the exact start state file."""
+    return root / "runs" / "segments" / "inputs" / re.sub(r"[^A-Za-z0-9_.@-]", "_", tag)
+
+
 def input_path(root: Path, tag: str) -> Path:
-    """Where a job's starting map memory is kept until we know whether its solve needs a replay."""
-    return root / "runs" / "segments" / "inputs" / (re.sub(r"[^A-Za-z0-9_.@-]", "_", tag) + ".json")
+    return job_dir(root, tag) / "maps.json"
 
 
 REPLAY_KEYS = ("seed", "starter", "explore_rate", "box_pace")   # what a faithful replay must know
 
 
+def sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 def replayable(b: dict | None) -> bool:
-    """A best can be confirmed only if its seed/pace settings AND starting map memory were kept."""
-    return bool(b and b.get("input") and Path(b["input"]).exists() and all(b.get(k) is not None for k in REPLAY_KEYS))
+    """A best can be confirmed only if its seed/pace settings, starting map memory AND exact start state (path + sha256,
+    both kept under runs/segments/inputs/) are all still there and unchanged."""
+    if not b or not b.get("input") or not b.get("start") or not Path(b["input"]).exists() or not Path(b["start"]).exists():
+        return False
+    return all(b.get(k) is not None for k in REPLAY_KEYS) and sha256(b["start"]) == b.get("start_sha")

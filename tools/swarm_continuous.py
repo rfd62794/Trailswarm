@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +22,8 @@ BOX_PACES = [8, 16, 30]
 FAST_S = 60.0
 PAUSE_S = 300.0
 POLL_S = 1.0
+SOLVED_FAST_S = 20.0   # a segment run this quick was already trivially solved
+SOLVED_HOLD_S = 600.0  # ...so --segment auto must not pick it again for 10 minutes
 MIN_S_PER_STEP = 0.05  # a clean exit faster than this per step cannot have used its step budget
 
 
@@ -41,6 +44,8 @@ class Supervisor:
                  segment: Callable[[int], str | None] | None = None, stop_file: Path | None = None,
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
                  heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None, plan: Any = None,
+                 watch: Callable[[dict], Any] | None = None, watch_s: float = 15.0,
+                 on_stall: Callable[..., None] | None = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = lambda m: print(m, flush=True), fast_s: float = FAST_S, pause_s: float = PAUSE_S):
         self.root, self.shared, self.launch, self.merge, self.limit = Path(root), Path(shared), launch, merge, limit
@@ -48,7 +53,12 @@ class Supervisor:
         self.stop_file = Path(stop_file) if stop_file else self.root / "runs" / "swarm.stop"
         self.deadline, self.firsts, self.clock, self.sleep, self.log = deadline, firsts, clock, sleep, log
         self.fast_s, self.pause_s = fast_s, pause_s
-        self.heartbeat, self.segment_ok, self.plan = heartbeat, segment_ok, plan  # plan: seg_sched.Curriculum
+        self.heartbeat, self.segment_ok, self.watch_factory, self.watch_s = heartbeat, segment_ok, watch, watch_s
+        self.plan = plan  # seg_sched.Curriculum: picks each slot's segment job
+        self.on_stall = on_stall
+        self.watchers: dict[int, Any] = {}
+        self.next_watch = 0.0
+        self.solved: dict[str, float] = {}
         roles = roles or ["exploiter", "explorer"]
         self.slots = [Slot(i, roles[i % len(roles)]) for i in range(n)]
         self.seq = self.finished = self.merged = 0
@@ -76,6 +86,16 @@ class Supervisor:
         except OSError:
             return None
 
+    def _pick_segment(self, n: int) -> str | None:
+        if not self.segment:
+            return None
+        for k in range(3):  # the picker rotates through the weak goals; skip ones just seen to be trivial
+            seg = self.segment(n + k)
+            if seg is None or self.clock() - self.solved.get(seg, float("-inf")) > SOLVED_HOLD_S:
+                return seg
+            self.log(f"segment {seg}: solved trivially {self.clock() - self.solved[seg]:.0f}s ago, not re-picking")
+        return None
+
     # --- launching ---------------------------------------------------------------------------------------
     def _config(self, slot: Slot) -> dict:
         n = self.seq
@@ -90,7 +110,7 @@ class Supervisor:
     def _base_config(self, slot: Slot, n: int) -> dict:
         return {"slot": slot.idx, "seq": n, "seed": 1000 + n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
                 "starter": self.starter or STARTERS[n % 3], "steps": self.steps,
-                "segment": self.segment(n) if self.segment else None,
+                "segment": self._pick_segment(n),
                 "own": self.swarm_dir / f"agent{slot.idx}-{n}.json"}
 
     def _start(self, slot: Slot) -> None:
@@ -108,6 +128,8 @@ class Supervisor:
             self.log(f"WARNING segment {cfg['segment']}: no checkpoint, running a full agent")
         try:
             slot.handle = self.launch(cfg)
+            if self.watch_factory:
+                self.watchers[slot.idx] = self.watch_factory(cfg)
         except Exception as e:  # no free port, Popen failure: a failed start feeds the backoff, never crashes us
             cfg["own"].unlink(missing_ok=True)
             self.log(f"slot {slot.idx} failed to start: {e!r}; {self.status()}")
@@ -140,6 +162,11 @@ class Supervisor:
     def _finish(self, slot: Slot, rc: Any) -> None:
         ran = self.clock() - slot.started
         cfg, slot.handle = slot.cfg, None
+        self.watchers.pop(slot.idx, None)
+        if rc == 0 and cfg["segment"] and not cfg.get("job") and ran < SOLVED_FAST_S:
+            self.solved[cfg["segment"]] = self.clock()
+            self.log(f"segment {cfg['segment']} finished in {ran:.0f}s (already solved); "
+                     f"not re-picking for {SOLVED_HOLD_S:.0f}s")
         self.finished += 1
         keep = False
         try:
@@ -175,6 +202,7 @@ class Supervisor:
         return Path(shutil.move(str(own), str(dest / own.name)))
 
     def tick(self) -> None:
+        self._watch_progress()
         if self.heartbeat:
             self.heartbeat()  # keeps runs/spawn.lock fresh: a live swarm's lock must never look 6 h old
         for s in self.slots:
@@ -192,6 +220,23 @@ class Supervisor:
             elif self.deadline is not None and self.clock() >= self.deadline:
                 self.request_stop("duration reached")
         self._refill()
+
+    def _watch_progress(self) -> None:
+        """Every watch_s: stop agents that are alive but stuck, merge what they learned; _refill replaces them."""
+        if not self.watch_factory or self.clock() < self.next_watch:
+            return
+        self.next_watch = self.clock() + self.watch_s
+        for s in self.slots:
+            w = self.watchers.get(s.idx)
+            if s.handle is None or w is None or s.handle.poll() is not None:
+                continue
+            reason = w.check()
+            if reason:
+                self.log(f"slot {s.idx} stalled: {reason} (last position {w.last_pos})")
+                if self.on_stall:
+                    self.on_stall(self.swarm_dir, s.idx, s.cfg["seed"], reason, w)
+                s.handle.kill()  # the whole process tree we launched
+                self._finish(s, "stalled")
 
     def kill_all(self) -> None:
         for s in self.slots:

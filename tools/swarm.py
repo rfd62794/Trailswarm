@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
 from swarm_proc import TreeProc  # noqa: E402
+from swarm_watch import ProgressWatch, record_stall  # noqa: E402
 from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
 
@@ -66,12 +67,12 @@ def weakest_segment(n: int) -> str | None:
 class Launcher:
     """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
 
-    def __init__(self, share_frames: bool, roles_mode: bool = False):
-        self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
+    def __init__(self, share_frames: bool, roles_mode: bool = False, port_base: int = 8800):
+        self.share_frames, self.roles_mode, self.handles, self.port_base = share_frames, roles_mode, [], port_base
 
     def _port(self) -> int:
         used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
-        return next(p for p in range(8800, 8900) if p not in used)
+        return next(p for p in range(self.port_base, self.port_base + 100) if p not in used)
 
     def __call__(self, cfg: dict):
         role_args = ["--explore-rate", str(cfg["explore_rate"]) if "explore_rate" in cfg
@@ -90,6 +91,10 @@ class Launcher:
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
         return h
+
+
+def make_watch(cfg: dict):
+    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer")
 
 
 def touch_lock() -> None:
@@ -123,10 +128,10 @@ def run_continuous(a) -> int:
         room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
         return sup[0].running() + room
 
-    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles), merge_file_into, limit, steps=a.steps,
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.port_base), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
-                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock,
+                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
                              segment_ok=lambda g: bool(segment_args(g)), plan=plan))
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
@@ -139,6 +144,7 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--maps", default="runs/maps.json")
+    ap.add_argument("--port-base", type=int, default=8800, help="--continuous: first control port to try (100 ports)")
     ap.add_argument("--plan", choices=["curriculum"], default=None,
                     help="--continuous: curriculum = pick each slot's segment by need (tools/segments.py shows the table)")
     ap.add_argument("--segment", default=None,

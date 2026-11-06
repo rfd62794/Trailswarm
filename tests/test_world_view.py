@@ -254,7 +254,7 @@ def test_battle_lifecycle_and_stadium_cap():
 def test_viewport_zoom_pan_pick():
     vp = Viewport(1000, 2000, 400, 400)
     vp.fit()
-    assert vp.zoom == pytest.approx(0.2)
+    assert vp.zoom == 0.125  # Fit snaps to a crisp level (exact fit 0.2)
     before = vp.to_world(100, 120)
     vp.zoom_at(100, 120, 2.0)
     assert vp.to_world(100, 120) == pytest.approx(before)

@@ -14,7 +14,7 @@ from pokeagent.segment_names import state_goal  # noqa: E402
 
 def att(solved, frames=1000, steps=100, maps=(0x26,), **kw):
     return {"run": kw.pop("run", "r"), "solved": solved, "frames": frames if solved else 0, "steps": steps, "seed": 1,
-            "starter": "squirtle", "explore_rate": 0.0, "box_pace": 8, "budget": 1500, "maps": list(maps), **kw}
+            "starter": "squirtle", "explore_rate": 0.0, "box_pace": 8, "budget": 1500, "maps": list(maps), "tagged": True, "outside": 0, **kw}
 
 
 def mkroot(tmp_path, have=("bedroom", "potion", "left_house", "first_pokemon")):
@@ -43,6 +43,16 @@ def mkrun(root, name, meta, goal_lines=(), moves=(), end=True):
     return d
 
 
+def mkjob(root, tag, start="bedroom.state", content=b"s", sha=None):
+    """What on_start keeps for a normal job: map memory + the exact start-state copy + job.json."""
+    d = ss.job_dir(root, tag)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "maps.json").write_text("{}")
+    (d / start).write_bytes(content)
+    (d / "job.json").write_text(json.dumps({"start_name": start, "start_sha": sha or ss.sha256(d / start)}))
+    return d
+
+
 def meta(goal="potion", tag="seg:potion:1-0", **kw):
     return {"start": "baseline", "stop_at_goal": goal, "seed": 5, "starter": "squirtle", "explore_rate": 0.0,
             "box_pace": 8, "steps": 1500, "tag": tag, **kw}
@@ -62,7 +72,9 @@ def test_solved_needs_90_percent_over_full_window():
 def test_expected_frames_charge_failures():
     st = ss.stat(ss.empty_doc(), "potion")
     st["attempts"] = [att(True, frames=1000), att(False, steps=100)]
-    assert ss.expected_frames(st) == 1000 + 100 * ss.FRAMES_PER_STEP + ss.FAIL_PENALTY_FRAMES
+    assert ss.expected_frames(st) == 1000 + 100 * ss.FRAMES_PER_STEP + ss.PENALTY_FLOOR   # 0.5 x 1000 < the floor
+    st["attempts"] = [att(True, frames=10000), att(False, steps=100)]
+    assert ss.fail_penalty(st) == 5000   # proportional to the segment's typical solve
     st["attempts"] = [att(False)]
     assert ss.expected_frames(st) is None
 
@@ -164,20 +176,22 @@ def test_next_job_records_the_slot_share(tmp_path):
 def test_new_best_waits_for_a_replay(tmp_path):
     root = mkroot(tmp_path, ("bedroom",))
     inp = ss.input_path(root, "seg:potion:1-0")
-    inp.parent.mkdir(parents=True)
-    inp.write_text("{}")
+    mkjob(root, "seg:potion:1-0")
     mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
     doc = ss.empty_doc()
     assert seg_ingest.ingest(root, doc, quiet_s=0) == 1
     st = ss.stat(doc, "potion")
     assert st["best"]["frames"] == 900 and not st["best"]["confirmed"] and st["confirmed"] is None
+    assert st["best"]["start"].endswith("bedroom.state") and st["best"]["start_sha"] == ss.sha256(st["best"]["start"])
+    assert not (root / "runs/explore-a/end.state").exists()                  # end.state kept only via the candidate copy
+    assert Path(st["best"]["state"]).read_bytes() == b"END-explore-a"
     assert not (root / "runs/checkpoints/potion.best.state").exists()      # not accepted yet
     assert inp.exists()                                                      # kept for the replay
     mkrun(root, "explore-b", meta(tag="confirm:potion:explore-a"), [{"goal": "potion", "step": 30, "frame": 900}])
     seg_ingest.ingest(root, doc, quiet_s=0)
     assert st["confirmed"]["frames"] == 900 and st["n"] == 1                 # a replay is not an extra attempt
     assert (root / "runs/checkpoints/potion.best.state").read_bytes() == b"END-explore-a"
-    assert not inp.exists()
+    assert not inp.exists() and not inp.parent.exists() and not Path(st["confirmed"]["state"] or "x").exists()
 
 
 def test_failed_replay_rejects_and_reverts(tmp_path):
@@ -206,15 +220,74 @@ def test_slower_solve_is_not_a_candidate(tmp_path):
 def test_pending_confirm_job_replays_seed_and_memory(tmp_path):
     root = mkroot(tmp_path)
     inp = ss.input_path(root, "seg:potion:1-0")
-    inp.parent.mkdir(parents=True)
-    inp.write_text("{}")
+    kept = mkjob(root, "seg:potion:1-0") / "bedroom.state"
     mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
     c = seg_sched.Curriculum(root, log=lambda m: None, quiet_s=0)
+    (root / "baselines/bedroom.state").write_bytes(b"CHANGED")   # the live checkpoint drifted after the candidate ran
     job = c.next_job(0)
     assert job["kind"] == "confirm" and job["seed"] == 5 and job["starter"] == "squirtle"
+    assert job["start"] == str(kept)                            # replays the kept copy, never ckpt() at confirm time
     assert job["maps_in"] == str(inp) and job["steps"] == 1500 and job["tag"] == "confirm:potion:explore-a"
     assert c.pending_confirm() is None                 # in flight: not issued twice
     assert c.next_job(1)["kind"] != "confirm"
+
+
+def test_replay_refused_when_kept_start_state_changed(tmp_path):
+    root = mkroot(tmp_path)
+    d = mkjob(root, "seg:potion:1-0")
+    mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    c = seg_sched.Curriculum(root, log=lambda m: None, quiet_s=0)
+    c.refresh()
+    assert c.pending_confirm() is not None
+    (d / "bedroom.state").write_bytes(b"tampered")             # sha256 no longer matches the record
+    assert c.pending_confirm() is None
+
+
+def test_candidate_with_outside_input_is_not_a_best(tmp_path):
+    root = mkroot(tmp_path, ("bedroom",))
+    mkjob(root, "seg:potion:1-0")
+    d = mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    (d / "transitions.jsonl").write_text(json.dumps({"to": [1, 0, 0], "source": "human"}) + "\n")
+    doc = ss.empty_doc()
+    seg_ingest.ingest(root, doc, quiet_s=0)
+    st = ss.stat(doc, "potion")
+    assert st["solves"] == 1 and st["best"] is None
+
+
+def test_inconclusive_replay_is_retried_not_rejected(tmp_path):
+    root = mkroot(tmp_path, ("bedroom",))
+    mkjob(root, "seg:potion:1-0")
+    mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 30, "frame": 900}])
+    doc = ss.empty_doc()
+    seg_ingest.ingest(root, doc, quiet_s=0)
+    st = ss.stat(doc, "potion")
+    st["best"]["tries"] = 1
+    d = mkrun(root, "explore-b", meta(tag="confirm:potion:explore-a"), [])
+    (d / "transitions.jsonl").write_text("".join(json.dumps({"to": [1, 0, 0], "source": "claude"}) + "\n" for _ in range(1500)))
+    seg_ingest.ingest(root, doc, quiet_s=0)
+    assert not st["best"]["rejected"] and st["best"]["tries"] == 0
+
+
+def test_frames_per_press_calibrates_from_goal_frames(tmp_path):
+    root = mkroot(tmp_path, ("bedroom",))
+    doc = ss.empty_doc()
+    assert ss.fps(doc) == ss.FRAMES_PER_STEP                     # no evidence yet
+    mkrun(root, "explore-a", meta(), [{"goal": "potion", "step": 1000, "frame": 20000},
+                                      {"goal": "left_house", "step": 3000, "frame": 40000}])
+    seg_ingest.ingest(root, doc, quiet_s=0)
+    assert doc["calib"] == {"frames": 40000, "steps": 3000} and ss.fps(doc) == 40000 / 3000
+
+
+def test_polish_goes_to_the_biggest_potential_gain(tmp_path):
+    root = mkroot(tmp_path)
+    c = seg_sched.Curriculum(root, log=lambda m: None)
+    for key in ("potion", "left_house"):
+        st = ss.stat(c.doc, key)
+        st["attempts"] = [att(True, frames=1000) for _ in range(20)]
+        st["best"] = {"frames": 1000, "steps": 10}
+    ss.stat(c.doc, "left_house")["attempts"][0] = att(True, frames=9000)        # slow on average, best still 1000
+    assert [s.key for s in c.groups()["polish"]][0] == "left_house"
+    assert ss.potential_gain(ss.stat(c.doc, "potion")) == 0
 
 
 def test_running_agents_are_not_ingested(tmp_path):
@@ -235,9 +308,9 @@ def test_old_untagged_segment_runs_count_for_their_goal(tmp_path):
 
 
 # --- auto-split ----------------------------------------------------------------------------------------------
-def _flaky(n_ok, wander=(0x0C, 0x01, 0x99)):
-    return ([att(False, maps=(0x0C, 0x01, 0x0D)) for _ in range(12)] + [att(False, maps=wander) for _ in range(20 - 12 - n_ok)]
-            + [att(True) for _ in range(n_ok)])
+def _flaky(n_ok, wander=(0x0C, 0x01, 0x99), **kw):
+    return ([att(False, maps=(0x0C, 0x01, 0x0D), **kw) for _ in range(12)]
+            + [att(False, maps=wander, **kw) for _ in range(20 - 12 - n_ok)] + [att(True) for _ in range(n_ok)])
 
 
 def test_split_cuts_at_maps_failed_attempts_reached():
@@ -246,6 +319,33 @@ def test_split_cuts_at_maps_failed_attempts_reached():
     st["attempts"], st["n"] = _flaky(2), 20
     assert seg_split.maybe_split(doc) == ["to_route2"]
     assert doc["splits"]["to_route2"] == [0x01, 0x0D]   # first entries along the furthest failed path (0x99 was a one-off)
+
+
+def test_split_ignores_untagged_and_estimated_attempts():
+    doc = ss.empty_doc()
+    st = ss.stat(doc, "to_route2")
+    st["attempts"], st["n"] = _flaky(2, tagged=False), 20
+    assert seg_split.maybe_split(doc) == [] and st["split_retry_at"] == 40
+    st["attempts"], st["n"] = _flaky(2, est=True), 40
+    assert seg_split.maybe_split(doc) == []
+
+
+def test_split_rejects_start_map_and_maps_from_earlier_segments():
+    doc = ss.empty_doc()
+    ss.stat(doc, "potion")["attempts"] = [att(True, maps=(0x26, 0x25, 0x00))]    # an earlier segment walked 0x25 and 0x00
+    st = ss.stat(doc, "left_house")
+    st["attempts"] = [att(False, maps=(0x26, 0x25, 0x00, 0x0C, 0x26, 0x0D)) for _ in range(20)]
+    st["n"] = 20
+    assert seg_split.maybe_split(doc) == ["left_house"]
+    assert doc["splits"]["left_house"] == [0x0C, 0x0D]     # not 0x26 (start map), not 0x25/0x00 (earlier segment's)
+
+
+def test_split_needs_two_attempts_to_reach_a_map():
+    doc = ss.empty_doc()
+    st = ss.stat(doc, "to_route2")
+    st["attempts"] = [att(False, maps=(0x0C,)) for _ in range(19)] + [att(False, maps=(0x0C, 0x01))]   # only ONE reached 0x01
+    st["n"] = 20
+    assert seg_split.maybe_split(doc) == [] and "to_route2" not in doc["splits"]
 
 
 def test_no_split_above_30_percent_or_before_20_attempts():
@@ -257,13 +357,33 @@ def test_no_split_above_30_percent_or_before_20_attempts():
     assert seg_split.maybe_split(doc) == []
 
 
-def test_unsplittable_segment_retries_later():
+def test_reset_splits_drops_pieces_and_keeps_parent_history():
     doc = ss.empty_doc()
     st = ss.stat(doc, "to_route2")
-    st["attempts"], st["n"] = [att(False, maps=(0x0C,)) for _ in range(20)], 20   # never left the first map
-    assert seg_split.maybe_split(doc) == [] and st["split_retry_at"] == 40
-    st["n"] = 25
-    assert seg_split.maybe_split(doc) == []
+    st["attempts"], st["n"] = _flaky(2), 20
+    seg_split.maybe_split(doc)
+    ss.stat(doc, "to_route2@01")
+    assert seg_split.reset(doc) == ["to_route2"]
+    assert doc["splits"] == {} and "to_route2@01" not in doc["stats"] and st["n"] == 20
+
+
+# --- janitor -------------------------------------------------------------------------------------------------
+def test_janitor_removes_stale_unreferenced_job_dirs_only(tmp_path):
+    import os
+
+    import seg_janitor
+    root = mkroot(tmp_path)
+    old, held, fresh = (mkjob(root, t) for t in ("seg:a:1-0", "seg:b:1-1", "seg:c:1-2"))
+    cand = root / "runs/segments/states/x.cand.state"
+    cand.parent.mkdir(parents=True)
+    cand.write_bytes(b"c")
+    for p in (old, held, cand):
+        os.utime(p, (1, 1))                                  # ancient
+    doc = ss.empty_doc()
+    ss.stat(doc, "b")["best"] = {"input": str(held / "maps.json"), "frames": 1}
+    gone = seg_janitor.sweep(root, doc, now=os.path.getmtime(fresh) + 1)
+    assert set(gone) == {old.name, "x.cand.state"}
+    assert held.exists() and fresh.exists() and not old.exists()
 
 
 def test_sub_segment_attempts_are_ingested_by_tag(tmp_path):
@@ -314,6 +434,7 @@ def test_supervisor_runs_curriculum_jobs_with_fake_launcher(tmp_path):
     assert plan.doc["stats"]["potion"]["best"]["frames"] == 900
     assert launched[1]["job"]["kind"] == "confirm" and launched[1]["seed"] == 5
     assert launched[1]["job"]["maps_in"].endswith(".json")
+    assert launched[1]["job"]["start"] == cfg["job"]["start"] and "inputs" in cfg["job"]["start"]   # the kept copy
 
 
 def test_launcher_job_args_are_state_stop_and_tag():
