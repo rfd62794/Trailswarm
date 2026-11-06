@@ -63,7 +63,7 @@ to sane headers), then follows each header's connections and warp list. Warps ar
 | 0x3C | Mt Moon B1F | Route 4 warp (24,5) is B1F warp 7 (27,3); 1F stairs (5,5),(17,11),(25,15) lead to it; 14x14 |
 | 0x3D | Mt Moon B2F | B1F warps lead to it; four warps back up to B1F; 20x18 |
 | x >= 24 on 0x0F | east of the cave exit | the exit warp lands at Route 4 (24,5); west side holds entrance (18,5) and the Pokecenter door (11,5) |
-| 0x44 | Mt Moon (Route 4) Pokecenter | Route 4 warp (11,5) -> 0x44; Pokecenter tileset 6, 7x4 |
+| 0x44 | Mt Moon (Route 4) Pokecenter | Route 4 warp (11,5) -> 0x44; Pokecenter tileset 6, 7x4; confirmed live 2026-11-05: its NPC sells MAGIKARP ("for just 500") |
 | 0x03 | Cerulean City | N conn 0x23, S conn 0x10 (Route 5), W conn 0x0F, E conn 0x14 (Route 9) |
 | 0x40 | Cerulean Pokecenter | Cerulean warp 2 (19,17) -> 0x40, whose exit points back at warp index 2; tileset 6, 7x4 |
 | 0x41 | Cerulean Gym | Cerulean warp 3 (30,19) -> 0x41, exit points back at index 3; gym tileset 7, 5x7, same shape as Pewter Gym 0x36 |
@@ -73,5 +73,6 @@ to sane headers), then follows each header's connections and warp list. Warps ar
 | 0xD356 bit1 | CASCADEBADGE | `21 56 D3 CB CE` (ld hl,wObtainedBadges; set 1,[hl]) occurs once, at ROM 0x5C736 (bank 17, the gym-leader bank); the Brock twin `CB C6` is at 0x5C408 |
 | item 0x3F | S.S.TICKET | item-name table starts at 0x472B ("MASTER BALL" = id 1); entry 0x3F decodes "S.S.TICKET"; entries 0x14 "POTION" and 0x46 "OAK PARCEL" match the ids already in use |
 
-Not verified on the ROM (still unconfirmed): that Misty is the only way to bit1 in play (not an issue: the bit is only set by that script),
-and the in-game route through Mt Moon (it is left to exploration).
+Not verified on the ROM: the name "Bill's house" for 0x58 (it is the only warp of Route 25, a 4x4 house; the name is from pret's map list),
+and the in-game route through Mt Moon (left to exploration). Seen live 2026-11-05 (seed 7, beat_brock state): a level-8 Ivysaur team
+blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.

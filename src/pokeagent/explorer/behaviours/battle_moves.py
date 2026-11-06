@@ -57,11 +57,12 @@ class BattleMoves(BehaviourBase):
             moves = [ln.replace(">", "").strip() for ln in move_lines]
             # --- no-PP guard, two layers (Robert, 2026-11-04: reselecting an empty move stalls the run) ---
             # 1) the game's refusal: an A-press that drew the 'no PP left' text marks the move unusable this battle
-            if any("PP" in ln.upper() for ln in lines_now):
+            # (a DISABLED move - "The move is disabled!" - is refused the same way: 1,195 presses were lost on it, 2026-11-05)
+            if any("PP" in ln.upper() or "DISABLED" in ln.upper() for ln in lines_now):
                 rejected = ctx.pop("last_move_choice")
                 if rejected:
                     ctx.no_pp.add(rejected)
-                    ctx.log(f"[{rejected} is out of PP - not reselecting it this battle]", "res")
+                    ctx.log(f"[{rejected} was refused (no PP / disabled) - not reselecting it this battle]", "res")
             # 2) the PP bytes already trusted by move_scores (wBattleMonPP 0xD02D-0xD030, slots = list order)
             pp_of = [ctx.emu.read(0xD02D + i) & 0x3F for i in range(4)]
             avail = [mv for i, mv in enumerate(moves)
@@ -118,4 +119,11 @@ class BattleMoves(BehaviourBase):
             return Decision("UP", "back_to_fight", "battle menu: back up to FIGHT")
         if any("CANCEL" in ln and ">" in ln for ln in lines_now):
             return Decision("A", "close_empty_list", "battle: closing an empty list")
+        if any("DISABLED" in ln.upper() for ln in lines_now):
+            # "The move is disabled!" leaves the move list on screen WITHOUT its PP line, with the cursor on the refused move:
+            # remember it and step the cursor off it (the PP-line branch above never saw this screen; 1,195 presses lost, 2026-11-05)
+            stuck = next((ln.replace(">", "").strip() for ln in lines_now if ln.strip().startswith(">") and ln.strip(">").strip().upper() not in ("FIGHT", "")), None)
+            if stuck:
+                ctx.no_pp.add(stuck)
+                return Decision("UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

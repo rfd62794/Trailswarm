@@ -6,11 +6,13 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
-from pokeagent.explorer.world import WorldGraph
+from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
 PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24 = 0x02, 0x0E, 0x0F, 0x03, 0x23
 CERULEAN_GYM = 0x41
+OUTDOORS = (PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24, 0x24)
+CAVE = (0x3B, 0x3C, 0x3D)
 EXIT_X = 24  # Route 4 tile x of the cave-exit warp; the west part (Pokecenter 11, entrance 18) is left of it
 
 LADDER = tuple(GOALS[GOALS.index("to_route3"):])
@@ -68,6 +70,13 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[
     target = TARGETS.get(stage)
     if stage is None or target is None:
         return None
+    if pos[0] in POKECENTER_MAPS:  # the center is a stop, not a goal: 2,048 of 6,000 presses went to its salesman (2026-11-05)
+        p = g.path(pos, lambda n: n[0] in OUTDOORS)
+        if p:
+            return p[0], f"goal {stage}: leaving the Pokecenter ({len(p)} steps)"
+        if pos[1] != 3:
+            return ("RIGHT" if pos[1] < 3 else "LEFT"), f"goal {stage}: crossing the Pokecenter to its door column"
+        return "DOWN", f"goal {stage}: walking out of the Pokecenter by its door"
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
     if not training:
         p = g.path(pos, target)
@@ -75,6 +84,8 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[
             return p[0], f"goal {stage}: {len(p)} steps toward it over the learned world"
     if stage == "beat_misty":
         return _misty_step(g, goals, pos)
+    if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
+        return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
