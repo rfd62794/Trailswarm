@@ -25,6 +25,7 @@ class Thinking:
     button: str = ""
     result: str = ""
     confidence: float | None = None
+    brain: str = ""  # e.g. the RL agent's decoded Q-brain line; "" for agents without one
 
 
 @dataclass

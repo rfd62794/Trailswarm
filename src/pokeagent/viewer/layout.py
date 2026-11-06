@@ -1,15 +1,19 @@
 """Pure layout maths and focus state for the card grid."""
 from __future__ import annotations
 
+# A card is two 10:9 panels side by side (Render | Sees) over a text block 0.75 of a
+# frame tall, so card aspect = 2*10 : (9 + 0.75*9) = 20 : 15.75 = 80 : 63.
+CARD_ASPECT = (80, 63)
 
-def grid(n: int, width: int, height: int, aspect: tuple[int, int] = (10, 9)) -> tuple[int, int, int, int]:
+
+def grid(n: int, width: int, height: int, aspect: tuple[int, int] = CARD_ASPECT) -> tuple[int, int, int, int]:
     """Return (cols, rows, card_w, card_h) maximising card area for ``n`` cards.
 
-    A card is a frame of ``aspect`` plus a text area as tall as the card is wide, so
-    card_h = card_w * aspect[1] / aspect[0] + card_w."""
+    ``aspect`` is the card's (width, height) in arbitrary units; cards keep that
+    aspect and the grid reflows to the column count with the largest total card area."""
     if n <= 0:
         return (0, 0, 0, 0)
-    ratio = aspect[1] / aspect[0] + 1.0  # card_h / card_w
+    ratio = aspect[1] / aspect[0]  # card_h / card_w
     best = (0.0, 1, n, 0, 0)
     for cols in range(1, n + 1):
         rows = -(-n // cols)
