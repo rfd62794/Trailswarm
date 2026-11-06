@@ -11,6 +11,7 @@ from pokeagent.explorer.behaviours.goto import Goto
 from pokeagent.explorer.behaviours.guards import LoopGuard, StallGuard
 from pokeagent.explorer.behaviours.heal import Heal
 from pokeagent.explorer.behaviours.menu import Menu
+from pokeagent.explorer.behaviours.pickup import Pickup
 from pokeagent.explorer.behaviours.plan_goal import PlanGoal
 from pokeagent.explorer.behaviours.procedures import Procedures
 from pokeagent.explorer.behaviours.readiness import Readiness, SettleWait
@@ -18,8 +19,9 @@ from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, Rep
 
 __all__ = [
     "AdvanceDialog", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
-    "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "PlanGoal", "Procedures",
-    "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard", "default_behaviours", "no_press",
+    "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
+    "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard",
+    "default_behaviours", "no_press",
 ]
 
 
@@ -28,12 +30,13 @@ def default_behaviours() -> list[Behaviour]:
 
     Same order as the old agent_step: settle pause, loop guards, input readiness, replay interrupt, battle
     (potion/flee, catch, moves), text boxes (keyboard, beat replay, dialog, menu), procedures, goto, replays,
-    the stall guard, the Mom-heal guard, new-map exploration, the goal planner, and finally plain exploration.
+    the stall guard, the Mom-heal guard, new-map exploration, the goal planner, nearby item-ball pickups,
+    and finally plain exploration.
     """
     return [
         SettleWait(), LoopGuard(), Readiness(), ReplayInterrupt(),
         Battle(), Catch(), BattleMoves(),
         NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),
-        ExploreBurst(), PlanGoal(), Frontier(),
+        ExploreBurst(), PlanGoal(), Pickup(), Frontier(),
     ]

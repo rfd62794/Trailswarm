@@ -130,6 +130,9 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    pickup_await: tuple | None = None  # (map,x,y) ball whose A press is awaiting its item result
+    pickup_ball: tuple | None = None  # committed item-ball target (map,x,y)
+    pickup_tries: dict = field(default_factory=dict)  # (map,x,y) -> presses that gave no item text this run
     trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
