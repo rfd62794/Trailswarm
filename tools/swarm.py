@@ -2,6 +2,7 @@
 
     uv run python tools/swarm.py --agents 4 --steps 400          # ~N x faster learning than one watched run
     uv run python tools/swarm.py --merge-only                     # just fold runs/swarm/agent*.json into runs/maps.json
+    uv run python tools/swarm.py --continuous --agents 4 [--duration 6] [--stop-now]   # self-refilling; see swarm_continuous.py
 
 Each agent gets its own copy of runs/maps.json, a different seed and starter, a different control port
 (8800+i) and its own transitions file (runs/explore-<ts>/, as always). When all finish, merge_memory folds
@@ -14,6 +15,7 @@ import argparse
 import atexit
 import contextlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -22,8 +24,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
+from swarm_proc import TreeProc  # noqa: E402
+from swarm_watch import ProgressWatch, record_stall  # noqa: E402
+from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
 
 def plan_agents(root: Path, want: int, **limits) -> tuple[int, str]:
@@ -32,143 +38,93 @@ def plan_agents(root: Path, want: int, **limits) -> tuple[int, str]:
     return resources.room_for(want, root, **limits)
 
 
-def merge_memory(dst: dict, src: dict) -> dict:
-    for mid, s in src.get("maps", {}).items():
-        d = dst.setdefault("maps", {}).setdefault(mid, {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
-        for k, n in s.get("visited", {}).items():
-            d["visited"][k] = max(d["visited"].get(k, 0), n)  # counts are per-run observations; keep the max, not the sum
-        for k in s.get("blocked", []):
-            if k not in d["blocked"]:
-                d["blocked"].append(k)
-        d["warps"].update(s.get("warps", {}))
-        wc = d.setdefault("warp_cand", {})
-        for k, n in s.get("warp_cand", {}).items():
-            wc[k] = max(wc.get(k, 0), n)
-        # Every agent started from a copy of the shared memory, so counts are taken as MAX, never summed:
-        # summing would add the shared base once per agent and inflate solids, grades and counts.
-        wt = d.setdefault("warp_taken", {})
-        for k, n in s.get("warp_taken", {}).items():
-            wt[k] = max(wt.get(k, 0), n)
-        wd = d.setdefault("warp_disproof", {})
-        for k, n in s.get("warp_disproof", {}).items():
-            wd[k] = max(wd.get(k, 0), n)
-        wdt = d.setdefault("warp_disproof_total", {})
-        for k, n in s.get("warp_disproof_total", {}).items():
-            wdt[k] = max(wdt.get(k, 0), n)
-        for name in ("warp_disproof", "warp_disproof_total"):
-            if not d[name]:
-                del d[name]  # keep maps.json free of an empty key
-        inter = d.setdefault("interactions", {})
-        for k, e in s.get("interactions", {}).items():
-            cur = inter.setdefault(k, {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
-            cur["count"] = max(cur.get("count", 0), e.get("count", 0))
-            if len(e.get("text", "")) > len(cur.get("text", "")):
-                cur["text"] = e["text"]
-            for key in ("presses", "menus", "choices", "effects"):
-                for v in e.get(key, []) or []:
-                    if v not in cur.setdefault(key, []):
-                        cur[key].append(v)
-            cur["presses"] = cur.get("presses", [])[-10:]
-        demos = d.setdefault("demos", [])
-        for dm in s.get("demos", []):
-            if not dm.get("achieved"):
-                continue  # only goal-achieving demonstrations are hypotheses worth keeping
-            same = next((x for x in demos if x["at"] == dm["at"] and x["buttons"] == dm["buttons"]), None)
-            if same:
-                same["grade"] = min(same.get("grade", 0), dm.get("grade", 0))  # a bad grade anywhere sticks
-                same["replays"] = max(same.get("replays", 0), dm.get("replays", 0))
-            else:
-                demos.append(dm)
-        npcs = d.setdefault("npcs", {})
-        for k, e in s.get("npcs", {}).items():
-            cur = npcs.setdefault(k, {"pic": e["pic"], "slot": e["slot"], "positions": {}, "first_seen": e.get("first_seen", 0), "text": "", "talked": 0})
-            for p, n in e.get("positions", {}).items():
-                cur["positions"][p] = max(cur["positions"].get(p, 0), n)
-            cur["moves"] = len(cur["positions"]) > 1
-            cur["talked"] = max(cur.get("talked", 0), e.get("talked", 0))
-            if len(e.get("text", "")) > len(cur.get("text", "")):
-                cur["text"] = e["text"]
-            cur["last"] = e.get("last", cur.get("last"))
-        for key in ("encounters", "fails"):  # per-tile / per-edge counters: max, never summed (shared base)
-            dd = d.setdefault(key, {})
-            for k, n in s.get(key, {}).items():
-                dd[k] = max(dd.get(k, 0), n)
-        jm = d.setdefault("jumps", {})
-        jm.update(s.get("jumps", {}))  # one-way ledge hops are facts: union
-        d["last_seen"] = max(d.get("last_seen", 0), s.get("last_seen", 0))
-    # --- everything else the agents learn goes into the collective knowledge too ---
-    for key in ("move_damage", "enemy_damage", "damage_dealt", "damage_taken", "item_heal"):  # {key: [samples]}
-        dd = dst.setdefault(key, {})
-        for k, vals in src.get(key, {}).items():
-            cur = dd.setdefault(k, [])
-            if len(vals) > len(cur) and cur == vals[:len(cur)]:
-                cur[:] = vals  # the agent extended the shared base: take its longer list, never re-append the base
-            else:
-                for v in vals:
-                    if v not in cur:
-                        cur.append(v)
-            del cur[:-20]
-    for key in ("items", "events", "catches"):  # append-only records: union by content, newest 300
-        cur = dst.setdefault(key, [])
-        for r in src.get(key, []):
-            if r not in cur:
-                cur.append(r)
-        del cur[:-300]
-    for sp, ls in src.get("battle_lessons", {}).items():  # per enemy species: fights/wins/fled are max (shared base)
-        cur = dst.setdefault("battle_lessons", {}).setdefault(sp, {"fights": 0, "wins": 0, "fled": 0, "turns": [], "hp_lost": []})
-        for f in ("fights", "wins", "fled"):
-            cur[f] = max(cur.get(f, 0), ls.get(f, 0))
-        for f in ("turns", "hp_lost"):
-            cur[f] = (cur.get(f, []) + [v for v in ls.get(f, []) if v not in cur.get(f, [])])[-20:]
-        if ls.get("best_move"):
-            cur["best_move"] = ls["best_move"]; cur["move_avg_damage"] = ls.get("move_avg_damage", {})
-    for name, rec in src.get("procedures", {}).items():  # verified menu procedures: keep the successes and the safest pace
-        cur = dst.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": rec.get("pace", 12)})
-        cur["ok"] = max(cur["ok"], rec.get("ok", 0)); cur["fail"] = max(cur["fail"], rec.get("fail", 0))
-        if rec.get("ok", 0) >= cur["ok"]:
-            cur["pace"] = rec.get("pace", cur["pace"])
-    for mid, tr in src.get("training", {}).items():  # XP economics per map
-        cur = dst.setdefault("training", {}).setdefault(mid, {"exp": 0, "steps": 0, "by_level": {}})
-        cur["exp"] = max(cur["exp"], tr.get("exp", 0)); cur["steps"] = max(cur["steps"], tr.get("steps", 0))
-        for lv, n in tr.get("by_level", {}).items():
-            cur["by_level"][lv] = max(cur["by_level"].get(lv, 0), n)
-    for k, v in src.get("menus", {}).items():
-        dst.setdefault("menus", {}).setdefault(k, v)
-    gi = dst.setdefault("grass_ids", {})
-    for ts, table in src.get("grass_ids", {}).items():
-        cur = gi.setdefault(ts, {})
-        for k, n in table.items():
-            cur[k] = max(cur.get(k, 0), n)
-    dst["team_best_level"] = max(dst.get("team_best_level", 0), src.get("team_best_level", 0))
-    bw = dst.setdefault("bad_warps", [])
-    for ref in src.get("bad_warps", []):
-        if ref not in bw:
-            bw.append(ref)
-    for ref in bw:  # tombstones win over any agent copy that still carries the pollution
-        mid, sep, key = ref.partition(":")
-        if sep:
-            md = dst.get("maps", {}).get(mid, {})
-            md.get("warps", {}).pop(key, None); md.get("warp_cand", {}).pop(key, None); md.get("warp_taken", {}).pop(key, None)
-    # whiteout respawns (Pokecenter door / home) are never doors from other maps (see explore_demo.WHITEOUT_LANDINGS)
-    for mid, d in dst.get("maps", {}).items():
-        for key, dest in list(d.get("warps", {}).items()):
-            if tuple(dest) in {(1, 23, 26): 41, (0, 5, 6): 37} and int(mid) != {(1, 23, 26): 41, (0, 5, 6): 37}[tuple(dest)]:
-                d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
-    beats = dst.setdefault("beats", {})
-    for sig, b in src.get("beats", {}).items():
-        cur = beats.get(sig)
-        if cur is None or (b.get("grade", 0) >= 0 and (cur.get("grade", 0) < 0 or len(b["buttons"]) < len(cur["buttons"]))):
-            beats[sig] = b
-        elif cur is not None and b.get("grade", 0) < 0 and b["buttons"] == cur["buttons"]:
-            cur["grade"] = min(cur.get("grade", 0), b["grade"])  # a failed replay anywhere lowers the shared grade
-    tt = dst.setdefault("tile_types", {})
-    for ts, table in src.get("tile_types", {}).items():
-        t = tt.setdefault(ts, {})
-        for k, e in table.items():
-            cur = t.setdefault(k, {"solid": 0, "walkable": 0})
-            cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
-    dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-    return dst
+def segment_args(goal: str | None) -> list[str]:
+    """--state/--stop-at-goal for re-running one segment, or [] when its start checkpoint does not exist yet."""
+    from pokeagent.goals import GOALS
+    if not goal or goal not in GOALS:
+        return []
+    i = GOALS.index(goal)
+    start = ROOT / "runs" / "checkpoints" / f"{GOALS[i - 1]}.state" if i > 0 else ROOT / "baselines" / "bedroom.state"
+    return ["--state", str(start), "--stop-at-goal", goal] if start.exists() else []
+
+
+def weakest_segment(n: int) -> str | None:
+    """The n-th refill takes the next-weakest goal (consistency < 70%); None when everything is consistent."""
+    try:
+        import overnight
+        cons = {g: c for g, c in overnight.consistency().items() if c is not None and c < 0.7}
+    except Exception:
+        return None
+    weak = sorted(cons, key=cons.get)[:3]
+    return weak[n % len(weak)] if weak else None
+
+
+class Launcher:
+    """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
+
+    def __init__(self, share_frames: bool, roles_mode: bool = False):
+        self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
+
+    def _port(self) -> int:
+        used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
+        return next(p for p in range(8800, 8900) if p not in used)
+
+    def __call__(self, cfg: dict):
+        role_args = ["--explore-rate", "0.5" if cfg["role"] == "explorer" else "0.0"]
+        if cfg["role"] in ("trainer", "explorer") and self.roles_mode:
+            ck = ROOT / "runs" / "checkpoints"
+            start = next((p for p in (ck / "team_best.state", ck / "to_route1.state") if p.exists()), None)
+            if start:
+                role_args = ["--state", str(start), "--explore-rate", "0.0" if cfg["role"] == "trainer" else "0.3"]
+        port = self._port()
+        cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
+               "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + role_args + segment_args(cfg["segment"])
+        log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
+        h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        self.handles = [x for x in self.handles if x.poll() is None] + [h]
+        return h
+
+
+def make_watch(cfg: dict):
+    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer")
+
+
+def touch_lock() -> None:
+    with contextlib.suppress(OSError):
+        os.utime(ROOT / "runs" / "spawn.lock")
+
+
+def run_continuous(a) -> int:
+    import swarm_continuous as sc
+    stack = contextlib.ExitStack(); atexit.register(stack.close)
+    try:
+        stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+    except resources.LockBusy as e:
+        print(f"not starting: {e}"); return 1
+    n, why = plan_agents(ROOT, max(1, a.agents))
+    print(why)
+    if n == 0:
+        print("no room for more agents; not starting a swarm"); return 0
+    shared = ROOT / a.maps
+    roles = ["trainer", "explorer"] if a.roles else None
+    segment = weakest_segment if a.segment == "auto" else (lambda _n: a.segment) if a.segment else None
+    sup: list = []
+
+    def limit() -> int:  # machine cap minus agents we did not start (a viewer-spawned one counts against us)
+        live = resources.live_agent_count(ROOT)
+        pending = max(0, sup[0].running() - live)  # started but not registered yet: still count against the cap
+        room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
+        return sup[0].running() + room
+
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles), merge_file_into, limit, steps=a.steps,
+                             starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
+                             deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
+                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
+                             segment_ok=lambda g: bool(segment_args(g))))
+    print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
+    sup[0].run()
+    return 0
 
 
 def main() -> int:
@@ -185,10 +141,20 @@ def main() -> int:
                     help="fix the starter for every agent (default: rotate bulbasaur/charmander/squirtle)")
     ap.add_argument("--share-frames", action="store_true",
                     help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
+    ap.add_argument("--continuous", action="store_true",
+                    help="keep --agents running: merge each agent's memory as it exits, then start a replacement")
+    ap.add_argument("--duration", type=float, default=None, help="--continuous: stop refilling after this many hours")
+    ap.add_argument("--stop-now", action="store_true", help="--continuous: on stop, kill running agents instead of letting them finish")
     a = ap.parse_args()
     from pokeagent.goals import GOALS
     seg_args: list[str] = []
+    if a.merge_only and resources.lock_held(ROOT):
+        print("a swarm is running (runs/spawn.lock); not merging its in-progress agent files"); return 1
+    if a.continuous:
+        return run_continuous(a)
     if a.segment:
+        if a.segment not in GOALS:
+            print(f"unknown segment {a.segment!r}"); return 1
         i = GOALS.index(a.segment)
         start = ROOT / "runs" / "checkpoints" / f"{GOALS[i - 1]}.state" if i > 0 else ROOT / "baselines" / "bedroom.state"
         if not start.exists():
@@ -247,16 +213,14 @@ def main() -> int:
                 if p.poll() is None:
                     p.kill()
 
-    dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
     merged = 0
-    for own in sorted(swarm_dir.glob("agent*.json")):
+    dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
+    for own in sorted([*swarm_dir.glob("agent*.json"), *(swarm_dir / "unmerged").glob("agent*.json")]):
         try:
-            merge_memory(dst, json.loads(own.read_text())); merged += 1
+            dst = merge_file_into(shared, own); merged += 1
+            own.unlink()  # merged; a stale file must not be merged again by a later --merge-only
         except Exception as e:
-            print(f"skip {own.name}: {e!r}")
-    tmp = shared.with_suffix(".json.tmp"); tmp.write_text(json.dumps(dst, indent=1)); tmp.replace(shared)
-    for own in swarm_dir.glob("agent*.json"):
-        own.unlink()  # merged; a stale file must not be merged again by a later --merge-only
+            print(f"skip {own.name} (kept): {e!r}")
     print(f"merged {merged} agent memories into {shared}: maps={len(dst['maps'])}, "
           f"tiles={sum(len(m['visited']) for m in dst['maps'].values())}, "
           f"interactions={sum(len(m.get('interactions', {})) for m in dst['maps'].values())}, "

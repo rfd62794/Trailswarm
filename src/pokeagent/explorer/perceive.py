@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
+from pokeagent.magikarp import fighter, trainee_slot
 from pokeagent.names import load_registry
 from pokeagent.screentext import CHARMAP
 
@@ -19,9 +20,17 @@ REGISTRY = load_registry()
 def party_hp(emu) -> tuple[int, int]:
     """Lead pokemon HP and max HP. VERIFIED 2026-11-03: wPartyMon1HP 0xD16C/6D, wPartyMon1MaxHP 0xD18D/8E
     (read 11/20 for a level-5 Bulbasaur; wPartyMon1Level 0xD18C read 5; species at 0xD16B read 0x99)."""
+    if trainee_slot(emu) is not None:  # a Magikarp in training lives in the party: the fighter is not the lead
+        _, _, hp, mx = fighter(emu)
+        return hp, mx
     hp = (emu.read(0xD16C) << 8) | emu.read(0xD16D)
     mx = (emu.read(0xD18D) << 8) | emu.read(0xD18E)
     return hp, mx
+
+
+def lead_level(emu) -> int:
+    """Level of the fighter (the party lead, or the strongest non-Magikarp while a Magikarp is in training)."""
+    return fighter(emu)[1] if trainee_slot(emu) is not None else emu.read(0xD18C)
 
 
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:

@@ -52,6 +52,8 @@ class Engine:
                           stage, box, battle, outcome, reversal)
         if self.decision_log is not None:
             self.decision_log.write(rec)
+        if ctx.anomalies is not None:
+            ctx.anomalies.note_decision(rec)
         self._pending_outcomes.append(rec)
         del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
         if len(ctx.goal_steps) > goals_reached:

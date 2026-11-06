@@ -14,16 +14,19 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands, steering
+from pokeagent.viewer import commands, steering, ui_scale
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.panels import BG
+from pokeagent.viewer.screen_fit import open_viewport
 from pokeagent.viewer.ui import keys, theme
 from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
+from pokeagent.viewer.ui.world_host import WorldHost
+from pokeagent.world.model import WorldModel
 
 log = logging.getLogger(__name__)
 _BAR_H = 120  # reserved height for the three control-bar rows
@@ -35,12 +38,13 @@ class ViewerWindow:
 
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
-                 root: Path | None = None) -> None:
+                 root: Path | None = None, world: WorldModel | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
         self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
+        self.world = WorldHost(self, world)
         self.selected: str | None = None
         self.scope = "all"
         self._speed = 1
@@ -188,9 +192,7 @@ class ViewerWindow:
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
-        dpg.create_context()
-        dpg.create_viewport(title="PokeAgent viewer", width=1500, height=950,
-                            clear_color=self._bg())
+        open_viewport(self._bg())  # DPI awareness, then a viewport sized in physical px
 
     def _populate(self) -> None:
         """All widgets. Needs setup_dearpygui first: groups/fonts resolve at setup time."""
@@ -201,6 +203,7 @@ class ViewerWindow:
                               self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
+        self.world.build()
         self._bar = ControlBar(self._win, self)
         keys.install(self)
         self._fit()
@@ -216,7 +219,8 @@ class ViewerWindow:
             return
         self._last_size = (vw, vh)
         dpg.configure_item(self._win, pos=[0, 0], width=vw, height=vh)
-        avail = max(80, vh - _BAR_H)
+        avail = max(80, vh - ui_scale.px(_BAR_H))
+        self.world.fit(vw, avail)
         for view in (self._grid, self._focus_view):
             if view is not None and dpg.does_item_exist(view.area):
                 dpg.delete_item(view.area)
@@ -232,14 +236,14 @@ class ViewerWindow:
     # -- frame loop ----------------------------------------------------------------
     def area_visible(self, is_grid: bool) -> bool:
         """Which card area shows in the current mode (also used when areas are recreated on resize)."""
-        return is_grid == (self.focus.focused is None)
+        return self.focus.view == ("grid" if is_grid else "focus")
 
     def drop_lost_focus(self) -> None:
         if self.focus.focused is not None and self.focus.focused not in self.model.ids():
             self.leave_focus()  # the focused agent was lost/pruned: back to the grid
 
     def _title(self, fps: float | None = None) -> str:
-        mode = f"focus {self.focus.focused}" if self.focus.focused else "grid"
+        mode = f"focus {self.focus.focused}" if self.focus.focused else self.focus.mode
         return f"PokeAgent viewer [{mode}]" + (f" - {fps:.0f} fps" if fps is not None else "")
 
     def tick(self) -> None:
@@ -248,8 +252,9 @@ class ViewerWindow:
         if focused != self._shown_focus:  # the title always names the view (and what steers)
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
+        self.world.tick()
         if self._grid is not None:
-            dpg.configure_item(self._grid.area, show=focused is None)
+            dpg.configure_item(self._grid.area, show=self.focus.view == "grid")
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):
             dpg.configure_item(self._focus_view.area, show=focused is not None)
             self._focus_view.sync(focused)
@@ -257,7 +262,7 @@ class ViewerWindow:
             self._grid.pin = focused or self.selected  # the agent being watched/steered never pages out
             self._grid.sync()
         hold = self._hold_s_for
-        if self._grid is not None and focused is None:
+        if self._grid is not None and self.focus.view == "grid":
             self._grid.update(hold)
             for aid, card in self._grid.cards.items():
                 card.set_selected(aid == self.selected)
@@ -271,6 +276,7 @@ class ViewerWindow:
         self._build()
         dpg.set_viewport_resize_callback(lambda *_: setattr(self, "_last_size", (0, 0)))
         dpg.setup_dearpygui()
+        ui_scale.install_font(dpg)
         self._populate()
         theme.apply()  # theme colours need the initialized context; binds before first frame
         dpg.show_viewport()

@@ -19,6 +19,7 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
 from pokeagent.goals import bag_contents, check_goals
+from pokeagent.magikarp import fighter
 from pokeagent.ramstructs import read_party
 
 PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
@@ -131,7 +132,7 @@ class Battle(BehaviourBase):
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
             # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
             species = ctx.emu.read(0xCFE5)
-            my_sp, my_lvl, e_lvl = ctx.emu.read(0xD16B), ctx.emu.read(0xD18C), ctx.emu.read(0xCFF3)
+            my_sp, my_lvl = fighter(ctx.emu)[:2]; e_lvl = ctx.emu.read(0xCFF3)
             if ctx.last_battle_hp is not None and hp < ctx.last_battle_hp:
                 taken = ctx.last_battle_hp - hp
                 dmg = ctx.mem.data.setdefault("enemy_damage", {}).setdefault(str(species), [])

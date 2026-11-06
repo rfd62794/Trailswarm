@@ -33,7 +33,8 @@ class Menu(BehaviourBase):
                 ans, why, forget = learn_decision(context, cur_moves)
                 ctx.forget_move = forget
             else:
-                ans, why = yesno_answer(context, ctx.opts.starter)
+                ans, why = yesno_answer(context, ctx.opts.starter, buy_magikarp=not check_goals(ctx.emu, ctx)["buy_magikarp"],
+                                      offer_text=" ".join(ctx.dialog[-12:]) + " " + question)  # the price line scrolls past the name
             ctx.yesno = {"question": question[:80], "answer": ans}
             offered = offered_starter(context)
             if ans == "NO" and offered:  # remember THIS ball so we try another one

@@ -17,6 +17,8 @@ class WorldGraph:
     def __init__(self, maps: dict):
         self.maps = maps
 
+    blocked_now: frozenset = frozenset()  # (map, x, y) tiles an NPC temporarily occupies: skipped, never learned
+
     strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
 
     def static_npc_tiles(self, m: int) -> set:
@@ -50,6 +52,8 @@ class WorldGraph:
             if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy
+            if (m, nx, ny) in self.blocked_now:
+                continue
             if (nx, ny) in self.static_npc_tiles(m):
                 continue  # a person standing there: walking into them only starts a conversation (Forest corridor, 07:34)
             if f"{nx},{ny}" in d.get("visited", {}):

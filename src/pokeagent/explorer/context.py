@@ -53,6 +53,7 @@ class ExplorerContext:
     opts: ExplorerOptions = field(default_factory=ExplorerOptions)
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
+    anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
     step: int = 0
@@ -127,6 +128,14 @@ class ExplorerContext:
     box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
     pace: object = None  # text_pace.PaceLearner, built lazily over mem.data
     text_frames: int = 0  # emulator frames spent pressing through text boxes (fast path only)
+    buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
+    buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
+    switch_runs: tuple = (-1, 0)  # (ctx.battles, RUN attempts) of switch_train_run
+    party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
+    order_retry_at: int = 0  # step before which a failed reorder_party is not retried
+    switch_train: dict | None = None  # switch_out_lead in progress for this battle
+    switch_gave_up: int = -1  # ctx.battles value of the battle whose switch was abandoned
+    magikarp_shared: int = 0  # battles in which the trainee was sent out and swapped on turn one
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None
