@@ -13,9 +13,9 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 
 from pokeagent.atlas import sprites
+from pokeagent.viewer import ui_scale
 from pokeagent.world import anim, draw
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
-from pokeagent.viewer import ui_scale
 from pokeagent.world.view import Viewport, locate, pick
 
 TEX = "world_tex"

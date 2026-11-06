@@ -5,9 +5,8 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer.ui_scale import px
-
 from pokeagent.viewer.model import ViewerModel
+from pokeagent.viewer.ui_scale import px
 
 
 class FocusView:

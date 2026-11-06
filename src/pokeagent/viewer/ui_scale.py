@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+import logging
 import os
 import sys
 
@@ -10,6 +11,8 @@ MIN_SCALE, MAX_SCALE = 0.75, 4.0
 SIDE_FRAC, SIDE_MIN, SIDE_MAX = 0.22, 260, 420   # world side panel: share of the window, clamped (px at 1x)
 ENV = "POKEAGENT_UI_SCALE"
 _scale = 1.0
+FONT = "C:/Windows/Fonts/segoeui.ttf"
+log = logging.getLogger(__name__)
 
 
 def scale_from_dpi(dpi: float) -> float:
@@ -100,13 +103,18 @@ def init() -> float:
 
 
 def install_font(dpg, scale: float | None = None, size: int = 14) -> None:
-    """A crisp scaled font (Segoe UI at size*scale); falls back to the global font scale."""
+    """A crisp scaled font (Segoe UI at size*scale, any scale but 1.0); falls back to the dpg global font scale."""
     s = _scale if scale is None else scale
-    if s <= 1.01:
+    if abs(s - 1.0) < 0.01:
+        return
+    if not os.path.exists(FONT):
+        log.warning("font %s not found; using global font scale %.2f", FONT, s)
+        dpg.set_global_font_scale(s)
         return
     try:
         with dpg.font_registry():
-            font = dpg.add_font("C:/Windows/Fonts/segoeui.ttf", int(round(size * s)))
+            font = dpg.add_font(FONT, int(round(size * s)))
         dpg.bind_font(font)
-    except Exception:
+    except Exception as exc:
+        log.warning("font load failed (%s); using global font scale %.2f", exc, s)
         dpg.set_global_font_scale(s)
