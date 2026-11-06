@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 from pokeagent import resources
+from pokeagent.campaign import selectable
 from pokeagent.goals import GOALS
 
 
@@ -104,7 +105,7 @@ def main() -> int:
         rnd += 1
         cons = consistency()
         skip = {g for g, until in skipped.items() if until > rnd}  # goals whose segment produced no attempts: back off
-        ready = [g for g in GOALS if g not in skip and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
+        ready = [g for g in GOALS if g not in skip and selectable(g) and (g == GOALS[0] or (ROOT / "runs" / "checkpoints" / f"{GOALS[GOALS.index(g) - 1]}.state").exists())]
         # known-failing goals first, FURTHEST first (the frontier of the campaign), then goals never sampled
         failing = [g for g in reversed(ready) if cons.get(g) is not None and cons.get(g) < 0.7]
         unsampled = [g for g in ready if cons.get(g) is None]
@@ -115,7 +116,8 @@ def main() -> int:
             objective, args = f"segment {weak} (consistency {cons.get(weak)})", ["--segment", weak]
         else:
             far = furthest_checkpoint()
-            objective, args = f"explore beyond {far}", (["--segment", GOALS[min(len(GOALS) - 1, GOALS.index(far) + 1)]] if far and GOALS.index(far) + 1 < len(GOALS) else [])
+            nxt = GOALS[GOALS.index(far) + 1] if far and GOALS.index(far) + 1 < len(GOALS) else None
+            objective, args = f"explore beyond {far}", (["--segment", nxt] if nxt and selectable(nxt) else [])
         picked = weak if (weak and "segment" in objective) else None
         t0 = time.time()
         last = run_swarm(["--agents", str(a.agents), "--steps", str(a.steps)] + args, timeout=max(900, int(a.steps * 1.2) + 600))
