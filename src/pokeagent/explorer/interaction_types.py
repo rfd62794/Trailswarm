@@ -97,7 +97,7 @@ def classify(fx: Effects) -> tuple[str, str]:
         return HEALER, "party HP restored to full"
     if fx.money < 0:
         return VENDOR, f"money fell by {-fx.money} after a choice"
-    if fx.bag_gain or fx.party_gain or any(w in said for w in GIVE_WORDS):
+    if fx.bag_gain or fx.party_gain:  # the effect, never the words: a battle line ("Got away safely!") in the buffer made a nurse a giver
         return GIVER, "the bag or party gained something"
     if fx.map_changed or fx.flags_changed:
         return STORY, "the text changed the map or flipped an event flag"

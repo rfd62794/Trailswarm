@@ -11,6 +11,7 @@ from pokeagent.explorer.interaction_policy import Need, decide, needs_heal
 from pokeagent.explorer.interaction_record import stats
 from pokeagent.explorer.interaction_types import GIVER, HEALER, INFO, SIGN
 from pokeagent.explorer.perceive import DIRS, EFFECT_WINDOW
+from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.explorer.interaction_types import _bag, _party_hp
 
 VETOABLE = (INFO, SIGN, GIVER, HEALER)
@@ -43,6 +44,8 @@ def veto(ctx, decision) -> str | None:
     entry = entry_in_front(ctx)
     if not entry or entry.get("type") not in VETOABLE:
         return None
+    if ctx.view.m in POKECENTER_MAPS or entry.get("type_votes", {}).get(HEALER):
+        return None  # the planner walks into a Pokecenter on purpose (its threshold is 90%, not the veto's 50%); a nurse is never "done"
     win = ctx.emu.read_range(*EFFECT_WINDOW)
     party = _party_hp(win)
     if needs_heal(party):
