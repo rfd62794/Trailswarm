@@ -10,11 +10,15 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
+from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.goals import bag_contents, check_goals
+
+PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
 
 
 @dataclass
@@ -31,6 +35,55 @@ class BattleView:
     e_lvl: int = 0
     want_potion: bool = False
     cur: str = ""
+    threat: float = 0.0  # worst ROM-estimated threat this enemy species has shown
+
+
+def _record_observed(ctx: ExplorerContext, move: str, observed: str) -> None:
+    """Count one result message for our move in the type-effect ledger (super/weak/none)."""
+    mv = move_by_name(move)
+    if mv is None:
+        return
+    record_type_effect(ctx.mem.data, mv["type"], enemy_types(ctx.emu), observed, step=ctx.step)
+    ctx.fx_last_fx = {"move": move, "effect": observed, "step": ctx.step}
+
+
+def _finalize_pending_effect(ctx: ExplorerContext) -> None:
+    """Our last attack's result window closed with no message: a damaging hit reads neutral."""
+    pe = ctx.pending_effect
+    if pe is None:
+        return
+    record_type_effect(ctx.mem.data, pe["move_type"], pe["def_types"], "neutral", step=pe["step"])
+    ctx.pending_effect = None
+
+
+def scan_battle_text(ctx: ExplorerContext) -> None:
+    """Parse newly arrived battle text: our moves' results -> type_effect, enemy moves -> threat.
+
+    ctx.dialog is an append-only stream of text-box contents; fx_mark is the scan cursor so each
+    entry is parsed once (a reset dialog simply fails the mark lookup and is rescanned whole).
+    """
+    dlg = ctx.dialog
+    if not dlg:
+        return
+    start = 0
+    if ctx.fx_mark is not None:
+        for i in range(len(dlg) - 1, -1, -1):
+            if dlg[i] == ctx.fx_mark:
+                start = i + 1
+                break
+    blob = " ".join(e.replace(" | ", " ") for e in dlg[start:])
+    ctx.fx_mark = dlg[-1]
+    for ev in battle_events(blob):
+        if ev[0] == "used":
+            _finalize_pending_effect(ctx)  # a new attack means the last one's result text is done
+            ctx.fx_last = {"side": ev[1], "move": ev[2]}
+            if ev[1] == "enemy":
+                record_threat(ctx.mem.data, ctx.emu, ctx.emu.read(0xCFE5), ev[2], step=ctx.step)
+        elif ev[0] == "effect" and ctx.fx_last and ctx.fx_last["side"] == "ours":
+            _record_observed(ctx, ctx.fx_last["move"], ev[1])
+            pe = ctx.pending_effect
+            if pe and norm_name(pe["move"]) == norm_name(ctx.fx_last["move"]):
+                ctx.pending_effect = None  # the real message beat the neutral default
 
 
 class Battle(BehaviourBase):
@@ -45,6 +98,7 @@ class Battle(BehaviourBase):
         if ctx.view.battling:
             if not ctx.in_battle:
                 ctx.battles = ctx.battles + 1; ctx.battle_pos = (m, x, y)
+                ctx.fx_last = ctx.fx_last_fx = ctx.pending_effect = None  # fresh fight: no carried text state
                 bflag = ctx.emu.read(0xD057)
                 if bflag == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
                     under = [tm_now[8 * 20 + 8], tm_now[8 * 20 + 9], tm_now[9 * 20 + 8], tm_now[9 * 20 + 9]]
@@ -56,6 +110,9 @@ class Battle(BehaviourBase):
                         ctx.log(f"[trainer battle: NPC pic {ctx.trainer_npc['pic']} marked trainer]", "res")
             ctx.in_battle = True
             ctx.box_streak = 0
+            scan_battle_text(ctx)
+            if ctx.pending_effect and ctx.step - ctx.pending_effect["step"] > PENDING_EFFECT_MAX_STEPS:
+                _finalize_pending_effect(ctx)  # the result text never came: count the hit neutral
             kind = ctx.emu.read(0xD057)
             hp, mx = party_hp(ctx.emu)
             weak = mx > 0 and hp / mx < 0.4
@@ -75,6 +132,7 @@ class Battle(BehaviourBase):
                 rec.append(taken); del rec[:-20]
             ctx.last_battle_hp = hp
             expected = max(ctx.mem.data.get("enemy_damage", {}).get(str(species), [0]) or [0])
+            threat = ctx.mem.data.get("threat_by_species", {}).get(str(species), {}).get("score", 0.0)
             # --- potion timing: use one when the next expected hit could take us below ~1 hit of safety and the heal
             #     is not wasted (POTION restores 20 HP in Gen 1; the observed heal is learned into item_heal) ---
             heal = max(ctx.mem.data.get("item_heal", {}).get("20", [20]) or [20])
@@ -103,18 +161,20 @@ class Battle(BehaviourBase):
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(0xCFE5)))
             if kind == 1 and (weak or hurry) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
+                tnote = f", threat {threat:g}" if weak and threat else ""
                 if ">RUN" in run_line:
-                    return Decision("A", "flee_run", f"BATTLE wild, HP {hp}/{mx}: RUN")
+                    return Decision("A", "flee_run", f"BATTLE wild, HP {hp}/{mx}: RUN{tnote}")
                 cur = next((ln for ln in lines_now if ">" in ln), "")
                 if "FIGHT" in cur or "PKMN" in cur:
-                    return Decision("DOWN", "flee_down", f"BATTLE wild, HP {hp}/{mx}: moving the cursor down toward RUN")
+                    return Decision("DOWN", "flee_down", f"BATTLE wild, HP {hp}/{mx}: moving the cursor down toward RUN{tnote}")
                 if "ITEM" in cur:
-                    return Decision("RIGHT", "flee_right", f"BATTLE wild, HP {hp}/{mx}: moving the cursor right to RUN")
-            ctx.bv = BattleView(kind, hp, mx, run_line, species, my_sp, my_lvl, e_lvl, bool(want_potion), cur)
+                    return Decision("RIGHT", "flee_right", f"BATTLE wild, HP {hp}/{mx}: moving the cursor right to RUN{tnote}")
+            ctx.bv = BattleView(kind, hp, mx, run_line, species, my_sp, my_lvl, e_lvl, bool(want_potion), cur, threat)
             return None
         if ctx.in_battle:
             ctx.in_battle = False; ctx.last_battle_hp = None; ctx.potion_hp_before = None
             ctx.no_pp = set(); ctx.all_pp_out = 0; ctx.last_move_choice = None
+            _finalize_pending_effect(ctx)  # the fight ended before any result text: the hit reads neutral
             ca = ctx.pop("catch_attempt")
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
                 dn = ca.get("dex") or 0
