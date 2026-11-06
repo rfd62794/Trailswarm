@@ -22,6 +22,10 @@ from pokeagent.explorer import perceive
 from pokeagent.goals import SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
+from pokeagent.intervene import extra as intervene_extra
+from pokeagent.intervene.handlers import MACRO_TIMEOUT_S, intervene_handlers
+from pokeagent.intervene.lease import LEASE_FILE, ClaudeHold
+from pokeagent.intervene.rig import ClaudeDriver
 from pokeagent.ram import read_state
 from pokeagent.snapshot import AgentSnapshot, DRIVERS, Event, Goal, Screen, Sees, Segment, Thinking
 
@@ -43,6 +47,12 @@ class ExplorerAgentView:
         self.ctx, self.emu, self.mem, self.engine, self.presser = ctx, emu, mem, engine, presser
         self.agent_id, self.root, self.frame_slot = agent_id, Path(root), frame_slot
         self.hold = HumanHold()
+        run_dir = getattr(ctx, "run_dir", None)
+        self.claude_hold = ClaudeHold(Path(run_dir) / LEASE_FILE if run_dir and Path(run_dir).is_dir() else None)
+        self.tracker = intervene_extra.Tracker()
+        if engine.decision_log is not None:
+            engine.decision_log.listeners.append(self.tracker.add_decision)
+        self.driver = ClaudeDriver(ctx, presser, engine.decision_log, self.claude_hold)
         self.feed = EventFeed()
         self.recent: deque[Event] = deque(maxlen=MAX_RECENT)
         self._presses: dict[str, int] = {}
@@ -51,6 +61,10 @@ class ExplorerAgentView:
         # HTTP threads never touch the emulator: commands run in tick() on the emulator thread and
         # snapshot() returns a copy built there. marshal=False (tests) runs everything inline.
         self.bridge = EmuBridge(self._build, every=refresh_every, marshal=marshal)
+
+    def held(self) -> bool:
+        """Does anyone (a human steering, or Claude's lease) hold the agent? The decision loop skips its own step while True."""
+        return self.hold.active() or self.claude_hold.active()
 
     def tick(self) -> None:
         """Call once per frame from the emulator's own loop."""
@@ -85,6 +99,13 @@ class ExplorerAgentView:
         except Exception:
             return Screen()
 
+    def _extra(self) -> dict:
+        try:
+            return intervene_extra.build(self.ctx, self.emu, self.tracker, self._screen().box_text)
+        except Exception:
+            logging.getLogger(__name__).warning("intervene extra failed", exc_info=True)
+            return {}
+
     def snapshot(self) -> AgentSnapshot:
         return self.bridge.snapshot()
 
@@ -116,6 +137,7 @@ class ExplorerAgentView:
             drivers_available=["explorer", "human"],
             recent=list(self.recent),
             sees=self._sees(), screen=self._screen(), human_hold=self.hold.active(),
+            claude_hold_s=round(self.claude_hold.remaining(), 1), extra=self._extra(),
             frame_slot=self.frame_slot, updated_at=time.time())
 
     # -- commands -------------------------------------------------------------------
@@ -136,7 +158,10 @@ class ExplorerAgentView:
             self._presses[source] = self._presses.get(source, 0) + 1
             if source == "human":
                 hold.touch()
-            presser.press(button, source, f"viewer press {button}")
+            if source == "claude":
+                self.driver.press(button, f"remote press {button}")  # refreshes the lease, marks decisions.jsonl
+            else:
+                presser.press(button, source, f"viewer press {button}")
             self.recent.append(Event(step=ctx.step, driver=source, text=f"press {button}"))
             return {}
 
@@ -160,9 +185,10 @@ class ExplorerAgentView:
             "hand_to": lambda driver, **_: _ret(hold.touch() if driver == "human" else hold.release()),
             "save_state": save_state,
             "load_state": load_state,
-            "hold_release": lambda **_: _ret(hold.release()),
         }
-        return {name: self.bridge.wrap(h) for name, h in raw.items()}
+        extra = intervene_handlers(self)
+        raw.update(extra)
+        return {name: self.bridge.wrap(h, MACRO_TIMEOUT_S if name == "macro" else None) for name, h in raw.items()}
 
     # -- serving ---------------------------------------------------------------------
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:
