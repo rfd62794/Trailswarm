@@ -150,7 +150,7 @@ def test_hold_release_press_macro_and_the_journal(swarm):
     assert [c["cmd"] for c in a.cmds] == ["claude_hold", "press", "press", "hold_release"]
     assert [c.get("button") for c in a.cmds if c["cmd"] == "press"] == ["B", "UP"] and all(
         c["source"] == "claude" for c in a.cmds if c["cmd"] == "press")
-    rows = [json.loads(line) for line in (root / "runs" / "interventions.jsonl").read_text().splitlines()]
+    rows = [json.loads(line) for line in (root / "runs" / "agent_interventions.jsonl").read_text().splitlines()]
     assert [r["action"] for r in rows] == ["hold", "macro", "release", "press"]
     r = rows[0]
     assert set(r) == {"ts", "agent", "by", "action", "args", "result", "digest_before", "digest_after"}
@@ -169,7 +169,7 @@ def test_nudge_runs_from_a_wild_battle_then_releases(swarm):
     assert "-- before" in text and "-- after" in text
     before, after = text.split("-- before")[1].split("-- after")
     assert "battle: wild" in before and "battle: wild" not in after  # the battle is gone afterwards
-    row = json.loads((root / "runs" / "interventions.jsonl").read_text().splitlines()[-1])
+    row = json.loads((root / "runs" / "agent_interventions.jsonl").read_text().splitlines()[-1])
     assert row["action"] == "nudge" and [s["step"] for s in row["result"]["steps"]] == ["hold", "back_out", "battle_run", "release"]
 
 
@@ -178,7 +178,7 @@ def test_nudge_without_a_battle_only_backs_out_and_releases(swarm):
     a = agents["explore-333"]
     rc, _ = run(["--by", "tobor", "nudge", "explore-333"], root)
     assert rc == 0 and [(c["cmd"], c.get("name")) for c in a.cmds] == [("claude_hold", None), ("macro", "back_out"), ("hold_release", None)]
-    assert json.loads((root / "runs" / "interventions.jsonl").read_text().splitlines()[-1])["by"] == "tobor"
+    assert json.loads((root / "runs" / "agent_interventions.jsonl").read_text().splitlines()[-1])["by"] == "tobor"
 
 
 def test_nudge_a_failed_macro_reports_not_ok(swarm):
@@ -217,7 +217,7 @@ def test_mcp_agent_tools(swarm):
     assert tools.agent_release("333")["action"] == "release"
     assert tools.agent_macro("333", "back_out")["result"]["result"] == "overworld"
     assert tools.agent_show("zzz")["ok"] is False
-    rows = (root / "runs" / "interventions.jsonl").read_text().splitlines()
+    rows = (root / "runs" / "agent_interventions.jsonl").read_text().splitlines()
     assert json.loads(rows[0])["by"] == "claude-mcp"
 
 
@@ -228,3 +228,39 @@ def test_mcp_server_registers_the_agent_tools(tmp_path):
     register(server, tmp_path)
     names = {t.name for t in asyncio.run(server.list_tools())}
     assert names == {"agents_digest", "agent_show", "agent_hold", "agent_release", "agent_macro", "agent_nudge"}
+
+
+class OldAgent(FakeAgent):
+    """An agent from before the lease/macros: its snapshot has no claude_hold_s/extra and it lacks those commands."""
+
+    def __init__(self, root, aid, done):
+        super().__init__(root, aid, done)
+        self.srv.stop()
+        outer = self
+
+        class Old:
+            def to_dict(self):
+                d = outer.snap().to_dict()
+                d.pop("claude_hold_s"), d.pop("extra")
+                return d
+        self.srv = ControlServer(lambda: Old(), {"press": self.h_press, "hold_release": self.h_release}, token="tok-old")
+        port = self.srv.start()
+        agent_registry.register(root, aid, "explorer", port, "", pid=os.getpid(), token=self.srv.token)
+
+
+def test_old_agent_degrades_gracefully(tmp_path):
+    a = OldAgent(tmp_path, "explore-old", done=5)
+    try:
+        rc, text = run(["ls"], tmp_path)
+        assert rc == 0 and "explore-old" in text and "no-lease" in text and "unreachable" not in text
+        rc, text = run(["show", "explore-old"], tmp_path)
+        assert rc == 0 and "lease unsupported (old agent code)" in text and "WARTORTLE" in text
+        a.cmds.clear()
+        for argv in (["hold", "explore-old", "5"], ["nudge", "explore-old"], ["macro", "explore-old", "back_out"]):
+            rc, text = run(argv, tmp_path)
+            assert rc == 1 and "lease unsupported (old agent code)" in text
+        assert a.cmds == []  # nothing was sent to it
+        rc, _ = run(["press", "explore-old", "B"], tmp_path)
+        assert rc == 0 and [c["cmd"] for c in a.cmds] == ["press"]  # plain presses still work, without a lease
+    finally:
+        a.stop()

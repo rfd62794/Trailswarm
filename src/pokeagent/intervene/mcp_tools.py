@@ -3,7 +3,7 @@
 Registered by ``mcp_server.build_server`` next to the emulator tools. They talk to the LIVE agents registered under
 ``$POKEAGENT_ROOT`` (default: the server's working directory); the emulator tools of the same server are a separate game.
 Selectors: an agent id, a unique fragment of one, ``closest`` (furthest goal stage) or ``stuck``. Every intervention is
-journaled to runs/interventions.jsonl with the digest before and after.
+journaled to runs/agent_interventions.jsonl with the digest before and after.
 """
 from __future__ import annotations
 

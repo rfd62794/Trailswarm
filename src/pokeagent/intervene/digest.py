@@ -53,7 +53,7 @@ def digest_agent(snap: dict) -> dict:
         "bag": bag, "potions": any("POTION" in n.upper() and q > 0 for n, q in bag.items()),
         "decisions": [f"{d.get('r', '?')}:{d.get('b', '')}" + ("*claude" if d.get("d") == "claude" else "") for d in decs],
         "stuck": stuck_signals(snap), "box_text": scr.get("box_text", ""),
-        "claude_hold_s": round(float(snap.get("claude_hold_s", 0) or 0), 1), "human_hold": bool(snap.get("human_hold")),
+        "lease": "claude_hold_s" in snap, "claude_hold_s": round(float(snap.get("claude_hold_s", 0) or 0), 1), "human_hold": bool(snap.get("human_hold")),
     }
 
 
@@ -83,7 +83,7 @@ def row_cells(d: dict) -> list[str]:
     hold = hold_text(d)
     return [d["id"], where(d), f"{d['stage']} {d['done']}/{d['total']}", mode, lead,
             f"${d['money']}" if d.get("money") is not None else "$?", f"STUCK:{stuck}" if stuck != "-" else "ok",
-            f"HELD:{hold}" if hold else ""]
+            f"HELD:{hold}" if hold else ("" if d.get("lease", True) else "no-lease")]
 
 
 def format_table(digests: list[dict]) -> str:
@@ -107,6 +107,8 @@ def format_block(d: dict) -> str:
     out.append(f"money : {d['money'] if d.get('money') is not None else '?'}   bag: {bag}" + ("" if d["potions"] else "   (NO POTION)"))
     if d.get("box_text"):
         out.append(f"box   : {d['box_text'][:120]}")
+    if not d.get("lease", True):
+        out.append("lease : lease unsupported (old agent code)")
     out.append("last 8: " + (", ".join(d["decisions"]) or "-"))
     out.append("stuck : " + ("; ".join(f"{s['kind']} - {s['reason']}" for s in d["stuck"]) or "no signals"))
     return "\n".join(out)

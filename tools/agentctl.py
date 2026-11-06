@@ -9,7 +9,7 @@
     uv run python tools/agentctl.py nudge <agent|closest>    # hold 120 s, back_out, battle_run if a wild battle is open, release
 
 ``<agent>`` is an id, a unique fragment of one, ``closest`` (furthest goal stage) or ``stuck``. ``--root`` (or POKEAGENT_ROOT)
-is the checkout whose ``runs/agents`` registry to read; every intervention is journaled to ``<root>/runs/interventions.jsonl``.
+is the checkout whose ``runs/agents`` registry to read; every intervention is journaled to ``<root>/runs/agent_interventions.jsonl``.
 """
 from __future__ import annotations
 
