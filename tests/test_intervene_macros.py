@@ -79,6 +79,7 @@ def test_back_out_noop_when_already_clear_and_stops_on_a_screen_that_will_not_ch
     rig = Rig([scr(["Stuck text"], battle=False)])  # B changes nothing
     out = run_macro(rig, "back_out")
     assert not out["ok"] and out["result"] == "screen_unchanged" and len(rig.pressed) <= 5
+    assert rig.ticks, "it lets an animation finish before it gives up"
 
 
 # --- battle_run ----------------------------------------------------------------

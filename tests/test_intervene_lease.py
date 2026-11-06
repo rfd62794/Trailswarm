@@ -207,3 +207,15 @@ def test_watchdog_waiting_for_first_transition_is_also_skipped(tmp_path):
     ClaudeHold(run / LEASE_FILE).grant(600)
     c.t += 1000
     assert w.check() is None and w.skipped == "claude hold"
+
+
+def test_snapshot_extra_battle_block_uses_the_party_slot_for_our_species(tmp_path):
+    from pokeagent.intervene.names import species_name
+    view, _, emu = _view(tmp_path)
+    emu.memory.update({0xD057: 1, 0xD163: 1, 0xD16B: 0xB2, 0xCC2F: 0,           # wild battle, party of one, slot 0 in the fight
+                       0xD014: 0, 0xD016: 11, 0xD022: 24, 0xD024: 57,           # wBattleMon: species byte reads 0, 11/57 HP, L24
+                       0xCFE5: 0x6D, 0xCFE7: 8, 0xCFF3: 12, 0xCFF5: 20})       # wEnemyMon: 8/20 HP, L12
+    b = view.snapshot().extra["battle"]
+    assert b["kind"] == "wild" and view.snapshot().extra["mode"] == "battle"
+    assert b["you"] == {"species": species_name(0xB2), "level": 24, "hp": 11, "max": 57}
+    assert b["enemy"] == {"species": species_name(0x6D), "level": 12, "hp": 8, "max": 20}

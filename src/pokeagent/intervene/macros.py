@@ -36,8 +36,10 @@ def build_back_out(args: dict):
         sig = (tuple(scr.screen), scr.cur)
         st["same"] = st.get("same", 0) + 1 if sig == st.get("sig") else 0
         st["sig"] = sig
-        if st["same"] >= 4:
+        if st["same"] >= 6:
             return Step(stop="screen_unchanged")  # B is not moving this screen: a person should look
+        if st["same"] in (2, 3):
+            return Step(wait=30)  # an animation or slow text may still be running: let it, then judge
         return press("B", "backing out")
     return step, 20
 

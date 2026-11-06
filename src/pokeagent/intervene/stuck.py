@@ -44,7 +44,8 @@ def item_loop(snap: dict) -> dict | None:
 
 
 def box_repeat(extra: dict, n: int = BOX_REPEAT_N) -> dict | None:
-    hist = [t for t in extra.get("box_hist", [])[-6:] if t]
+    # the battle main menu is a screen an agent legitimately sits on between turns: it is not "the same box text"
+    hist = [t for t in extra.get("box_hist", [])[-6:] if t and not ("FIGHT" in t and "PKMN" in t)]
     top = max(set(hist), key=hist.count) if hist else ""
     if top and hist.count(top) >= n:
         return {"kind": "box_repeat", "reason": f"same box text {hist.count(top)}x: \"{top[:60]}\""}
@@ -58,10 +59,10 @@ def stall_guard(decs: list[dict]) -> dict | None:
 
 
 def stuck_signals(snap: dict) -> list[dict]:
-    """All signals that currently hold. A paused or human-steered agent is still on purpose, so only the item loop counts."""
+    """All signals that currently hold. A paused, human-steered or Claude-held agent is still on purpose, so only the item loop counts."""
     extra = snap.get("extra") or {}
     decs = _agent_decisions(extra)
     out = [item_loop(snap)]
-    if snap.get("state") != "paused" and not snap.get("human_hold"):
+    if snap.get("state") != "paused" and not snap.get("human_hold") and not snap.get("claude_hold_s"):
         out += [rule_repeat(decs), no_new_tile(decs), box_repeat(extra), stall_guard(decs)]
     return [s for s in out if s]

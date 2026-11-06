@@ -60,4 +60,6 @@ def item_id(name) -> int | None:
 
 
 def species_name(internal_id: int) -> str:
+    if not internal_id:
+        return "?"  # battle data not loaded yet (the first frames of a fight)
     return str(((ROM_KB or {}).get("name_of_internal") or {}).get(str(internal_id), f"#{internal_id}"))

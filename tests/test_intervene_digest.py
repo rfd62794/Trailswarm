@@ -89,7 +89,10 @@ def test_no_new_tile_box_repeat_and_stall_guard():
     assert any(s["kind"] == "box_repeat" for s in stuck_signals(boxes))
     esc = snap(extra={"decisions": [dec(rule="frontier")] * 3 + [dec(rule="stall_escalate", btn="START", out="none")]})
     assert any(s["kind"] == "stall_guard" for s in stuck_signals(esc))
+    menu = snap(extra={"box_hist": [">FIGHT PKMN | ITEM RUN"] * 6})
+    assert stuck_signals(menu) == []  # the battle menu between turns is not a repeated box
     assert stuck_signals({**pacing, "state": "paused"}) == [] and stuck_signals({**pacing, "human_hold": True}) == []
+    assert stuck_signals({**pacing, "claude_hold_s": 30.0}) == []
 
 
 def test_ranking_closest_first_and_table():
