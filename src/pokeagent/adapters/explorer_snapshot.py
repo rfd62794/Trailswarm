@@ -6,12 +6,14 @@ keeps its own --control-port HTTP API untouched; this adapter adds the viewer-fa
 """
 from __future__ import annotations
 
+import os
 import time
 from collections import deque
 from pathlib import Path
 from typing import Callable
 
 from pokeagent import agent_registry
+from pokeagent.adapters.bridge import EmuBridge
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
@@ -32,7 +34,8 @@ class ExplorerAgentView:
     viewer Steer key) feeds ``HumanHold`` so the agent stops deciding while a human drives."""
 
     def __init__(self, ctx, emu, mem, engine, presser, *, agent_id: str = "explorer",
-                 root: Path = Path("."), frame_slot: str = "") -> None:
+                 root: Path = Path("."), frame_slot: str = "", marshal: bool = True,
+                 refresh_every: int = 6) -> None:
         self.ctx, self.emu, self.mem, self.engine, self.presser = ctx, emu, mem, engine, presser
         self.agent_id, self.root, self.frame_slot = agent_id, Path(root), frame_slot
         self.hold = HumanHold()
@@ -40,6 +43,13 @@ class ExplorerAgentView:
         self._presses: dict[str, int] = {}
         self._ctl: ControlServer | None = None
         self._port = 0
+        # HTTP threads never touch the emulator: commands run in tick() on the emulator thread and
+        # snapshot() returns a copy built there. marshal=False (tests) runs everything inline.
+        self.bridge = EmuBridge(self._build, every=refresh_every, marshal=marshal)
+
+    def tick(self) -> None:
+        """Call once per frame from the emulator's own loop."""
+        self.bridge.tick()
 
     # -- snapshot -----------------------------------------------------------------
     def _last_decision(self):
@@ -70,6 +80,9 @@ class ExplorerAgentView:
             return Screen()
 
     def snapshot(self) -> AgentSnapshot:
+        return self.bridge.snapshot()
+
+    def _build(self) -> AgentSnapshot:
         ctx = self.ctx
         done = bool(ctx.done)
         check = ctx.goals()
@@ -128,7 +141,7 @@ class ExplorerAgentView:
             self.recent.append(Event(step=ctx.step, driver="human", text=f"load {name}"))
             return {}
 
-        return {
+        raw = {
             "pause": lambda **_: _ret(setattr(ctx, "paused", True)),
             "resume": lambda **_: _ret(setattr(ctx, "paused", False)),
             "speed": lambda n, **_: _ret(setattr(ctx, "speed", int(n))),
@@ -139,6 +152,7 @@ class ExplorerAgentView:
             "load_state": load_state,
             "hold_release": lambda **_: _ret(hold.release()),
         }
+        return {name: self.bridge.wrap(h) for name, h in raw.items()}
 
     # -- serving ---------------------------------------------------------------------
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:
@@ -146,7 +160,7 @@ class ExplorerAgentView:
         self._ctl = ControlServer(self.snapshot, self.handlers(), port=port, token="")
         self._port = self._ctl.start()
         agent_registry.register(self.root, agent_id or self.agent_id, "explorer", self._port,
-                                self.frame_slot, token=self._ctl.token)
+                                self.frame_slot, pid=os.getpid(), token=self._ctl.token)
         return self._port
 
     def close(self) -> None:

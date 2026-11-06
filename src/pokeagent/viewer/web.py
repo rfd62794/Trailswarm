@@ -19,14 +19,26 @@ _PAGE = """<!doctype html><meta charset=utf-8><title>pokeagent view</title>
 img{image-rendering:pixelated;width:170px}pre{white-space:pre-wrap;margin:4px 0}.dim{color:#8a8f98}</style>
 <div id=app>loading…</div>
 <script>
+const COLOR = /^#[0-9a-fA-F]{3,8}$/;
+function el(tag, cls, text){const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e;}
+function card(a){
+  const c = el('div','card');
+  const name = el('b', '', String(a.id));
+  if (COLOR.test(a.color)) name.style.color = a.color;
+  c.append(name, document.createTextNode(' '),
+           el('span','dim', [a.kind, a.state, 'step ' + a.step, a.staleness].filter(x => x !== undefined).join(' ')),
+           document.createElement('br'));
+  if (a.frame){const i=el('img'); i.src='/frame.png?id='+encodeURIComponent(a.id); c.append(i);}
+  c.append(el('pre','', (a.sees||[]).join('
+')), el('pre','dim', (a.text||[]).join('
+')));
+  return c;
+}
 async function tick(){
   const d = await (await fetch('/data')).json();
-  document.getElementById('app').innerHTML = d.agents.map(a=>`
-    <div class=card><b style="color:${a.color}">${a.id}</b> <span class=dim>${a.kind} ${a.state} step ${a.step} ${a.staleness}</span><br>
-    ${a.frame?`<img src="/frame.png?id=${encodeURIComponent(a.id)}">`:''}
-    <pre>${a.sees.map(esc).join('\n')}</pre><pre class=dim>${a.text.map(esc).join('\n')}</pre></div>`).join('') || 'no agents';
+  const app = document.getElementById('app');
+  app.replaceChildren(...(d.agents.length ? d.agents.map(card) : [document.createTextNode('no agents')]));
 }
-const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 setInterval(tick, 500); tick();
 </script>"""
 
@@ -53,6 +65,8 @@ def _data(model: ViewerModel) -> bytes:
 
 
 def make_server(model: ViewerModel, port: int = 8899, host: str = "127.0.0.1") -> ThreadingHTTPServer:
+    bound: list[int] = []  # the real port, known once the socket exists (port 0 -> ephemeral)
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a) -> None:
             pass
@@ -65,6 +79,9 @@ def make_server(model: ViewerModel, port: int = 8899, host: str = "127.0.0.1") -
             self.wfile.write(body)
 
         def do_GET(self) -> None:  # read-only: no do_POST/do_PUT anywhere
+            host = self.headers.get("Host", "")
+            if host not in (f"127.0.0.1:{bound[0]}", f"localhost:{bound[0]}"):  # DNS-rebinding guard
+                return self._send(403, "text/plain", b"forbidden")
             path = urlparse(self.path).path
             q = parse_qs(urlparse(self.path).query)
             if path == "/":
@@ -83,6 +100,7 @@ def make_server(model: ViewerModel, port: int = 8899, host: str = "127.0.0.1") -
 
     httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.daemon_threads = True
+    bound.append(httpd.server_address[1])
     return httpd
 
 

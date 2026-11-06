@@ -315,6 +315,7 @@ def main() -> int:
                 ep_path.append(list(obs) + [act])
                 ep_times.append(round(time.time() - t0, 2))
                 nxt, rew, done, info = env.step(act)
+                agent_view and agent_view.tick()  # viewer snapshot is built here, on the trainer thread
                 reward_components['extrinsic'] += rew
                 if phi:
                     shaping = 0.01 * potential_reward(phi(obs), phi(nxt), gamma, info['terminated'])

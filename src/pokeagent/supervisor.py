@@ -5,8 +5,6 @@ Agents self-register in the agent registry, so the viewer discovers them on its 
 """
 from __future__ import annotations
 
-import os
-import signal
 import socket
 import subprocess
 import sys
@@ -49,16 +47,13 @@ class Supervisor:
         return proc.pid
 
     def stop(self, pid: int) -> bool:
-        """Terminate a spawned (or registry-listed) agent; False when nothing was signaled."""
+        """Terminate an agent this supervisor spawned. Any other pid (e.g. one read from the agent
+        registry, which a stale or hostile entry could point at an unrelated process) is refused."""
         proc = self._procs.pop(pid, None)
-        if proc is not None:
-            try:
-                proc.terminate()
-            except OSError:
-                pass
-            return True
-        try:
-            os.kill(pid, signal.SIGTERM)
-            return True
-        except (OSError, ProcessLookupError):
+        if proc is None:
             return False
+        try:
+            proc.terminate()
+        except OSError:
+            pass
+        return True

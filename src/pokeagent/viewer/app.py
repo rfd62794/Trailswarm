@@ -6,6 +6,7 @@ agents (demos/tests). ``--web`` additionally serves the read-only page on 127.0.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import threading
 import time
@@ -16,6 +17,7 @@ from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Think
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.sources import AgentSource, HttpShmSource, discover
 
+log = logging.getLogger(__name__)
 SNAPSHOT_HZ = 10.0  # spec: snapshots 10 Hz, frames 30 Hz
 
 
@@ -99,6 +101,18 @@ def _sources_for(root: Path, fake: int) -> tuple[dict, dict]:
     return {aid: HttpShmSource(e) for aid, e in entries.items()}, entries
 
 
+def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
+    """Reconcile ``current`` (agent_id -> _Throttle) with ``fresh`` (agent_id -> source) in place:
+    keep existing throttles for agents still present, add new ones, drop vanished ones."""
+    gone = [aid for aid in current if aid not in fresh]
+    for aid in gone:
+        del current[aid]
+    added = [aid for aid in fresh if aid not in current]
+    for aid in added:
+        current[aid] = _Throttle(fresh[aid])
+    return added, gone
+
+
 def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899) -> int:
     root = Path(root)
     sources, entries = _sources_for(root, fake)
@@ -107,20 +121,21 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     stop = threading.Event()
 
     def poller() -> None:
-        ticks = 0
+        ticks, warned = 0, False
         while not stop.is_set():
             ticks += 1
             # re-discover real agents every ~2 s (60 ticks at 30 fps) so spawns appear, exits vanish
             if not fake and ticks % 60 == 0:
                 try:
                     fresh, new_entries = _sources_for(root, fake)
-                    holder["sources"].clear()
-                    holder["sources"].update({aid: _Throttle(s) for aid, s in fresh.values()})
+                    merge_sources(holder["sources"], fresh)
                     holder["entries"].clear()
                     holder["entries"].update(new_entries)
                     model.prune()
                 except Exception:
-                    pass
+                    if not warned:  # once: a persistent failure must not flood the log every 2 s
+                        log.exception("agent re-discovery failed (further failures suppressed)")
+                        warned = True
             model.poll(list(holder["sources"].values()))
             time.sleep(1.0 / fps)
 

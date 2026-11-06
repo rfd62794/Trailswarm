@@ -5,6 +5,8 @@ The render loop only reads the model (never blocks on the network); commands go 
 """
 from __future__ import annotations
 
+import queue
+import threading
 import time
 from pathlib import Path
 from typing import Callable
@@ -45,6 +47,22 @@ class ViewerWindow:
         self._bar: ControlBar | None = None
         self._win = "viewer_main"
         self._last_size: tuple[int, int] = (0, 0)
+        self._outbox: queue.Queue = queue.Queue()  # sends run on a worker so the UI never waits on HTTP
+        threading.Thread(target=self._send_loop, daemon=True, name="viewer-send").start()
+
+    def _send_loop(self) -> None:
+        while True:
+            src, cmd, args = self._outbox.get()
+            try:
+                src.send(cmd, **args)
+            except Exception:
+                pass  # sources never raise by contract; a bad one must not kill the sender
+            finally:
+                self._outbox.task_done()
+
+    def flush_sends(self) -> None:
+        """Block until queued commands were sent (tests; never call from the render loop)."""
+        self._outbox.join()
 
     # -- host API for control_bar / keys ----------------------------------------
     def set_scope(self, scope: str) -> None:
@@ -99,7 +117,7 @@ class ViewerWindow:
         for aid in self._target_ids():
             src = self.sources.get(aid)
             if src is not None:
-                src.send(cmd, **args)
+                self._outbox.put((src, cmd, args))
 
     def key_button(self, key_name: str) -> None:
         """Steer-gated game key: reaches only the selected agent, only while Steer is on."""
@@ -108,7 +126,7 @@ class ViewerWindow:
             return
         src = self.sources.get(self.selected)
         if src is not None:
-            src.send("press", button=button, source="human")
+            self._outbox.put((src, "press", {"button": button, "source": "human"}))
 
     def escape(self) -> None:
         self.focus.back()

@@ -8,12 +8,14 @@ asks the env for live screen state. ``brain_fn(obs)`` supplies the Thinking.brai
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import deque
 from pathlib import Path
 from typing import Callable
 
 from pokeagent import agent_registry
+from pokeagent.adapters.bridge import EmuBridge
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer.perceive import BATTLE_FLAG, battle_view
 from pokeagent.ram import read_state
@@ -30,7 +32,8 @@ class RlAgentView:
     the snapshot - they do not stop the trainer."""
 
     def __init__(self, env, status_path: Path, *, agent_id: str, frame_slot: str = "",
-                 root: Path = Path("."), segment: str = "", brain_fn: Callable | None = None) -> None:
+                 root: Path = Path("."), segment: str = "", brain_fn: Callable | None = None,
+                 marshal: bool = True, refresh_every: int = 6) -> None:
         self.env, self.status_path = env, Path(status_path)
         self.agent_id, self.root, self.frame_slot = agent_id, Path(root), frame_slot
         self.segment_name, self._brain_fn = segment, brain_fn
@@ -39,6 +42,12 @@ class RlAgentView:
         self._ctl: ControlServer | None = None
         self._port = 0
         self._last_status: dict = {}
+        # the trainer owns env.emu: the snapshot is built on its thread via tick() and served cached
+        self.bridge = EmuBridge(self._build, every=refresh_every, marshal=marshal)
+
+    def tick(self) -> None:
+        """Call from the training loop after each env step."""
+        self.bridge.tick()
 
     # -- snapshot -----------------------------------------------------------------
     def _status(self) -> dict:
@@ -76,6 +85,9 @@ class RlAgentView:
             return Screen()
 
     def snapshot(self) -> AgentSnapshot:
+        return self.bridge.snapshot()
+
+    def _build(self) -> AgentSnapshot:
         st = self._status()
         obs = self._obs()
         episode = int(st.get("episode", 0))
@@ -133,7 +145,7 @@ class RlAgentView:
         self._ctl = ControlServer(self.snapshot, self.handlers(), port=port, token="")
         self._port = self._ctl.start()
         agent_registry.register(self.root, self.agent_id, "rl", self._port, self.frame_slot,
-                                token=self._ctl.token)
+                                pid=os.getpid(), token=self._ctl.token)
         return self._port
 
     def close(self) -> None:

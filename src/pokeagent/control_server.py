@@ -159,7 +159,10 @@ class ControlServer:
         if name == PRESS:
             args.setdefault("source", "human")
         try:
-            return 200, {**(self.handlers[name](**args) or {}), "ok": True}
+            out = self.handlers[name](**args) or {}
+            if "error" in out:  # e.g. the emulator thread did not pick the command up in time
+                return 504, {**out, "ok": False}
+            return 200, {**out, "ok": True}
         except Exception as exc:
             return 500, {"ok": False, "error": str(exc)}
 

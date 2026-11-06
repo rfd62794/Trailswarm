@@ -42,7 +42,7 @@ def test_explorer_adapter_snapshot_and_hold(tmp_path):
     from pokeagent.explorer.engine import Engine
     ctx, emu, mem, presser = _explorer_ctx(tmp_path)
     engine = Engine(ctx, presser)
-    view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id="ex1", root=tmp_path)
+    view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id="ex1", root=tmp_path, marshal=False)
     s = view.snapshot()
     assert s.agent_id == "ex1" and s.kind == "explorer" and s.state == "running"
     assert s.sees is not None and s.screen is not None and s.thinking.driver == "explorer"
@@ -65,7 +65,7 @@ def test_explorer_adapter_serve_registers(tmp_path):
     from pokeagent.explorer.engine import Engine
     ctx, emu, mem, presser = _explorer_ctx(tmp_path)
     engine = Engine(ctx, presser)
-    view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id="ex2", root=tmp_path)
+    view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id="ex2", root=tmp_path, marshal=False)
     port = view.serve(port=0)
     try:
         entries = list_agents(tmp_path)
@@ -103,7 +103,7 @@ def test_rl_adapter_brain_and_status(tmp_path):
                                   "updated_at": 0.0, "outcomes": {}, "rewards": {}, "current_steps": 7,
                                   "steps_total": 100, "steps_avg": 25.0, "steps_best": 20,
                                   "steps_worst": 30, "win_avg": 24.0}))
-    view = RlAgentView(_FakeRlEnv(), status, agent_id="rl1", segment="left_house",
+    view = RlAgentView(_FakeRlEnv(), status, agent_id="rl1", segment="left_house", marshal=False,
                        brain_fn=lambda obs: "OVERWORLD -> A(0.07)")
     s = view.snapshot()
     assert s.kind == "rl" and s.step == 7
