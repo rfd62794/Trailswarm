@@ -9,6 +9,33 @@ from __future__ import annotations
 from pokeagent.atlas import rom_maps
 
 TILESET_TABLE, ENTRY, NUM_TILESETS = 0xC7BE, 12, 24
+PAIRS_LAND = 0xC7E  # TilePairCollisionsLand: (tileset, tileA, tileB) triples ended by 0xFF; ROM-verified 2026-11-06
+
+
+def tile_pairs(rom: bytes, tileset: int, start: int = PAIRS_LAND) -> frozenset:
+    """Tile-id pairs between which walking is blocked on ``tileset`` even though both are walkable (cave elevation steps:
+    Mt Moon's floor 0x05 against 0x20/0x41/0x2A/0x21 on the cavern tileset 17). Both orders are included."""
+    out, o = set(), start
+    while o + 2 < len(rom) and rom[o] != 0xFF and len(out) < 512:
+        if rom[o] == tileset:
+            out.add((rom[o + 1], rom[o + 2])); out.add((rom[o + 2], rom[o + 1]))
+        o += 3
+    return frozenset(out)
+
+
+def rom_tile_pairs(rom_path: str = "roms/Pokemon Red.gb"):
+    """``tileset -> frozenset of (a, b) pairs`` (both orders); None when the ROM is unreadable."""
+    try:
+        rom = rom_maps.load(rom_path)
+    except OSError:
+        return None
+    cache: dict[int, frozenset] = {}
+
+    def pairs(tileset: int) -> frozenset:
+        if tileset not in cache:
+            cache[tileset] = tile_pairs(rom, tileset)
+        return cache[tileset]
+    return pairs
 
 
 def walkable_ids(rom: bytes, tileset: int) -> frozenset:

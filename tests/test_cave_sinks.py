@@ -164,3 +164,34 @@ def test_rom_collision_list_for_the_cavern_tileset():
         pytest.skip("ROM not present")
     ids = rom_walkable_ids()(17)
     assert {0x05, 0x20, 0x21, 0x15} <= ids and 0x31 not in ids
+
+
+def test_rom_tile_pairs_for_the_cavern_and_ship_tilesets():
+    from pathlib import Path
+    from pokeagent.atlas.collision import rom_tile_pairs
+    if not Path("roms/Pokemon Red.gb").exists():
+        pytest.skip("ROM not present")
+    pairs = rom_tile_pairs()
+    assert {(0x20, 0x05), (0x05, 0x20), (0x41, 0x05), (0x2A, 0x05), (0x05, 0x21)} <= pairs(17)
+    assert (0x05, 0x05) not in pairs(17) and (0x30, 0x2E) in pairs(3) and pairs(1) == frozenset()
+
+
+def test_pair_blocked_edges_are_solid_from_the_stand_tile_but_the_same_tile_is_walkable_from_elsewhere(tmp_path):
+    from pokeagent.explorer.memory import MapMemory
+    mem = MapMemory(tmp_path / "m.json")
+    mem.rom_walkable = lambda ts: frozenset({0x05, 0x20, 0x21, 0x2A, 0x41}) if ts == 17 else frozenset()
+    mem.rom_pairs = lambda ts: frozenset({(0x20, 0x05), (0x05, 0x20), (0x05, 0x21), (0x21, 0x05)}) if ts == 17 else frozenset()
+    ahead20 = [0x20, 0x20, 0x20, 0x20]
+    assert mem.known_solid(17, ahead20, stand=0x05)         # 05 -> 20: blocked by the pair table, both walkable
+    assert not mem.known_solid(17, ahead20, stand=0x20)     # 20 -> 20 walks
+    assert not mem.known_solid(17, [0x05] * 4, stand=0x05)  # 05 -> 05 walks
+    assert mem.known_solid(17, [0x05] * 4, stand=0x20)      # 20 -> 05 is the same pair, other direction
+    assert not mem.known_solid(17, ahead20)                 # no stand tile known: the walkable-wins rule
+    mem.learn_tiles(17, ahead20, walkable=False, stand=0x05)
+    assert not mem.data.get("tile_types", {}).get("17")     # a pair failure is not recorded against the ahead tile
+
+
+def test_stand_tile_is_the_bottom_left_of_the_players_cell():
+    from pokeagent.explorer.perceive import stand_tile
+    tm = bytearray(360); tm[9 * 20 + 8] = 0x05; tm[8 * 20 + 8] = 0x99
+    assert stand_tile(bytes(tm)) == 0x05

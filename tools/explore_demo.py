@@ -131,6 +131,8 @@ def main(argv=None) -> int:
     ctx.cave_plan = rom_cave_planner(a.rom)
     from pokeagent.atlas.collision import rom_walkable_ids
     mem.rom_walkable = rom_walkable_ids(a.rom)
+    from pokeagent.atlas.collision import rom_tile_pairs
+    mem.rom_pairs = rom_tile_pairs(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None

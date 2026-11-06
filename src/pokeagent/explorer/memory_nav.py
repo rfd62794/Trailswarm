@@ -4,7 +4,7 @@ Mixed into MapMemory (moved unchanged from tools/explore_demo.py).
 """
 from __future__ import annotations
 
-from pokeagent.explorer.perceive import DIRS, ahead_tiles
+from pokeagent.explorer.perceive import DIRS, ahead_tiles, stand_tile
 from pokeagent.explorer.world import WorldGraph
 
 OPPOSITE = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
@@ -36,7 +36,7 @@ class NavMixin:
         tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
         if tilemap is not None:  # tile ids ahead already known solid (bookshelf, wall, desk) count as tried
             for n in DIRS:
-                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
+                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n), stand_tile(tilemap)):
                     tried.append(n)
                     # remember it as a wall edge too: the frontier search only knows 'blocked', so without this it kept
                     # sending agents to a 'frontier' tile whose open side was a known-solid tile (move/A loop at Viridian)

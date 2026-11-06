@@ -7,7 +7,7 @@ from pokeagent.emulator import Button
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import close_episode, record_intervention, shutdown
 from pokeagent.explorer.perceive import (
-    DIRS, EFFECT_WINDOW, TILEMAP, TILEMAP_LEN, ahead_tiles, box_open, box_text, frame_lines, is_menu,
+    DIRS, EFFECT_WINDOW, TILEMAP, TILEMAP_LEN, ahead_tiles, stand_tile, box_open, box_text, frame_lines, is_menu,
 )
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_goals import record_goals
@@ -65,6 +65,7 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
         extra["battle_turn"] = len(bl["turns"])
     if name in DIRS and not box_before:
         extra["ahead_tiles"] = ahead_tiles(tm, name)  # lets the KB learn which tile ids are walls
+        extra["stand_tile"] = stand_tile(tm)  # ... and which tile PAIRS (cave elevation steps) block
     if name not in DIRS or box_before:
         ctx.last_fail = None  # a wall is only 'confirmed' by two consecutive identical move presses
     snap_pre = ctx.emu.read_range(*EFFECT_WINDOW) if not box_before else None

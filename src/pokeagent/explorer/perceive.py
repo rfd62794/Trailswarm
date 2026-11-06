@@ -37,6 +37,11 @@ def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:
     return [tilemap[r * 20 + c] for r, c in AHEAD[direction]]
 
 
+def stand_tile(tilemap: bytes) -> int:
+    """The tile id under the player: bottom-left of the 2x2 at screen rows 8-9, columns 8-9 (the game's wTilePlayerStandingOn)."""
+    return tilemap[9 * 20 + 8]
+
+
 def sprite_snapshot(emu) -> list[list[int]]:
     """[picture id, map y, map x] for NPC sprite slots 1-15 (wSpriteStateData, UNVERIFIED addresses)."""
     out = []
