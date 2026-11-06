@@ -96,7 +96,7 @@ def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], boo
     ``crop`` (x0, y0, x1, y1 in world px) and ``scale`` keep exports of a region small; drawing happens at full size first."""
     ids = [t.id for t in tracks]
     img = overlay(base, layout, model or {}, headers or {}, [], tuple(layers)) if layers else base
-    vl, shown = None, set()
+    vl, shown, imgs = None, set(), inplace_render.InteriorImages(book.rom, headers or {})
     if plan is not None and interiors != "inset":
         shown = inplace.shown_set(interiors, plan.anchors, scale, inside=tuple(t.map for t in tracks if t.placed),
                                   hidden=plan.hidden)
@@ -104,10 +104,10 @@ def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], boo
     if crop:
         x0, y0, x1, y1 = (v // CELL * CELL for v in crop)
         shift = (-x0, -y0)
-        img = inplace_render.compose(img, vl, plan.anchors, shown, None, (x0, y0, x1, y1)) if vl else img[y0:y1, x0:x1]
+        img = inplace_render.compose(img, vl, plan.anchors, shown, imgs, None, (x0, y0, x1, y1)) if vl else img[y0:y1, x0:x1]
     else:
         shift = (0, 0)
-        img = inplace_render.compose(img, vl, plan.anchors, shown) if vl else img
+        img = inplace_render.compose(img, vl, plan.anchors, shown, imgs) if vl else img
     layout = vl or layout
     im = Image.fromarray(np.ascontiguousarray(img)).convert("RGBA")
     if shift != (0, 0):                                      # draw in world coordinates on a translated canvas

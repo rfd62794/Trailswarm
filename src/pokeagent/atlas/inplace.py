@@ -18,6 +18,7 @@ from pokeagent.atlas.world import WorldLayout, Xform
 MODES = ("auto", "inplace", "inplace_full", "stretch", "inset")
 LABELS = {"auto": "auto", "inplace": "in place (fit)", "inplace_full": "in place (full size)",
           "stretch": "in place (stretch world)", "inset": "inset"}
+DEFAULT_MODE = "inset"         # the original full-grid atlas until the user picks an in-place mode (it is remembered)
 AUTO_ZOOM = 0.75               # screen px per world px at which auto shows every interior
 
 
@@ -41,6 +42,15 @@ class Plan:
                         d[k] = Xform(t.ox + dx, t.oy + dy, t.s)
 
 
+def usable_anchors(headers: dict[int, MapHeader], layout: WorldLayout, model: dict | None = None,
+                   overrides: Overrides | None = None) -> dict[int, Anchor]:
+    """Anchors minus the interiors (and the floors hanging off them) the user keeps in the inset grid."""
+    anchors = anchor_interiors(headers, layout, model)
+    if overrides is not None and overrides.inset_only:
+        anchors = {m: a for m, a in anchors.items() if not set(chain(anchors, m)) & overrides.inset_only}
+    return anchors
+
+
 def plan_interiors(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayout, model: dict | None = None,
                    walk_cache: dict | None = None, overrides: Overrides | None = None) -> Plan:
     cache = walk_cache if walk_cache is not None else {}
@@ -50,10 +60,8 @@ def plan_interiors(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayou
             cache[m] = walk_cells(rom, headers[m]) if m in headers else None
         return cache[m]
 
-    anchors = anchor_interiors(headers, layout, model)
     ov = overrides
-    if ov is not None and ov.inset_only:                       # user keeps these (and the floors hanging off them) in the inset grid
-        anchors = {m: a for m, a in anchors.items() if not set(chain(anchors, m)) & ov.inset_only}
+    anchors = usable_anchors(headers, layout, model, ov)
     adj = (lambda m, t: ov.adjust(m, t, anchors[m].entry)) if ov is not None else None
     fit, full = build_xforms(anchors, layout, walk, True, adj), build_xforms(anchors, layout, walk, False, adj)
     for m in (ov.interiors if ov is not None else ()):          # a per-interior mode beats the global fit/full choice

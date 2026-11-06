@@ -1,8 +1,10 @@
-"""World view, stretch world: build the stretched world once on a worker thread and swap it in (and back) on the UI thread.
+"""World view, world variants: build the world the chosen Interiors mode needs on a worker thread and swap it in on the UI thread.
 
-The stretched pair is cached and rebuilt only when what it depends on changes (anchors or band overrides). A failed build
-records the error, drops back to 'auto', says so on screen and is not retried until that dependency changes. A swap keeps the
-pan/zoom: the view centre is mapped through the warp instead of re-fitting.
+Three variants: ``full`` (inset mode: the whole interior grid), ``compact`` (every in-place mode: the grid holds only the
+interiors that could not be placed) and ``stretch`` (compact + the outdoor map locally stretched). Built pairs are cached; the
+stretched one is rebuilt only when its inputs (anchors, band overrides) change. A failed build records the error, drops back
+to 'auto', says so on screen and is not retried until the inputs change. A swap keeps pan/zoom: the view centre is mapped
+through the layout change instead of re-fitting.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.atlas.inplace import LABELS
 from pokeagent.atlas.stretch import remap_view
-from pokeagent.world.export import stretch_world
+from pokeagent.world.export import compact_world, full_world, stretch_world
 from pokeagent.world.pyramid import Pyramid
 
 log = logging.getLogger(__name__)
@@ -29,17 +31,25 @@ def _levels(w) -> Pyramid:
     return pyr
 
 
+def kind_of(w) -> str:
+    return "stretch" if w.layout.warp is not None else ("compact" if w.compact else "full")
+
+
+def kind_for(mode: str) -> str:
+    return {"inset": "full", "stretch": "stretch"}.get(mode, "compact")
+
+
 class StretchSwap:
     def __init__(self, layer) -> None:
         self.layer = layer
-        self.plain = None                     # the un-stretched World (and its pyramid when it is the clean base one)
-        self.plain_pyr = None
-        self.built_sig = None
+        self.pairs: dict[str, tuple] = {}      # kind -> (World, Pyramid | None)
+        self.sigs: dict[str, object] = {}      # kind -> what the cached stretched world was built from
         self.failed_sig = None
         self.building = False
+        self.force_full = False                # set when the in-place layout failed: stay on the full world
         self.swapping = False
         self.message = ("", 0.0)
-        self._done: tuple | None = None       # (kind, world, pyramid, signature) handed from the worker to the UI thread
+        self._done: tuple | None = None        # (kind, world, pyramid | error text, signature) from the worker
 
     def signature(self):
         plan = self.layer.plan
@@ -49,59 +59,76 @@ class StretchSwap:
         return (tuple(sorted((m, a.parent, a.via, a.entry) for m, a in plan.anchors.items())),
                 tuple(sorted(b["x"].items())), tuple(sorted(b["y"].items())))
 
+    def _remember(self, have: str) -> None:
+        v = self.layer.view
+        clean = v.pyr if v.pyr is not None and v.pyr.base is v.world.base else None
+        if have not in self.pairs or (self.pairs[have][1] is None and clean is not None and self.pairs[have][0] is v.world):
+            self.pairs[have] = (v.world, clean)
+
     def tick(self) -> None:
         L, v = self.layer, self.layer.view
         if v.world is None:
             return
-        if v.world.layout.warp is None:
-            self.plain = v.world
-            if v.pyr is not None and v.pyr.base is v.world.base:
-                self.plain_pyr = v.pyr
+        have = kind_of(v.world)
+        self._remember(have)
         if self._done is not None:
-            kind, w, pyr, sig = self._done
-            self._done = None
-            if w is None:                       # the build failed: back to auto, tell the user, don't retry this input
-                self.failed_sig = sig
-                L.mode = "auto"
-                self.message = (f"stretch failed ({pyr}); back to auto", time.monotonic() + 8)
-                if dpg.does_item_exist(COMBO):
-                    dpg.set_value(COMBO, LABELS["auto"])
-            else:
-                self.swapping, self.built_sig = True, sig if kind == "stretch" else self.built_sig
-                v._loaded = (w, pyr)
+            self._adopt()
             return
-        if self.building or self.plain is None:
+        if self.building:
             return
-        have = "stretch" if v.world.layout.warp is not None else "plain"
-        want = "stretch" if L.mode == "stretch" else "plain"
-        sig = self.signature()
-        if want == "stretch" and (sig is None or sig == self.failed_sig or (have == "stretch" and sig == self.built_sig)):
+        want, sig = ("full" if self.force_full else kind_for(L.mode)), self.signature()
+        if want == "stretch" and (sig is None or sig == self.failed_sig):
             return
-        if want == have and want == "plain":
+        fresh = want != "stretch" or self.sigs.get("stretch") == sig
+        if want == have and fresh:
+            return
+        if want in self.pairs and fresh and self.pairs[want][1] is not None:
+            self.swapping, v._loaded = True, self.pairs[want]
             return
         self._spawn(want, sig)
+
+    def _adopt(self) -> None:
+        L, v = self.layer, self.layer.view
+        kind, w, pyr, sig = self._done
+        self._done = None
+        if w is None:                       # the build failed: back to auto, tell the user, don't retry these inputs
+            self.failed_sig = sig
+            L.mode = "auto"                     # this session only: a transient failure must not overwrite the saved choice
+            self.message = (f"{kind} world failed ({pyr}); back to auto", time.monotonic() + 8)
+            if dpg.does_item_exist(COMBO):
+                dpg.set_value(COMBO, LABELS["auto"])
+            return
+        self.pairs[kind] = (w, pyr)
+        self.sigs[kind] = sig
+        self.swapping, v._loaded = True, (w, pyr)
 
     def _spawn(self, kind: str, sig) -> None:
         L, v = self.layer, self.layer.view
         self.building = True
-        ov, model, plain, plain_pyr = copy.deepcopy(L.ov), v.wm.union_model(), self.plain, self.plain_pyr
+        ov, model = copy.deepcopy(L.ov), v.wm.union_model()
+        cached = self.pairs.get(kind)
+        full = full_world(v.world)
 
         def work() -> None:
             try:
                 if kind == "stretch":
-                    w = stretch_world(plain, model, ov)
-                    self._done = ("stretch", w, _levels(w), sig)
+                    w, pyr = stretch_world(full, model, ov), None
+                elif kind == "compact":
+                    w, pyr = compact_world(full, model, ov), None
                 else:
-                    self._done = ("plain", plain, plain_pyr or _levels(plain), sig)
+                    w, pyr = full, None
+                if cached is not None and cached[0] is w:
+                    pyr = cached[1]
+                self._done = (kind, w, pyr or _levels(w), sig)
             except Exception as exc:
-                log.exception("stretch world build failed")
+                log.exception("%s world build failed", kind)
                 self._done = (kind, None, str(exc)[:80], sig)
             finally:
                 self.building = False
-        threading.Thread(target=work, daemon=True, name="world-stretch").start()
+        threading.Thread(target=work, daemon=True, name="world-variant").start()
 
     def restore(self, prev_world, prev_vp, vp) -> bool:
-        """After a swap: keep zoom and put the view centre on the same place (mapped through the warp)."""
+        """After a swap: keep zoom and put the view centre on the same place (mapped through the layout change)."""
         if not self.swapping:
             return False
         self.swapping = False

@@ -63,7 +63,8 @@ class AnomalyMonitor:
                    sprites=read_sprites(emu), wanderers=wanderer_slots(md.get("npcs", {})),
                    doors=doorway_tiles(md.get("warps", {})), walkable=walkable_tiles(md), warps=md.get("warps", {}),
                    jumps=md.get("jumps", {}), box=fr.box_after, box_before=fr.box_before, battle=battle,
-                   joy_ignore=joy, screen_sig=sig, broken=impossible_state(emu, self.valid_maps))
+                   joy_ignore=joy, screen_sig=sig, broken=impossible_state(emu, self.valid_maps),
+                   blocked_here=tuple(d for d in DIRS if f"{x},{y},{d}" in md.get("blocked", [])))
 
     def observe(self, ctx, fr) -> list[dict]:
         """Run every detector on the press just made; returns the records written."""
