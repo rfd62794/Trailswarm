@@ -144,6 +144,22 @@ def bag_emu(items):
     return emu
 
 
+SP = (0xB2, 0xB3, 0xB4)
+
+
+def set_active(emu, i, species=SP):
+    emu.memory[PLAYER_MON] = i
+    emu.memory[0xD014] = species[i]  # wBattleMon species
+
+
+def set_party(emu, n=2, active=0):
+    emu.memory[PARTY_COUNT] = n
+    for i in range(n):
+        emu.memory[0xD16B + 44 * i] = SP[i]
+    set_active(emu, active)
+    return emu
+
+
 def bag_list(cur):
     return scr(["POTION", "x 2"], menu=True, cur=cur)
 
@@ -172,7 +188,7 @@ def test_use_item_success_is_verified_by_the_bag_count(potion):
 
 
 def test_use_item_no_effect_backs_out_and_never_reopens_the_bag(potion):
-    emu = bag_emu([(POTION, 2)])
+    emu = set_party(bag_emu([(POTION, 2)]))
     screens = [battle_menu("ITEM"), bag_list(0), party_prompt(0), scr(["It won't have any effect."]),
                scr(["POTION", "x 2"], menu=True), battle_menu("ITEM")]
     rig = Rig(screens, emu)
@@ -191,7 +207,7 @@ def test_use_item_stops_for_a_missing_item_unknown_item_target_and_outside_battl
 
 
 def test_use_item_caps_attempts(potion):
-    emu = bag_emu([(POTION, 2)])
+    emu = set_party(bag_emu([(POTION, 2)]))
     screens = [bag_list(0)] * 10
     out = run_macro(Rig(screens, emu), "use_item", {"item": "POTION"})
     assert not out["ok"] and out["result"] in ("attempt_cap", "press_cap")
@@ -200,18 +216,18 @@ def test_use_item_caps_attempts(potion):
 # --- switch --------------------------------------------------------------------
 
 def test_switch_to_slot_two():
-    emu = FakeEmulator({PARTY_COUNT: 3, PLAYER_MON: 0})
+    emu = set_party(FakeEmulator(), 3)
     sub = lambda cur: scr(["STATS", "SWITCH", "CANCEL"], menu=True, cur=cur, screen=["STATS SWITCH CANCEL"])
     screens = [battle_menu("FIGHT"), battle_menu("PKMN"), scr([], screen=["Choose a POKeMON."], menu=True, cur=0),
                scr([], screen=["Choose a POKeMON."], menu=True, cur=1), sub(0), sub(1), scr(["Go! PIDGEY!"]), battle_menu("FIGHT")]
-    rig = Rig(screens, emu, after={6: lambda e: e.memory.__setitem__(PLAYER_MON, 1)})
+    rig = Rig(screens, emu, after={6: lambda e: set_active(e, 1)})
     out = run_macro(rig, "switch", {"slot": 2})
     assert out["ok"] and out["result"] == "switched", out
     assert rig.pressed == ["RIGHT", "A", "DOWN", "A", "DOWN", "A", "A"]
 
 
 def test_switch_stops_on_bad_slot_already_active_and_fainted_target():
-    emu = FakeEmulator({PARTY_COUNT: 2, PLAYER_MON: 0})
+    emu = set_party(FakeEmulator(), 2)
     assert run_macro(Rig([battle_menu("FIGHT")], emu), "switch", {"slot": 5})["result"] == "slot_not_in_party"
     assert run_macro(Rig([battle_menu("FIGHT")], emu), "switch", {"slot": 1})["result"] == "already_active"
     out = run_macro(Rig([scr(["There's no will to fight!"])], emu), "switch", {"slot": 2})
@@ -247,3 +263,56 @@ def test_unknown_macro_and_press_cap_and_never_ready():
     assert not out["ok"] and out["result"] == "press_cap" and out["presses"] == 20
     out = run_macro(Rig([scr([], battle=True, screen=[])]), "battle_run")  # a blank battle screen that never gets a menu
     assert not out["ok"] and out["result"] == "screen_not_ready"
+
+
+# --- an unverified active slot is never acted on --------------------------------------
+
+def test_use_item_without_a_target_needs_a_verified_active_slot(potion):
+    emu = bag_emu([(POTION, 2)])
+    set_party(emu, 2)
+    emu.memory[0xD014] = 0  # wBattleMon not loaded: cannot verify who is in the fight
+    rig = Rig([battle_menu("FIGHT")], emu)
+    out = run_macro(rig, "use_item", {"item": "POTION"})
+    assert not out["ok"] and out["result"] == "active_unverified" and rig.pressed == []
+    emu.memory.update({0xD014: SP[1], PLAYER_MON: 0})  # 0xCC2F says slot 0 but the battler is slot 1's species: use the species
+    rig = Rig([battle_menu("FIGHT"), battle_menu("ITEM"), bag_list(0), party_prompt(0)], emu)
+    run_macro(rig, "use_item", {"item": "POTION"})
+    assert rig.pressed[-1] == "DOWN"  # toward slot 2 (index 1), not the 0xCC2F guess
+    emu.memory[0xD16B + 44] = SP[0]  # two slots with the battler's species and a wrong 0xCC2F: ambiguous
+    emu.memory[0xD014] = SP[0]
+    emu.memory[PLAYER_MON] = 2
+    assert run_macro(Rig([battle_menu("FIGHT")], emu), "use_item", {"item": "POTION"})["result"] == "active_unverified"
+    out = run_macro(Rig([party_prompt(0)], emu), "use_item", {"item": "POTION", "on": 1})  # explicit target: no guess needed
+    assert out["result"] != "active_unverified"
+
+
+def test_switch_result_codes_need_a_verified_active_slot():
+    emu = set_party(FakeEmulator(), 2)
+    emu.memory[0xD014] = 0
+    out = run_macro(Rig([battle_menu("FIGHT")], emu), "switch", {"slot": 2})
+    assert not out["ok"] and out["result"] == "active_unverified" and out["presses"] == 0
+
+
+# --- incremental runs: one step per advance, deadline, cancel ---------------------------
+
+def test_a_macro_run_advances_one_step_at_a_time():
+    from pokeagent.intervene.macros import make_run
+    rig = Rig([scr(["a"], battle=False), scr(["b"], battle=False), scr(["c"], battle=False), scr([], battle=False, screen=[])])
+    run = make_run(rig, "back_out")
+    assert not run.advance() and rig.pressed == ["B"] and run.status()["state"] == "running"
+    assert not run.advance() and not run.advance() and len(rig.pressed) == 3
+    assert run.advance() and run.result["result"] == "overworld" and run.status()["state"] == "done"
+
+
+def test_macro_run_deadline_and_cancel():
+    from pokeagent.intervene.macros import make_run
+    t = [0.0]
+    rig = Rig([scr([f"line {i}"], battle=False) for i in range(30)])
+    run = make_run(rig, "back_out", clock=lambda: t[0], deadline_s=60)
+    run.advance()
+    t[0] = 61
+    assert run.advance() and run.result["result"] == "deadline" and not run.result["ok"]
+    run = make_run(Rig([scr([f"line {i}"], battle=False) for i in range(30)]), "back_out")
+    run.advance()
+    run.cancel()
+    assert run.advance() and run.result["result"] == "cancelled" and run.status()["state"] == "stopped"

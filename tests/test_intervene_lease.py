@@ -1,7 +1,9 @@
 """Claude lease: blocks decisions and expires, press refreshes it, the watchdog skips a held agent, decisions.jsonl marks claude."""
 import importlib.util
 import json
+import os
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -51,19 +53,41 @@ def test_lease_grant_expire_touch_release_and_clamp():
 
 
 def test_lease_file_mirrors_the_lease_for_the_watchdog(tmp_path):
-    c, wall = Clock(), Clock()
-    wall.t = 5000.0
-    h = ClaudeHold(tmp_path / LEASE_FILE, clock=c, wall=wall)
-    assert not lease_active(tmp_path, wall)
+    c = Clock()
+    f = tmp_path / LEASE_FILE
+    h = ClaudeHold(f, clock=c)
+    assert not lease_active(tmp_path)
     h.grant(60)
-    assert lease_active(tmp_path, wall)
-    wall.t += 61
-    assert not lease_active(tmp_path, wall)
+    assert lease_active(tmp_path)
+    assert not lease_active(tmp_path, lambda: time.time() + 61)  # expired
+    # a hung agent stops refreshing the mirror: an old mtime is not trusted even though `until` is still ahead
+    f.write_text(json.dumps({"until": time.time() + 500}))
+    os.utime(f, (time.time() - 100, time.time() - 100))
+    assert not lease_active(tmp_path)
+    h.grant(60)
+    os.utime(f, (time.time() - 100, time.time() - 100))
+    c.t += 4
+    h.refresh()  # the agent's own loop re-writes it while held
+    assert lease_active(tmp_path)
+    # an `until` far past the mirror's mtime is nonsense
+    f.write_text(json.dumps({"until": time.time() + 5000}))
+    assert not lease_active(tmp_path)
     h.grant(60)
     h.release()
-    assert not (tmp_path / LEASE_FILE).exists()
-    (tmp_path / LEASE_FILE).write_text("not json")
+    assert not f.exists()
+    f.write_text("not json")
     assert not lease_active(tmp_path)
+
+
+def test_release_overwrites_the_mirror_when_it_cannot_unlink(tmp_path, monkeypatch):
+    f = tmp_path / LEASE_FILE
+    h = ClaudeHold(f)
+    h.grant(60)
+    real = Path.unlink
+    monkeypatch.setattr(Path, "unlink", lambda self, missing_ok=False: (_ for _ in ()).throw(PermissionError("locked")))
+    h.release()
+    monkeypatch.setattr(Path, "unlink", real)
+    assert json.loads(f.read_text()) == {"until": 0} and not lease_active(tmp_path)
 
 
 def test_control_server_validates_claude_hold_and_macro(tmp_path):
@@ -159,7 +183,11 @@ def test_macro_command_runs_under_an_automatic_lease_and_journals_decisions(tmp_
     view, run_dir, _ = _view(tmp_path)
     out = view.handlers()["macro"](name="back_out", args={})
     assert out["ok"] and out["result"] == "overworld" and out["presses"] == 0 and out["final_screen"]["mode"] == "overworld"
-    assert view.held()  # a macro always leaves the agent held for a moment
+    assert not view.held() and not lease_active(run_dir)  # the automatic lease goes with the macro
+    view.handlers()["claude_hold"](seconds=200)
+    view.handlers()["macro"](name="back_out", args={})
+    assert view.claude_hold.remaining() > 100  # an explicit hold survives a macro
+    view.handlers()["hold_release"]()
     out = view.handlers()["macro"](name="wait", args={"frames": 12})
     assert out["ok"] and out["result"] == "waited"
     out = view.handlers()["macro"](name="nonsense", args={})
@@ -222,3 +250,71 @@ def test_snapshot_extra_battle_block_never_mixes_two_pokemon(tmp_path):
     assert b["enemy"] == {"species": species_name(0x6D), "level": 12, "hp": 8, "max": 20}
     emu.memory[0xD014] = 0xB2  # battle loaded: the struct is authoritative
     assert view.snapshot().extra["battle"]["you"] == {"species": species_name(0xB2), "level": 24, "hp": 11, "max": 57}
+
+
+def _marshalled_view(tmp_path, screens, agent_id):
+    from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
+    from pokeagent.intervene.runner import MacroController
+    from test_intervene_macros import Rig
+    base, _, emu = _view(tmp_path)
+    view = ExplorerAgentView(base.ctx, emu, base.ctx.mem, base.engine, base.presser, agent_id=agent_id, root=tmp_path,
+                             refresh_every=1)
+    view.macros = MacroController(view, rig_factory=lambda name: Rig(screens, emu))
+    return view
+
+
+def _drive(view, thread, frames=2000):
+    """The emulator-side frame loop while an HTTP-side thread waits: returns (frames ticked, macro states seen)."""
+    n, seen = 0, []
+    while thread.is_alive() and n < frames:
+        view.tick()
+        n += 1
+        st = view.snapshot().extra.get("macro_status")
+        if st:
+            seen.append(st["state"])
+        time.sleep(0.001)
+    thread.join(5)
+    return n, seen
+
+
+def test_macro_runs_on_the_frame_loop_without_freezing_it_and_reports_status(tmp_path):
+    import threading
+    from test_intervene_macros import scr
+    screens = [scr([f"line {i}"], battle=False) for i in range(5)] + [scr([], battle=False, screen=[])]
+    view = _marshalled_view(tmp_path, screens, "m")
+    out: dict = {}
+    t = threading.Thread(target=lambda: out.update(view.handlers()["macro"](name="back_out", args={})))
+    t.start()
+    frames, seen = _drive(view, t)
+    assert out["ok"] and out["result"] == "overworld" and out["presses"] == 5
+    assert frames > 5 and "running" in seen  # ticks kept coming between steps; the status was visible while it ran
+    view.tick()  # the next frame refreshes the cached snapshot
+    assert view.snapshot().extra["macro_status"]["state"] == "done" and not view.held()
+
+
+def test_macro_pending_busy_and_cancel(tmp_path):
+    import threading
+    from test_intervene_macros import scr
+    view = _marshalled_view(tmp_path, [scr([f"line {i}"], battle=False) for i in range(500)], "m2")
+    h = view.handlers()
+
+    def call(fn, sink, **kw):
+        t = threading.Thread(target=lambda: sink.append(fn(**kw)))
+        t.start()
+        return t
+
+    results: list = []
+    t = call(h["macro"], results, name="back_out", args={}, wait_s=0.05)
+    _drive(view, t, 400)
+    assert results[0]["result"] == "pending" and results[0]["macro_status"]["state"] == "running"  # the 504 does not hide it
+    assert view.snapshot().extra["macro_status"]["state"] == "running"
+    busy: list = []
+    _drive(view, call(h["macro"], busy, name="wait", args={}), 400)
+    assert busy[0]["result"] == "macro_busy"
+    cancel: list = []
+    _drive(view, call(h["macro_cancel"], cancel), 400)
+    for _ in range(5):
+        view.tick()
+    st = view.snapshot().extra["macro_status"]
+    assert cancel[0]["cancelling"] == "back_out" and st["state"] == "stopped" and st["result"] == "cancelled"
+    assert not view.held()

@@ -6,7 +6,7 @@ Every macro here and in macros_battle / macros_goto is built from its args by a 
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours.switch_out import run_press
-from pokeagent.intervene.macro_core import MacroArgError, Step, press, run_steps
+from pokeagent.intervene.macro_core import MacroArgError, MacroRun, Step, press
 from pokeagent.intervene.screen import ScreenRead, main_menu
 
 MAX_WAIT_FRAMES = 600
@@ -84,12 +84,21 @@ def macro_names() -> list[str]:
     return sorted(_registry())
 
 
-def run_macro(rig, name: str, args: dict | None = None) -> dict:
+def make_run(rig, name: str, args: dict | None = None, **kw) -> MacroRun:
+    """A MacroRun for `name` (never raises: unknown macros and bad args come back as an already-finished failed run)."""
     build = _registry().get(name)
     if build is None:
-        return {"ok": False, "result": f"unknown_macro: {name} (have {', '.join(macro_names())})", "presses": 0}
+        return MacroRun.failed(name, f"unknown_macro: {name} (have {', '.join(macro_names())})")
     try:
         step, cap = build(args or {})
     except (MacroArgError, ValueError, KeyError, TypeError) as exc:
-        return {"ok": False, "result": f"bad_args: {exc}", "presses": 0}
-    return run_steps(step, rig, name, cap)
+        return MacroRun.failed(name, f"bad_args: {exc}")
+    return MacroRun(step, rig, name, cap, **kw)
+
+
+def run_macro(rig, name: str, args: dict | None = None, **kw) -> dict:
+    """Run a macro to completion right now (tests, scripts); the agent drives a MacroRun a tick at a time instead."""
+    run = make_run(rig, name, args, **kw)
+    while not run.advance():
+        pass
+    return run.result

@@ -14,7 +14,7 @@ from pokeagent.explorer.party_menu import toward
 from pokeagent.intervene.macro_core import MacroArgError, Step, press
 from pokeagent.intervene.names import item_id, norm
 from pokeagent.intervene.screen import (
-    PLAYER_MON, ScreenRead, bag_qty, battle_moves, main_cursor, main_menu, party_names, party_slot, toward_main)
+    ScreenRead, active_slot, bag_qty, battle_moves, main_cursor, main_menu, party_names, party_slot, toward_main)
 from pokeagent.ramstructs import read_party_count
 
 
@@ -77,10 +77,16 @@ def build_use_item(args: dict):
             return Step(stop="no_effect") if main_menu(scr.frames) else press("B", "backing out of a useless item")
         if st.get("attempts", 0) >= MAX_ITEM_ATTEMPTS:
             return Step(stop="attempt_cap")
-        if on is not None and party_prompt_open(scr.frames):
-            slot = party_slot(emu, on)
+        target = on
+        if target is None:  # never act on a guess: the active slot must be verified against wBattleMon
+            active = active_slot(emu)
+            if active is None:
+                return Step(stop="active_unverified")
+            target = active + 1
+        if party_prompt_open(scr.frames):
+            slot = party_slot(emu, target)
             if slot is None:
-                return Step(stop=f"target_not_in_party: {on} (have {', '.join(party_names(emu))})")
+                return Step(stop=f"target_not_in_party: {target} (have {', '.join(party_names(emu))})")
             p = toward(scr.cur, slot)
             st["attempts"] = st.get("attempts", 0) + (p == "A")
             return press(p, f"{name} on slot {slot + 1}")
@@ -107,16 +113,21 @@ def build_switch(args: dict):
             return Step(stop="slot_not_in_party")
         if not scr.in_battle:
             return Step(done="switched") if st.get("sent") else Step(stop="not_in_battle")
-        active = emu.read(PLAYER_MON)
+        active = active_slot(emu)
         text = scr.text.lower()
         if "no will" in text:
             return Step(stop="target_fainted")
         if "already out" in text:
             return Step(stop="already_active")
         if st.get("sent") and main_menu(scr.frames):
+            if active is None:
+                return Step(stop="active_unverified")
             return Step(done="switched") if active == target else Step(stop="switch_failed")
-        if not st.get("sent") and active == target and main_menu(scr.frames):
-            return Step(stop="already_active")
+        if not st.get("sent") and main_menu(scr.frames):
+            if active is None:
+                return Step(stop="active_unverified")
+            if active == target:
+                return Step(stop="already_active")
         p = switch_press(scr.frames, scr.screen, scr.cur, target)
         if p is None:
             return press("A", "advancing battle text") if scr.box else Step(wait=10)

@@ -68,16 +68,22 @@ def macro(root: Path, entry: dict, name: str, args: dict | None = None, by: str 
 
 
 def nudge(root: Path, entry: dict, by: str = "claude") -> dict:
-    """Hold 120 s, back_out, battle_run when a wild battle is open, then release (always: a nudge never leaves it frozen)."""
+    """Hold 120 s, back_out, battle_run when a wild battle is open, then release (always, even on an error: never left frozen)."""
     def body(e: dict) -> dict:
         steps = [("hold", client.command(e, "claude_hold", seconds=NUDGE_HOLD_S))]
-        steps.append(("back_out", client.command(e, "macro", name="back_out", args={})))
-        d = client.digest_of(e)
-        if d.get("battle") and d["battle"].get("kind") == "wild":
-            steps.append(("battle_run", client.command(e, "macro", name="battle_run", args={})))
-        steps.append(("release", client.command(e, "hold_release")))
+        try:
+            steps.append(("back_out", client.command(e, "macro", name="back_out", args={})))
+            d = client.digest_of(e)
+            if d.get("battle") and d["battle"].get("kind") == "wild":
+                steps.append(("battle_run", client.command(e, "macro", name="battle_run", args={})))
+        finally:
+            steps.append(("release", client.command(e, "hold_release")))
         macros = [o for n, o in steps if n in ("back_out", "battle_run")]
         return {"ok": bool(macros) and bool(macros[-1].get("ok")),
                 "steps": [{"step": n, "ok": o.get("ok"), "result": o.get("result"), "presses": o.get("presses")}
                           for n, o in steps]}
     return _run(root, entry, by, "nudge", {}, body, needs_lease=True)
+
+
+def macro_cancel(root: Path, entry: dict, by: str = "claude") -> dict:
+    return _run(root, entry, by, "macro_cancel", {}, lambda e: client.command(e, "macro_cancel"), needs_lease=True)

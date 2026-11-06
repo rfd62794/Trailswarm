@@ -32,7 +32,7 @@ NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 PAUSE, RESUME, SPEED, PRESS, STEER = "pause", "resume", "speed", "press", "steer"
 HAND_TO, SAVE_STATE, LOAD_STATE, HOLD_RELEASE = "hand_to", "save_state", "load_state", "hold_release"
-CLAUDE_HOLD, MACRO = "claude_hold", "macro"   # intervene/: lease + screen-verified macros (see pokeagent.intervene)
+CLAUDE_HOLD, MACRO, MACRO_CANCEL = "claude_hold", "macro", "macro_cancel"   # intervene/: lease + screen-verified macros (see pokeagent.intervene)
 
 # name -> (required args, optional args), each {arg: type}
 COMMAND_ARGS: dict[str, tuple[dict[str, type], dict[str, type]]] = {
@@ -45,6 +45,7 @@ COMMAND_ARGS: dict[str, tuple[dict[str, type], dict[str, type]]] = {
     LOAD_STATE: ({"name": str}, {}),
     CLAUDE_HOLD: ({"seconds": int}, {}),
     MACRO: ({"name": str}, {"args": dict}),
+    MACRO_CANCEL: ({}, {}),
 }
 
 

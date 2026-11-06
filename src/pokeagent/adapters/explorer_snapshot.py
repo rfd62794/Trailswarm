@@ -23,9 +23,10 @@ from pokeagent.goals import SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
 from pokeagent.intervene import extra as intervene_extra
-from pokeagent.intervene.handlers import MACRO_TIMEOUT_S, intervene_handlers
+from pokeagent.intervene.handlers import intervene_handlers
 from pokeagent.intervene.lease import LEASE_FILE, ClaudeHold
 from pokeagent.intervene.rig import ClaudeDriver
+from pokeagent.intervene.runner import MacroController
 from pokeagent.ram import read_state
 from pokeagent.snapshot import AgentSnapshot, DRIVERS, Event, Goal, Screen, Sees, Segment, Thinking
 
@@ -53,6 +54,7 @@ class ExplorerAgentView:
         if engine.decision_log is not None:
             engine.decision_log.listeners.append(self.tracker.add_decision)
         self.driver = ClaudeDriver(ctx, presser, engine.decision_log, self.claude_hold)
+        self.macros = MacroController(self)
         self.feed = EventFeed()
         self.recent: deque[Event] = deque(maxlen=MAX_RECENT)
         self._presses: dict[str, int] = {}
@@ -69,6 +71,8 @@ class ExplorerAgentView:
     def tick(self) -> None:
         """Call once per frame from the emulator's own loop."""
         self.bridge.tick()
+        self.claude_hold.refresh()  # keep the watchdog's lease mirror fresh while held
+        self.macros.tick()          # one macro step per frame: frames and snapshots keep flowing
 
     # -- snapshot -----------------------------------------------------------------
     def _last_decision(self):
@@ -101,7 +105,9 @@ class ExplorerAgentView:
 
     def _extra(self) -> dict:
         try:
-            return intervene_extra.build(self.ctx, self.emu, self.tracker, self._screen().box_text)
+            out = intervene_extra.build(self.ctx, self.emu, self.tracker, self._screen().box_text)
+            out["macro_status"] = self.macros.status()
+            return out
         except Exception:
             logging.getLogger(__name__).warning("intervene extra failed", exc_info=True)
             return {}
@@ -188,7 +194,9 @@ class ExplorerAgentView:
         }
         extra = intervene_handlers(self)
         raw.update(extra)
-        return {name: self.bridge.wrap(h, MACRO_TIMEOUT_S if name == "macro" else None) for name, h in raw.items()}
+        wrapped = {name: self.bridge.wrap(h) for name, h in raw.items()}
+        wrapped["macro"] = self.macros.command  # starts on the emulator thread, then waits on the HTTP thread
+        return wrapped
 
     # -- serving ---------------------------------------------------------------------
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:

@@ -13,6 +13,7 @@ from typing import Callable
 
 LEASE_FILE = "claude_hold.json"
 MIN_S, MAX_S, TOUCH_FLOOR_S = 1, 600, 3.0
+REFRESH_S, STALE_S = 3.0, 20.0  # the agent re-writes the mirror every REFRESH_S while held; older than STALE_S is not trusted
 
 
 class ClaudeHold:
@@ -20,6 +21,7 @@ class ClaudeHold:
                  wall: Callable[[], float] = time.time) -> None:
         self.path, self._clock, self._wall = path, clock, wall
         self._secs, self._until = 0.0, None
+        self._last = float("-inf")
 
     def grant(self, seconds: float) -> float:
         self._secs = float(min(MAX_S, max(MIN_S, seconds)))
@@ -42,12 +44,22 @@ class ClaudeHold:
         self._secs, self._until = 0.0, None
         self._mirror()
 
+    def refresh(self) -> None:
+        """Called from the agent's own loop: while held, re-write the mirror every few seconds. A hung agent stops doing this,
+        and the watchdog then no longer trusts the file (lease_active wants a fresh mtime)."""
+        if self.active() and self._clock() - self._last >= REFRESH_S:
+            self._mirror()
+
     def _mirror(self) -> None:
         if self.path is None:
             return
+        self._last = self._clock()
         try:
             if self._until is None:
-                Path(self.path).unlink(missing_ok=True)
+                try:
+                    Path(self.path).unlink(missing_ok=True)
+                except OSError:
+                    Path(self.path).write_text(json.dumps({"until": 0}), encoding="utf-8")  # cannot delete: say "expired"
             else:
                 Path(self.path).write_text(json.dumps({"until": self._wall() + self.remaining()}), encoding="utf-8")
         except OSError:
@@ -55,8 +67,13 @@ class ClaudeHold:
 
 
 def lease_active(run_dir: Path, wall: Callable[[], float] = time.time) -> bool:
-    """Is a Claude lease on this run still running? (reads the file the agent mirrors it to)"""
+    """Is a Claude lease on this run still running? Only a FRESH mirror counts (refreshed within STALE_S, so a hung agent is
+    judged again) and an ``until`` more than MAX_S past the file's mtime is nonsense and ignored."""
+    path = Path(run_dir) / LEASE_FILE
     try:
-        return float(json.loads((Path(run_dir) / LEASE_FILE).read_text(encoding="utf-8")).get("until", 0)) > wall()
+        until = float(json.loads(path.read_text(encoding="utf-8")).get("until", 0))
+        mtime = path.stat().st_mtime
     except (OSError, ValueError, TypeError, AttributeError):
         return False
+    now = wall()
+    return until > now and until - mtime <= MAX_S and now - mtime <= STALE_S

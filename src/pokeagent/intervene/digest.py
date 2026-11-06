@@ -53,7 +53,7 @@ def digest_agent(snap: dict) -> dict:
         "bag": bag, "potions": any("POTION" in n.upper() and q > 0 for n, q in bag.items()),
         "decisions": [f"{d.get('r', '?')}:{d.get('b', '')}" + ("*claude" if d.get("d") == "claude" else "") for d in decs],
         "stuck": stuck_signals(snap), "box_text": scr.get("box_text", ""),
-        "lease": "claude_hold_s" in snap, "claude_hold_s": round(float(snap.get("claude_hold_s", 0) or 0), 1), "human_hold": bool(snap.get("human_hold")),
+        "lease": "claude_hold_s" in snap, "macro": extra.get("macro_status"), "claude_hold_s": round(float(snap.get("claude_hold_s", 0) or 0), 1), "human_hold": bool(snap.get("human_hold")),
     }
 
 
@@ -107,6 +107,9 @@ def format_block(d: dict) -> str:
     out.append(f"money : {d['money'] if d.get('money') is not None else '?'}   bag: {bag}" + ("" if d["potions"] else "   (NO POTION)"))
     if d.get("box_text"):
         out.append(f"box   : {d['box_text'][:120]}")
+    if d.get("macro"):
+        m = d["macro"]
+        out.append(f"macro : {m.get('name')} {m.get('state')} {m.get('result') or ''} ({m.get('presses')} presses, {m.get('age_s')}s)".rstrip())
     if not d.get("lease", True):
         out.append("lease : lease unsupported (old agent code)")
     out.append("last 8: " + (", ".join(d["decisions"]) or "-"))
