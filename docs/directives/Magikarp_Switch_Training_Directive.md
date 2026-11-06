@@ -34,14 +34,21 @@ Facts already in hand (verify each on the ROM before relying on it):
    menu text) like the existing procedures. Used to put Magikarp **first** after buying it and after every
    heal/faint that changes the order.
 3. **In-battle switch** `switch_out_lead`: when the battle opens and the lead is the trainee (Magikarp), on turn
-   one choose PKMN -> the strongest healthy non-trainee -> SHIFT (or the Gen 1 menu text the ROM shows) ->
-   confirm; then fight normally. Skip it for wild battles the agent intends to flee, and never switch into a
-   fainted or sub-25%-HP member.
-4. **Goal `gyarados`** (party contains GYARADOS): a background goal, not a blocker - the main ladder continues;
-   switch-training applies in every battle while Magikarp is in the party. When Magikarp would be sent first into
-   a battle it cannot survive a single hit in (enemy level >= Magikarp level + 8), still switch on turn one (the
-   switch itself takes the hit for the incoming Pokemon - acceptable) but never let Magikarp take a second turn.
-   After evolution, stop switch-training; Gyarados joins normal team logic.
+   one choose PKMN -> the strongest healthy non-trainee -> the party-menu action the ROM actually shows for
+   sending a Pokemon out (read it from the screen text on the ROM and record it in KNOWLEDGE.md; do not assume a
+   word) -> confirm; then fight normally. Never switch into a fainted or sub-25%-HP member.
+   **Precedence with flee** (`behaviours/battle.py` flee rule): in a **wild** battle the existing flee decision
+   wins - if the agent would flee, it flees on turn one with Magikarp still out (no switch; Magikarp gets no XP,
+   which is fine). In a **trainer** battle (cannot flee) the switch always happens on turn one. The "enemy level
+   >= Magikarp level + 8" case only matters for trainer battles: switch on turn one as usual, never give Magikarp
+   a second turn.
+4. **Goal `gyarados`** (party contains GYARADOS) is **not in the GOALS ladder** (it must never block the main
+   route). Add a separate `SIDE_GOALS` list in `goals.py` with its detector, reported by `check_goals` and
+   `tools/status.py` but ignored by the planner's next-goal choice and by segment/checkpoint logic.
+   Switch-training applies in every battle while Magikarp is in the party; after evolution it stops and Gyarados
+   joins normal team logic. `buy_magikarp` IS in the main ladder (before `to_mt_moon`) - update
+   `tests/test_goal_order.py` and every other GOALS consumer accordingly, and add a test that SIDE_GOALS never
+   appear in the ladder.
 5. **Viewer/decision log**: rule strings `switch_train: MAGIKARP L12 -> out, BULBASAUR in`,
    `reorder_party: [MAGIKARP, BULBASAUR]`; status.py prints Magikarp level and battles shared.
 
