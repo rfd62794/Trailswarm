@@ -113,11 +113,13 @@ Test tail, line counts, and anything that did not fit.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
+| Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05 (type learning); STAB reads party slot 1
+- 2026-11-05 19:43 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates
 <!-- queue:end -->
