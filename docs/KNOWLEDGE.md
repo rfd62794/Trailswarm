@@ -16,6 +16,7 @@ not re-create it.
 | 0xD361 / 0xD362 | wYCoord / wXCoord | player tile position | make_baseline (RIGHT changed X 4->5) |
 | 0xD53A | wNumBoxItems | items stored in the PC | probe_pc: 1->0 |
 | 0xD53B.. | wBoxItems | pairs (item id, qty), 0xFF terminator | probe_pc: D53B 14->FF |
+| 0xD019 / 0xD01A | wBattleMonType1 / wBattleMonType2 | OUR battler's types in a fight (the STAB source; party slot 1's 0xD170/0xD171 is not the Pokemon in play) | from pokered wBattleMon layout, consistent with the moves at 0xD01C and PP at 0xD02D already in use; controller verifies on the ROM |
 
 Item id 0x14 = POTION (the one item in the PC at a new game). Still UNVERIFIED: 0xD163 party count
 (the START menu showed POKéMON while it read 0), 0xD356 badges, 0xD057 in-battle.

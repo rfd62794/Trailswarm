@@ -93,3 +93,25 @@ Output stable JSON (sorted keys) so Claude can diff results between calls.
 ## 8. Report
 
 Test tail, line counts, one example JSON output per CLI command, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Review |
+| Assigned to | devin |
+| Branch | directive/pokeagent-brain-tools-directive |
+| Base branch | - |
+| Base commit | d88defb92bc8de47bf77526586df27c56448a4db |
+| Head commit | 87db60dc678880365511fc4ddcc33f6459e678c0 |
+| Head remote | rfd62794/pokeagent |
+| Model | swe-2-flash-max |
+
+**Status log**
+- 2026-11-05 20:16 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05 (live surgery tools for Claude); dep World Legend merged
+- 2026-11-05 20:16 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dep merged
+- 2026-11-05 20:16 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-tools-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q6W56MBEFZ7JEWAC7DG7H4
+- 2026-11-05 20:21 · dispatcher · launched pid=19908; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-tools-directive; provisioned: uv sync --frozen
+- 2026-11-05 20:44 · devin-overseer (delegated) · In progress → Review — Brain tools complete: edit journal (runs/memory_edits.jsonl, 11 ops + undo, pure idempotent apply) folded on MapMemory load/pre-save/reload_edits/swarm-merge; tile_kind overrides win in classify; pure pokeagent.brain query lib (maps/map/tile/find/diff/lessons/q); pokeagent brain CLI + tools/brain.py (JSON default, --text); 8 brain_* MCP tools; apply --backup folds journal with backup and refuses while agents live; Q --set/--patch-save always back up first. uv run pytest -q: 312 passed, 5 skipped. All modules <=300 lines.; under delegate.envelope [origin] spent: devin 18 min est. n/a
+<!-- queue:end -->

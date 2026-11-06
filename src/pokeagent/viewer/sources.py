@@ -12,7 +12,6 @@ from pokeagent.snapshot import AgentSnapshot
 from pokeagent.telemetry import FrameSubscriber
 
 TIMEOUT_S = 0.5
-_SLOT_PREFIX = "pokeagent_frames_"
 
 
 class AgentSource(Protocol):
@@ -31,7 +30,8 @@ class HttpShmSource:
         self._headers = {"X-PokeAgent-Token": str(entry.get("token", ""))}
         self.base = f"http://127.0.0.1:{entry['port']}"
         slot = str(entry.get("frame_slot") or "")
-        self._sub = FrameSubscriber(slot[len(_SLOT_PREFIX):] if slot.startswith(_SLOT_PREFIX) else slot) if slot else None
+        self._pid = entry.get("pid")
+        self._sub = FrameSubscriber(slot) if slot else None
 
     def snapshot(self) -> AgentSnapshot | None:
         try:
@@ -42,7 +42,12 @@ class HttpShmSource:
             return None
 
     def frame(self) -> tuple[bytes, int, int] | None:
-        return self._sub.read() if self._sub is not None else None
+        if self._sub is None:
+            return None
+        fr = self._sub.read()
+        if fr is not None and self._pid is not None and self._sub.owner_pid != self._pid:
+            return None  # a stranger's frame in our slot: show "no frame", never another game
+        return fr
 
     def send(self, cmd: str, **args) -> dict:
         req = urllib.request.Request(self.base + "/command", data=json.dumps({"cmd": cmd, **args}).encode(),

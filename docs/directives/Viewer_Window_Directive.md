@@ -145,11 +145,13 @@ anything you had to interpret.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-viewer-window-directive |
 | Base branch | - |
 | Base commit | 041acdd3f7634938e72d7e94d0540ecf1ba5518a |
+| Head commit | b6c668b8eecfaedb968c9e2b32a7e89a630a67a2 |
+| Head remote | rfd62794/pokeagent |
 | Model | swe-2-flash-max |
 
 **Status log**
@@ -157,4 +159,6 @@ anything you had to interpret.
 - 2026-11-05 19:34 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
 - 2026-11-05 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-window-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4FJQFR2593W94K3YEZ4DH
 - 2026-11-05 19:38 · dispatcher · launched pid=5048; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-window-directive; provisioned: uv sync --frozen
+- 2026-11-05 20:01 · devin · In progress → Review — Full viewer window implemented: panels, DPG UI shell, app+CLI, explorer/RL adapters, supervisor, web. Suite: 281 passed, 5 skipped (baseline 265/5). UI smoke builds+ticks 6 FakeSource cards and focus view headless; render_dearpygui_frame needs a real GL context so it is not exercised in tests. [origin] spent: devin 23 min est. n/a
+- 2026-11-05 20:44 · robert-claude-laptop · Review → Done — note: merged via PR #44 (bb3dc31) with Sonnet-review and live-test fixes; live: 7 real agents ~25 fps, --fake 12 ~20 fps; 338 passed
 <!-- queue:end -->
