@@ -129,6 +129,7 @@ class ExplorerContext:
     box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
     pace: object = None  # text_pace.PaceLearner, built lazily over mem.data
     text_frames: int = 0  # emulator frames spent pressing through text boxes (fast path only)
+    train_need: int = 8  # the training level plan_goal last computed for this map (0 inside a dungeon)
     buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
     buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
     switch_runs: tuple = (-1, 0)  # (ctx.battles, RUN attempts) of switch_train_run
