@@ -165,8 +165,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
                 try:
                     fresh, new_entries = _sources_for(root, fake)
                     refresh_sources(holder, model, fresh, new_entries, world)
-                    for aid in model.prune():  # lost > 60 s: gone from the map as well
-                        world.forget(aid)
+                    model.prune()  # cards only: a lost-but-registered agent keeps its map track and event cursor
                 except Exception:
                     if not warned:  # once: a persistent failure must not flood the log every 2 s
                         log.exception("agent re-discovery failed (further failures suppressed)")
