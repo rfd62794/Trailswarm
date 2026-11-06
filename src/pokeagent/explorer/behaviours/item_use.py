@@ -18,7 +18,7 @@ MAX_ITEM_ATTEMPTS = 3  # confirmations of one item per battle before it is writt
 POTION = 0x14
 BAG_COUNT, BAG_START = 0xD31D, 0xD31E
 MENU_ITEM, LIST_SCROLL, PLAYER_MON = 0xCC26, 0xCC36, 0xCC2F
-_QTY_ROW = re.compile(r"x ?\d+")
+_QTY_ROW = re.compile(r"x ?\d+", re.IGNORECASE)
 _NO_EFFECT = re.compile(r"have any\s*effect", re.IGNORECASE)  # the apostrophe glyph does not survive the screen read
 
 
