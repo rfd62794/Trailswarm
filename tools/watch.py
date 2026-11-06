@@ -19,6 +19,8 @@ import threading
 import time
 import tkinter as tk
 import urllib.request
+
+from pokeagent.goals import GOALS
 from pathlib import Path
 from typing import Optional
 
@@ -141,7 +143,7 @@ def status_line(a: Agent) -> str:
     goals = sum(1 for v in s.get("goals", {}).values() if v)
     bits = [f":{a.port}", f"step {s.get('step', '?')}",
             f"m{s.get('map', '?')}", f"({s.get('x', '?')},{s.get('y', '?')}) {s.get('facing', '?')}",
-            f"hp {s.get('hp', '?')}", f"goals {goals}/12"]
+            f"hp {s.get('hp', '?')}", f"goals {goals}/{len(GOALS)}"]
     if s.get("in_battle"):
         bits.append("BATTLE")
     if s.get("paused"):

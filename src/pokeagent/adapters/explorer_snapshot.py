@@ -19,9 +19,14 @@ from pokeagent.adapters.event_feed import EventFeed
 from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
-from pokeagent.goals import SIDE_GOALS
+from pokeagent.goals import GOALS, SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
+from pokeagent.intervene import extra as intervene_extra
+from pokeagent.intervene.handlers import intervene_handlers
+from pokeagent.intervene.lease import LEASE_FILE, ClaudeHold
+from pokeagent.intervene.rig import ClaudeDriver
+from pokeagent.intervene.runner import MacroController
 from pokeagent.ram import read_state
 from pokeagent.snapshot import AgentSnapshot, DRIVERS, Event, Goal, Screen, Sees, Segment, Thinking
 
@@ -43,6 +48,13 @@ class ExplorerAgentView:
         self.ctx, self.emu, self.mem, self.engine, self.presser = ctx, emu, mem, engine, presser
         self.agent_id, self.root, self.frame_slot = agent_id, Path(root), frame_slot
         self.hold = HumanHold()
+        run_dir = getattr(ctx, "run_dir", None)
+        self.claude_hold = ClaudeHold(Path(run_dir) / LEASE_FILE if run_dir and Path(run_dir).is_dir() else None)
+        self.tracker = intervene_extra.Tracker()
+        if engine.decision_log is not None:
+            engine.decision_log.listeners.append(self.tracker.add_decision)
+        self.driver = ClaudeDriver(ctx, presser, engine.decision_log, self.claude_hold)
+        self.macros = MacroController(self)
         self.feed = EventFeed()
         self.recent: deque[Event] = deque(maxlen=MAX_RECENT)
         self._presses: dict[str, int] = {}
@@ -52,9 +64,15 @@ class ExplorerAgentView:
         # snapshot() returns a copy built there. marshal=False (tests) runs everything inline.
         self.bridge = EmuBridge(self._build, every=refresh_every, marshal=marshal)
 
+    def held(self) -> bool:
+        """Does anyone (a human steering, or Claude's lease) hold the agent? The decision loop skips its own step while True."""
+        return self.hold.active() or self.claude_hold.active()
+
     def tick(self) -> None:
         """Call once per frame from the emulator's own loop."""
         self.bridge.tick()
+        self.claude_hold.refresh()  # keep the watchdog's lease mirror fresh while held
+        self.macros.tick()          # one macro step per frame: frames and snapshots keep flowing
 
     # -- snapshot -----------------------------------------------------------------
     def _last_decision(self):
@@ -85,6 +103,15 @@ class ExplorerAgentView:
         except Exception:
             return Screen()
 
+    def _extra(self) -> dict:
+        try:
+            out = intervene_extra.build(self.ctx, self.emu, self.tracker, self._screen().box_text)
+            out["macro_status"] = self.macros.status()
+            return out
+        except Exception:
+            logging.getLogger(__name__).warning("intervene extra failed", exc_info=True)
+            return {}
+
     def snapshot(self) -> AgentSnapshot:
         return self.bridge.snapshot()
 
@@ -107,7 +134,7 @@ class ExplorerAgentView:
             segment=Segment(id="run", name=current or ctx.opts.stop_at_goal or "explore",
                             steps=ctx.step),
             goals=[Goal(id=k, name=k, status="done" if v else ("current" if k == current else "ahead"))
-                   for k, v in sorted(check.items())],
+                   for k, v in sorted(check.items(), key=lambda kv: (GOALS.index(kv[0]) if kv[0] in GOALS else len(GOALS), kv[0]))],
             thinking=Thinking(want=want, plan=(dec.why if dec else "") or (dec.behaviour if dec else ""),
                               blocker=str(ctx.last_fail) if ctx.last_fail else "",
                               driver="explorer", rule=(dec.rule if dec else ""),
@@ -116,6 +143,7 @@ class ExplorerAgentView:
             drivers_available=["explorer", "human"],
             recent=list(self.recent),
             sees=self._sees(), screen=self._screen(), human_hold=self.hold.active(),
+            claude_hold_s=round(self.claude_hold.remaining(), 1), extra=self._extra(),
             frame_slot=self.frame_slot, updated_at=time.time())
 
     # -- commands -------------------------------------------------------------------
@@ -136,7 +164,10 @@ class ExplorerAgentView:
             self._presses[source] = self._presses.get(source, 0) + 1
             if source == "human":
                 hold.touch()
-            presser.press(button, source, f"viewer press {button}")
+            if source == "claude":
+                self.driver.press(button, f"remote press {button}")  # refreshes the lease, marks decisions.jsonl
+            else:
+                presser.press(button, source, f"viewer press {button}")
             self.recent.append(Event(step=ctx.step, driver=source, text=f"press {button}"))
             return {}
 
@@ -160,9 +191,12 @@ class ExplorerAgentView:
             "hand_to": lambda driver, **_: _ret(hold.touch() if driver == "human" else hold.release()),
             "save_state": save_state,
             "load_state": load_state,
-            "hold_release": lambda **_: _ret(hold.release()),
         }
-        return {name: self.bridge.wrap(h) for name, h in raw.items()}
+        extra = intervene_handlers(self)
+        raw.update(extra)
+        wrapped = {name: self.bridge.wrap(h) for name, h in raw.items()}
+        wrapped["macro"] = self.macros.command  # starts on the emulator thread, then waits on the HTTP thread
+        return wrapped
 
     # -- serving ---------------------------------------------------------------------
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:

@@ -99,7 +99,8 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         # too weak for the cave (and Route 4's trainers): grind Route 3 first
         return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
     if pos[0] in CAVE:  # the whole dungeon is in the ROM: route across floors first, learned walls only delay it
-        rom = rom_route_step(maps, stage, pos, goals.get("_cave_plan"), goals.get("_blocked_now", ()))
+        rom = rom_route_step(maps, stage, pos, goals.get("_cave_plan"), goals.get("_blocked_now", ()),
+                              goals.get("_rom_route"))
         if rom:
             return rom
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)

@@ -143,6 +143,7 @@ class ExplorerContext:
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
     cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo
     ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
     cave_runs: int = 0  # RUN presses chosen only because we are in a dungeon, this battle (battle_run caps it)

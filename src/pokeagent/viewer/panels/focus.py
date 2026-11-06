@@ -33,8 +33,10 @@ def focus_lines(snap: AgentSnapshot) -> list[Line]:
         if screen.bag_summary:
             out.append(plain(f"  bag  {_clip(screen.bag_summary, 70)}"))
     if snap.goals:
-        out.append(plain("goals", DIM))
-        for g in snap.goals:
+        done = sum(1 for g in snap.goals if g.status == "done")
+        out.append(plain(f"goals {done}/{len(snap.goals)}", DIM))
+        cur = next((i for i, g in enumerate(snap.goals) if g.status != "done"), len(snap.goals))
+        for g in (snap.goals if len(snap.goals) <= 12 else snap.goals[max(0, cur - 1):cur + 5]):  # last done, current, next 4
             steps = f" ({g.steps})" if g.steps is not None else ""
             label = g.name or g.id
             out.append([span(f"  {_GOAL_MARK.get(g.status, '-')} {label}{steps}",

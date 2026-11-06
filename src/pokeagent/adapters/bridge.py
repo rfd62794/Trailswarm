@@ -45,12 +45,12 @@ class EmuBridge:
             self.refresh()
 
     # -- HTTP threads ----------------------------------------------------------------
-    def call(self, fn: Callable[[], Any]) -> Any:
+    def call(self, fn: Callable[[], Any], timeout: float | None = None) -> Any:
         """Run ``fn`` on the emulator thread; TimeoutError when the loop does not get to it."""
         fut: Future = Future()
         self.jobs.put((fn, fut))
         try:
-            return fut.result(timeout=self.timeout)
+            return fut.result(timeout=self.timeout if timeout is None else timeout)
         except FutureTimeout:
             fut.cancel()
             raise TimeoutError("emulator thread busy") from None
@@ -61,8 +61,8 @@ class EmuBridge:
         cached = self._cache
         return cached if cached is not None else self.call(self.refresh)
 
-    def wrap(self, handler: Callable[..., dict]) -> Callable[..., dict]:
-        """Marshal a command handler onto the emulator thread; a snapshot refresh follows it."""
+    def wrap(self, handler: Callable[..., dict], timeout: float | None = None) -> Callable[..., dict]:
+        """Marshal a command handler onto the emulator thread; a snapshot refresh follows it (``timeout`` for slow ones)."""
         if not self.marshal:
             return handler
 
@@ -72,7 +72,7 @@ class EmuBridge:
                 self.refresh()
                 return out
             try:
-                return self.call(job)
+                return self.call(job, timeout)
             except TimeoutError as exc:
                 return {"error": str(exc)}
         return run
