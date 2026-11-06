@@ -61,6 +61,23 @@ def footprint(walk: np.ndarray | None, door: tuple[int, int]) -> tuple[int, int,
     return min(xs), min(ys), max(xs) + 1, dy + 1
 
 
+def gap_cells(walk: np.ndarray | None, fp: tuple[int, int, int, int], door: tuple[int, int]) -> tuple[int, int]:
+    """(column, row) of the ground just left of / above a building where the stretch inserts room: the first walkable cell
+    out from the footprint on the door row / door column (up to 3 away), else the cell right next to it."""
+    x0, y0, _x1, y1 = fp
+    gx, gy = x0 - 1, y0 - 1
+    if walk is not None:
+        for k in range(1, 4):
+            if 0 <= x0 - k < walk.shape[1] and 0 <= y1 - 1 < walk.shape[0] and walk[y1 - 1, x0 - k]:
+                gx = x0 - k
+                break
+        for k in range(1, 4):
+            if 0 <= y0 - k < walk.shape[0] and 0 <= door[0] < walk.shape[1] and walk[y0 - k, door[0]]:
+                gy = y0 - k
+                break
+    return gx, gy
+
+
 def choose_scale(w: float, h: float, fw: float, fh: float) -> float:
     """Largest of SCALES with the interior (w x h cells) inside fw x fh; MIN_SCALE when none fits."""
     for s in SCALES:
@@ -89,7 +106,10 @@ def build_xforms(anchors: dict[int, Anchor], layout: WorldLayout, walk_of: Calla
             door = (fx(par.x + a.via[0]) + ddx, fy(par.y + a.via[1]) + ddy)
             s, ox, oy = 1.0, door[0] - a.entry[0], door[1] - a.entry[1]
             if fit:
-                x0, y0, x1, y1 = footprint(walk_of(a.parent), a.via)
+                walk = walk_of(a.parent)
+                x0, y0, x1, y1 = footprint(walk, a.via)
+                if wp:                                          # stretched: the room made just outside counts too
+                    x0, y0 = gap_cells(walk, (x0, y0, x1, y1), a.via)
                 X0, X1 = fx(par.x + x0) + ddx, fx(par.x + x1) + ddx
                 Y0, Y1 = fy(par.y + y0) + ddy, fy(par.y + y1) + ddy
                 s = choose_scale(p.w, p.h, X1 - X0, Y1 - Y0)

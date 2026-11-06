@@ -7,21 +7,21 @@ from typing import Callable
 import numpy as np
 
 from pokeagent.atlas.anchor import Anchor
-from pokeagent.atlas.fit import footprint
+from pokeagent.atlas.fit import footprint, gap_cells
 from pokeagent.atlas.warp import AxisWarp, Warp, merge_inserts, resample
 from pokeagent.atlas.world import CELL, WorldLayout
 
 MAX_EXTRA = 8                  # most cells one building may add per axis
 
 
-def _bump(ins: dict[int, int], lo: int, hi: int, need: int) -> None:
-    """Make the inserts inside [lo, hi) total at least ``need``: top up the best existing one there, else add at the middle."""
+def _bump(ins: dict[int, int], lo: int, hi: int, need: int, at: int) -> None:
+    """Make the inserts inside [lo, hi) at least ``need``: top up the best existing one there, else add at ``at``."""
     have = [p for p in ins if lo <= p < hi]
     if have:
         p = max(have, key=lambda q: ins[q])
         ins[p] = max(ins[p], need)
     else:
-        ins[(lo + hi) // 2] = need
+        ins[at] = need
 
 
 def stretch_warp(anchors: dict[int, Anchor], layout: WorldLayout, walk_of: Callable[[int], np.ndarray | None],
@@ -32,12 +32,15 @@ def stretch_warp(anchors: dict[int, Anchor], layout: WorldLayout, walk_of: Calla
     roots = sorted((a for a in anchors.values() if a.parent not in anchors), key=lambda a: (a.parent, a.via[1], a.via[0]))
     for a in roots:
         par, p = layout.places[a.parent], layout.places[a.map]
-        x0, y0, x1, y1 = footprint(walk_of(a.parent), a.via)
+        walk = walk_of(a.parent)
+        fp = footprint(walk, a.via)
+        x0, y0 = gap_cells(walk, fp, a.via)             # room is made in the ground beside the building, never inside it
+        x1, y1 = fp[2], fp[3]
         wneed, hneed = min(MAX_EXTRA, max(0, p.w - (x1 - x0))), min(MAX_EXTRA, max(0, p.h - (y1 - y0)))
         if wneed:
-            _bump(xs, par.x + x0, par.x + x1, wneed)
+            _bump(xs, par.x + x0, par.x + x1, wneed, par.x + x0)
         if hneed:
-            _bump(ys, par.y + y0, par.y + y1, hneed)
+            _bump(ys, par.y + y0, par.y + y1, hneed, par.y + y0)
     b = bands or {}
     return Warp(AxisWarp(merge_inserts(xs, b.get("x", {}))), AxisWarp(merge_inserts(ys, b.get("y", {}))))
 
@@ -60,3 +63,28 @@ def stretch_image(base: np.ndarray, layout: WorldLayout, warp: Warp) -> np.ndarr
     out[:top.shape[0], :top.shape[1]] = top
     out[top.shape[0]:, :rest.shape[1]] = rest
     return out
+
+
+def to_logical(layout: WorldLayout, cx: float, cy: float) -> tuple[float, float]:
+    """Plain-layout cell of a world cell of ``layout`` (undoes the stretch; the inset grid below just shifts)."""
+    wp = layout.warp
+    if wp is None:
+        return cx, cy
+    if cy < layout.outdoor_height:
+        return wp.uncell(cx, cy)
+    return cx, cy - wp.y.total
+
+
+def from_logical(layout: WorldLayout, ux: float, uy: float) -> tuple[float, float]:
+    wp = layout.warp
+    if wp is None:
+        return ux, uy
+    if uy < layout.outdoor_height - wp.y.total:
+        return wp.cell(ux, uy)
+    return ux, uy + wp.y.total
+
+
+def remap_view(old: WorldLayout, new: WorldLayout, wx: float, wy: float) -> tuple[float, float]:
+    """World pixel in ``new`` showing the same place as world pixel (wx, wy) in ``old`` (keeps the view centre on a swap)."""
+    nx, ny = from_logical(new, *to_logical(old, wx / CELL, wy / CELL))
+    return nx * CELL, ny * CELL

@@ -31,6 +31,15 @@ class Plan:
     def xf(self, mode: str) -> dict[int, Xform]:
         return self.full if mode == "inplace_full" else self.fit
 
+    def shift(self, m: int, dx: float, dy: float) -> None:
+        """Move interior ``m`` and the floors hanging off it by (dx, dy) cells in place (a live drag; no replanning)."""
+        for k in self.anchors:
+            if m in chain(self.anchors, k):
+                for d in (self.fit, self.full):
+                    if k in d:
+                        t = d[k]
+                        d[k] = Xform(t.ox + dx, t.oy + dy, t.s)
+
 
 def plan_interiors(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayout, model: dict | None = None,
                    walk_cache: dict | None = None, overrides: Overrides | None = None) -> Plan:
