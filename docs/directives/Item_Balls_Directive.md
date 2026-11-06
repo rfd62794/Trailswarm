@@ -31,8 +31,13 @@ can be read live without storing it.
    "seen": int, "picked": int}` (`item` parsed from "found <ITEM>!" / "obtained <ITEM>!" text; `picked` counts
    runs that picked it up). This is a world fact; whether a ball is still there in *this* run is read live from
    the sprite table, never from memory.
-3. Legend: add kind `item`, glyph `*`, precedence just after `N`/`T` (`@, T/t, *, N, W, ...`). Starter balls in
-   the lab show as `*` too. Both renderers and the viewer legend pick it up through `legend.py`.
+3. Legend: add kind `item`, glyph `*`. In `legend.py`'s `PRECEDENCE` (today `you, trainer, trainer_beaten, npc,
+   warp, ledge, object, wall, ...`) insert `item` **after `trainer_beaten` and before `npc`**, so it also wins over
+   `object` (whose KIND_ROWS text currently says "sign, PC, item ball" - drop "item ball" from it). Starter balls
+   in the lab show as `*` too. Both renderers and the viewer legend pick it up through `legend.py`. If the Brain
+   Tools `tile_kind` override exists when you run, it must accept `item`.
+   (The pic-61 table in section 1 comes from the gitignored `runs/maps.json`; the controller re-checks it on the
+   ROM. In your tests, build the sprite table with `FakeEmulator`.)
 4. Behaviour `pickup` (new module `behaviours/pickup.py`), placed in the selector **after `plan_goal`'s
    goal-critical routes and before `frontier`**: applies when a visible item ball on the current map is reachable
    (navigation BFS to a tile adjacent to it) within `PICKUP_DETOUR = 20` tiles, and the current goal is not one
