@@ -112,12 +112,12 @@ def test_an_edge_that_fails_repeatedly_becomes_a_hard_wall_for_the_run():
     pos = (0x3C, 23, 3)
     for _ in range(MAX_BUMPS + 1):                                       # asked again from the same tile: the press went nowhere
         rom_route_step({}, "through_mt_moon", pos, plan, (), cache)
-    assert "23,3,RIGHT" in cache["hard"][0x3C]
+    assert (0x3C, "23,3,RIGHT") in cache["edges"]
     assert any("23,3,RIGHT" in h.get(0x3C, ()) for h in plan.hard_seen[1:])  # and the planner is told on every later pass
     cache2 = {}
     for x in range(23, 27):                                              # moving along resets the count: never a wall
         rom_route_step({}, "through_mt_moon", (0x3C, x, 3), plan, (), cache2)
-    assert not cache2["hard"]
+    assert not cache2["edges"]
 
 
 @needs_rom
@@ -136,3 +136,50 @@ def test_walk_cells_never_raises_for_any_parsable_header():
         assert grid.ndim == 2 and grid.dtype == bool
         n += 1
     assert n > 200
+
+
+def test_hard_walls_expire_clear_on_a_floor_change_and_never_go_under_an_npc():
+    from pokeagent.explorer.cave_route import HARD_WALL_ASKS, MAX_BUMPS, rom_route_step
+    plan, cache = StubPlan(), {}
+    pos = (0x3C, 23, 3)
+    for _ in range(MAX_BUMPS + 1):
+        rom_route_step({}, "through_mt_moon", pos, plan, (), cache)
+    assert cache["edges"]
+    for x in range(HARD_WALL_ASKS + 2):                                    # time passes (asks elsewhere on the floor)
+        rom_route_step({}, "through_mt_moon", (0x3C, 10 + x % 5, 3), plan, (), cache)
+    assert not cache["edges"]                                              # expired
+    for _ in range(MAX_BUMPS + 1):
+        rom_route_step({}, "through_mt_moon", pos, plan, (), cache)
+    assert cache["edges"]
+    rom_route_step({}, "through_mt_moon", (0x3D, 9, 9), plan, (), cache)    # a floor change drops them
+    assert not cache["edges"]
+    npc, cache3 = StubPlan(), {}
+    for _ in range(MAX_BUMPS + 1):                                         # (24,3) holds a wanderer: wait for it, no wall
+        rom_route_step({}, "through_mt_moon", pos, npc, ((0x3C, 24, 3),), cache3)
+    assert not cache3["edges"]
+
+
+@needs_rom
+def test_a_hard_wall_on_the_only_path_makes_the_planner_fall_back_and_the_route_returns_after_expiry():
+    from pokeagent.explorer.cave_route import HARD_WALL_ASKS, rom_route_step
+    plan = rom_cave_planner()
+    cut = {0x3C: {"26,3,RIGHT", "27,2,DOWN", "27,4,UP"}}                   # every way onto the exit tile (27,3)
+    pos = (0x3C, 26, 3)
+    assert plan(pos, EXIT) == ["RIGHT"] and plan(pos, EXIT, hard=cut) is None
+    cache = {"tick": 0, "floor": 0x3C, "edges": {(0x3C, e): HARD_WALL_ASKS for e in cut[0x3C]}}   # three bumps' worth of walls
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache) is None      # walled in: today's logic takes over
+    for _ in range(HARD_WALL_ASKS):                                                  # time passes
+        rom_route_step({}, "through_mt_moon", (0x3C, 20, 3), plan, (), cache)
+    assert not cache["edges"]
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"  # expired: the ROM route is back
+
+
+
+def test_a_person_on_the_only_next_tile_makes_the_route_wait_instead_of_bumping():
+    from pokeagent.explorer.cave_route import rom_route_step
+    plan, cache = StubPlan(), {}
+    pos = (0x3C, 23, 3)
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"
+    button, why = rom_route_step({}, "through_mt_moon", pos, plan, ((0x3C, 24, 3),), cache)   # the NPC stands at (24,3)
+    assert button == "" and "waiting" in why                    # a no-press step: the person gets time to walk away
+    assert rom_route_step({}, "through_mt_moon", pos, plan, (), cache)[0] == "RIGHT"          # block decayed: go

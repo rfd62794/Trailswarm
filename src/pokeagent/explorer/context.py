@@ -146,6 +146,11 @@ class ExplorerContext:
     rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
     cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo
     ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
+    cave_catch_balls: dict = field(default_factory=dict)  # species -> balls thrown this run (battle_run caps it inside dungeons)
+    topup_presses: int = 0  # presses in the current cave_topup potion sequence (0 = not started)
+    topup_potions0: int = 0
+    topup_cooldown_until: int = 0
+    cave_runs: int = 0  # RUN presses chosen only because we are in a dungeon, this battle (battle_run caps it)
     dir_fail: int = 0  # consecutive direction presses that left the position unchanged (LoopGuard)
     dir_fail_pos: tuple | None = None
     rope_presses: int = 0  # presses spent in the current escape-rope sequence (cave_escape); 0 = not started
