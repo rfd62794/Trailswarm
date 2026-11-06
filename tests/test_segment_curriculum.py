@@ -568,3 +568,20 @@ def test_killed_run_is_not_a_failed_attempt(tmp_path):
     doc = ss.empty_doc()
     assert seg_ingest.ingest(root, doc, quiet_s=0) == 1
     assert ss.stat(doc, "potion")["n"] == 1 and set(doc["ingested"]) == {"explore-a", "explore-b"}
+
+
+def test_held_lock_never_crashes_the_supervisor_path(tmp_path, monkeypatch):
+    root = mkroot(tmp_path, ("bedroom",))
+    logs = []
+    c = seg_sched.Curriculum(root, log=logs.append, quiet_s=0)
+    (root / "runs" / "segments.lock").write_text("")          # another supervisor holds it, fresh (not stale)
+    monkeypatch.setattr(ss, "LOCK_WAIT_S", 0.1)
+    cfg = c.configure({"slot": 0, "steps": 400, "segment": None}, 0)       # no raise: a plain agent this slot
+    assert "job" not in cfg and cfg["steps"] == 400
+    c.configure({"slot": 0, "steps": 400, "segment": None}, 1)
+    job = {"key": "potion", "kind": "unsolved", "tag": "seg:potion:1-0"}
+    c.on_finish({"job": job}, 0)                                          # no raise either
+    assert sum("skipped, will retry" in m for m in logs) == 1             # logged once per episode
+    (root / "runs" / "segments.lock").unlink()
+    assert c.configure({"slot": 0, "steps": 400, "segment": None}, 2)["job"]["key"] == "potion"   # recovered
+    c.on_finish({"job": job}, 0)

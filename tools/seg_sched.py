@@ -46,8 +46,22 @@ class Curriculum:
         self.confirming: set[str] = set()
         self.session = int(clock())
         self._depth = 0
-        with self.txn():
-            seg_janitor.sweep(self.root, self.doc, clock(), log=log)
+        self._warned = False
+        with self._guard("start-up sweep"):
+            with self.txn():
+                seg_janitor.sweep(self.root, self.doc, clock(), log=log)
+
+    @contextlib.contextmanager
+    def _guard(self, what: str):
+        """The supervisor must never die on curriculum bookkeeping: a segments.json lock held too long (another supervisor)
+        is logged ONCE, that bookkeeping is skipped, and the next call retries."""
+        try:
+            yield
+            self._warned = False
+        except TimeoutError as e:
+            if not self._warned:
+                self.log(f"curriculum: {what} skipped, will retry ({e})")
+            self._warned = True
 
     @contextlib.contextmanager
     def txn(self):
@@ -150,7 +164,9 @@ class Curriculum:
     # --- Supervisor hooks (kept here so swarm_continuous.py stays small) ------------------------------------
     def configure(self, cfg: dict, n: int) -> dict:
         """Apply the next job to a slot config: its segment, step budget and (for a replay) the old seed/starter/pace."""
-        job = self.next_job(n)
+        job = None
+        with self._guard("job pick (running a plain agent this slot)"):
+            job = self.next_job(n)
         if job:
             cfg.update({k: job[k] for k in ("seed", "starter", "box_pace", "explore_rate") if job.get(k) is not None})
             cfg.update(steps=job["steps"], segment=job["key"], job=job)
@@ -191,7 +207,8 @@ class Curriculum:
             return
         self.confirming.discard(job["key"])
         stalled = {job["tag"]} if rc == "stalled" else set()
-        self.refresh({job["tag"]}, stalled)
-        st = ss.stat(self.doc, job["key"])
-        self.log(f"curriculum: {job['key']} ({job['kind']}) rc={rc}: {st['solves']}/{st['n']} solved, "
-                 f"best {ss.best_frames(st)} frames{' confirmed' if st['confirmed'] else ''}")
+        with self._guard("ingest of a finished job"):   # not lost: the run is picked up by a later refresh
+            self.refresh({job["tag"]}, stalled)
+            st = ss.stat(self.doc, job["key"])
+            self.log(f"curriculum: {job['key']} ({job['kind']}) rc={rc}: {st['solves']}/{st['n']} solved, "
+                     f"best {ss.best_frames(st)} frames{' confirmed' if st['confirmed'] else ''}")
