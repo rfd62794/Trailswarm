@@ -79,13 +79,19 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 m = _re.search(r"YOU WANT THE\W*(FIRE|WATER|PLANT|GRASS)\W*POK", spot_text(*s))
                 return ELEMENT[m.group(1)] if m else None
             balls = [s for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and ball_species(s)]
+            declined = goals.get("_declined") or set()  # ball spots this run already said NO to
+            balls = [s for s in balls if s not in declined]
             targets = [s for s in balls if want == "ANY" or ball_species(s) == want]
-            if not targets and balls:
-                tried = {(s[1], s[2], s[3]) for s in balls}
-                for (m, x, y, f) in balls:
+            if not targets:
+                # The wanted ball is unknown: try an untried neighbour of every ball we have seen (including the declined
+                # ones). A neighbour with recorded dialog text was already tried (NPC/sign), so skip it; empty captures do not count.
+                seen = {(s[0], s[1], s[2], s[3]) for s in interaction_spots(maps, OFFER) if s[0] == 0x28 and ball_species(s)} | set(declined)
+                lab_inter = {k: e for k, e in maps.get("40", {}).get("interactions", {}).items() if (e.get("text") or "").strip()}
+                for (m, x, y, f) in seen:
                     for dx in (-1, 1):
-                        if (x + dx, y, f) not in tried and not any(n in spot_text(m, x + dx, y, f) for n in STARTERS if n != want):
-                            targets.append((m, x + dx, y, f))
+                        nb = (m, x + dx, y, f)
+                        if nb not in seen and f"{x + dx},{y},{f}" not in lab_inter and not any(n in spot_text(m, x + dx, y, f) for n in STARTERS if n != want):
+                            targets.append(nb)
             for (m, x, y, f) in sorted(targets, key=lambda s: abs(s[1] - pos[1]) + abs(s[2] - pos[2])):
                 if pos == (m, x, y):
                     return ("A" if facing == f else f), f"goal first pokemon: at a ball spot for {want}, {'taking it' if facing == f else 'facing it'}"

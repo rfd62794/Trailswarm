@@ -82,6 +82,7 @@ class ExplorerContext:
     catch_attempt: dict | None = None
     catch_mode: bool = False
     dialog: list = field(default_factory=list)
+    declined_balls: dict = field(default_factory=dict)  # (map, x, y, facing) of a ball whose starter offer we said NO to -> species
     episode: dict | None = None
     events_prev: bytes | None = None
     exp_prev: int | None = None

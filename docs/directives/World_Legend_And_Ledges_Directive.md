@@ -147,4 +147,5 @@ did not fit.
 - 2026-11-05 18:43 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; depends on E1 (merged PR #30 a39b464)
 - 2026-11-05 18:44 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; dependency E1 merged
 - 2026-11-05 18:44 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q1KASTARBPE78XRN6D04HS
+- 2026-11-05 18:49 · dispatcher · launched pid=21576; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
