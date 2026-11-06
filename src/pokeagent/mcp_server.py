@@ -20,6 +20,7 @@ from PIL import Image as PILImage
 from pokeagent.emulator import Button, Emulator, PyBoyEmulator
 from pokeagent.emu_thread import EmulatorThread
 from pokeagent.explorer import Explorer
+from pokeagent.mcp_brain import BrainTools
 from pokeagent.ram import RAM_MAP, read_state
 
 WRAM_START, WRAM_LEN = 0xC000, 0x2000  # WRAM 0xC000-0xDFFF
@@ -39,8 +40,9 @@ def _safe(name: str) -> str:
     return SAFE_NAME.sub("_", name).strip("_") or "state"
 
 
-class _Tools:
-    """Tool implementations over one EmulatorThread; build_server registers these."""
+class _Tools(BrainTools):
+    """Tool implementations over one EmulatorThread; build_server registers these.
+    BrainTools (mcp_brain.py) adds the brain_* world-model tools."""
 
     def __init__(
         self,
@@ -50,6 +52,7 @@ class _Tools:
     ) -> None:
         self.thread = thread
         self.runs_dir = Path(runs_dir)
+        self.maps_path = Path(maps_path)
         self.snapshots: dict[str, bytes] = {}
         self.explorer = Explorer(maps_path)
 
@@ -186,6 +189,8 @@ def build_server(
         tools.press, tools.wait, tools.state, tools.screenshot, tools.peek,
         tools.snapshot, tools.diff, tools.save_state, tools.load_state,
         tools.pause, tools.resume, tools.note, tools.explore,
+        tools.brain_maps, tools.brain_map, tools.brain_tile, tools.brain_find,
+        tools.brain_diff, tools.brain_lessons, tools.brain_edit, tools.brain_undo,
     ):
         server.tool()(fn)
 

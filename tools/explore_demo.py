@@ -212,6 +212,12 @@ def main(argv=None) -> int:
     @ctl.route("POST", "/say")
     def _say(text="", **_): log(f"claude:   {text}", "human"); return {"ok": True}
 
+    @ctl.route("POST", "/reload_edits")
+    def _reload_edits(**_):
+        n = mem.apply_edits()  # fold runs/memory_edits.jsonl into live memory (brain-tools surgery)
+        log(f"[edit journal reloaded: {n} edit(s) applied]", "res")
+        return {"edits": n}
+
     try:
         ctl.start()
     except OSError as e:  # port taken (another agent): run without the API rather than crash

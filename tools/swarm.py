@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def merge_memory(dst: dict, src: dict) -> dict:
+def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
     for mid, s in src.get("maps", {}).items():
         d = dst.setdefault("maps", {}).setdefault(mid, {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
         for k, n in s.get("visited", {}).items():
@@ -157,6 +157,9 @@ def merge_memory(dst: dict, src: dict) -> dict:
             cur = t.setdefault(k, {"solid": 0, "walkable": 0})
             cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    if edits:  # brain-tools surgery: the journal is folded in AFTER merging so no agent copy can resurrect an edit
+        from pokeagent.explorer.edits import apply as apply_edits
+        apply_edits(dst, edits)
     return dst
 
 
@@ -188,11 +191,15 @@ def main() -> int:
     swarm_dir = ROOT / "runs" / "swarm"; swarm_dir.mkdir(parents=True, exist_ok=True)
 
     if not a.merge_only:
+        from pokeagent.explorer.edits import JOURNAL_NAME
+        journal = ROOT / "runs" / JOURNAL_NAME
         procs = []
         for i in range(a.agents):
             own = swarm_dir / f"agent{i}.json"
             if shared.exists():
                 shutil.copy(shared, own)
+            if journal.exists():  # agents fold the same surgery into their own copies on load
+                shutil.copy(journal, own.parent / JOURNAL_NAME)
             starter = a.starter or ["bulbasaur", "charmander", "squirtle"][i % 3]
             role_args: list[str] = []
             role = ""
@@ -226,10 +233,12 @@ def main() -> int:
                     p.kill()
 
     dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
+    from pokeagent.explorer.edits import JOURNAL_NAME, read_journal
+    journal = read_journal(ROOT / "runs" / JOURNAL_NAME)
     merged = 0
     for own in sorted(swarm_dir.glob("agent*.json")):
         try:
-            merge_memory(dst, json.loads(own.read_text())); merged += 1
+            merge_memory(dst, json.loads(own.read_text()), edits=journal); merged += 1
         except Exception as e:
             print(f"skip {own.name}: {e!r}")
     tmp = shared.with_suffix(".json.tmp"); tmp.write_text(json.dumps(dst, indent=1)); tmp.replace(shared)

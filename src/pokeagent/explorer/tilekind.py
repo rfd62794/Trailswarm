@@ -104,15 +104,19 @@ def trainer_tiles(memory_map: dict) -> dict:
 
 def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
              x: int, y: int, block, npcs_here, trainers, strict: bool = True) -> str:
-    """The legend kind for tile (x,y), by precedence: trainer > npc > warp > ledge > object > wall >
-    encounter > grass > interaction > walkable > unknown."""
+    """The legend kind for tile (x,y), by precedence: override > trainer > npc > warp > ledge >
+    object > wall > encounter > grass > interaction > walkable > unknown. A ``tile_kind`` journal
+    edit lands in ``memory_map["tile_overrides"]["x,y"]`` and wins over everything."""
+    d = memory_map or {}
+    override = (d.get("tile_overrides") or {}).get(f"{x},{y}")
+    if override:
+        return override
     p = (x, y)
     trainer = trainers.get(p) if hasattr(trainers, "get") else None
     if trainer is not None:
         return "trainer_beaten" if trainer.get("beaten") else "trainer"
     if p in (npcs_here or ()):
         return "npc"
-    d = memory_map or {}
     if _prefix_hit(d.get("warps", {}), x, y):
         return "warp"
     if ledge_dir(d, x, y) is not None:
