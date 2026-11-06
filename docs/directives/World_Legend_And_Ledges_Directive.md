@@ -136,7 +136,7 @@ did not fit.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-world-legend-and-ledges-directive |
 | Base branch | - |
@@ -151,4 +151,5 @@ did not fit.
 - 2026-11-05 18:44 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q1KASTARBPE78XRN6D04HS
 - 2026-11-05 18:49 · dispatcher · launched pid=21576; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-legend-and-ledges-directive; provisioned: uv sync --frozen
 - 2026-11-05 19:16 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 9 min est. n/a
+- 2026-11-05 19:27 · robert-claude-laptop · Review → Done — note: merged via PR #34 (cb83903) with review fixes; Sonnet review MERGE-WITH-FOLLOWUPS fixed; 257 passed; ROM A/B identical to main (no Explorer behaviour change)
 <!-- queue:end -->
