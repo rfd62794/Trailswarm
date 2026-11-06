@@ -314,3 +314,53 @@ def test_missing_segment_checkpoint_warns_every_refill(tmp_path):
     w.end(w.procs[0])
     w.sup.tick()
     assert sum("segment won_battle: no checkpoint, running a full agent" in line for line in w.logs) == 2
+
+
+class FakeWatch:
+    def __init__(self):
+        self.reason, self.last_pos, self.presses, self.run_dir = None, [13, 2, 3], 5, None
+
+    def check(self):
+        return self.reason
+
+
+def test_stalled_agent_is_stopped_merged_logged_and_replaced(tmp_path):
+    watchers = []
+    w = World(tmp_path, n=1, watch=lambda cfg: watchers.append(FakeWatch()) or watchers[-1])
+    w.sup.tick()
+    watchers[0].reason = "no new goal and only 2 new tiles in the last 600 presses"
+    w.t += 20
+    w.sup.tick()
+    assert w.procs[0].killed and w.merges == ["agent0-0.json"]
+    assert any("slot 0 stalled: no new goal" in line and "[13, 2, 3]" in line for line in w.logs)
+    row = json.loads((tmp_path / "runs" / "swarm" / "stalls.jsonl").read_text())
+    assert row["slot"] == 0 and row["pos"] == [13, 2, 3]
+    assert len(w.live()) == 1 and len(w.procs) == 2  # refilled with a fresh agent and a fresh watcher
+    assert len(watchers) == 2
+
+
+def test_healthy_agent_not_stopped_and_watch_is_rate_limited(tmp_path):
+    watchers = []
+    w = World(tmp_path, n=1, watch=lambda cfg: watchers.append(FakeWatch()) or watchers[-1], watch_s=15.0)
+    w.sup.tick()
+    watchers[0].reason = "x"
+    w.t += 5
+    w.sup.tick()  # first look happened at t=0; the next is due at 15
+    assert not w.procs[0].killed
+
+
+def test_trivially_solved_segment_not_repicked_for_ten_minutes(tmp_path):
+    w = World(tmp_path, n=1, segment=lambda n: ["a", "b"][n % 2])
+    w.sup.tick()
+    assert w.procs[0].cfg["segment"] == "a"
+    w.end(w.procs[0], rc=0, after=5)  # segment a finished in 5 s: already solved
+    w.sup.tick()
+    assert w.procs[1].cfg["segment"] == "b" or w.procs[1].cfg["segment"] is None
+    assert any("segment a finished in 5s (already solved)" in line for line in w.logs)
+    w.end(w.procs[1], rc=0, after=100)
+    w.sup.tick()
+    assert w.procs[2].cfg["segment"] != "a"  # still inside the 10 minutes
+    w.t += 700
+    w.end(w.procs[2], rc=0, after=100)
+    w.sup.tick()
+    assert w.procs[3].cfg["segment"] in ("a", "b")
