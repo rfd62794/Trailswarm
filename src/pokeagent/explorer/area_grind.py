@@ -25,8 +25,8 @@ def note_map(ctx, m: int) -> None:
 def capped_need(ctx, m: int, need: int, level: int, to_route2: bool) -> int:
     """``need``, or 0 (target lifted, head for Pewter) once the grind on the grind maps has used up its steps or battles."""
     g = ctx.area_grind
-    if g.get("lifted"):
-        return 0
+    if g.get("lifted"):  # lifted only where the in-place grind applies: Route 3 / Mt Moon / Misty training keep their need
+        return 0 if m in GRIND_IN_PLACE else need
     if not (to_route2 and m in GRIND_IN_PLACE and 0 < level < need):
         return need
     if g.get("battles0") is None:

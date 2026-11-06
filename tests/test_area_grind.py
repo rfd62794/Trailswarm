@@ -50,3 +50,12 @@ def test_top_off_threshold_drops_to_half_after_the_trips():
     assert later is None or "HP 25/30" not in later[1]  # no heal rule fires any more
     hurt = plan_step({**g, "_hp": (10, 30), "_heal_trips": 2}, {}, (41, 2, 5), "UP")
     assert hurt is not None and "HP 10/30" in hurt[1]  # below 50% still heals
+
+
+def test_lift_is_scoped_to_the_grind_maps():
+    from types import SimpleNamespace
+    from pokeagent.explorer import area_grind
+    c = SimpleNamespace(area_grind={"lifted": True}, battles=0, log=lambda *a, **k: None)
+    assert area_grind.capped_need(c, 0x0D, 13, 9, True) == 0      # Route 2 stays lifted
+    assert area_grind.capped_need(c, 0x33, 13, 9, True) == 0      # Viridian Forest stays lifted
+    assert area_grind.capped_need(c, 0x0E, 13, 9, True) == 13     # Route 3 (Mt Moon training) keeps its target
