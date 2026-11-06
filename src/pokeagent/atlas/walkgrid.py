@@ -15,26 +15,35 @@ from functools import lru_cache
 import numpy as np
 
 from pokeagent.atlas import rom_maps
-from pokeagent.atlas.collision import walkable_ids
+from pokeagent.atlas.collision import tile_pairs, walkable_ids
 from pokeagent.atlas.tiles import load_tileset
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 
 
-def walk_grid(rom: bytes, hd: rom_maps.MapHeader) -> np.ndarray:
-    """(h*2, w*2) bool: cell (y, x) is walkable by the ROM collision list."""
-    ids = list(walkable_ids(rom, hd.tileset))
+def cell_tiles(rom: bytes, hd: rom_maps.MapHeader) -> np.ndarray:
+    """(h*2, w*2) tile ids: the stepping tile (bottom-left of each 2x2 cell) the collision rules look at."""
     bs = load_tileset(rom, hd.tileset).blockset
     blocks = np.frombuffer(hd.blocks(rom), dtype=np.uint8)
     if blocks.size < hd.w * hd.h:
         blocks = np.pad(blocks, (0, hd.w * hd.h - blocks.size))
     blocks = blocks.reshape(hd.h, hd.w)
     tile = bs[blocks.astype(np.intp) % len(bs)][:, :, [1, 3]][:, :, :, [0, 2]]
-    tile = tile.transpose(0, 2, 1, 3).reshape(hd.h * 2, hd.w * 2)
-    return np.isin(tile, ids)
+    return tile.transpose(0, 2, 1, 3).reshape(hd.h * 2, hd.w * 2)
 
 
-def bfs(grid: np.ndarray, start: tuple, goals: set, obstacles: set, walls: set, jumps: dict) -> list[str] | None:
+def walk_grid(rom: bytes, hd: rom_maps.MapHeader) -> np.ndarray:
+    """(h*2, w*2) bool: cell (y, x) is walkable by the ROM collision list."""
+    return np.isin(cell_tiles(rom, hd), list(walkable_ids(rom, hd.tileset)))
+
+
+def pair_blocked(tiles: np.ndarray, pairs: frozenset, a: tuple, b: tuple) -> bool:
+    """Both cells walkable but their stepping tiles form a TilePairCollisions pair (cave elevation step): the edge is a wall."""
+    return bool(pairs) and (int(tiles[a[1], a[0]]), int(tiles[b[1], b[0]])) in pairs
+
+
+def bfs(grid: np.ndarray, start: tuple, goals: set, obstacles: set, walls: set, jumps: dict,
+        tiles: np.ndarray | None = None, pairs: frozenset = frozenset()) -> list[str] | None:
     """Buttons from ``start`` (x, y) to the nearest of ``goals``; goals may stand on obstacle cells (warps)."""
     h, w = grid.shape
     prev = {start: None}
@@ -59,6 +68,8 @@ def bfs(grid: np.ndarray, start: tuple, goals: set, obstacles: set, walls: set, 
                 continue
             if not jump and not grid[nxt[1], nxt[0]] and nxt not in goals:
                 continue
+            if not jump and tiles is not None and pair_blocked(tiles, pairs, cur, nxt):
+                continue
             if nxt in obstacles and nxt not in goals:
                 continue
             prev[nxt] = (cur, name)
@@ -79,11 +90,12 @@ def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
         hd = rom_maps.header(rom, map_id)
         warps = frozenset((x, y) for x, y, _dw, _dm in hd.warps)
         objs = frozenset((o["x"], o["y"]) for o in hd.objects)
-        return walk_grid(rom, hd), warps, objs
+        tiles = cell_tiles(rom, hd)
+        return np.isin(tiles, list(walkable_ids(rom, hd.tileset))), warps, objs, tiles, tile_pairs(rom, hd.tileset)
 
     def plan(map_id: int, start: tuple, goals, walls=(), blocked=(), jumps=None):
         try:
-            grid, warps, objs = parts(map_id)
+            grid, warps, objs, tiles, pairs = parts(map_id)
         except Exception:  # an unparseable header must never end a run
             return None
         start, goals, jumps = tuple(start), {tuple(g) for g in goals}, jumps or {}
@@ -92,7 +104,7 @@ def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
         # trainer or NPC standing in a corridor is something to talk to or fight, not a wall). Warp tiles are never stepped on
         # in passing. Learned walls and NPC blocks can therefore delay a ROM route but never remove it.
         for obstacles, w in ((warps | objs | set(blocked), set(walls)), (warps | objs, set()), (warps, set())):
-            path = bfs(grid, start, goals, obstacles - keep, w, jumps)
+            path = bfs(grid, start, goals, obstacles - keep, w, jumps, tiles, pairs)
             if path is not None:
                 return path
         return None
@@ -111,7 +123,9 @@ def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B
     except OSError:
         return None
     heads = {m: rom_maps.header(rom, m) for m in maps}
-    grids = {m: walk_grid(rom, h) for m, h in heads.items()}
+    tiles = {m: cell_tiles(rom, h) for m, h in heads.items()}
+    grids = {m: np.isin(tiles[m], list(walkable_ids(rom, h.tileset))) for m, h in heads.items()}
+    pairs = {m: tile_pairs(rom, h.tileset) for m, h in heads.items()}
     warp_to: dict = {}
     for m, h in heads.items():
         for x, y, dw, dm in h.warps:
@@ -137,6 +151,8 @@ def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B
                     continue
                 is_goal = cell in goals
                 if not is_goal and (not g[cell[2], cell[1]] and cell not in warp_to):
+                    continue
+                if cell not in warp_to and (m, x, y) not in warp_to and pair_blocked(tiles[m], pairs[m], (x, y), cell[1:]):
                     continue
                 if not is_goal and (cell[1:] in solid.get(m, ()) or cell[1:] in blocked.get(m, ())):
                     continue
