@@ -91,6 +91,12 @@ def press_and_read(ctx: ExplorerContext, fr: PressFrame) -> None:
     else:
         ctx.emu.press(Button[name])
         after = settle_position(ctx, before)
+        if after[0] == before[0] and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN)):
+            # settle_position already waited for the screen to calm. The demo loop counts stillness per frame from the press, so
+            # the next decision (4 frames later) read "still moving" after EVERY step and Readiness spent an A on it:
+            # 24% of the Viridian Forest steps and 111 on Route 2 in the seed-11 run were those no-op A presses.
+            ctx.stable_frames = max(ctx.stable_frames, 4)
+            ctx.last_hash = hash(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
     tm2 = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
     box_after = box_open(tm2)
     text = box_text(tm2) if box_after else ""
