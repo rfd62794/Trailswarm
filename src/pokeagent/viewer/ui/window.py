@@ -5,6 +5,7 @@ The render loop only reads the model (never blocks on the network); commands go 
 """
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
@@ -23,6 +24,7 @@ from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 
+log = logging.getLogger(__name__)
 _BAR_H = 120  # reserved height for the three control-bar rows
 
 
@@ -83,7 +85,7 @@ class ViewerWindow:
 
     def toggle_pause(self) -> None:
         self._paused = not self._paused
-        self.send_to_targets("resume" if self._paused else "pause")
+        self.send_to_targets("pause" if self._paused else "resume")
 
     def set_steer(self, on: bool) -> None:
         self._steer = on
@@ -216,9 +218,18 @@ class ViewerWindow:
         dpg.setup_dearpygui()
         self._populate()
         theme.apply()  # theme colours need the initialized context; binds before first frame
+        dpg.show_viewport()
+        dpg.set_primary_window(self._win, True)
+        frames, t_mark = 0, time.monotonic()
         while dpg.is_dearpygui_running():
             t0 = time.monotonic()
             self.tick()
             dpg.render_dearpygui_frame()
+            frames += 1
+            if t0 - t_mark >= 5.0:  # fps counter: title + one log line per 5 s
+                self.ui_fps = frames / (t0 - t_mark)
+                dpg.set_viewport_title(f"PokeAgent viewer - {self.ui_fps:.0f} fps")
+                log.info("ui fps %.1f", self.ui_fps)
+                frames, t_mark = 0, t0
             time.sleep(max(0.0, 1.0 / self.fps - (time.monotonic() - t0)))
         dpg.destroy_context()

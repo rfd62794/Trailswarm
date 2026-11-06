@@ -64,7 +64,7 @@ class ExplorerAgentView:
             if self.emu.read(BATTLE_FLAG) != 0 or self.ctx.view.battling:
                 return Sees(rows=list(perceive.battle_view(self.emu)), mode="battle")
             vis = perceive.ascii_vision(self.emu, self.mem, self.emu.read(0xD367))
-            rows = list(vis.rows) + ([vis.legend] if getattr(vis, "legend", "") else [])
+            rows = list(vis) + ([vis.legend] if getattr(vis, "legend", "") else [])  # Rendered is a list
             return Sees(rows=rows, mode="overworld")
         except Exception:
             return Sees()

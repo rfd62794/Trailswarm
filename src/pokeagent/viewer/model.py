@@ -27,7 +27,10 @@ class ViewerModel:
         self._pool = ThreadPoolExecutor(max_workers=POLL_WORKERS, thread_name_prefix="viewer-poll")
 
     def _read_one(self, src: AgentSource) -> None:
-        snap, frame = src.snapshot(), src.frame()
+        try:
+            snap, frame = src.snapshot(), src.frame()
+        except Exception:  # sources must not raise; one that does counts as a failed poll, never kills the poller
+            snap = frame = None
         with self._lock:
             self._last_ok.setdefault(src.agent_id, float("-inf"))
             self._fails[src.agent_id] = 0 if snap is not None else self._fails.get(src.agent_id, 0) + 1

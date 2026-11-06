@@ -224,3 +224,37 @@ def test_dead_agents_retried_rarely():
     for _ in range(DEAD_AFTER + DEAD_EVERY * 2):
         model.poll([d])
     assert len(calls) < DEAD_AFTER + 4
+
+
+def test_explorer_sees_has_rows(tmp_path):
+    from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
+    from pokeagent.explorer.engine import Engine
+    ctx, emu, mem, presser = _explorer_ctx(tmp_path)
+    view = ExplorerAgentView(ctx, emu, mem, Engine(ctx, presser), presser, agent_id="s1", root=tmp_path,
+                             marshal=False)
+    sees = view.snapshot().sees
+    assert sees.mode == "overworld" and len(sees.rows) >= 9     # 9 map rows (+ legend), not an empty Sees()
+
+
+def test_toggle_pause_sends_pause_first():
+    pytest.importorskip("dearpygui.dearpygui")
+    from pokeagent.viewer.model import ViewerModel
+    from pokeagent.viewer.ui.window import ViewerWindow
+    model, src = ViewerModel(), FakeSource("a", [snap("a")], [FRAME])
+    model.poll([src])
+    win = ViewerWindow(model, {"a": src})
+    win.selected = "a"
+    win.toggle_pause()
+    win.toggle_pause()
+    win.flush_sends()
+    assert [c for c, _ in src.sent] == ["pause", "resume"]
+
+
+def test_theme_builds_under_context():
+    dpg = pytest.importorskip("dearpygui.dearpygui")
+    from pokeagent.viewer.ui import theme
+    dpg.create_context()
+    try:
+        theme.apply()                                    # raised "Incompatible parent" before the fix
+    finally:
+        dpg.destroy_context()

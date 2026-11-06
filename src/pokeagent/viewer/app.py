@@ -12,6 +12,8 @@ import threading
 import time
 from pathlib import Path
 
+import numpy as np
+
 from pokeagent.agent_registry import list_agents
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
 from pokeagent.viewer.model import ViewerModel
@@ -61,8 +63,8 @@ class _AnimatedFake:
         rows = ["".join(glyphs[(i * 7 + t + j) % len(glyphs)] for j in range(10)) for i in range(9)]
         return AgentSnapshot(
             agent_id=self.agent_id, kind="explorer" if t % 2 else "rl", state="running",
-            step=t, segment=Segment(id="S3", name="first_pokemon", status="current", steps=3),
-            goals=[Goal(id="g1", name="first_pokemon", status="current", steps=3)],
+            step=t, segment=Segment(id="S3", name="first_pokemon", steps=3),
+            goals=[Goal(id="g1", name="first_pokemon", steps=3)],
             thinking=Thinking(want="reach route 4", plan="walk north", driver="explorer",
                               rule="rule-17", button="UP", result="moved", confidence=0.8,
                               brain="OVERWORLD -> A(0.07)" if t % 2 else ""),
@@ -74,14 +76,9 @@ class _AnimatedFake:
     def frame(self):
         t = self._t
         w, h = 160, 144
-        px = bytearray(w * h * 3)
-        for y in range(h):
-            for x in range(w):
-                i = (y * w + x) * 3
-                px[i] = (x * 3 + t) % 256
-                px[i + 1] = (y * 5 + t * 2) % 256
-                px[i + 2] = ((x + y) * 2 + t) % 256
-        return bytes(px), w, h
+        y, x = np.mgrid[0:h, 0:w]
+        px = np.stack([(x * 3 + t) % 256, (y * 5 + t * 2) % 256, ((x + y) * 2 + t) % 256], axis=-1)
+        return px.astype(np.uint8).tobytes(), w, h
 
     def send(self, cmd: str, **args) -> dict:
         self.sent.append((cmd, args))
@@ -165,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8899, help="web view port (default 8899)")
     p.add_argument("--fps", type=int, default=30, help="poll/UI rate (default 30)")
     args = p.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port)
 
 

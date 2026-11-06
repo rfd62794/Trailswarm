@@ -9,6 +9,8 @@ import hashlib
 import time
 from typing import Callable
 
+import numpy as np
+
 import dearpygui.dearpygui as dpg
 
 from pokeagent.snapshot import AgentSnapshot
@@ -19,6 +21,7 @@ from pokeagent.viewer.panels.textimg import lines_texture
 
 _PAD = 5
 _HEADER_H = 15
+_FRAME_MIN_S = 1 / 20  # a card re-uploads a changed frame at most 20 times a second
 
 
 class _Tex:
@@ -54,7 +57,7 @@ class _Tex:
 def _frame_tex(rgb: bytes, w: int, h: int, pw: int, ph: int, dim: bool) -> tuple[list[float], int, int, tuple]:
     px = pres.frame_rgba(rgb, w, h, pw, ph)
     if dim:  # lost/stopped: darken the last frame instead of dropping it
-        px = [v * 0.4 for v in px]
+        px = px * np.float32(0.4)
     key = (w, h, dim, hashlib.blake2b(rgb, digest_size=8).digest())
     return px, pw, ph, key
 
@@ -70,19 +73,17 @@ def _hex_rgba(color: str) -> list[float]:
     return [int(c[i:i + 2], 16) / 255.0 for i in (0, 2, 4)] + [1.0]
 
 
-def _hstack(left: list[float] | None, lw: int, lh: int,
-            right: list[float], rw: int, rh: int, gap: int,
-            fill: list[float]) -> tuple[list[float], int, int]:
+def _hstack(left: np.ndarray | None, lw: int, lh: int,
+            right: np.ndarray, rw: int, rh: int, gap: int,
+            fill: list[float]) -> tuple[np.ndarray, int, int]:
     """Render | Sees side by side in one texture (DPG groups cannot nest in cells)."""
     w, h = lw + gap + rw, lh
-    out = [c for _ in range(w * h) for c in fill]
-    for y in range(h):
-        base = y * w * 4
-        if left is not None:
-            out[base:base + lw * 4] = left[y * lw * 4:(y + 1) * lw * 4]
-        ro = base + (lw + gap) * 4
-        out[ro:ro + rw * 4] = right[y * rw * 4:(y + 1) * rw * 4]
-    return out, w, h
+    out = np.empty((h, w, 4), dtype=np.float32)
+    out[:] = np.asarray(fill, dtype=np.float32)
+    if left is not None:
+        out[:, :lw] = left.reshape(h, lw, 4)
+    out[:, lw + gap:] = right.reshape(rh, rw, 4)
+    return out.reshape(-1), w, h
 
 
 class CardView:
@@ -100,6 +101,9 @@ class CardView:
         self._img: dict[str, str | int] = {}
         self._parent = parent  # items are leaves: no container can nest inside cells/child_windows
         self._last_click = 0.0
+        self._sees_cache: tuple = (None, None)
+        self._top_at = 0.0
+        self._memo: dict = {}  # panel -> input signature of what its texture shows now
         self._build()
 
     def _clicked(self) -> None:
@@ -180,26 +184,43 @@ class CardView:
         # top strip: render frame (left) | sees text (right) in one texture, at 2x
         rw_, sw_ = self._split
         _, th_ = g["top"]
+        if min(rw_, sw_, th_) < 4:  # window not sized yet / degenerate card: nothing to draw
+            return
         ss = 2  # textimg supersample; frame is rasterized to match
-        left = lkey = None
-        if frame is not None:
-            rgb, w, h = frame
-            px, pw_, ph_, lkey = _frame_tex(rgb, w, h, rw_ * ss, th_ * ss, dim)
-            if (pw_, ph_) == (rw_ * ss, th_ * ss):
-                left = px
-            else:  # unexpected raster size: skip rather than misalign
-                lkey = None
         sees_lines = registry.lines_for("sees", snap) if snap is not None else [plain("(waiting for snapshot)", DIM)]
-        rpx, rtw, rth, rkey = _text_tex(sees_lines, sw_, th_)
-        data, tw2, th2 = _hstack(left, rw_ * ss, rth, rpx, rtw, rth, _PAD * ss, _hex_rgba(PANE))
-        tag = self._tex["top"].set(data, tw2, th2, ("top", lkey, rkey))
-        dpg.configure_item(self._img["top"], texture_tag=tag)
+        fkey = (frame[1], frame[2], hashlib.blake2b(frame[0], digest_size=8).digest()) if frame is not None else None
+        top_key = ("top", fkey, dim, (rw_, sw_, th_), hashlib.md5(repr(sees_lines).encode()).digest()[:8])
+        now = time.monotonic()
+        prev = self._memo.get("top")
+        if prev != top_key and not (prev is not None and prev[2:] == top_key[2:] and now - self._top_at < _FRAME_MIN_S):
+            # rasterize only when frame/text/size changed; frame-only changes are capped at ~20 Hz
+            self._memo["top"] = top_key
+            self._top_at = now
+            left = lkey = None
+            if frame is not None:
+                rgb, w, h = frame
+                px, pw_, ph_, lkey = _frame_tex(rgb, w, h, rw_ * ss, th_ * ss, dim)
+                if (pw_, ph_) == (rw_ * ss, th_ * ss):
+                    left = px
+                else:  # unexpected raster size: skip rather than misalign
+                    lkey = None
+            skey = (sw_, th_, top_key[4])
+            if self._sees_cache[0] != skey:  # the Sees text changes far less often than the frame
+                self._sees_cache = (skey, _text_tex(sees_lines, sw_, th_))
+            rpx, rtw, rth, rkey = self._sees_cache[1]
+            data, tw2, th2 = _hstack(left, rw_ * ss, rth, rpx, rtw, rth, _PAD * ss, _hex_rgba(PANE))
+            tag = self._tex["top"].set(data, tw2, th2, ("top", lkey, rkey))
+            dpg.configure_item(self._img["top"], texture_tag=tag)
         # text panels
         for name in ("header", "thinking", "progress", "focus"):
             if name not in self._img:
                 continue
             lines = self._panel_lines(name, snap, hold_s)
             pw, ph = g[name]
+            mkey = (name, pw, ph, hashlib.md5(repr(lines).encode()).digest()[:8])
+            if self._memo.get(name) == mkey:
+                continue
+            self._memo[name] = mkey
             data, tw, th, key = _text_tex(lines, pw, ph)
             tag = self._tex[name].set(data, tw, th, key)
             dpg.configure_item(self._img[name], texture_tag=tag)
@@ -217,4 +238,6 @@ class CardView:
         if (card_w, card_h) != (self.card_w, self.card_h):
             self.card_w, self.card_h = card_w, card_h
             self.delete()
+            self._memo.clear()
+            self._sees_cache = (None, None)
             self._build()

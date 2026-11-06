@@ -8,6 +8,7 @@ dependencies = [
     "mcp>=2.3.0",
     "pillow>=13.0.0",
     "pyboy>=2.0",
+    "numpy>=1.26",
 ]
 
 [project.scripts]

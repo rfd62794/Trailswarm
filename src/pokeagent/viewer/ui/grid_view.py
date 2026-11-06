@@ -1,12 +1,16 @@
 """Multi-view: the card grid inside the grid area, rebuilt only on agent-set or size change."""
 from __future__ import annotations
 
+import time
 from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
 from pokeagent.viewer.layout import grid
 from pokeagent.viewer.model import ViewerModel
+
+
+UPDATE_BUDGET_S = 0.022  # per UI tick; the rest of the cards are refreshed on the following ticks
 
 
 class GridView:
@@ -18,6 +22,7 @@ class GridView:
                                          no_scrollbar=True, tag="grid_area")
         self.cards: dict[str, object] = {}
         self._sig: tuple | None = None
+        self._rr = 0
 
     def area_size(self) -> tuple[int, int]:
         if dpg.does_item_exist(self.area):
@@ -39,10 +44,11 @@ class GridView:
         if not ids:
             return
         cols, rows, cw, ch = grid(len(ids), w - 8, h - 8)
+        if dpg.does_item_exist("grid_table"):  # a rebuild (agent set / resize) must drop the old table first
+            dpg.delete_item("grid_table")
         table = dpg.add_table(parent=self.area, header_row=False, tag="grid_table",
                               resizable=False, reorderable=False, sortable=False,
-                              hideable=False, scrollX=False, scrollY=False,
-                              no_host_extendX=True, no_host_extendY=True)
+                              hideable=False, scrollX=False, scrollY=False)
         for _ in range(cols):
             dpg.add_table_column(parent=table, width_fixed=True, init_width_or_weight=float(cw))
         for r in range(rows):
@@ -57,10 +63,20 @@ class GridView:
                                                  self._on_focus, self._on_select)
 
     def update(self, hold_s_for) -> None:
-        for aid, card in self.cards.items():
-            snap = self.model.snapshot(aid)
-            frame = self.model.frame(aid)
-            card.update(snap, frame, self.model.staleness(aid), hold_s_for(aid))
+        """Refresh cards round-robin within a time budget so many agents keep the UI frame rate up;
+        a card skipped this tick is first in line next tick (cards only redraw changed content)."""
+        ids = list(self.cards)
+        if not ids:
+            return
+        start, t0 = self._rr % len(ids), time.monotonic()
+        for k in range(len(ids)):
+            aid = ids[(start + k) % len(ids)]
+            self.cards[aid].update(self.model.snapshot(aid), self.model.frame(aid),
+                                   self.model.staleness(aid), hold_s_for(aid))
+            if time.monotonic() - t0 > UPDATE_BUDGET_S:
+                self._rr = start + k + 1
+                return
+        self._rr = start + 1
 
     def delete(self) -> None:
         for card in self.cards.values():

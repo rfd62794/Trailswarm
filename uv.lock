@@ -344,6 +344,7 @@ source = { editable = "." }
 dependencies = [
     { name = "dearpygui" },
     { name = "mcp" },
+    { name = "numpy" },
     { name = "pillow" },
     { name = "pyboy" },
 ]
@@ -357,6 +358,7 @@ dev = [
 requires-dist = [
     { name = "dearpygui", specifier = ">=2.0" },
     { name = "mcp", specifier = ">=2.3.0" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pyboy", specifier = ">=2.0" },
 ]

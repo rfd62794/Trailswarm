@@ -43,14 +43,15 @@ class FocusView:
         if self.card is not None:
             self.card.delete()
         self._aid = agent_id
-        bar_h = 26
+        bar_h = 56  # back button + padding + the card's own item gaps
+        if self._back_btn is not None and dpg.does_item_exist(self._back_btn):
+            dpg.delete_item(self._back_btn)
+        # button first (top of the area) so it can never be pushed out of view by the tall card
+        self._back_btn = dpg.add_button(label="< All agents", parent=self.area,
+                                        callback=lambda s, a, u: self._on_back(), width=110)
         cw, ch = max(120, w - 8), max(120, h - bar_h - 8)
         self.card = self._factory(self.area, agent_id, cw, ch,
                                   self._on_toggle, self._on_select, big=True)
-        if self._back_btn is not None and dpg.does_item_exist(self._back_btn):
-            dpg.delete_item(self._back_btn)
-        self._back_btn = dpg.add_button(label="< All agents", parent=self.area,
-                                        callback=lambda s, a, u: self._on_back(), width=110)
 
     def update(self, hold_s_for) -> None:
         if self.card is None or self._aid is None:

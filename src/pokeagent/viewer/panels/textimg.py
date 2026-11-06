@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from pokeagent.viewer.panels import PANE
@@ -32,7 +33,7 @@ def _font(px: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-def lines_texture(lines: list[Line], width: int, height: int, *, bg: str = PANE) -> tuple[list[float], int, int]:
+def lines_texture(lines: list[Line], width: int, height: int, *, bg: str = PANE) -> tuple[np.ndarray, int, int]:
     """Lines -> (rgba floats 0..1, tex_w, tex_h). Font size shrinks to fit ``height``."""
     w, h = max(8, width) * _SS, max(8, height) * _SS
     n = max(1, len(lines))
@@ -47,12 +48,4 @@ def lines_texture(lines: list[Line], width: int, height: int, *, bg: str = PANE)
         for text, color in line:
             draw.text((x, y), text, font=font, fill=_hex_rgb(color) + (255,))
             x += int(font.getlength(text)) + 1
-    rgba = im.convert("RGBA").tobytes()
-    out: list[float] = []
-    ap = out.append
-    for j in range(0, len(rgba), 4):
-        ap(rgba[j] / 255.0)
-        ap(rgba[j + 1] / 255.0)
-        ap(rgba[j + 2] / 255.0)
-        ap(rgba[j + 3] / 255.0)
-    return out, w, h
+    return np.frombuffer(im.tobytes(), dtype=np.uint8).astype(np.float32) / np.float32(255.0), w, h

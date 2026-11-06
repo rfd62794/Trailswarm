@@ -41,10 +41,10 @@ def test_frame_rgba_nearest():
     rgb = bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0])  # 2x2: R G / B Y
     out = render.frame_rgba(rgb, 2, 2, 4, 4)
     assert len(out) == 4 * 4 * 4
-    assert out[:4] == [1.0, 0.0, 0.0, 1.0]          # top-left = red
-    assert out[(1 * 4 + 1) * 4:(1 * 4 + 1) * 4 + 4] == [1.0, 0.0, 0.0, 1.0]  # (1,1) still src(0,0) = red
-    assert out[(3 * 4 + 3) * 4:(3 * 4 + 3) * 4 + 4] == [1.0, 1.0, 0.0, 1.0]  # (3,3) = yellow
-    assert out[(3 * 4 + 0) * 4:(3 * 4 + 0) * 4 + 4] == [0.0, 0.0, 1.0, 1.0]  # bottom-left = blue
+    assert list(out[:4]) == [1.0, 0.0, 0.0, 1.0]          # top-left = red
+    assert list(out[(1 * 4 + 1) * 4:(1 * 4 + 1) * 4 + 4]) == [1.0, 0.0, 0.0, 1.0]  # (1,1) still src(0,0) = red
+    assert list(out[(3 * 4 + 3) * 4:(3 * 4 + 3) * 4 + 4]) == [1.0, 1.0, 0.0, 1.0]  # (3,3) = yellow
+    assert list(out[(3 * 4 + 0) * 4:(3 * 4 + 0) * 4 + 4]) == [0.0, 0.0, 1.0, 1.0]  # bottom-left = blue
 
 
 def test_frame_png():
