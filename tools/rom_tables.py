@@ -9,7 +9,9 @@ Offsets come from pret's pokered.sym (bank:addr -> file offset = bank*0x4000 + (
   2c:4000 MoveNames    0x50-terminated names, in move id order
   07:421e MonsterNames 10 bytes each, fixed width, in INTERNAL id order (the byte at 0xD16B / 0xCFE5)
   10:5024 PokedexOrder internal id -> dex number (1-based), 190 entries
-Checks printed: Scratch power 40 / Tackle 35 / Ember 40, Fire vs Grass 2x, Charmander base HP 39 and types.
+Extras (species names/level-1 moves/growth, learnsets + evolutions, wild tables, trainer parties, items) come from
+rom_extra.py and rom_world.py; their offsets are in those docstrings and in docs/KNOWLEDGE.md. The file is written ONLY if
+every check passes. Checks printed: Scratch power 40 / Tackle 35 / Ember 40, Fire vs Grass 2x, Charmander base HP 39 and types.
 """
 from __future__ import annotations
 
@@ -19,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pokeagent.screentext import CHARMAP  # noqa: E402
+import rom_extra, rom_world  # noqa: E402  (tools/ is on sys.path when run as a script)
 
 TYPES = {0: "NORMAL", 1: "FIGHTING", 2: "FLYING", 3: "POISON", 4: "GROUND", 5: "ROCK", 7: "BUG", 8: "GHOST",
          20: "FIRE", 21: "WATER", 22: "GRASS", 23: "ELECTRIC", 24: "PSYCHIC", 25: "ICE", 26: "DRAGON"}
@@ -73,19 +76,45 @@ def main(rom="roms/Pokemon Red.gb", out="kb/rom_tables.json") -> int:
         s = data[p + 28 * (dex - 1):p + 28 * dex]
         species[dex] = {"hp": s[1], "atk": s[2], "def": s[3], "spd": s[4], "spc": s[5],
                         "type1": TYPES.get(s[6], str(s[6])), "type2": TYPES.get(s[7], str(s[7])), "catch_rate": s[8], "base_exp": s[9]}
+    move_names = {i: m["name"] for i, m in moves.items()}
+    items = rom_extra.items(data, text)
+    rom_extra.base_extras(data, species, move_names, dex_of, mon_names)
+    learn = rom_extra.learnsets(data, mon_names, move_names, {i: v["name"] for i, v in items.items()})
+    classes = rom_world.trainer_classes(data)
     kb = {"source": "ROM via pokered.sym offsets", "moves": moves, "type_chart": chart, "species_by_dex": species,
-          "dex_of_internal": dex_of, "name_of_internal": mon_names}
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_text(json.dumps(kb, indent=1), encoding="utf-8")
-    # checks against known facts
+          "dex_of_internal": dex_of, "name_of_internal": mon_names, "learnsets": learn, "items": items,
+          "wild_by_map": rom_world.wild(data, mon_names), "trainers": rom_world.trainers(data, mon_names),
+          "map_trainers": rom_world.map_trainers(data, classes)}
     by_name = {m["name"]: m for m in moves.values()}
+    sp = {v["name"]: v for v in species.values()}
     fire_grass = next((e for a, d, e in chart if a == "FIRE" and d == "GRASS"), None)
     charm = species.get(4, {})
     print("SCRATCH", by_name.get("SCRATCH"), "| TACKLE", by_name.get("TACKLE"), "| EMBER", by_name.get("EMBER"))
     print("FIRE vs GRASS:", fire_grass, "| Charmander base:", charm, "| internal 0xB0 ->", mon_names.get(0xB0), "dex", dex_of.get(0xB0))
-    ok = (by_name.get("SCRATCH", {}).get("power") == 40 and by_name.get("TACKLE", {}).get("power") == 35
-          and fire_grass == 2.0 and charm.get("hp") == 39 and mon_names.get(0xB0) == "CHARMANDER")
-    print("ALL CHECKS", "PASS" if ok else "FAIL", "-> wrote", out)
+    r1 = kb["wild_by_map"].get(0x0C, {}).get("grass", [])
+    brock = (kb["trainers"].get("BROCK") or [[]])[0]
+    checks = {
+        "SCRATCH 40 / TACKLE 35": by_name.get("SCRATCH", {}).get("power") == 40 and by_name.get("TACKLE", {}).get("power") == 35,
+        "FIRE vs GRASS 2x": fire_grass == 2.0,
+        "CHARMANDER HP 39 FIRE/FIRE": charm.get("hp") == 39 and charm.get("type1") == "FIRE" and mon_names.get(0xB0) == "CHARMANDER",
+        "PIDGEY NORMAL/FLYING": (sp["PIDGEY"]["type1"], sp["PIDGEY"]["type2"]) == ("NORMAL", "FLYING"),
+        "GEODUDE ROCK/GROUND": (sp["GEODUDE"]["type1"], sp["GEODUDE"]["type2"]) == ("ROCK", "GROUND"),
+        "ONIX ROCK/GROUND": (sp["ONIX"]["type1"], sp["ONIX"]["type2"]) == ("ROCK", "GROUND"),
+        "CHARMANDER EMBER at 9": [9, "EMBER"] in learn["CHARMANDER"]["learnset"],
+        "CHARMANDER evolves at 16": any(e["how"] == "level" and e["level"] == 16 and e["into"] == "CHARMELEON" for e in learn["CHARMANDER"]["evolves"]),
+        "BULBASAUR VINE WHIP at 13": [13, "VINE WHIP"] in learn["BULBASAUR"]["learnset"],
+        "Route 1 PIDGEY+RATTATA L2-5": {n for _, n in r1} == {"PIDGEY", "RATTATA"} and all(2 <= lv <= 5 for lv, _ in r1) and len(r1) == 10,
+        "BROCK = GEODUDE 12, ONIX 14": brock == [[12, "GEODUDE"], [14, "ONIX"]],
+        "POTION 300": items[20] == {"name": "POTION", "price": 300},
+        "Pewter Gym (0x36) has BROCK trainer": any(t["class"] == "BROCK" for t in kb["map_trainers"].get(0x36, [])),
+    }
+    for name, ok in checks.items():
+        print(("PASS  " if ok else "FAIL  ") + name)
+    ok = all(checks.values())
+    if ok:
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(json.dumps(kb, indent=1), encoding="utf-8")
+    print("ALL CHECKS", "PASS -> wrote " + out if ok else "FAIL -> nothing written")
     return 0 if ok else 1
 
 

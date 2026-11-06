@@ -81,6 +81,10 @@ class ExplorerContext:
     burst_maps: set = field(default_factory=set)
     catch_attempt: dict | None = None
     catch_mode: bool = False
+    readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
+    clamp_note: str = ""      # last readiness clamp logged
+    blackouts_row: int = 0    # lost battles that warped us away since the last win (grind budget)
+    grind: Any = None         # explorer.grind.GrindBudget, made on first use
     dialog: list = field(default_factory=list)
     declined_balls: dict = field(default_factory=dict)  # (map, x, y, facing) of a ball whose starter offer we said NO to -> species
     episode: dict | None = None

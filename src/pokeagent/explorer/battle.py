@@ -8,6 +8,8 @@ battler's types are wBattleMon 0xD019/0xD01A - the Pokemon actually in the fight
 from __future__ import annotations
 
 from pokeagent.explorer.kb import ROM_KB
+from pokeagent.knowledge.damage import PHYSICAL, expected_damage, turns_to_ko
+from pokeagent.knowledge.scoring import ScoreCtx, adjust
 
 # Gen 1 type ids as stored in wBattleMon/wEnemyMon and the pokedex base stats (6 and 9-19 unused).
 TYPE_IDS = {"NORMAL": 0, "FIGHTING": 1, "FLYING": 2, "POISON": 3, "GROUND": 4, "ROCK": 5, "BUG": 7,
@@ -115,23 +117,42 @@ def move_rule(emu, name: str) -> str:
     return _tag(mv, chart_mult(_chart(), mv["type"], defs), defs, mine)
 
 
-def move_scores(emu) -> dict[str, tuple[float, str]]:
+def _score_ctx(emu, rows: list, chart: dict, defs: list[str], mine: list[str], catching: bool) -> ScoreCtx:
+    """Battle facts the effect table needs; fast_ko = our best damaging move ends the fight in <= 2 turns."""
+    from pokeagent.ramstructs import read_battle_mon, read_enemy_mon
+    me, foe = read_battle_mon(emu), read_enemy_mon(emu)
+    best = 0.0
+    for mv, pp in rows:
+        phys = mv["type"] in PHYSICAL
+        a, d = (me.stats[0], foe.stats[1]) if phys else (me.stats[3], foe.stats[3])
+        best = max(best, expected_damage(me.level, mv["power"], a, d, stab=mv["type"] in mine, eff=chart_mult(chart, mv["type"], defs))
+                   * mv["accuracy"] * (pp > 0))
+    return ScoreCtx(level=me.level, hp_frac=me.hp / me.max_hp if me.max_hp else 1.0, enemy_hp=foe.hp, enemy_status=foe.status,
+                    catching=catching, fast_ko=bool(foe.hp and best and turns_to_ko(foe.hp, best) <= 2))
+
+
+def move_scores(emu, catching: bool = False) -> dict[str, tuple[float, str]]:
     """Knowledge-based move values for the current battle: power x type effectiveness (ROM type chart) x STAB x
-    accuracy, from the cartridge's own tables; moves with 0 PP score 0. Returns {MOVE NAME: (score, rule)}."""
+    accuracy, from the cartridge's own tables, then adjusted by the move's effect (knowledge.scoring: drain, two-turn,
+    multi-hit, fixed damage, status when catching ...); moves with 0 PP score 0. Returns {MOVE NAME: (score, rule)}."""
     if not ROM_KB:
         return {}
     chart = _chart()
     defs, mine = enemy_types(emu), battler_types(emu)
-    out = {}
+    rows = []
     for slot in range(4):
         mid, pp = emu.read(0xD01C + slot), emu.read(0xD02D + slot) & 0x3F
         mv = ROM_KB["moves"].get(str(mid))
-        if not mv or not mid:
-            continue
+        if mv and mid:
+            rows.append((mv, pp))
+    ctx = _score_ctx(emu, rows, chart, defs, mine, catching) if any("effect" in mv for mv, _ in rows) else ScoreCtx()
+    out = {}
+    for mv, pp in rows:
         eff = chart_mult(chart, mv["type"], defs)
         stab = 1.5 if mv["type"] in mine else 1.0
-        score = mv["power"] * eff * stab * mv["accuracy"] if pp > 0 else 0.0
-        out[mv["name"]] = (score, _tag(mv, eff, defs, mine))
+        base = mv["power"] * eff * stab * mv["accuracy"]
+        score, note = adjust(mv, base, eff, mv["accuracy"], ctx) if pp > 0 else (0.0, "")
+        out[mv["name"]] = (score if pp > 0 else 0.0, _tag(mv, eff, defs, mine) + (f" [{note}]" if note else ""))
     return out
 
 
