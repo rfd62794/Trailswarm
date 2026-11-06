@@ -61,7 +61,7 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
             mx, my = px + (c - 4), py + (r - 4)
             block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
             kind = "you" if (c, r) == (4, 4) else tilekind.classify(
-                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers)
+                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, strict=False)
             kinds.add(kind)
             line += legend.glyph(kind, tilekind.ledge_dir(d, mx, my) if kind == "ledge" else None)
         rows.append(line)

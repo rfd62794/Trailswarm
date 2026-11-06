@@ -232,3 +232,51 @@ def test_engine_backfills_goal_keyed_outcomes(tmp_path):
     assert engine._pending_outcomes == []
     engine.decision_log.close()
     ctx.trans.close()
+
+
+def test_stop_at_goal_final_segment_outcomes_are_saved(tmp_path):
+    """The goal press sets ctx.done and saves inside the press; the outcomes must still reach maps.json."""
+    import json
+    emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6})
+    mem = MapMemory(tmp_path / "maps.json")
+    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(stop_at_goal="potion"), run_dir=tmp_path)
+    ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
+
+    class GoalPresser:
+        def press(self, button, who, why):
+            ctx.step += 1
+            ctx.goal_steps["potion"] = ctx.step
+            ctx.done = True
+            ctx.mem.save()  # what shutdown() does inside the goal press
+
+    engine = Engine(ctx, presser=GoalPresser(), decision_log=DecisionLog(tmp_path / "decisions.jsonl"))
+    engine._pending_outcomes = [
+        {"map": 1, "x": 2, "y": 3, "button": "UP", "goal_stage": "potion", "outcome": "moved", "step": 0}]
+    engine.step()
+    saved = json.loads((tmp_path / "maps.json").read_text())
+    assert any(e.get("potion") for m in saved["maps"].values() for e in m.get("outcomes", {}).values())
+    engine.decision_log.close()
+    ctx.trans.close()
+
+
+def test_pending_outcomes_are_capped(tmp_path):
+    emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6})
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path)
+    ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
+    engine = Engine(ctx)
+    engine._pending_outcomes = [{"step": i} for i in range(2000)]
+    engine.step()  # a real press appends one more
+    assert len(engine._pending_outcomes) == 2000
+    assert engine._pending_outcomes[0]["step"] == 1  # the oldest was dropped
+    ctx.trans.close()
+
+
+def test_classify_strict_flag_controls_wall_rule():
+    d = synth_map()
+    block = [0x20] * 4
+    weak = {"1": {"20,20,20,20": {"solid": 2, "walkable": 1}}}
+    # old Sees rule: solid > walkable draws a wall; strict (Remembers) needs solid>=3 and walkable==0
+    assert kind_at(d, 40, 40, block, tile_types=weak) != "wall"
+    args = (d, weak, {}, 1, 40, 40, block, (), tilekind.trainer_tiles(d))
+    assert tilekind.classify(*args, strict=False) == "wall"
+    assert tilekind.classify(*args, strict=True) != "wall"

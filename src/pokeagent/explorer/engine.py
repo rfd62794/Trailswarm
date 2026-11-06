@@ -12,6 +12,8 @@ from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
 from pokeagent.explorer.selector import Selector
 
+MAX_PENDING = 2000  # cap on un-flushed decision records
+
 
 class Engine:
     def __init__(self, ctx: ExplorerContext, presser: Presser | None = None, selector: Selector | None = None,
@@ -41,10 +43,13 @@ class Engine:
         if self.decision_log is not None:
             self.decision_log.write(rec)
         self._pending_outcomes.append(rec)
+        del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
         if len(ctx.goal_steps) > goals_reached:
             self._flush_outcomes(ctx.step)
         elif ctx.done:
             self._flush_outcomes(None)
+        if ctx.done:
+            ctx.mem.save()  # shutdown() already saved inside the press, before the outcomes were back-filled
         return decision
 
     def _flush_outcomes(self, goal_step: int | None) -> None:

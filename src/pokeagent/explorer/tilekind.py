@@ -22,10 +22,15 @@ def _entry(table: dict, tileset: int, block):
     return (table or {}).get(str(tileset), {}).get(_block_key(block))
 
 
-def _solid(tile_types: dict, tileset: int, block) -> bool:
-    """The block was learned solid (same rule as MapMemory.known_solid)."""
+def _solid(tile_types: dict, tileset: int, block, strict: bool = True) -> bool:
+    """The block was learned solid. strict (Remembers, same rule as MapMemory.known_solid): solid>=3 and never
+    walkable. Not strict (the Sees view, its original rule): solid outweighs walkable."""
     e = _entry(tile_types, tileset, block)
-    return bool(e) and e.get("solid", 0) >= 3 and e.get("walkable", 0) == 0
+    if not e:
+        return False
+    if strict:
+        return e.get("solid", 0) >= 3 and e.get("walkable", 0) == 0
+    return e.get("solid", 0) > e.get("walkable", 0)
 
 
 def _walkable(tile_types: dict, tileset: int, block) -> bool:
@@ -98,7 +103,7 @@ def trainer_tiles(memory_map: dict) -> dict:
 
 
 def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
-             x: int, y: int, block, npcs_here, trainers) -> str:
+             x: int, y: int, block, npcs_here, trainers, strict: bool = True) -> str:
     """The legend kind for tile (x,y), by precedence: trainer > npc > warp > ledge > object > wall >
     encounter > grass > interaction > walkable > unknown."""
     p = (x, y)
@@ -116,7 +121,7 @@ def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
     inter = d.get("interactions", {})
     if _aimed_at(inter, x, y) and not visited and not _walkable(tile_types, tileset, block):
         return "object"
-    if not visited and (_solid(tile_types, tileset, block) or _blocked_target(d, x, y)):
+    if not visited and (_solid(tile_types, tileset, block, strict) or _blocked_target(d, x, y)):
         return "wall"
     if f"{x},{y}" in d.get("encounters", {}):
         return "encounter"
