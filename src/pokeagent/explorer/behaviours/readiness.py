@@ -20,14 +20,16 @@ class SettleWait(BehaviourBase):
 
 
 WALKER_RADIUS = 3  # a wandering NPC this close keeps the screen changing without anything being "busy"
-_WALKING = 0xFE    # wSpriteStateData2 +6 movement byte: random walk (0xFF is STAY)
+_MOVING = 2        # wSpriteStateData1 +1 while the sprite is mid-walk (ROM, Mt Moon 1F: the wanderer reads 2, still NPCs 1);
+_BALL_PIC = 61     # the +6 movement byte is 0xFF for wanderers too, so it cannot tell them apart. Hidden balls also read 2.
 
 
 def walker_near(ctx: ExplorerContext) -> bool:
-    """A random-walking NPC sprite within WALKER_RADIUS tiles of the player (sprite tables, slots 1-15)."""
+    """A walking (mid-move) NPC sprite within WALKER_RADIUS tiles of the player (sprite tables, slots 1-15)."""
     emu, px, py = ctx.emu, ctx.view.x, ctx.view.y
     for i in range(1, 16):
-        if emu.read(0xC100 + 16 * i) and emu.read(0xC206 + 16 * i) == _WALKING:
+        pic = emu.read(0xC100 + 16 * i)
+        if pic and pic != _BALL_PIC and emu.read(0xC101 + 16 * i) == _MOVING:
             nx, ny = emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4
             if max(abs(nx - px), abs(ny - py)) <= WALKER_RADIUS:
                 return True

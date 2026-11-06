@@ -15,16 +15,16 @@ from pokeagent.explorer.world import WorldGraph
 from test_battle_types import make_ctx
 
 
-def _npc(ctx, slot, x, y, move=0xFE):
-    ctx.emu.set(0xC100 + 16 * slot, 6)
-    ctx.emu.set(0xC205 + 16 * slot, x + 4); ctx.emu.set(0xC204 + 16 * slot, y + 4); ctx.emu.set(0xC206 + 16 * slot, move)
+def _npc(ctx, slot, x, y, move=2):
+    ctx.emu.set(0xC100 + 16 * slot, 6); ctx.emu.set(0xC101 + 16 * slot, move)
+    ctx.emu.set(0xC205 + 16 * slot, x + 4); ctx.emu.set(0xC204 + 16 * slot, y + 4); ctx.emu.set(0xC206 + 16 * slot, 0xFF)
 
 
 def test_walker_near_only_for_random_walkers_within_radius(tmp_path):
     ctx = make_ctx(tmp_path)           # player at (5,6)
     ctx.refresh()
     assert not walker_near(ctx)
-    _npc(ctx, 1, 6, 6, move=0xFF)      # standing NPC (STAY): not a walker
+    _npc(ctx, 1, 6, 6, move=1)         # standing NPC: not a walker
     assert not walker_near(ctx)
     _npc(ctx, 2, 9, 6)                 # walker 4 tiles away: outside the radius
     assert not walker_near(ctx)
