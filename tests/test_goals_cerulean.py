@@ -30,7 +30,7 @@ def test_route4_east_without_b2f_is_not_through():
 
 
 def test_cerulean_goal_detectors():
-    emu, st = FakeEmulator({MAP: 0x40}), {}
+    emu, st = FakeEmulator({MAP: 0x40, 0xD163: 1, 0xD16D: 30, 0xD18E: 30}), {}  # one Pokemon, 30/30
     g = check_goals(emu, st)
     assert g["heal_cerulean"] and g["through_mt_moon"] is False and not g["beat_misty"]
     emu.set(BADGES, 1); assert not check_goals(emu, st)["beat_misty"]  # Boulder is not Cascade

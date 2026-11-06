@@ -13,6 +13,9 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 
 
+MENU_CURSORS = ("", "FIGHT", "PKMN", "ITEM", "RUN", "CANCEL")  # a cursor on the battle menu is not a move
+
+
 class BattleMoves(BehaviourBase):
     name = "battle_moves"
 
@@ -122,7 +125,8 @@ class BattleMoves(BehaviourBase):
         if any("DISABLED" in ln.upper() for ln in lines_now):
             # "The move is disabled!" leaves the move list on screen WITHOUT its PP line, with the cursor on the refused move:
             # remember it and step the cursor off it (the PP-line branch above never saw this screen; 1,195 presses lost, 2026-11-05)
-            stuck = next((ln.replace(">", "").strip() for ln in lines_now if ln.strip().startswith(">") and ln.strip(">").strip().upper() not in ("FIGHT", "")), None)
+            stuck = next((ln.replace(">", "").strip() for ln in lines_now
+                          if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
             if stuck:
                 ctx.no_pp.add(stuck)
                 return Decision("UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")

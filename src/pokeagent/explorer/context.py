@@ -107,6 +107,7 @@ class ExplorerContext:
     last_text: str = ""
     mash: int = 0
     mom_failed_until: int = 0
+    center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None
     move_nav: int = 0

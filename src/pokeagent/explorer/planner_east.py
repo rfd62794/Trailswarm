@@ -65,18 +65,32 @@ def _misty_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | Non
     return None  # on Route 24: roam the grass
 
 
-def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[str, str] | None:
+def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: str = "UP") -> tuple[str, str] | None:
     stage = next((s for s in LADDER if not goals.get(s)), None)
     target = TARGETS.get(stage)
     if stage is None or target is None:
         return None
-    if pos[0] in POKECENTER_MAPS:  # the center is a stop, not a goal: 2,048 of 6,000 presses went to its salesman (2026-11-05)
+    if pos[0] in POKECENTER_MAPS:
+        if stage == "heal_cerulean" and pos[0] == 0x40:  # the goal IS the nurse: walk up the door column and talk to her
+            if pos[1] != 3:
+                return ("RIGHT" if pos[1] < 3 else "LEFT"), f"goal {stage}: crossing the Pokecenter to the counter"
+            if pos[2] > 2:
+                return "UP", f"goal {stage}: walking up to the nurse"
+            return ("A" if facing == "UP" else "UP"), f"goal {stage}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
+        if goals.get("_center_intent"):
+            return None  # a deliberate stop (heal, PC, a purchase): leave the center to the behaviour that set the intent
+        # the center is a stop, not a goal: 2,048 of 6,000 presses went to its salesman (2026-11-05)
         p = g.path(pos, lambda n: n[0] in OUTDOORS)
         if p:
             return p[0], f"goal {stage}: leaving the Pokecenter ({len(p)} steps)"
         if pos[1] != 3:
             return ("RIGHT" if pos[1] < 3 else "LEFT"), f"goal {stage}: crossing the Pokecenter to its door column"
         return "DOWN", f"goal {stage}: walking out of the Pokecenter by its door"
+    hp, mx = goals.get("_hp", (0, 0))
+    need, level = goals.get("_train_level", 8), goals.get("_level", 0)
+    if stage in ("to_route4", "to_mt_moon") and 0 < level < need and mx and hp / mx >= 0.5:
+        # too weak for the cave (and Route 4's trainers): grind Route 3 first
+        return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
     if not training:
         p = g.path(pos, target)

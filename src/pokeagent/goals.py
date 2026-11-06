@@ -33,6 +33,26 @@ def through_mt_moon(emu, st: dict, m: int, seen: set) -> bool:
     return bool(st.get("through_mt_moon")) or 0x03 in seen
 
 
+def party_full(emu) -> bool:
+    """Every party Pokemon at full HP (wPartyMonN HP 0xD16C / MaxHP 0xD18D, 44 bytes apart; count at 0xD163)."""
+    n = emu.read(0xD163)
+    if not 0 < n <= 6:
+        return False
+    for i in range(n):
+        hp = (emu.read(0xD16C + 0x2C * i) << 8) | emu.read(0xD16D + 0x2C * i)
+        mx = (emu.read(0xD18D + 0x2C * i) << 8) | emu.read(0xD18E + 0x2C * i)
+        if mx == 0 or hp < mx:
+            return False
+    return True
+
+
+def healed_in_cerulean(emu, st: dict, m: int) -> bool:
+    """heal_cerulean = the whole party is at full HP while standing in the Cerulean Pokecenter (0x40); sticky."""
+    if m == 0x40 and party_full(emu):
+        st["healed_cerulean"] = True
+    return bool(st.get("healed_cerulean"))
+
+
 def check_goals(emu, st: dict) -> dict[str, bool]:
     """Milestones read straight from RAM (bag 0xD31D/E verified; party 0xD163 and battle 0xD057 unverified)."""
     bag_n = emu.read(0xD31D)
@@ -61,9 +81,9 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # (24,5); the west entrance is (18,5) and the Mt Moon Pokecenter door (11,5). So: map 0x0F, x >= 24, B2F seen.
          "mt_moon_b1f": 0x3C in seen, "mt_moon_b2f": 0x3D in seen,
          "through_mt_moon": through_mt_moon(emu, st, m, seen), "to_cerulean": 0x03 in seen,
-         # Cerulean (ROM warps from 0x03): 0x40 Pokecenter, 0x41 Gym; 0x23 Route 24 is Cerulean's north connection;
+         # Cerulean (ROM warps from 0x03): 0x40 Pokecenter (heal_cerulean needs a full party inside it, not just a visit), 0x41 Gym; 0x23 Route 24 is Cerulean's north connection;
          # 0x58 Bill's house is the only warp on Route 25 (0x24). CASCADEBADGE = wObtainedBadges bit1 (ROM 17:5736).
-         "heal_cerulean": 0x40 in seen, "beat_misty": bool(emu.read(0xD356) & 2),
+         "heal_cerulean": healed_in_cerulean(emu, st, m), "beat_misty": bool(emu.read(0xD356) & 2),
          "nugget_bridge": 0x23 in seen, "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
