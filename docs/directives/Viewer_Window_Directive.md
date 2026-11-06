@@ -145,13 +145,15 @@ anything you had to interpret.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-viewer-window-directive |
 | Base branch | - |
+| Base commit | 041acdd3f7634938e72d7e94d0540ecf1ba5518a |
 | Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; deps V1 (#26), E1 (#30), World Legend (#34) merged
 - 2026-11-05 19:34 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
+- 2026-11-05 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-window-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4FJQFR2593W94K3YEZ4DH
 <!-- queue:end -->
