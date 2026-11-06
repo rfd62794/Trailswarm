@@ -75,3 +75,13 @@ def test_readiness_mash_never_talks_to_something_in_front():
     c.mem.npc_at = lambda m, x, y: {"pic": 61}
     assert veto(c, Decision("A", "mash", behaviour="readiness")) is not None
     assert veto(c, Decision("A", "advance", behaviour="plan_goal")) is None  # the planner may talk on purpose
+
+
+def test_a_pokecenter_nurse_is_never_vetoed():
+    nurse = {"type": "giver", "done": True, "count": 9, "type_votes": {"giver": 10, "healer": 1}}
+    c = ctx_for(nurse)
+    assert veto(c, Decision("A", "x")) is None  # ever voted healer
+    c2 = ctx_for({"type": "giver", "done": True, "count": 9})
+    assert veto(c2, Decision("A", "x")) is not None
+    c2.view.m = 0x29  # Viridian Pokecenter: the planner is here to heal on purpose
+    assert veto(c2, Decision("A", "x")) is None

@@ -43,7 +43,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         if pos[0] in POKECENTER_MAPS:
             if pos[1] != 3:
                 return ("RIGHT" if pos[1] < 3 else "LEFT"), f"HP {hp}/{mx}: crossing the Pokecenter to the counter"
-            if pos[2] > 2:
+            if pos[2] > 3:  # y=3 is the counter row: the nurse (3,1) answers across it (Viridian: 483 heals from (3,3) facing UP)
                 return "UP", f"HP {hp}/{mx}: walking up to the nurse"
             return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
         p = g.path(pos, lambda n: n[0] in POKECENTER_MAPS)

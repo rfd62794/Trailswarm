@@ -41,7 +41,7 @@ def test_shop_pc_trainer_vendor_giver():
     assert kind(win(), win(battle=1)) == it.INFO  # a wild battle is not a trainer talk
     assert kind(win(money=3000), win(money=2500), texts=["Do you want a MAGIKARP for 500?"]) == it.VENDOR
     assert kind(win(), win(bag=[(0x46, 1)])) == it.GIVER
-    assert kind(win(), win(), texts=["BCN got OAK PARCEL!"]) == it.GIVER
+    assert kind(win(), win(), texts=["BCN got OAK PARCEL!"]) == it.INFO  # words alone are not a gift: a battle line in the buffer said "Got away safely!"
 
 
 def test_story_blocker_sign_info():

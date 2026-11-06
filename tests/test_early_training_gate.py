@@ -32,3 +32,10 @@ def test_planner_never_sends_a_weak_lead_back_to_route_1():
 def test_route2_grinds_in_place_below_the_target_then_goes_on():
     base = {**goals_until("to_route2"), "_level": 9, "_hp": (30, 30)}
     assert plan_step({**base, "_train_level": 13}, {}, (0x0D, 5, 5), "UP") is None  # roam the grass here
+
+
+def test_planner_talks_to_the_nurse_from_the_counter_row():
+    g = {**goals_until("deliver_parcel"), "_hp": (20, 30), "_level": 10, "_train_level": 8}
+    assert plan_step(g, {}, (0x29, 3, 3), "UP")[0] == "A"
+    assert plan_step(g, {}, (0x29, 3, 3), "LEFT")[0] == "UP"  # face her first
+    assert plan_step(g, {}, (0x29, 3, 5), "UP")[0] == "UP"
