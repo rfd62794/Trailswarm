@@ -13,15 +13,15 @@ The continuous swarm (`tools/swarm.py --continuous --plan curriculum`) ran 8 age
 
 It is currently stuck before Bill's house: the `to_bill` segment is at 0 of 288 attempts.
 
-## Battle-text wait (pending change, not merged)
+## Battle-text wait (merged, PR #90)
 
-Fresh game, 3,000-step budget, 3 seeds, before versus after the pending battle-text-wait change. Values are steps to reach the goal, listed per seed.
+Fresh game, 3,000-step budget, 3 seeds, before versus after the battle-text-wait change. Values are steps to reach the goal, listed per seed.
 
 | goal | before | after |
 |---|---|---|
 | `to_pewter` | not reached / 2953 / 2630 | 2006 / 1917 / 1847 |
 
-With the change, `beat_brock` was reached on 2 of 3 seeds. This change is not merged; treat these numbers as preliminary until it is.
+With the change, `beat_brock` was reached on 2 of 3 seeds.
 
 ## Fewer wasted presses
 

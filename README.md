@@ -8,6 +8,7 @@ PokeAgent is a rule-based agent that plays Pokemon Red through the PyBoy emulato
 
 - A continuous overnight swarm of 8 agents finished 500 runs and reached Cerulean City, beat Misty, and crossed Nugget Bridge (Route 24). It is currently stuck before Bill's house.
 - Mt Moon was traversed on 3 of 3 seeds (earlier harness), using collision data read from the ROM and a multi-floor planner.
+- Waiting for the battle prompt arrow instead of pressing through scrolling text cut steps to Pewter by about a third (1847-2006 vs 2630-2953), and Brock fell inside 3,000 steps on 2 of 3 seeds.
 - No-op A presses per run fell from about 198 to 16-31 after a readiness fix.
 - Emulation is not the bottleneck: a lean headless environment runs about 1,000 steps/s at agent pacing (measured in [EXPLORATION.md](EXPLORATION.md)).
 
