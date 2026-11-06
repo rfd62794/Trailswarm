@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.explorer.mash_skill import WAIT, MashSkill, gap_frames, signature
 
 
@@ -17,6 +18,26 @@ class SettleWait(BehaviourBase):
     def step(self, ctx: ExplorerContext) -> Decision | None:
         ctx.settle -= ctx.opts.frames_per_step
         return no_press("settle", "pause after a map change")
+
+
+WALKER_RADIUS = 3  # a wandering NPC this close keeps the screen changing without anything being "busy"
+_MOVING = 2        # wSpriteStateData1 +1 while the sprite is mid-walk (ROM, Mt Moon 1F: the wanderer reads 2, still NPCs 1);
+_BALL_PIC = 61     # the +6 movement byte is 0xFF for wanderers too, so it cannot tell them apart. Hidden balls also read 2.
+
+
+def walker_near(ctx: ExplorerContext) -> bool:
+    """A walking (mid-move) NPC sprite within WALKER_RADIUS tiles of the player (sprite tables, slots 1-15). Only inside a
+    dungeon: elsewhere a scripted walker (rival, Oak, a cutscene) is exactly what the busy-A nudge exists for."""
+    if ctx.view.m not in DUNGEON_MAPS:
+        return False
+    emu, px, py = ctx.emu, ctx.view.x, ctx.view.y
+    for i in range(1, 16):
+        pic = emu.read(0xC100 + 16 * i)
+        if pic and pic != _BALL_PIC and emu.read(0xC101 + 16 * i) == _MOVING:
+            nx, ny = emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4
+            if max(abs(nx - px), abs(ny - py)) <= WALKER_RADIUS:
+                return True
+    return False
 
 
 BUSY_STABLE_FRAMES = 4  # the overworld screen must be unchanged this many frames to count as settled
@@ -37,7 +58,13 @@ class Readiness(BehaviourBase):
         # Only the OVERWORLD needs the stillness check (forced walks, fades, Oak dragging you to the lab).
         # Boxes and menus are paced by the game itself: a waiting text box goes to advance_dialog, and a
         # blinking cursor would otherwise look like "still changing" forever (that stalled the 23:20 run).
-        return bool(not ctx.view.box and (ctx.stable_frames < BUSY_STABLE_FRAMES or ctx.emu.read(0xCD6B)))
+        if ctx.view.box:
+            return False
+        if ctx.emu.read(0xCD6B):
+            return True  # the game is ignoring the joypad
+        # A walker nearby makes the picture change forever: that is not a cutscene, and A "in case text is waiting" would
+        # talk to it (164 times at Mt Moon 1F (16,23), 2026-11-05). Only a still-changing screen with nobody walking is busy.
+        return ctx.stable_frames < BUSY_STABLE_FRAMES and not walker_near(ctx)
 
     @staticmethod
     def _skill(ctx: ExplorerContext) -> MashSkill:

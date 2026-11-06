@@ -8,6 +8,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pokeagent.atlas.compact import compact_image, compact_layout
+from pokeagent.atlas.fit import walk_cells
+from pokeagent.atlas.inplace import plan_interiors, usable_anchors
+from pokeagent.atlas.overrides import Overrides
+from pokeagent.atlas.stretch import stretch_image, stretch_layout, stretch_warp
 from pokeagent.atlas.rom_maps import MapHeader, all_headers, load
 from pokeagent.atlas.world import WorldLayout, build_layout
 from pokeagent.atlas.world_render import render_world
@@ -25,6 +30,8 @@ class World:
     layout: WorldLayout
     base: np.ndarray
     book: SpriteBook
+    compact: bool = False                  # inset grid holds only the interiors that could not be anchored
+    source: "World | None" = None          # the full-grid world this one was derived from (to go back to inset mode)
 
 
 def load_world(rom_path: str | Path = "roms/Pokemon Red.gb", cache: Path | None = CACHE, base: str | Path | None = None) -> World:
@@ -57,10 +64,61 @@ def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track
     return out
 
 
+def load_for_view(rom_path: str | Path = "roms/Pokemon Red.gb", cache: Path | None = CACHE, base: str | Path | None = None) -> World:
+    """What the viewer opens with: the full inset world, unless the saved Interiors choice is an in-place mode (then compact)."""
+    from pokeagent.atlas.inplace import DEFAULT_MODE
+    w, ov = load_world(rom_path, cache, base), Overrides.load()
+    return w if (ov.mode or DEFAULT_MODE) == "inset" else compact_world(w, None, ov)
+
+
+def full_world(world: World) -> World:
+    """The world with the complete inset grid (what inset mode shows)."""
+    return world.source or world
+
+
+def compact_world(world: World, model: dict | None = None, overrides: Overrides | None = None) -> World:
+    """The world for the in-place modes: the grid below Kanto holds only the interiors that could not be anchored (the
+    anchored ones are drawn in place from the ROM) and the canvas shrinks to fit. Already-compact worlds come back as is."""
+    if world.compact:
+        return world
+    lay = world.layout
+    anchors = usable_anchors(world.headers, lay, model, overrides)
+    keep = {m for m, p in lay.places.items() if p.interior} - set(anchors)
+    lay2 = compact_layout(lay, keep)
+    return World(world.rom, world.headers, lay2, compact_image(world.base, lay, lay2, keep), world.book, True, world.source or world)
+
+
+def stretch_world(world: World, model: dict | None = None, overrides: Overrides | None = None,
+                  walk_cache: dict | None = None) -> World:
+    """The compact world with the outdoor map locally stretched so every in-place interior fits its building at full size."""
+    ov = overrides or Overrides()
+    world = compact_world(world, model, ov)
+    cache = walk_cache if walk_cache is not None else {}
+    lay, hd = world.layout, world.headers
+
+    def walk(m: int):
+        if m not in cache:
+            cache[m] = walk_cells(world.rom, hd[m]) if m in hd else None
+        return cache[m]
+
+    anchors = usable_anchors(hd, lay, model, ov)
+    warp = stretch_warp(anchors, lay, walk, ov.bands)
+    return World(world.rom, hd, stretch_layout(lay, warp), stretch_image(world.base, lay, warp), world.book, True, world.source)
+
+
 def export_png(path: str | Path, world: World, tracks: list[Track], model: dict | None = None, layers: tuple[str, ...] = (),
-               crop: tuple[int, int, int, int] | None = None, scale: float = 1.0, now: float | None = None) -> tuple[int, int]:
+               crop: tuple[int, int, int, int] | None = None, scale: float = 1.0, now: float | None = None,
+               interiors: str = "inset", overrides: Overrides | None = None) -> tuple[int, int]:
+    """Render the world state to a PNG. ``interiors``: inset | inplace (fit) | inplace_full | auto | stretch (stretched world,
+    full-size in place). With ``stretch`` the ``crop`` is in the stretched world's pixels (see ``stretch_world``)."""
+    ov = overrides if overrides is not None else Overrides.load()
+    if interiors != "inset":
+        world = compact_world(world, model, ov)               # the grid keeps only what could not be placed
+    if interiors == "stretch":
+        world, interiors = stretch_world(world, model, ov), "inplace"
+    plan = plan_interiors(world.rom, world.headers, world.layout, model, overrides=ov) if interiors != "inset" else None
     img = render_state(world.base, world.layout, tracks, world.book, time.monotonic() if now is None else now, model,
-                       world.headers, layers, crop=crop, scale=scale)
+                       world.headers, layers, crop=crop, scale=scale, interiors=interiors, plan=plan)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(img).save(path)
     return img.shape[1], img.shape[0]

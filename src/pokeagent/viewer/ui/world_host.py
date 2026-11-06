@@ -5,7 +5,7 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.viewer.ui.world_side import WorldSide
 from pokeagent.viewer.ui.world_view import WorldView
-from pokeagent.world.export import load_world
+from pokeagent.world.export import load_for_view
 from pokeagent.world.model import WorldModel
 
 
@@ -16,7 +16,7 @@ class WorldHost:
 
     def build(self) -> None:
         w = self.win
-        self.view = WorldView(w._win, self.model, w.toggle_focus, w._on_select, load_world, WorldSide)
+        self.view = WorldView(w._win, self.model, w.toggle_focus, w._on_select, load_for_view, WorldSide)
         self.view.side.bind(w.model, w.toggle_focus)
 
     def fit(self, vw: int, avail: int) -> None:

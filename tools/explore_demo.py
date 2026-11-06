@@ -38,21 +38,15 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
     party_hp,
 )
 from pokeagent.explorer.press import Presser  # noqa: E402
+from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
 from pokeagent.goals import GOALS, check_goals  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
+from pokeagent.statemeta import _git_sha  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from explore_plan import ControlServer, png_bytes  # noqa: E402
 
 __all__ = ["DIRS", "box_open", "box_text", "frame_lines", "is_menu", "main"]  # probe_pc.py's imports
-
-
-def _git_sha() -> str:
-    try:
-        import subprocess
-        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip()
-    except Exception:
-        return ""
 
 
 KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", "s": "B",
@@ -70,6 +64,7 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    add_ram_diff_flag(ap)
     ap.add_argument("--frame-share", action="store_true",
                     help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
@@ -101,7 +96,7 @@ def main(argv=None) -> int:
     (run_dir / "meta.json").write_text(json.dumps({"start": Path(a.state).stem if a.state else "baseline",
                                                     "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed,
                                                     "frame_share": a.frame_share, "train_level": a.train_level,
-                                                    "window": not a.headless, "git_sha": _git_sha()}))
+                                                    "window": not a.headless, "git_sha": _git_sha() or ""}))
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
@@ -134,6 +129,9 @@ def main(argv=None) -> int:
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
+    a.ram_diff and start_ram_diff(ctx, emu, run_dir, a.state, a.rom)  # fail-soft: runs unrecorded on any error
+    from pokeagent.atlas.ladders import rom_ladders
+    ctx.ladders = rom_ladders(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None

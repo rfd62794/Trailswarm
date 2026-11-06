@@ -83,5 +83,8 @@
   "size": 2,
   "encoding": "bytes",
   "note": "Atk<<12|Def<<8|Spd<<4|Spc nibbles; HP DV = low bits of the four"
+ },
+ "wCurOpponent": {
+  "note": "trainer id: 200 + trainer class (201..) in trainer battles, 0 in wild battles; set as the pre-battle text closes, cleared at battle end (ram_discover 2026-11-05)"
  }
 }

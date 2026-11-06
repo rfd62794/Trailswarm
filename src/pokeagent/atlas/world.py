@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from pokeagent.atlas.warp import Warp
 
 from pokeagent.atlas.rom_maps import MapHeader
 
@@ -28,6 +32,13 @@ class Place:
     interior: bool
 
 
+class Xform(NamedTuple):
+    """Where an interior is painted in place: top-left (cells, may be fractional) and scale (1.0 = full size)."""
+    ox: float
+    oy: float
+    s: float
+
+
 @dataclass
 class WorldLayout:
     places: dict[int, Place]
@@ -35,10 +46,22 @@ class WorldLayout:
     height: int
     outdoor_height: int                         # cells; interiors start below this
     entrances: dict[int, tuple[int, int, int]] = field(default_factory=dict)   # interior -> (parent map, x, y)
+    pins: dict[int, tuple[int, int]] = field(default_factory=dict)    # in-place views: interior shown only as its door cell
+    xf: dict[int, Xform] = field(default_factory=dict)                # in-place views: interior painted at this transform
+    z: dict[int, int] = field(default_factory=dict)                   # in-place views: draw rank (higher = on top)
+    warp: "Warp | None" = None       # stretched world: outdoor places are logical cells, this maps them to world cells
 
     def to_world(self, map_id: int, x: int, y: int) -> tuple[int, int]:
         """Top-left pixel of cell (x, y) of ``map_id`` on the world image."""
+        if map_id in self.pins:
+            return self.pins[map_id][0] * CELL, self.pins[map_id][1] * CELL
+        if map_id in self.xf:
+            t = self.xf[map_id]
+            return round((t.ox + x * t.s) * CELL), round((t.oy + y * t.s) * CELL)
         p = self.places[map_id]
+        if self.warp is not None and not p.interior:
+            wx, wy = self.warp.cell(p.x + x, p.y + y)
+            return round(wx * CELL), round(wy * CELL)
         return (p.x + x) * CELL, (p.y + y) * CELL
 
     @property
