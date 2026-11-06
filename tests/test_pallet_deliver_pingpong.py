@@ -185,7 +185,7 @@ def test_east_road_goals_follow_seen_maps():
     for m, k in ((0x3B, "to_mt_moon"), (0x0F, "to_route4"), (0x03, "to_cerulean")):
         emu.set(MAP, m)
         assert check_goals(emu, st)[k]
-    assert GOALS[-4:] == ["to_route3", "to_route4", "to_mt_moon", "to_cerulean"]
+    assert GOALS[GOALS.index("to_route3"):GOALS.index("to_cerulean") + 1] ==         ["to_route3", "to_route4", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean"]
 
 
 def test_east_road_uses_the_learned_world_then_pushes_to_the_edge(tmp_path):

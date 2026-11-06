@@ -17,7 +17,8 @@ FILES = [
 EXPECTED = ["potion", "left_house", "first_pokemon", "won_battle",
             "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
             "to_route2", "to_pewter", "to_gym", "beat_brock",
-            "to_route3", "to_route4", "to_mt_moon", "to_cerulean"]
+            "to_route3", "to_route4", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
+            "heal_cerulean", "beat_misty", "nugget_bridge", "to_bill", "ss_ticket"]
 
 
 def test_goals_literal_lives_only_in_pokeagent_goals() -> None:

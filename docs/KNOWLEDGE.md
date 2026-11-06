@@ -49,3 +49,29 @@ Item id 0x14 = POTION (the one item in the PC at a new game). Still UNVERIFIED: 
 - Map 0x2B (43) is a small house with one NPC ("Whew! I..."); map 0x2C (44) is a house where a child talks about nicknames.
 - Map 0x21 (33) is Route 22, west of Viridian (its east edge warps to Viridian (0,15)/(0,16)).
 - Viridian has one-way ledges (a press that moves two tiles); the plaza around (18-19, 26-28) loops if ledges are treated as two-way.
+
+## East of Pewter: Mt Moon to the S.S. Ticket (ROM-verified 2026-11-05)
+
+Verified with `uv run python tools/rom_maps.py <ids>`: it reads MapHeaderPointers (0x01AE, 248 entries) and MapHeaderBanks
+(0xC23D), both located by search and cross-checked (pointer 0 = 10x9 Pallet, pointer 1 = 20x18 Viridian; 224/248 entries decode
+to sane headers), then follows each header's connections and warp list. Warps are (x, y) tiles; the player lands ON the warp tile.
+
+| id | what | how verified |
+|---|---|---|
+| 0x0E / 0x0F | Route 3 (35x9), Route 4 (45x9) | Route 3 connects N to 0x0F and W to Pewter 0x02; Route 4 connects S to 0x0E and E to Cerulean 0x03 |
+| 0x3B | Mt Moon 1F | Route 4 warp (18,5) -> 0x3B; 1F exits at (14,35),(15,35) back to that warp; cavern tileset 17, 20x18 |
+| 0x3C | Mt Moon B1F | Route 4 warp (24,5) is B1F warp 7 (27,3); 1F stairs (5,5),(17,11),(25,15) lead to it; 14x14 |
+| 0x3D | Mt Moon B2F | B1F warps lead to it; four warps back up to B1F; 20x18 |
+| x >= 24 on 0x0F | east of the cave exit | the exit warp lands at Route 4 (24,5); west side holds entrance (18,5) and the Pokecenter door (11,5) |
+| 0x44 | Mt Moon (Route 4) Pokecenter | Route 4 warp (11,5) -> 0x44; Pokecenter tileset 6, 7x4 |
+| 0x03 | Cerulean City | N conn 0x23, S conn 0x10 (Route 5), W conn 0x0F, E conn 0x14 (Route 9) |
+| 0x40 | Cerulean Pokecenter | Cerulean warp 2 (19,17) -> 0x40, whose exit points back at warp index 2; tileset 6, 7x4 |
+| 0x41 | Cerulean Gym | Cerulean warp 3 (30,19) -> 0x41, exit points back at index 3; gym tileset 7, 5x7, same shape as Pewter Gym 0x36 |
+| 0x23 | Route 24 | Cerulean's N connection; its S conn is 0x03, E conn is 0x24; no warps |
+| 0x24 | Route 25 | Route 24's E connection; one warp (45,3) -> 0x58 |
+| 0x58 | Bill's house | the only warp of Route 25; 4x4 house, exit back to warp 0 (name from pret's map list; position confirms it) |
+| 0xD356 bit1 | CASCADEBADGE | `21 56 D3 CB CE` (ld hl,wObtainedBadges; set 1,[hl]) occurs once, at ROM 0x5C736 (bank 17, the gym-leader bank); the Brock twin `CB C6` is at 0x5C408 |
+| item 0x3F | S.S.TICKET | item-name table starts at 0x472B ("MASTER BALL" = id 1); entry 0x3F decodes "S.S.TICKET"; entries 0x14 "POTION" and 0x46 "OAK PARCEL" match the ids already in use |
+
+Not verified on the ROM (still unconfirmed): that Misty is the only way to bit1 in play (not an issue: the bit is only set by that script),
+and the in-game route through Mt Moon (it is left to exploration).

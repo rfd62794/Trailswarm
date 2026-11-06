@@ -1,0 +1,84 @@
+"""The road east of Pewter: Route 3, Route 4, Mt Moon, Cerulean City, Misty, Route 24/25, Bill (goals.GOALS from to_route3 on).
+
+Every step walks the LEARNED world graph toward the map of the next unmet goal; when that map is not mapped yet it either
+pushes to a map edge (outdoor connections) or returns None so exploration runs. Mt Moon's floors are a ladder maze: they are
+left to exploration plus learned warps, never scripted. Map ids are ROM-verified (docs/KNOWLEDGE.md).
+"""
+from __future__ import annotations
+
+from pokeagent.explorer.world import WorldGraph
+from pokeagent.goals import GOALS
+
+PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24 = 0x02, 0x0E, 0x0F, 0x03, 0x23
+CERULEAN_GYM = 0x41
+EXIT_X = 24  # Route 4 tile x of the cave-exit warp; the west part (Pokecenter 11, entrance 18) is left of it
+
+LADDER = tuple(GOALS[GOALS.index("to_route3"):])
+
+
+def _on(m: int):
+    return lambda n: n[0] == m
+
+
+# stage -> node predicate for "I have arrived" (None: no place to walk to, exploration handles it)
+TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "to_mt_moon": _on(0x3B), "mt_moon_b1f": _on(0x3C),
+           "mt_moon_b2f": _on(0x3D), "through_mt_moon": lambda n: n[0] == ROUTE4 and n[1] >= EXIT_X,
+           "to_cerulean": _on(CERULEAN), "heal_cerulean": _on(0x40), "beat_misty": _on(CERULEAN_GYM),
+           "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None}
+
+
+def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str) -> tuple[str, str] | None:
+    """Push toward a map edge ('RIGHT' = east, 'UP' = north): the extreme visited tile whose `side` is still unknown."""
+    d = maps.get(str(pos[0]), {})
+    visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
+    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
+    tiles = [tuple(map(int, k.split(","))) for k in visited]
+    tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
+             and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})]
+    order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
+    word = "easternmost" if side == "RIGHT" else "northernmost"
+    for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
+        if (pos[1], pos[2]) == (tx, ty):
+            return side, f"goal {stage}: at the {word} open tile, pushing {side} for the map edge"
+        p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
+        if p:
+            return p[0], f"goal {stage}: {len(p)} steps to the {word} known tile ({tx},{ty})"
+    return None
+
+
+def _back_to(g: WorldGraph, pos: tuple, stage: str, m: int, what: str) -> tuple[str, str] | None:
+    p = g.path(pos, _on(m))
+    return (p[0], f"goal {stage}: {len(p)} steps back to {what}") if p else None
+
+
+def _misty_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
+    """Gym at the training level, else train: Route 24 grass and its trainers (the Route 1 branch is far behind us)."""
+    level, need = goals.get("_level", 0), goals.get("_train_level", 8)
+    if level == 0 or level >= need:
+        if pos[0] == CERULEAN_GYM:
+            return None  # Misty and the gym trainers: battle and dialog behaviours, exploration for the way in
+        return _back_to(g, pos, "beat_misty", CERULEAN, "Cerulean City") if pos[0] != CERULEAN else None
+    if pos[0] != ROUTE24:
+        return _back_to(g, pos, "beat_misty", ROUTE24, f"Route 24 to train to L{need} (now L{level})")
+    return None  # on Route 24: roam the grass
+
+
+def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[str, str] | None:
+    stage = next((s for s in LADDER if not goals.get(s)), None)
+    target = TARGETS.get(stage)
+    if stage is None or target is None:
+        return None
+    training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
+    if not training:
+        p = g.path(pos, target)
+        if p:
+            return p[0], f"goal {stage}: {len(p)} steps toward it over the learned world"
+    if stage == "beat_misty":
+        return _misty_step(g, goals, pos)
+    push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
+            "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
+            "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
+    if push is None:
+        return None  # Mt Moon floors, the Pokecenter door, Bill's house: exploration + learned warps
+    home, side, name = push
+    return _edge_frontier(g, maps, pos, stage, side) if pos[0] == home else _back_to(g, pos, stage, home, name)
