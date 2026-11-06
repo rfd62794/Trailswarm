@@ -11,7 +11,7 @@ from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
 from pokeagent.checkpoint_goals import completed_goals, write_completed
-from pokeagent.goals import GOALS, check_goals
+from pokeagent.goals import GOALS, check_goals, is_unverified
 
 
 def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
@@ -37,6 +37,8 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
         except Exception:
             pass
     for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
+        if is_unverified(g):
+            continue  # inferred from later goals (no detector of its own): never a goal_frames line, checkpoint or milestone
         if goals[g] and g not in ctx.goal_steps and g not in ctx.initial_goals:
             ctx.goal_steps[g] = ctx.step; ctx.log(f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
             with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
