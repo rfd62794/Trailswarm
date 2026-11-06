@@ -118,7 +118,7 @@ def run_continuous(a) -> int:
     except resources.LockBusy as e:
         print(f"not starting: {e}"); return 1
     if adopted is not None:
-        n = a.agents or max(1, len(adopted.get("agents", [])))
+        n = a.agents or len(adopted.get("agents", [])) or 4  # requested count; else keep what was running
     else:
         n, why = plan_agents(ROOT, max(1, a.agents or 4))
         print(why)

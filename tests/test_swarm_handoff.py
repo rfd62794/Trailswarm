@@ -28,14 +28,17 @@ class FakeProcs:
         return self.cmd.get(pid)
 
 
-def _ask(w, pid=NEW):
+def _ask(w, pid=NEW, lock=True):
     w.sup.handoff_file.parent.mkdir(parents=True, exist_ok=True)
     w.sup.handoff_file.write_text(json.dumps({"pid": pid}))
+    if lock:  # the old supervisor owns the spawn lock
+        (w.sup.handoff_file.parent / "spawn.lock").write_text(str(os.getpid()))
 
 
 def _world_with_pids(tmp_path, n=2, **kw):
     w = World(tmp_path, n=n, **kw)
-    w.sup.ident = FakeProcs()
+    w.sup.ident = w.sup.state = FakeProcs()
+    w.sup.state.state[NEW] = "alive"  # the requester is alive
     w.sup.tick()
     for i, p in enumerate(w.procs):
         p.pid = 500 + i
@@ -295,3 +298,89 @@ def test_stop_now_kills_adopted_tree(tmp_path):
     w2.sup.adopt(data)
     w2.sup.request_stop("test")
     assert fp.killed == [500]
+
+
+def test_unknown_identity_is_never_killed(tmp_path):
+    h = lambda rec, fp: sh.ProcHandle(500, fp, fp.kill, fp, rec)  # noqa: E731
+    fp = _fp(500)
+    fp.start.pop(500)  # created() unreadable
+    h({"created": 1000, "sig": "explore_demo"}, fp).kill()
+    fp = _fp(500)
+    fp.cmd.pop(500)  # cmdline() unreadable
+    h({"created": 1000, "sig": "explore_demo"}, fp).kill()
+    h({"sig": "explore_demo"}, _fp(500)).kill()  # nothing recorded to match against
+    h({}, fp).kill()
+    assert fp.killed == []
+    fp = _fp(500)
+    h({"created": 1000, "sig": "explore_demo"}, fp).kill()
+    assert fp.killed == [500]  # positive match on both: killed
+
+
+def test_lock_not_ours_refuses_handoff_and_keeps_running(tmp_path):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+    (tmp_path / "runs" / "spawn.lock").write_text("1")
+    w.sup.tick()
+    assert not w.sup.handed_over and not w.sup.stopping
+    assert sh.read_adopt(w.sup.swarm_dir, NEW) is None and w.sup.handoff_file.exists()
+    assert w.sup.running() == 2 and any("refused" in line for line in w.logs)
+    w.sup.tick()
+    assert sum("refused" in line for line in w.logs) == 1  # logged once, not every tick
+
+
+def test_old_supervisor_backs_off_when_requester_gone_or_claim_changed(tmp_path):
+    w = _world_with_pids(tmp_path)
+    _ask(w)
+    w.sup.state.state[NEW] = "gone"  # requester died / gave up
+    w.sup.tick()
+    assert not w.sup.handed_over and (tmp_path / "runs" / "spawn.lock").read_text() == str(os.getpid())
+    w.sup.state.state[NEW] = "alive"
+    w.sup.handoff_file.write_text(json.dumps({"pid": 7}))  # claim now someone else's, who is not alive
+    w.sup.tick()
+    assert not w.sup.handed_over
+
+
+def test_empty_old_claim_is_replaced_but_fresh_empty_claim_blocks(tmp_path):
+    runs = tmp_path / "runs"
+    (runs / "swarm").mkdir(parents=True)
+    req = runs / "swarm.handoff"
+    req.write_text("")
+    assert sh.request_handoff(tmp_path, wait_s=30, pid=NEW, alive=lambda p: True, sleep=lambda s: None) is None
+    assert req.exists()  # fresh empty claim: its writer may still be writing
+    old = req.stat().st_mtime - 60
+    os.utime(req, (old, old))
+
+    def answer(_s):
+        (runs / "swarm" / f"adopt-{NEW}.json").write_text(json.dumps({"agents": []}))
+
+    assert sh.request_handoff(tmp_path, wait_s=30, pid=NEW, alive=lambda p: True, sleep=answer) == {"agents": []}
+
+
+def test_dead_claim_replace_backs_off_when_lost_or_live(tmp_path):
+    req = tmp_path / "swarm.handoff"
+    assert sh._replace_dead_claim(req, lambda p: False) is False  # someone already took it
+    req.write_text(json.dumps({"pid": 111}))
+    assert sh._replace_dead_claim(req, lambda p: True) is False  # it was live after all: put back
+    assert json.loads(req.read_text()) == {"pid": 111}
+    assert sh._replace_dead_claim(req, lambda p: False) is True and not req.exists()
+
+
+def test_withdraw_is_atomic_rename_and_late_answer_after_lock_move_is_adopted(tmp_path):
+    runs = tmp_path / "runs"
+    sd = runs / "swarm"
+    sd.mkdir(parents=True)
+    t = [0.0]
+    moved = []
+
+    def sleep(_s):
+        t[0] += 5
+        if t[0] >= 30 and not moved:  # past the wait: the old side moves the lock, answers a moment later
+            moved.append(1)
+            (runs / "spawn.lock").write_text(str(NEW))
+        elif moved:
+            (sd / f"adopt-{NEW}.json").write_text(json.dumps({"agents": [], "next_seq": 5}))
+
+    got = sh.request_handoff(tmp_path, wait_s=30, pid=NEW, clock=lambda: t[0], sleep=sleep)
+    assert got == {"agents": [], "next_seq": 5}
+    assert not (runs / "swarm.handoff").exists()
+    assert [p.name for p in runs.iterdir() if "handoff" in p.name] == []  # no stray withdrawn/tomb files
