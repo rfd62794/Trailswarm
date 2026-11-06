@@ -79,8 +79,16 @@ class PyBoyEmulator:
         self._pyboy = PyBoy(str(rom_path), window="null" if headless else "SDL2")
         self._pyboy.set_emulation_speed(0 if headless else 1)
         self._closed = False
+        self.on_press = None  # optional (button, hold, settle) callback, fired before each press (replay traces)
+
+    @property
+    def frames(self) -> int:
+        """Frames emulated since boot (monotonic; includes screenshot renders)."""
+        return self._pyboy.frame_count
 
     def press(self, button: Button, hold_frames: int = 8, settle_frames: int = 16) -> None:
+        if self.on_press is not None:
+            self.on_press(button, hold_frames, settle_frames)
         if button is Button.NONE:
             self.tick(hold_frames + settle_frames)
             return

@@ -68,3 +68,5 @@ def shutdown(ctx: ExplorerContext):
     from pokeagent.explorer.trainee import record_trainee
     record_trainee(ctx)
     ctx.mem.save()
+    if ctx.ram_diff is not None:
+        ctx.ram_diff.close()
