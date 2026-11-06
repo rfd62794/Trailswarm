@@ -43,6 +43,11 @@ strategy - which is exactly what an owner needs to know.
    choose the lead before a gym (reorder through the party procedure from the Magikarp work if merged), and switch
    when the counter planner says another member wins clearly - never into a fainted / sub-25%-HP member, never more
    than one switch per two turns.
+   **Switch precedence with Magikarp switch-training** (if merged): while the trainee (Magikarp) leads, its
+   turn-one `switch_out_lead` happens first and is not counted against the one-switch-per-two-turns limit; the
+   counter planner only chooses WHICH member comes in (its best counter instead of "strongest healthy"). After that
+   first turn the counter planner's switch rule applies normally. The trainee is never chosen as a counter.
+   Damage math uses the battler's own types (wBattleMon 0xD019/0xD01A, fixed by Battle Types - merged).
 4. **Team planning view** (report-only): `tools/team_plan.py` prints, for the next gym's party (trainer data), which
    of our members counters each enemy and which catchable species on the current route (encounter tables) would
    fill a gap - "catch ODDISH on Route 24: GRASS beats Misty's STARYU/STARMIE".
