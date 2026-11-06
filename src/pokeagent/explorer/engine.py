@@ -12,6 +12,8 @@ from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
 from pokeagent.explorer.selector import Selector
 
+MAX_PENDING = 2000  # cap on un-flushed decision records
+
 
 class Engine:
     def __init__(self, ctx: ExplorerContext, presser: Presser | None = None, selector: Selector | None = None,
@@ -21,6 +23,7 @@ class Engine:
         self.selector = selector or Selector(default_behaviours())
         self.decision_log = decision_log
         self._prev_from = None  # `from` position of the last press that moved the player
+        self._pending_outcomes: list[dict] = []  # decision records since the last goal event
 
     def step(self) -> Decision | None:
         ctx = self.ctx
@@ -33,13 +36,31 @@ class Engine:
         self.presser.press(decision.button, "agent", decision.why)
         if decision.after is not None:
             decision.after(ctx)
+        after = ctx.pos()
+        box_after = box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
+        outcome = classify_outcome(before, after, decision.button, box_after, len(ctx.goal_steps) > goals_reached)
+        reversal = after != before and after == self._prev_from
+        if after != before:
+            self._prev_from = before
+        rec = make_record(ctx.step, decision.behaviour, decision.rule, decision.button, before,
+                          stage, box, battle, outcome, reversal)
         if self.decision_log is not None:
-            after = ctx.pos()
-            box_after = box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
-            outcome = classify_outcome(before, after, decision.button, box_after, len(ctx.goal_steps) > goals_reached)
-            reversal = after != before and after == self._prev_from
-            if after != before:
-                self._prev_from = before
-            self.decision_log.write(make_record(ctx.step, decision.behaviour, decision.rule, decision.button, before,
-                                                stage, box, battle, outcome, reversal))
+            self.decision_log.write(rec)
+        self._pending_outcomes.append(rec)
+        del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
+        if len(ctx.goal_steps) > goals_reached:
+            self._flush_outcomes(ctx.step)
+        elif ctx.done:
+            self._flush_outcomes(None)
+        if ctx.done:
+            ctx.mem.save()  # shutdown() already saved inside the press, before the outcomes were back-filled
         return decision
+
+    def _flush_outcomes(self, goal_step: int | None) -> None:
+        """Back-fill goal-keyed tile outcomes for a finished goal segment: every pending press gets
+        presses_to_goal = presses between it and the goal (None when the segment ended without one)."""
+        for rec in self._pending_outcomes:
+            self.ctx.mem.record_outcome(rec["map"], rec["x"], rec["y"], rec["button"], rec["goal_stage"],
+                                        rec["outcome"] not in ("blocked", "none"),
+                                        None if goal_step is None else goal_step - rec["step"])
+        self._pending_outcomes.clear()

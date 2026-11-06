@@ -82,6 +82,7 @@ class ExplorerContext:
     catch_attempt: dict | None = None
     catch_mode: bool = False
     dialog: list = field(default_factory=list)
+    declined_balls: dict = field(default_factory=dict)  # (map, x, y, facing) of a ball whose starter offer we said NO to -> species
     episode: dict | None = None
     events_prev: bytes | None = None
     exp_prev: int | None = None
@@ -129,6 +130,7 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)

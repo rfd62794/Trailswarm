@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 
+from pokeagent.explorer import legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
 from pokeagent.explorer.perceive import DIRS
 
@@ -118,24 +119,25 @@ class MapMemory(NavMixin):
         e = self.data.get("tile_types", {}).get(str(tileset), {}).get(",".join(f"{b:02X}" for b in ahead))
         return bool(e) and e["solid"] >= 3 and e["walkable"] == 0
 
-    def render_memory(self, map_id: int, x: int, y: int, npcs: set, radius: int = 6) -> list[str]:
-        """What the agent REMEMBERS around it: . visited, # a wall it confirmed, W warp, i interaction, N NPC, @ you."""
+    def render_memory(self, map_id: int, x: int, y: int, npcs: set, radius: int = 6) -> legend.Rendered:
+        """What the agent REMEMBERS around it, in world-legend glyphs (see explorer.legend for the kinds).
+        There is no live tilemap here, so block-id kinds (grass, tile-type walls) come only from what
+        memory itself recorded: blocked-edge targets for walls, interaction targets for objects."""
         d = self.m(map_id)
-        visited = {tuple(map(int, k.split(","))) for k in d.get("visited", {})}
-        warps = {tuple(map(int, k.split(",")[:2])) for k in d.get("warps", {})}
-        inter = {tuple(map(int, k.split(",")[:2])) for k, e in d.get("interactions", {}).items() if e.get("text")}
-        walls = set()
-        for k in d.get("blocked", []):
-            bx, by, bd = k.split(","); dx, dy = DIRS[bd]; walls.add((int(bx) + dx, int(by) + dy))
+        trainers = tilekind.trainer_tiles(d)
+        tile_types = self.data.get("tile_types", {})
+        grass_ids = self.data.get("grass_ids", {})
+        kinds = set()
         rows = []
         for yy in range(y - radius, y + radius + 1):
             line = ""
             for xx in range(x - radius, x + radius + 1):
-                p = (xx, yy)
-                line += ("@" if p == (x, y) else "N" if p in npcs else "W" if p in warps else "i" if p in inter
-                         else "#" if p in walls and p not in visited else "." if p in visited else " ")
+                kind = "you" if (xx, yy) == (x, y) else tilekind.classify(
+                    d, tile_types, grass_ids, 0, xx, yy, None, npcs, trainers)
+                kinds.add(kind)
+                line += legend.glyph(kind, tilekind.ledge_dir(d, xx, yy) if kind == "ledge" else None)
             rows.append(line)
-        return rows
+        return legend.Rendered(rows, legend.line(kinds))
 
     # --- beats: text-triggered button sequences, learned from every agent, graded, replayed when the text recurs ---
     def beat_for(self, sig: str) -> dict | None:
@@ -206,6 +208,23 @@ class MapMemory(NavMixin):
                 return e
         return None
 
+    def mark_trainer(self, map_id: int, x: int, y: int, facing: str | None = None) -> dict | None:
+        """wIsInBattle == 2 means a trainer battle: the NPC we talked to or that walked up to us is a trainer.
+        Flag its entry 'trainer' (the battle behaviour sets 'beaten' on a win). Returns the entry, or None
+        when no NPC is adjacent - the battle could not be pinned to anyone."""
+        d = self.m(map_id)
+        fdx, fdy = DIRS.get(facing or "", (0, 0))
+        faced = self.npc_at(map_id, x + fdx, y + fdy)
+        near = [e for e in d.get("npcs", {}).values()
+                if e.get("last") and max(abs(e["last"][0] - x), abs(e["last"][1] - y)) == 1]
+        if faced is not None and not any(e is faced for e in near):
+            near.insert(0, faced)
+        if not near:
+            return None
+        e = max(near, key=lambda e: (e is faced, e.get("trainer", False), e.get("talked", 0)))
+        e["trainer"] = True
+        return e
+
     def interaction_known(self, map_id, x, y, facing) -> bool:
         return f"{x},{y},{facing}" in self.m(map_id).get("interactions", {})
 
@@ -220,6 +239,18 @@ class MapMemory(NavMixin):
     def is_grass(self, tileset: int, block: list[int]) -> bool:
         return ",".join(f"{b:02X}" for b in block) in self.data.get("grass_ids", {}).get(str(tileset), {})
 
+    # --- goal-keyed tile outcomes: per (tile, button, goal stage) counts - the "did this press help THIS goal"
+    #     memory Robert asked for. World facts stay goal-free on purpose: physics does not depend on the goal.
+    def record_outcome(self, map_id, x: int, y: int, button: str, goal_stage: str,
+                       progressed: bool, presses_to_goal: int | None) -> None:
+        """``maps[m]["outcomes"]["x,y,BUTTON"][goal_stage] = {"n", "progress", "best"}``: n tries, how often
+        the press progressed, and the fewest presses-to-goal seen (None until a segment reaches its goal)."""
+        stages = self.m(map_id).setdefault("outcomes", {}).setdefault(f"{x},{y},{button}", {})
+        e = stages.setdefault(goal_stage, {"n": 0, "progress": 0, "best": None})
+        e["n"] += 1
+        e["progress"] += int(bool(progressed))
+        if presses_to_goal is not None and (e["best"] is None or presses_to_goal < e["best"]):
+            e["best"] = presses_to_goal
 
     def save(self):
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
