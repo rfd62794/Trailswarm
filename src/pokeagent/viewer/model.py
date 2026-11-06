@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -9,6 +10,8 @@ from typing import Callable, Iterable
 
 from pokeagent.snapshot import AgentSnapshot
 from pokeagent.viewer.sources import AgentSource
+
+log = logging.getLogger(__name__)
 
 LIVE_S, LOST_S = 2.0, 10.0
 POLL_WORKERS = 8
@@ -30,6 +33,7 @@ class ViewerModel:
         try:
             snap, frame = src.snapshot(), src.frame()
         except Exception:  # sources must not raise; one that does counts as a failed poll, never kills the poller
+            log.warning("poll %s failed", src.agent_id, exc_info=True)
             snap = frame = None
         with self._lock:
             self._last_ok.setdefault(src.agent_id, float("-inf"))

@@ -6,6 +6,7 @@ keeps its own --control-port HTTP API untouched; this adapter adds the viewer-fa
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 from collections import deque
@@ -67,6 +68,7 @@ class ExplorerAgentView:
             rows = list(vis) + ([vis.legend] if getattr(vis, "legend", "") else [])  # Rendered is a list
             return Sees(rows=rows, mode="overworld")
         except Exception:
+            logging.getLogger(__name__).warning("sees build failed", exc_info=True)
             return Sees()
 
     def _screen(self) -> Screen:
