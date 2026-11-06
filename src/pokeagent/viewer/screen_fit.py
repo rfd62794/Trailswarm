@@ -28,9 +28,10 @@ def work_area() -> tuple[int, int] | None:
         return None
 
 
-def viewport_size(area: tuple[int, int] | None) -> tuple[int, int]:
-    """Largest size up to the defaults that fits inside the work area."""
+def viewport_size(area: tuple[int, int] | None, scale: float = 1.0) -> tuple[int, int]:
+    """Largest size up to the (scaled) defaults that fits inside the work area; both in physical pixels."""
+    dw, dh = round(DEFAULT_W * scale), round(DEFAULT_H * scale)
     if not area:
-        return DEFAULT_W, DEFAULT_H
+        return dw, dh
     w, h = area
-    return max(640, min(DEFAULT_W, w - MARGIN_W)), max(480, min(DEFAULT_H, h - MARGIN_H))
+    return (max(640, min(dw, w - round(MARGIN_W * scale))), max(480, min(dh, h - round(MARGIN_H * scale))))

@@ -5,6 +5,8 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.viewer.ui_scale import px
+
 from pokeagent.viewer.model import ViewerModel
 
 
@@ -48,7 +50,7 @@ class FocusView:
             dpg.delete_item(self._back_btn)
         # button first (top of the area) so it can never be pushed out of view by the tall card
         self._back_btn = dpg.add_button(label="< All agents", parent=self.area,
-                                        callback=lambda s, a, u: self._on_back(), width=110)
+                                        callback=lambda s, a, u: self._on_back(), width=px(110))
         cw, ch = max(120, w - 8), max(120, h - bar_h - 8)
         self.card = self._factory(self.area, agent_id, cw, ch,
                                   self._on_toggle, self._on_select, big=True)

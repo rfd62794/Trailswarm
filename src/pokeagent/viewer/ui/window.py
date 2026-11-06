@@ -23,6 +23,7 @@ from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
+from pokeagent.viewer import ui_scale
 from pokeagent.viewer.screen_fit import viewport_size, work_area
 from pokeagent.viewer.spawn_control import SpawnControl
 from pokeagent.viewer.ui.world_host import WorldHost
@@ -192,8 +193,9 @@ class ViewerWindow:
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
+        scale = ui_scale.init()  # DPI awareness first: sizes below are physical pixels
         dpg.create_context()
-        vw, vh = viewport_size(work_area())  # never taller than the screen: the control bar stays visible
+        vw, vh = viewport_size(work_area(), scale)  # never taller than the screen: the control bar stays visible
         dpg.create_viewport(title="PokeAgent viewer", width=vw, height=vh, x_pos=0, y_pos=0,
                             clear_color=self._bg())
 
@@ -222,7 +224,7 @@ class ViewerWindow:
             return
         self._last_size = (vw, vh)
         dpg.configure_item(self._win, pos=[0, 0], width=vw, height=vh)
-        avail = max(80, vh - _BAR_H)
+        avail = max(80, vh - ui_scale.px(_BAR_H))
         self.world.fit(vw, avail)
         for view in (self._grid, self._focus_view):
             if view is not None and dpg.does_item_exist(view.area):
@@ -279,6 +281,7 @@ class ViewerWindow:
         self._build()
         dpg.set_viewport_resize_callback(lambda *_: setattr(self, "_last_size", (0, 0)))
         dpg.setup_dearpygui()
+        ui_scale.install_font(dpg)
         self._populate()
         theme.apply()  # theme colours need the initialized context; binds before first frame
         dpg.show_viewport()

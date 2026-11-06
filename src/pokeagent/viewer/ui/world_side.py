@@ -7,10 +7,11 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.atlas.overlay import LAYERS
 from pokeagent.viewer.panels.render import frame_rgba
+from pokeagent.viewer.ui_scale import get_scale, px
 from pokeagent.world import stadium
 from pokeagent.world.tileinfo import describe
 
-SIDE_W = 380
+SIDE_W = 380                   # 1x fallback; the live width is proportional (ui_scale.side_panel_width)
 FW, FH = 120, 108              # live frame in a stadium panel
 FEED_KINDS = {"all": None, "battles": {"battle_start", "battle_turn", "battle_end"}, "items": {"item"},
               "goals": {"goal"}, "stalls": {"stall", "human_hold"}, "learned": {"learn"}}
@@ -24,15 +25,15 @@ class Slot:
     def __init__(self, parent, idx: int, on_focus) -> None:
         self.aid: str | None = None
         self._last = 0.0
-        self.tex = dpg.add_raw_texture(FW, FH, [0.0] * (FW * FH * 4), parent="viewer_tex")
+        self.tex = dpg.add_raw_texture(FW, FH, [0.0] * (FW * FH * 4), parent="viewer_tex")  # texture stays 1x; the button scales it
         self.group = dpg.add_group(horizontal=True, parent=parent, show=False)
-        self.btn = dpg.add_image_button(self.tex, width=FW, height=FH, parent=self.group,
+        self.btn = dpg.add_image_button(self.tex, width=px(FW), height=px(FH), parent=self.group,
                                         callback=lambda s, a, u: self.aid and on_focus(self.aid))
         with dpg.group(parent=self.group):
             self.title = dpg.add_text("")
             self.text = dpg.add_text("")
-            self.you = dpg.add_progress_bar(width=200, overlay="you")
-            self.foe = dpg.add_progress_bar(width=200, overlay="enemy")
+            self.you = dpg.add_progress_bar(width=px(200), overlay="you")
+            self.foe = dpg.add_progress_bar(width=px(200), overlay="enemy")
 
     def show(self, aid: str, card, frame, now: float) -> None:
         self.aid = aid
@@ -52,16 +53,14 @@ class Slot:
 
 
 class WorldSide:
-    width = SIDE_W
-
     def __init__(self, view) -> None:
         self.view = view
+        self.width = px(SIDE_W)
         self.host = None                       # set by the window: model (frames) + on_focus
         self._feed_sig: tuple = ()
         self._tile: list[str] = []
         self.kind = "all"
-        self.panel = dpg.add_child_window(width=SIDE_W, height=10, 
-                                          border=False, tag="world_side")
+        self.panel = dpg.add_child_window(width=self.width, height=10, border=False, tag="world_side")
         with dpg.group(parent=self.panel):
             dpg.add_text("Layers (learned by all agents)")
             with dpg.group(horizontal=True):
@@ -71,6 +70,7 @@ class WorldSide:
                 dpg.add_checkbox(label="trails", default_value=True, callback=lambda s, a, u: setattr(view, "trails", a))
                 dpg.add_checkbox(label="NPCs", callback=lambda s, a, u: setattr(view, "npcs", a))
                 dpg.add_button(label="Fit", callback=lambda s, a, u: view.vp.fit())
+                dpg.add_button(label="1:1", callback=lambda s, a, u: view.vp.one_to_one(get_scale()))
             dpg.add_separator()
             self.strip_title = dpg.add_text("Stadium")
             self.slots_parent = dpg.add_group()
@@ -78,9 +78,9 @@ class WorldSide:
             self.more = dpg.add_text("", color=(255, 200, 80, 255))
             dpg.add_separator()
             dpg.add_text("Tile (click the map)")
-            self.tile = dpg.add_text("", wrap=SIDE_W - 20)
+            self.tile = dpg.add_text("", wrap=self.width - px(20))
             dpg.add_separator()
-            dpg.add_combo(list(FEED_KINDS), default_value="all", width=120, callback=lambda s, a, u: setattr(self, "kind", a))
+            dpg.add_combo(list(FEED_KINDS), default_value="all", width=px(120), callback=lambda s, a, u: setattr(self, "kind", a))
             self.feed = dpg.add_child_window(height=-1, border=False)
 
     def _cb(self, name: str):
@@ -92,8 +92,11 @@ class WorldSide:
         self.host = (model, on_focus)
         self.slots = [Slot(self.slots_parent, i, on_focus) for i in range(stadium.MAX_CARDS)]
 
-    def fit(self, h: int) -> None:
-        dpg.configure_item(self.panel, height=max(100, h - 8))
+    def fit(self, w: int, h: int) -> None:
+        """Proportional width; the tile/feed text wraps to it."""
+        self.width = w
+        dpg.configure_item(self.panel, width=w, height=max(100, h - 8))
+        dpg.configure_item(self.tile, wrap=w - px(20))
 
     def show_tile(self, map_id: int, x: int, y: int) -> None:
         w = self.view.world
@@ -120,7 +123,7 @@ class WorldSide:
             self._feed_sig = sig
             dpg.delete_item(self.feed, children_only=True)
             for aid, d in reversed(rows):
-                dpg.add_text(f"{aid[-6:]} {_line(d)}", parent=self.feed, wrap=SIDE_W - 30)
+                dpg.add_text(f"{aid[-6:]} {_line(d)}", parent=self.feed, wrap=self.width - px(30))
 
 
 def _line(d: dict) -> str:

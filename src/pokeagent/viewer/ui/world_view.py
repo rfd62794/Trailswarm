@@ -15,12 +15,13 @@ import numpy as np
 from pokeagent.atlas import sprites
 from pokeagent.world import anim, draw
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
+from pokeagent.viewer import ui_scale
 from pokeagent.world.view import Viewport, locate, pick
 
 TEX = "world_tex"
 MAX_UPLOADS = 2         # chunk uploads per frame (a pan never stalls the UI on a burst of 16 MB uploads)
 MAX_TEX = 40            # chunk textures kept on the GPU (about 16 MB each)
-MIN_SPRITE_PX = 26      # an agent is never drawn smaller than this, however far out you zoom
+MIN_SPRITE_PX = 26      # an agent is never drawn smaller than this (1x px; scaled by DPI), however far out you zoom
 REBUILD_S = 3.0         # layer images are recomposed at most this often
 
 
@@ -134,7 +135,7 @@ class WorldView:
     def _wheel(self, delta) -> None:
         m = self._mouse()
         if m and self.pyr:
-            self.vp.zoom_at(m[0], m[1], 1.15 ** float(delta))
+            self.vp.step_zoom_at(m[0], m[1], 1 if float(delta) > 0 else -1)
 
     def _click(self) -> None:
         self._down_at = self._mouse()
@@ -169,13 +170,13 @@ class WorldView:
     # -- per frame -----------------------------------------------------------------------
     def fit(self, w: int, h: int) -> None:
         """Size the area to the viewport (the canvas takes what the side panel leaves)."""
-        side_w = self.side.width if self.side else 0
+        side_w = ui_scale.side_panel_width(w) if self.side else 0
         dpg.configure_item(self.area, width=w - 8, height=h)
         cw, ch = max(100, w - side_w - 24), max(100, h - 8)
         dpg.configure_item(self.canvas, width=cw, height=ch)
         self.vp.resize(cw, ch)
         if self.side:
-            self.side.fit(h)
+            self.side.fit(side_w, h)
 
     def update(self, now: float | None = None) -> None:
         now = time.monotonic() if now is None else now
@@ -190,7 +191,7 @@ class WorldView:
             self.vp.fit()
             self.status = ""
         if self.pyr is None:
-            dpg.draw_text((20, 20), self.status, size=18, parent=dl)
+            dpg.draw_text((20, 20), self.status, size=ui_scale.px(18), parent=dl)
             return
         if self._pending is not None:
             self.pyr, self._pending = self._pending, None
@@ -233,21 +234,21 @@ class WorldView:
                 pts = [vp.to_screen(*p) for p in anim.trail_points(t, w.layout, 120)]
                 n = len(pts)
                 for a in range(0, n - 1, 8):
-                    dpg.draw_polyline(pts[a:a + 9], color=(*col, 60 + 180 * a // max(n, 1)), thickness=2, parent=dl)
+                    dpg.draw_polyline(pts[a:a + 9], color=(*col, 60 + 180 * a // max(n, 1)), thickness=max(2, ui_scale.px(2)), parent=dl)
             pos = anim.place(t, w.layout, now)
             if pos is None:
                 continue
             x, y, phase = pos
             cx, cy = vp.to_screen(x + 8, y + 8)
             self._points[t.id] = (x + 8, y + 8)
-            half = max(9 * vp.zoom, MIN_SPRITE_PX / 2)
+            half = ui_scale.sprite_px(vp.zoom, 9, MIN_SPRITE_PX / 2)
             dpg.draw_circle((cx, cy), half + 3, color=(*col, 255), thickness=2, parent=dl)
             dpg.draw_image(self._agent_tex(t.facing, phase, col), (cx - half, cy - half), (cx + half, cy + half), parent=dl)
-            dpg.draw_text((cx + half + 4, cy - 8), t.id[-8:], color=(255, 255, 255, 255), size=14, parent=dl)
+            dpg.draw_text((cx + half + 4, cy - ui_scale.px(8)), t.id[-8:], color=(255, 255, 255, 255), size=ui_scale.px(14), parent=dl)
             if t.battle and t.battle.ended_at is None:
                 for a, b in (((-7, -34), (7, -20)), ((7, -34), (-7, -20))):
                     dpg.draw_line((cx + a[0], cy + a[1]), (cx + b[0], cy + b[1]), color=(230, 40, 40, 255), thickness=3, parent=dl)
-                dpg.draw_text((cx - 24, cy - 52), t.battle.species or "?", color=(255, 220, 80, 255), size=14, parent=dl)
+                dpg.draw_text((cx - ui_scale.px(24), cy - ui_scale.px(52)), t.battle.species or "?", color=(255, 220, 80, 255), size=ui_scale.px(14), parent=dl)
 
     def _draw_hover(self) -> None:
         m = self._mouse()
@@ -262,7 +263,7 @@ class WorldView:
             lines = [f"{loc}"] if loc else []
         lines = [s for s in lines if s]
         for i, s in enumerate(lines):
-            dpg.draw_text((m[0] + 14, m[1] + 8 + 15 * i), s, color=(255, 255, 160, 255), size=14, parent=self.canvas)
+            dpg.draw_text((m[0] + ui_scale.px(14), m[1] + ui_scale.px(8 + 15 * i)), s, color=(255, 255, 160, 255), size=ui_scale.px(14), parent=self.canvas)
 
     def delete(self) -> None:
         for t in (self.area, "world_input"):
