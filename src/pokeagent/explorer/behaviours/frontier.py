@@ -20,6 +20,9 @@ def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int) -> tuple[str, s
     current target unless a new frontier is RETARGET_MARGIN steps closer (hysteresis)."""
     pos = (m, x, y)
     mem = ctx.mem
+    if ctx.frontier_target is not None and ctx.frontier_target[0] != m:
+        ctx.frontier_target = None  # a target on another map is meaningless here (and is_frontier would misjudge it)
+        ctx.frontier_route = []
     if ctx.frontier_target == pos:
         ctx.frontier_target = None
         ctx.frontier_route = []
