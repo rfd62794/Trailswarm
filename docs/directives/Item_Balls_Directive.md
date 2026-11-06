@@ -90,11 +90,13 @@ Test tail, line counts, where `pickup` sits in the selector order and why, anyth
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
+| Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05; dep World Legend merged (#34)
+- 2026-11-05 19:40 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
 <!-- queue:end -->
