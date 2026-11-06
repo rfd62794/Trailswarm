@@ -8,6 +8,8 @@ from typing import Callable
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
 POKECENTER_MAPS = (41, 58, 0x44, 0x40)  # Viridian (41), Pewter (58, "Welcome... JIGGLY"), Mt Moon/Route 4 (0x44), Cerulean (0x40) Pokecenters
+MT_MOON_MAPS = frozenset({0x3B, 0x3C, 0x3D})  # 1F, B1F, B2F
+DUNGEON_MAPS = MT_MOON_MAPS  # no training gate inside: grind outside (Route 3/4), inside head for the exit
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 

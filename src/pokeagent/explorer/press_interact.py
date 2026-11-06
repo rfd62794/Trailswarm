@@ -5,6 +5,9 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.world import DUNGEON_MAPS
+
+NPC_BLOCK_FRAMES = 240  # how long a person in the way keeps their tile out of routing
 
 
 def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
@@ -73,6 +76,8 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         dx, dy = DIRS.get(name, (0, 0))
         npc_ahead = name in DIRS and after == before and (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
         result = ctx.mem.learn(before, name, after, confirmed=confirmed, npc_ahead=npc_ahead)
+        if npc_ahead and before[0] in DUNGEON_MAPS:  # only in a dungeon: elsewhere the person may be the target (nurse, Mom, clerk); route around / wait for the person; the tile decays (anomalies.expire) and is never learned as a wall
+            ctx.mem.temp_blocked[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
         if "ahead_tiles" in extra and after[0] == before[0]:
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
                 ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person

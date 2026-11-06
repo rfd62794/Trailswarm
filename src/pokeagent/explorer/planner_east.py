@@ -6,16 +6,18 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
+from pokeagent.explorer.cave_route import ladder_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
-from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
+from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
 PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24 = 0x02, 0x0E, 0x0F, 0x03, 0x23
 CERULEAN_GYM = 0x41
 OUTDOORS = (PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24, 0x24)
-CAVE = (0x3B, 0x3C, 0x3D)
+CAVE = tuple(sorted(DUNGEON_MAPS))
 EXIT_X = 24  # Route 4 tile x of the cave-exit warp; the west part (Pokecenter 11, entrance 18) is left of it
 
+TRAIN_OUTSIDE_STAGES = ("to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon")  # the Mt Moon stage trains on Route 3
 LADDER = tuple(GOALS[GOALS.index("to_route3"):])
 
 
@@ -93,7 +95,7 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         return "DOWN", f"goal {stage}: walking out of the Pokecenter by its door"
     hp, mx = goals.get("_hp", (0, 0))
     need, level = goals.get("_train_level", 8), goals.get("_level", 0)
-    if stage in ("to_route4", "buy_magikarp", "to_mt_moon") and 0 < level < need and mx and hp / mx >= 0.5:
+    if stage in TRAIN_OUTSIDE_STAGES and pos[0] not in CAVE and 0 < level < need and mx and hp / mx >= 0.5:
         # too weak for the cave (and Route 4's trainers): grind Route 3 first
         return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
@@ -101,6 +103,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         p = g.path(pos, target)
         if p:
             return p[0], f"goal {stage}: {len(p)} steps toward it over the learned world"
+    if pos[0] in CAVE and stage in ("to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon"):
+        lead = ladder_step(g, maps, stage, pos, goals.get("_ladders"))  # the ROM header's ladder, via the learned tile closest to it
+        if lead:
+            return lead
     if stage == "beat_misty":
         return _misty_step(g, goals, pos)
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside

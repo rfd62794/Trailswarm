@@ -8,7 +8,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
-from pokeagent.explorer.training import readiness_for, required_level, stage_goal
+from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
@@ -51,9 +51,10 @@ class PlanGoal(BehaviourBase):
             if clamp:
                 ctx.log(f"[readiness] {clamp}", "res")
         need = self._budgeted(ctx, goals_now_all, need, verdict)
+        need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need,
-                             "_center_intent": ctx.center_intent, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
+                             "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         if planned and "at Mom, talking" in planned[1]:
             ctx.mom_talk_step = ctx.step; ctx.mom_talk_hp = hp_now

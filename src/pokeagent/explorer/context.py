@@ -142,6 +142,13 @@ class ExplorerContext:
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
+    dir_fail: int = 0  # consecutive direction presses that left the position unchanged (LoopGuard)
+    dir_fail_pos: tuple | None = None
+    rope_presses: int = 0  # presses spent in the current escape-rope sequence (cave_escape); 0 = not started
+    rope_cooldown_until: int = 0  # step before which a failed rope try is not repeated
+    item_attempts: int = 0  # item-list confirmations this battle (item_use.MAX_ITEM_ATTEMPTS caps it)
+    item_blocked: set = field(default_factory=set)  # item ids that cannot help this battle ("won't have any effect")
     proc: dict | None = None
     proc_done: set = field(default_factory=set)
     proc_due: list = field(default_factory=list)

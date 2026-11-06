@@ -129,6 +129,8 @@ def main(argv=None) -> int:
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
+    from pokeagent.atlas.ladders import rom_ladders
+    ctx.ladders = rom_ladders(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None
