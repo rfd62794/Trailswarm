@@ -5,6 +5,7 @@ from pokeagent.explorer.behaviours.advance_dialog import AdvanceDialog, NamingKe
 from pokeagent.explorer.behaviours.base import Behaviour, BehaviourBase, Decision, no_press
 from pokeagent.explorer.behaviours.battle import Battle
 from pokeagent.explorer.behaviours.battle_moves import BattleMoves
+from pokeagent.explorer.behaviours.box_settle import BoxSettle, PostTalkSettle
 from pokeagent.explorer.behaviours.catch import Catch
 from pokeagent.explorer.behaviours.frontier import ExploreBurst, Frontier
 from pokeagent.explorer.behaviours.goto import Goto
@@ -18,8 +19,8 @@ from pokeagent.explorer.behaviours.readiness import Readiness, SettleWait
 from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, ReplayInterrupt
 
 __all__ = [
-    "AdvanceDialog", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
-    "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
+    "AdvanceDialog", "Battle", "BoxSettle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
+    "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal", "PostTalkSettle",
     "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard",
     "default_behaviours", "no_press",
 ]
@@ -34,9 +35,9 @@ def default_behaviours() -> list[Behaviour]:
     and finally plain exploration.
     """
     return [
-        SettleWait(), LoopGuard(), Readiness(), ReplayInterrupt(),
+        SettleWait(), LoopGuard(), PostTalkSettle(), Readiness(), ReplayInterrupt(),
         Battle(), Catch(), BattleMoves(),
-        NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
+        NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),
         ExploreBurst(), Pickup(), PlanGoal(), Frontier(),
     ]

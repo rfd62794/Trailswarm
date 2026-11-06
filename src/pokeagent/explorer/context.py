@@ -29,6 +29,8 @@ class ExplorerOptions:
     frames_per_step: int = 10
     train_level: int = 8
     maps_path: str = "runs/maps.json"
+    adaptive_pace: bool = False  # A through text boxes at the learned pace (text_press) instead of the fixed settle
+    fast_text: bool = False  # run the set_text_speed_fast procedure once at the start
 
 
 @dataclass
@@ -118,6 +120,12 @@ class ExplorerContext:
     busy_last_press: int = 0  # ctx.frame of the last nudge
     skill: object = None  # MashSkill, built lazily over mem.data
     mom_failed_until: int = 0
+    talk_closed_frame: int = -1  # ctx.frame when the last interaction's box closed (post_talk_settle)
+    post_talk_waits: int = 0
+    box_empty_since: int = -1  # ctx.frame when the current empty-box stretch began
+    box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
+    pace: object = None  # text_pace.PaceLearner, built lazily over mem.data
+    text_frames: int = 0  # emulator frames spent pressing through text boxes (fast path only)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None

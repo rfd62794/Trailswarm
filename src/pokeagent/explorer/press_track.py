@@ -117,7 +117,10 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
             progressed = (any(goals_now[g] and not bt["goals"].get(g) for g in GOALS) or bool(extra.get("ram_diff"))) \
                 and not bt.get("choice")
             src = "human" if "human" in bt["sources"] else "claude" if "claude" in bt["sources"] else "agent"
-            ctx.mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
+            if bt["sig"] is None:
+                progressed = False  # a one-line box (the START menu) never got a signature: nothing to key a beat on
+            else:
+                ctx.mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
             if progressed:
                 ctx.log(f"[beat learned for \"{bt['sig'][:40]}\": {len(bt['buttons'])} presses ({src})]", "res")
     fr.result = result
