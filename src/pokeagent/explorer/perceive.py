@@ -68,19 +68,23 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
     return legend.Rendered(rows, legend.line(kinds))
 
 
-def battle_view(emu) -> list[str]:
+def battle_view(emu, move: str = "") -> list[str]:
     """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
     we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
-    wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu."""
+    wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu.
+    `move` adds the chosen move's rule string ('EMBER x2 FIRE>GRASS/POISON STAB') when supplied."""
     def u16(a): return (emu.read(a) << 8) | emu.read(a + 1)
     tm = emu.read_range(TILEMAP, TILEMAP_LEN)
     lines = frame_lines(tm)
     rows = [f"BATTLE kind=0x{emu.read(0xD057):02X}",
             f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
-            "(hp addrs unverified)", ""]
+            "(hp addrs unverified)"]
+    if move:
+        rows.append(f"move  {move}")
+    rows += ["", "MENU/TEXT:"]
     menu = [ln for ln in lines if ">" in ln or ln.isupper()]
-    rows += ["MENU/TEXT:"] + [ln[:20] for ln in (menu or lines)[:6]]
+    rows += [ln[:20] for ln in (menu or lines)[:6]]
     return rows
 
 
