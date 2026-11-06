@@ -84,3 +84,17 @@ run is skipped for the rest of that run (in-memory only).
 ## 8. Report
 
 Test tail, line counts, where `pickup` sits in the selector order and why, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05; dep World Legend merged (#34)
+<!-- queue:end -->
