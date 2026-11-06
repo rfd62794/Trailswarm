@@ -91,6 +91,22 @@ def _unbroken_badge_run(ms: dict) -> dict | None:
     return None
 
 
+def _items_picked(d: Path) -> int:
+    """Item-ball pickups in a run: positive bag deltas whose dialog said 'found/obtained <ITEM>!'."""
+    n = 0
+    for line in (d / "transitions.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        it = rec.get("item")
+        if not it or it.get("delta", 0) <= 0:
+            continue
+        text = f"{it.get('text', '')} {rec.get('text', '')}".lower()
+        if "found" in text or "obtained" in text:
+            n += 1
+    return n
+
+
 def main() -> int:
     if not RUNS.exists():
         print("no runs/ data in this checkout (runs/ is gitignored; run the swarm here first)")
@@ -125,6 +141,7 @@ def main() -> int:
         s = backtrack_stats(dirs[-1] / "transitions.jsonl")
         print(f"backtrack ({dirs[-1].name}): reversals {s['reversal_pct']:.1f}% ({s['reversals']}/{s['moves']} agent moves), "
               f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
+        print(f"items picked up ({dirs[-1].name}): {_items_picked(dirs[-1])}")
     return 0
 
 

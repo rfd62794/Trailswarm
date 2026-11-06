@@ -9,6 +9,8 @@ what memory itself recorded: blocked-edge targets for walls, interaction targets
 """
 from __future__ import annotations
 
+from pokeagent.explorer.items import is_item_ball
+
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 
 
@@ -102,14 +104,23 @@ def trainer_tiles(memory_map: dict) -> dict:
             if e.get("trainer") and e.get("last")}
 
 
+def item_tiles(memory_map: dict) -> dict:
+    """``{(x, y): npc entry}`` for NPCs that are item balls (pic 61, never seen moving)."""
+    return {tuple(e["last"]): e for e in (memory_map or {}).get("npcs", {}).values()
+            if is_item_ball(e) and e.get("last")}
+
+
 def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
-             x: int, y: int, block, npcs_here, trainers, strict: bool = True) -> str:
-    """The legend kind for tile (x,y), by precedence: trainer > npc > warp > ledge > object > wall >
-    encounter > grass > interaction > walkable > unknown."""
+             x: int, y: int, block, npcs_here, trainers, items=None, strict: bool = True) -> str:
+    """The legend kind for tile (x,y), by precedence: trainer > item > npc > warp > ledge > object > wall >
+    encounter > grass > interaction > walkable > unknown. ``items`` is a set/dict of item-ball tiles
+    (``item_tiles`` for Remembers, live sprite positions for Sees); None means none are known."""
     p = (x, y)
     trainer = trainers.get(p) if hasattr(trainers, "get") else None
     if trainer is not None:
         return "trainer_beaten" if trainer.get("beaten") else "trainer"
+    if items and p in items:
+        return "item"
     if p in (npcs_here or ()):
         return "npc"
     d = memory_map or {}
