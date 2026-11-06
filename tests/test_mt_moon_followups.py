@@ -46,3 +46,21 @@ def test_item_list_open_with_only_wrong_items_is_closed_not_confirmed(tmp_path):
     ctx = _hurt_with_bag(tmp_path, [0x0B, 0xEA], rows=(">ANTIDOTE", "x 1", "TM34", "x 1"))
     d = Battle().step(ctx)
     assert d.button == "B" and d.rule == "item_list_close"
+
+
+def test_enclosed_tile_walls_are_purged_on_load_but_real_walls_stay(tmp_path):
+    import json
+    from pokeagent.explorer.memory import MapMemory
+    maps = {"61": {"visited": {"14,26": 5, "15,26": 3, "9,9": 2},
+                   "blocked": ["14,26,UP", "14,26,DOWN", "14,26,LEFT", "14,26,RIGHT",   # all four: a page swallowed them
+                               "15,26,UP", "15,26,DOWN",                                    # a corridor: two real walls
+                               "3,3,UP", "3,3,DOWN", "3,3,LEFT", "3,3,RIGHT",              # never stood on: kept
+                               "9,9,UP", "9,9,DOWN", "9,9,LEFT"],                           # three: a dead end, kept
+                   "fails": {"14,26,UP": 30, "15,26,UP": 2}, "warps": {"14,26,UP": [60, 1, 1]}, "jumps": {}}}
+    path = tmp_path / "maps.json"
+    path.write_text(json.dumps({"maps": maps}))
+    mem = MapMemory(path)
+    d = mem.data["maps"]["61"]
+    assert mem.purged_enclosed_walls == 4
+    assert sorted(d["blocked"]) == sorted(["15,26,UP", "15,26,DOWN", "3,3,UP", "3,3,DOWN", "3,3,LEFT", "3,3,RIGHT", "9,9,UP", "9,9,DOWN", "9,9,LEFT"])
+    assert "14,26,UP" not in d["fails"] and d["fails"]["15,26,UP"] == 2 and d["warps"]["14,26,UP"] == [60, 1, 1]

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
-from pokeagent.explorer.memory_purge import purge_npc_walls
+from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
 
@@ -36,6 +36,7 @@ class MapMemory(NavMixin, WarpsMixin):
         self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
         self.purge_bad_warps()
         self.purged_npc_walls = purge_npc_walls(self.data)  # false walls learned against wandering NPCs
+        self.purged_enclosed_walls = purge_enclosed_walls(self.data)  # ... and behind a full-screen page
 
     def purge_bad_warps(self):
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
