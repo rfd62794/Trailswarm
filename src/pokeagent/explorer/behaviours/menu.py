@@ -1,6 +1,8 @@
 """menu: YES/NO answers, move-forgetting, goal-driven menu choices, and exploring the first untried option."""
 from __future__ import annotations
 
+import re
+
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.dialog import goal_menu_choice, learn_decision, offered_starter, yesno_answer
@@ -66,6 +68,8 @@ class Menu(BehaviourBase):
             # Exits are always a fine choice once nothing here is wanted (seen 2026-11-03: the agent sat on
             # 'CANCEL' pressing DOWN because CANCEL counted as 'already tried').
             return Decision("A", "leave_menu", f"menu: cursor on '{cursor}' - leaving this menu")
+        if re.match(r"POK.DEX", cursor):  # its entry pages are full-screen, not boxes: nothing backs out of them (Mt Moon B2F, 2026-11-05)
+            return Decision("DOWN", "menu_skip_pokedex", "menu open, cursor on POKeDEX - never opening it, moving the cursor down")
         if cursor and cursor not in tried:
             return Decision("A", "menu_new_option", f"menu open, cursor on '{cursor}' (new) - choosing it")
         if any(o not in tried for o in options):
