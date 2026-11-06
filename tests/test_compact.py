@@ -65,19 +65,19 @@ def test_in_place_mode_never_dims_the_outdoor_map():
     assert (out[y1 + 2:y1 + 4, x0 + 10:x1 - 10] < 100).all()                      # the shadow is there
 
 
-def test_default_mode_is_in_place_fit_and_the_choice_persists(tmp_path, monkeypatch):
+def test_default_mode_is_the_original_inset_and_the_choice_persists(tmp_path, monkeypatch):
     from pokeagent.viewer.ui import world_interiors as wi
-    assert inplace.DEFAULT_MODE == "inplace"
+    assert inplace.DEFAULT_MODE == "inset"
     u = tmp_path / "u.json"
     view = SimpleNamespace(world=None, wm=SimpleNamespace(rev=0))
     real = Overrides.load
     monkeypatch.setattr(wi.Overrides, "load", staticmethod(lambda *a, **k: real(u, None)))
     layer = wi.InteriorLayer(view)
-    assert layer.mode == "inplace"                                                # nobody chose anything: rooms in place
-    layer.set_mode("auto")
+    assert layer.mode == "inset"                                                  # nobody chose anything: the original atlas
+    layer.set_mode("inplace")
     layer.edit.flush()
-    assert json.loads(u.read_text())["prefs"] == {"mode": "auto"}
-    assert wi.InteriorLayer(view).mode == "auto"                                  # survives a restart
+    assert json.loads(u.read_text())["prefs"] == {"mode": "inplace"}
+    assert wi.InteriorLayer(view).mode == "inplace"                               # picking fit sticks across restarts
     layer.set_mode("inset")
     layer.edit.flush()
     assert wi.InteriorLayer(view).mode == "inset"
@@ -117,3 +117,17 @@ def test_real_rom_compact_grid_holds_only_the_six():
     assert len(keep) == 6 and sum(in_grid(C, m) for m in C.places) == 6
     assert C.height < L.height * 0.6 and C.height - C.outdoor_height < 40               # no empty space below the world
     assert full_world(w) is w
+
+
+def test_viewer_opens_on_the_full_world_by_default(monkeypatch, tmp_path):
+    from pokeagent.world import export
+    seen = []
+    w = SimpleNamespace(compact=False)
+    monkeypatch.setattr(export, "load_world", lambda *a, **k: w)
+    monkeypatch.setattr(export, "compact_world", lambda *a, **k: seen.append("compact") or "compact-world")
+    real = Overrides.load
+    monkeypatch.setattr(export.Overrides, "load", staticmethod(lambda *a, **k: real(tmp_path / "none.json", None)))
+    assert export.load_for_view() is w and seen == []                      # no saved choice: the full inset world
+    (tmp_path / "p.json").write_text(json.dumps({"prefs": {"mode": "inplace"}}))
+    monkeypatch.setattr(export.Overrides, "load", staticmethod(lambda *a, **k: real(tmp_path / "p.json", None)))
+    assert export.load_for_view() == "compact-world" and seen == ["compact"]   # picked fit earlier: compact world

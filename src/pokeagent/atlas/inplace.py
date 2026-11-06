@@ -18,7 +18,7 @@ from pokeagent.atlas.world import WorldLayout, Xform
 MODES = ("auto", "inplace", "inplace_full", "stretch", "inset")
 LABELS = {"auto": "auto", "inplace": "in place (fit)", "inplace_full": "in place (full size)",
           "stretch": "in place (stretch world)", "inset": "inset"}
-DEFAULT_MODE = "inplace"       # rooms in place (fit) unless the user picked otherwise
+DEFAULT_MODE = "inset"         # the original full-grid atlas until the user picks an in-place mode (it is remembered)
 AUTO_ZOOM = 0.75               # screen px per world px at which auto shows every interior
 
 
