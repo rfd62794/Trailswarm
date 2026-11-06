@@ -67,16 +67,39 @@ def macro(root: Path, entry: dict, name: str, args: dict | None = None, by: str 
                 lambda e: client.command(e, "macro", name=name, args=args or {}), needs_lease=True)
 
 
+def _stop_macro(e: dict, steps: list) -> None:
+    """Cancel a macro that may still be running and wait briefly for it to stop (the caller then releases the lease)."""
+    try:
+        steps.append(("macro_cancel", client.command(e, "macro_cancel")))
+        for _ in range(20):
+            if (client.digest_of(e).get("macro") or {}).get("state") != "running":
+                break
+            time.sleep(0.1)
+    except AgentError:
+        pass
+
+
 def nudge(root: Path, entry: dict, by: str = "claude") -> dict:
     """Hold 120 s, back_out, battle_run when a wild battle is open, then release (always, even on an error: never left frozen)."""
     def body(e: dict) -> dict:
         steps = [("hold", client.command(e, "claude_hold", seconds=NUDGE_HOLD_S))]
+        unsettled = False  # a macro command was sent and has not answered with a final result
+
+        def run_macro(name: str) -> None:
+            nonlocal unsettled
+            unsettled = True
+            out = client.command(e, "macro", name=name, args={})
+            steps.append((name, out))
+            unsettled = out.get("result") == "pending"
+
         try:
-            steps.append(("back_out", client.command(e, "macro", name="back_out", args={})))
+            run_macro("back_out")
             d = client.digest_of(e)
             if d.get("battle") and d["battle"].get("kind") == "wild":
-                steps.append(("battle_run", client.command(e, "macro", name="battle_run", args={})))
+                run_macro("battle_run")
         finally:
+            if unsettled:
+                _stop_macro(e, steps)  # never drop the lease under a macro that is still running
             steps.append(("release", client.command(e, "hold_release")))
         macros = [o for n, o in steps if n in ("back_out", "battle_run")]
         return {"ok": bool(macros) and bool(macros[-1].get("ok")),

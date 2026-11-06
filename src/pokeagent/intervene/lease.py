@@ -13,6 +13,7 @@ from typing import Callable
 
 LEASE_FILE = "claude_hold.json"
 MIN_S, MAX_S, TOUCH_FLOOR_S = 1, 600, 3.0
+SLACK_S = 5.0  # NTFS mtime can read a hair earlier than the wall clock `until` was computed from
 REFRESH_S, STALE_S = 3.0, 20.0  # the agent re-writes the mirror every REFRESH_S while held; older than STALE_S is not trusted
 
 
@@ -68,7 +69,7 @@ class ClaudeHold:
 
 def lease_active(run_dir: Path, wall: Callable[[], float] = time.time) -> bool:
     """Is a Claude lease on this run still running? Only a FRESH mirror counts (refreshed within STALE_S, so a hung agent is
-    judged again) and an ``until`` more than MAX_S past the file's mtime is nonsense and ignored."""
+    judged again) and an ``until`` more than MAX_S (+ a little slack) past the file's mtime is nonsense and ignored."""
     path = Path(run_dir) / LEASE_FILE
     try:
         until = float(json.loads(path.read_text(encoding="utf-8")).get("until", 0))
@@ -76,4 +77,4 @@ def lease_active(run_dir: Path, wall: Callable[[], float] = time.time) -> bool:
     except (OSError, ValueError, TypeError, AttributeError):
         return False
     now = wall()
-    return until > now and until - mtime <= MAX_S and now - mtime <= STALE_S
+    return until > now and until - mtime <= MAX_S + SLACK_S and now - mtime <= STALE_S

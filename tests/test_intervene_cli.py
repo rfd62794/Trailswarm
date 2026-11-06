@@ -38,7 +38,8 @@ class FakeAgent:
         self.held = 0.0
         self.macro_results = {"back_out": {"ok": True, "result": "battle_menu" if battle else "overworld", "presses": 2},
                               "battle_run": {"ok": True, "result": "escaped", "presses": 3}}
-        handlers = {"claude_hold": self.h_hold, "hold_release": self.h_release, "macro": self.h_macro, "press": self.h_press}
+        handlers = {"claude_hold": self.h_hold, "hold_release": self.h_release, "macro": self.h_macro, "press": self.h_press,
+                    "macro_cancel": self.h_cancel}
         self.srv = ControlServer(self.snap, handlers, token=f"tok-{aid}")
         port = self.srv.start()
         agent_registry.register(root, aid, "explorer", port, "", pid=os.getpid(), token=self.srv.token)
@@ -47,6 +48,10 @@ class FakeAgent:
         self.cmds.append({"cmd": "claude_hold", "seconds": seconds})
         self.held = float(seconds)
         return {"claude_hold_s": self.held}
+
+    def h_cancel(self):
+        self.cmds.append({"cmd": "macro_cancel"})
+        return {"cancelling": "back_out"}
 
     def h_release(self):
         self.cmds.append({"cmd": "hold_release"})
@@ -264,3 +269,13 @@ def test_old_agent_degrades_gracefully(tmp_path):
         assert rc == 0 and [c["cmd"] for c in a.cmds] == ["press"]  # plain presses still work, without a lease
     finally:
         a.stop()
+
+
+def test_nudge_cancels_a_pending_macro_before_it_releases(swarm):
+    root, agents = swarm
+    a = agents["explore-333"]
+    a.macro_results["back_out"] = {"ok": False, "result": "pending", "presses": 0}  # still running on the agent
+    rc, text = run(["nudge", "explore-333"], root)
+    assert rc == 1
+    assert [(c["cmd"], c.get("name")) for c in a.cmds] == [("claude_hold", None), ("macro", "back_out"), ("macro_cancel", None),
+                                                           ("hold_release", None)]

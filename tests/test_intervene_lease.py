@@ -232,7 +232,7 @@ def test_watchdog_waiting_for_first_transition_is_also_skipped(tmp_path):
     (run / "transitions.jsonl").write_text("")
     c = Clock()
     w = sw.ProgressWatch(tmp_path, 9, since_wall=0, clock=c)
-    ClaudeHold(run / LEASE_FILE).grant(600)
+    ClaudeHold(run / LEASE_FILE).grant(60)
     c.t += 1000
     assert w.check() is None and w.skipped == "claude hold"
 
@@ -292,10 +292,15 @@ def test_macro_runs_on_the_frame_loop_without_freezing_it_and_reports_status(tmp
     assert view.snapshot().extra["macro_status"]["state"] == "done" and not view.held()
 
 
-def test_macro_pending_busy_and_cancel(tmp_path):
+def test_macro_pending_busy_and_cancel(tmp_path, monkeypatch):
+    """A macro that never settles (huge cap, frozen clock), so nothing here races real time."""
     import threading
+    from pokeagent.intervene import runner
+    from pokeagent.intervene.macro_core import MacroRun, press
     from test_intervene_macros import scr
-    view = _marshalled_view(tmp_path, [scr([f"line {i}"], battle=False) for i in range(500)], "m2")
+    monkeypatch.setattr(runner, "make_run", lambda rig, name, args: MacroRun(
+        lambda s, st, r: press("B"), rig, name, cap=10**9, clock=lambda: 0.0))
+    view = _marshalled_view(tmp_path, [scr(["x"], battle=False)], "m2")
     h = view.handlers()
 
     def call(fn, sink, **kw):
@@ -304,8 +309,7 @@ def test_macro_pending_busy_and_cancel(tmp_path):
         return t
 
     results: list = []
-    t = call(h["macro"], results, name="back_out", args={}, wait_s=0.05)
-    _drive(view, t, 400)
+    _drive(view, call(h["macro"], results, name="back_out", args={}, wait_s=0.05), 400)
     assert results[0]["result"] == "pending" and results[0]["macro_status"]["state"] == "running"  # the 504 does not hide it
     assert view.snapshot().extra["macro_status"]["state"] == "running"
     busy: list = []
@@ -318,3 +322,6 @@ def test_macro_pending_busy_and_cancel(tmp_path):
     st = view.snapshot().extra["macro_status"]
     assert cancel[0]["cancelling"] == "back_out" and st["state"] == "stopped" and st["result"] == "cancelled"
     assert not view.held()
+    idle: list = []
+    _drive(view, call(h["macro_cancel"], idle), 400)
+    assert idle[0]["result"] == "no_macro_running"
