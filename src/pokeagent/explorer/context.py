@@ -114,6 +114,9 @@ class ExplorerContext:
     busy_last_press: int = 0  # ctx.frame of the last nudge
     skill: object = None  # MashSkill, built lazily over mem.data
     mom_failed_until: int = 0
+    buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
+    buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
+    switch_runs: tuple = (-1, 0)  # (ctx.battles, RUN attempts) of switch_train_run
     party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
     order_retry_at: int = 0  # step before which a failed reorder_party is not retried
     switch_train: dict | None = None  # switch_out_lead in progress for this battle

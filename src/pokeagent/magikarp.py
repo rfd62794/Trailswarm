@@ -14,6 +14,8 @@ MAGIKARP_PRICE = 500                 # the salesman's price in the Mt Moon Pokem
 MT_MOON_CENTER = 0x44
 SWITCH_MIN_HP = 0.25                 # never send in a member below this HP fraction (directive section 2.3)
 EVOLVE_LEVEL = 20
+BUY_STEP_CAP = 600                   # steps in/around the center without buying before the goal is dropped for the run
+MAX_RUNS = 5                         # RUN attempts per battle when nobody healthy can replace the trainee
 IN_BATTLE = 0xD057
 
 
@@ -38,7 +40,7 @@ def magikarp_goal_settled(emu, st: dict, seen: set) -> bool:
     sp = party_species(emu)
     if MAGIKARP in sp or GYARADOS in sp:
         st["had_magikarp"] = True
-    return bool(st.get("had_magikarp")) or 0x3B in seen or not can_buy(emu)
+    return bool(st.get("had_magikarp")) or bool(st.get("buy_skipped")) or 0x3B in seen or not can_buy(emu)
 
 
 def gyarados_goal(emu, st: dict) -> bool:

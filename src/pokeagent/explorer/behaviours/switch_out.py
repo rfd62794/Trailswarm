@@ -15,7 +15,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
-from pokeagent.magikarp import MAGIKARP, switch_candidate
+from pokeagent.magikarp import MAGIKARP, MAX_RUNS, switch_candidate
 from pokeagent.ramstructs import read_battle_mon
 
 MAX_PRESSES = 30  # a switch is about 6 presses; past this the menus are not what we think: fight on
@@ -76,7 +76,17 @@ class SwitchOut(BehaviourBase):
             # a trainer fight cannot be left, so it carries on as before.
             if ctx.emu.read(0xD057) == 1:
                 wild_run = run_press(frame_lines(tm))
-                return Decision(wild_run, "switch_train_run", "switch_train: nobody healthy to send in, SPLASH is useless: RUN") if wild_run else None
+                if wild_run is None:
+                    return None
+                n = ctx.switch_runs[1] + 1 if ctx.switch_runs[0] == ctx.battles else 1
+                if wild_run == "A":  # an A on RUN is an attempt; the cursor walk before it is free
+                    ctx.switch_runs = (ctx.battles, n)
+                    if n > MAX_RUNS:
+                        ctx.switch_gave_up = ctx.battles
+                        ctx.log(f"[switch_train_run: RUN failed {MAX_RUNS} times this battle - fighting on]", "res")
+                        return None
+                    ctx.log(f"[switch_train_run: RUN attempt {n}/{MAX_RUNS}]", "res")
+                return Decision(wild_run, "switch_train_run", "switch_train: nobody healthy to send in, SPLASH is useless: RUN")
             if ctx.switch_gave_up != ctx.battles:
                 ctx.switch_gave_up = ctx.battles
                 ctx.log("[switch_train: nobody healthy enough to send in; fighting on]", "res")

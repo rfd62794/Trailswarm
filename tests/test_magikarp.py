@@ -299,3 +299,40 @@ def test_trainee_numbers_reach_meta_json_and_status(tmp_path):
     (run / "meta.json").write_text(json.dumps(meta))
     line = status._trainee_line([run])
     assert "L7" in line and "battles shared 4 of 9" in line and "gyarados=no" in line
+
+
+def test_run_attempts_are_capped_per_battle(tmp_path):
+    ctx = battle_ctx(tmp_path, [(MAGIKARP, 5, 17, 17), (STARTER, 18, 0, 51)], kind=1)
+    draw_framed(ctx.emu, ["FIGHT PKMN", "ITEM>RUN"])
+    for _ in range(5):
+        assert SwitchOut().step(ctx).button == "A"
+    assert SwitchOut().step(ctx) is None and ctx.switch_gave_up == ctx.battles and ctx.switch_runs[1] == 6
+    ctx.battles, ctx.switch_gave_up = 2, 1
+    assert SwitchOut().step(ctx).button == "A"  # a new battle starts the count again
+
+
+def test_stale_pitch_text_does_not_exempt_the_stuck_menu_guard(tmp_path):
+    from pokeagent.explorer.behaviours import AdvanceDialog
+    ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51), (MAGIKARP, 5, 17, 17)])  # goal settled: Magikarp owned
+    ctx.dialog = [OFFER]; ctx.box_streak = 12
+    draw_framed(ctx.emu, [">YES", "NO"])
+    ctx.emu.set(TM + 20 * 13 + 1, 0xED)
+    ctx.refresh()
+    assert AdvanceDialog().step(ctx).rule == "menu_stuck_b"
+    open_goal = party_ctx(tmp_path, [(STARTER, 18, 51, 51)])
+    open_goal.emu.memory.update(bcd(3000)); open_goal.dialog = [OFFER]; open_goal.box_streak = 12
+    draw_framed(open_goal.emu, [">YES", "NO"]); open_goal.refresh()
+    assert AdvanceDialog().step(open_goal) is None  # goal open: his pitch is still running, the menu behaviour answers
+
+
+def test_buy_stage_step_cap_settles_the_goal(tmp_path):
+    from pokeagent.explorer.behaviours import PlanGoal
+    from pokeagent.magikarp import BUY_STEP_CAP
+    ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51)])
+    ctx.emu.memory.update(bcd(3000))
+    ctx.mem.m(0x44)
+    ctx.buy_steps = BUY_STEP_CAP
+    ctx.center_intent = "buy_magikarp"
+    assert not ctx.goals()["buy_magikarp"]
+    PlanGoal().step(ctx)
+    assert ctx.buy_skipped and ctx.center_intent is None and ctx.goals()["buy_magikarp"]

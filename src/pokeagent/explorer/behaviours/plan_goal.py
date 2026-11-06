@@ -9,7 +9,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.training import train_level_for
 from pokeagent.explorer.world import POKECENTER_MAPS
-from pokeagent.magikarp import MT_MOON_CENTER
+from pokeagent.magikarp import BUY_STEP_CAP, MT_MOON_CENTER
 
 
 class PlanGoal(BehaviourBase):
@@ -24,6 +24,12 @@ class PlanGoal(BehaviourBase):
         if ctx.center_intent and m not in POKECENTER_MAPS:
             ctx.center_intent = None  # left the center: the intent is spent
         goals_now_all = ctx.goals()
+        if not goals_now_all["buy_magikarp"] and m in (MT_MOON_CENTER, 0x0F):
+            ctx.buy_steps += 1
+            if ctx.buy_steps > BUY_STEP_CAP:
+                ctx.buy_skipped = True; ctx.center_intent = None
+                ctx.log(f"[buy_magikarp: {BUY_STEP_CAP} steps in/around the Mt Moon Pokemon Center without buying - settled for this run]", "res")
+                goals_now_all = ctx.goals()
         if m == MT_MOON_CENTER and not goals_now_all["buy_magikarp"]:
             ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with
         elif ctx.center_intent == "buy_magikarp" and goals_now_all["buy_magikarp"]:
