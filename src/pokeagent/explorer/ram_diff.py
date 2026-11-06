@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,7 @@ class RamDiffer:
         self.noise_rate, self.noise_min = noise_rate, noise_min
         self.noisy: set[int] = set()          # snapshot offsets that change almost every frame / press
         self.records = 0
+        self.spent = 0.0                      # seconds spent in begin/end (overhead accounting)
         self.plain = 0                        # presses with no event seen so far
         self._plain_hits: Counter = Counter()
         self._freq: Counter = Counter()      # how often each offset changed over all presses (rare bytes win truncation)
@@ -74,10 +76,19 @@ class RamDiffer:
 
     # --- per press -----------------------------------------------------------------------------------------
     def begin(self, ctx: Any) -> None:
+        t = time.perf_counter()
         self._pre = snapshot(ctx.emu)
         self._goals = len(ctx.goal_steps)
+        self.spent += time.perf_counter() - t
 
     def end(self, ctx: Any, fr: Any) -> None:
+        t = time.perf_counter()
+        try:
+            self._end(ctx, fr)
+        finally:
+            self.spent += time.perf_counter() - t
+
+    def _end(self, ctx: Any, fr: Any) -> None:
         post = snapshot(ctx.emu)
         events, vals = classify(self._pre, post, fr, len(ctx.goal_steps) - self._goals, ctx.last_text)
         offs = changed_offsets(self._pre, post)
@@ -124,7 +135,7 @@ def start_ram_diff(ctx: Any, emu: Any, run_dir: Path, state: str | None, rom: st
     """Wire a RamDiffer into ``ctx``: call right after the start state is loaded, before the first press."""
     rd = RamDiffer(Path(run_dir) / "ram_events.jsonl")
     sha = hashlib.sha1(Path(state).read_bytes()).hexdigest() if state and Path(state).is_file() else ""
-    rd.attach(emu, {"start": Path(state).stem if state else "baseline", "state_sha1": sha, "rom": Path(rom).name})
+    rd.attach(emu, {"start": Path(state).stem if state else "baseline", "state_sha1": sha, "lead_ticks": 30, "rom": Path(rom).name})
     rd.learn_noise(emu)
     ctx.ram_diff = rd
     return rd

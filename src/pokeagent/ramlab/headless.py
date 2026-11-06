@@ -54,6 +54,7 @@ def run_agent(rom: Path, state: Path, maps: Path, run_dir: Path, steps: int, *, 
                 ctx.log(f"[agent step error: {e!r}]", "res")
     secs = time.perf_counter() - t0
     records = ctx.ram_diff.records if ctx.ram_diff is not None else 0
+    spent = ctx.ram_diff.spent if ctx.ram_diff is not None else 0.0
     try:
         shutdown(ctx)
     finally:
@@ -61,4 +62,5 @@ def run_agent(rom: Path, state: Path, maps: Path, run_dir: Path, steps: int, *, 
         if ctx.ram_diff is not None:
             ctx.ram_diff.close()
         emu.close()
-    return {"steps": ctx.step, "secs": secs, "records": records, "frames": frames}
+    return {"steps": ctx.step, "secs": secs, "records": records, "frames": frames,
+            "ram_diff_secs": round(spent, 3), "ram_diff_share": round(spent / secs, 4) if secs else 0.0}
