@@ -11,7 +11,7 @@ from pokeagent.explorer.context import ExplorerContext
 def uncount(ctx: ExplorerContext) -> None:
     """A wait is not a press: take the decision LoopGuard just added to its position history back out, so a few waits
     never add up to "60 presses on <=6 tiles" (that fired at step 18 and cost a 25-step shake)."""
-    if ctx.pos_hist:
+    if ctx.pos_hist and ctx.emu.read(0xD057) == 0:  # LoopGuard only appends outside battle: pop only what it added
         ctx.pos_hist.pop()
 
 
