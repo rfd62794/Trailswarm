@@ -66,7 +66,7 @@ def _toward(cur: int, want: int) -> str:
 
 
 def item_step(ctx: ExplorerContext, lines: list[str], cur_line: str, item_id: int, item_name: str,
-              why: str) -> Decision | None:
+              why: str, party_target: int | None = None) -> Decision | None:
     """The next press toward using ``item_id`` from wherever the battle UI is; None = nothing to do here."""
     emu = ctx.emu
     if item_list_open(lines):
@@ -80,7 +80,8 @@ def item_step(ctx: ExplorerContext, lines: list[str], cur_line: str, item_id: in
             return Decision("A", "item_use", f"{why}: using {item_name} (bag row {row}, attempt {ctx.item_attempts})")
         return Decision(press, "item_list_scroll", f"item list: row {pos} -> {item_name} at row {row}")
     if party_prompt_open(lines):  # "Use item on which POKeMON?": the one in the fight, not just slot 1
-        return Decision(_toward(emu.read(MENU_ITEM), emu.read(PLAYER_MON)), "item_party_pick", f"{item_name}: picking the active POKeMON")
+        slot = emu.read(PLAYER_MON) if party_target is None else party_target  # outside a fight 0xCC2F is stale: the caller says who
+        return Decision(_toward(emu.read(MENU_ITEM), slot), "item_party_pick", f"{item_name}: picking the active POKeMON")
     if ">ITEM" in cur_line:
         return Decision("A", "item_open", f"{why}: opening ITEM for {item_name}")
     if "FIGHT" in cur_line or "PKMN" in cur_line:
