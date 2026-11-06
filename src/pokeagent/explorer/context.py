@@ -52,6 +52,7 @@ class ExplorerContext:
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
     anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
+    ram_diff: Any = None  # explorer.ram_diff.RamDiffer (None = event RAM diffs off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
     step: int = 0

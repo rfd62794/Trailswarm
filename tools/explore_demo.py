@@ -70,6 +70,8 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    ap.add_argument("--ram-diff", action="store_true",
+                    help="record event RAM diffs to runs/<run>/ram_events.jsonl (+ ram_trace.jsonl) for tools/ram_discover.py")
     ap.add_argument("--frame-share", action="store_true",
                     help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
@@ -129,6 +131,9 @@ def main(argv=None) -> int:
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
+    if a.ram_diff:
+        from pokeagent.explorer.ram_diff import start_ram_diff
+        start_ram_diff(ctx, emu, run_dir, a.state, a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None
@@ -155,6 +160,8 @@ def main(argv=None) -> int:
 
     def close_logs() -> None:
         trans.close(); decisions.close()
+        if ctx.ram_diff is not None:
+            ctx.ram_diff.close()
 
     def on_key(ev):
         if ev.keysym == "p":

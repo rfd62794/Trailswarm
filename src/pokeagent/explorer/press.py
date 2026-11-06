@@ -139,6 +139,21 @@ class Presser:
     def press(self, name: str, source: str, why: str) -> None:
         ctx = self.ctx
         fr = PressFrame(name, source, why)
+        rd = ctx.ram_diff
+        if rd is None:
+            self._press(fr)
+            return
+        rd.begin(ctx)
+        try:
+            self._press(fr)
+        finally:
+            try:  # recording must never end a run
+                rd.end(ctx, fr)
+            except Exception as e:
+                ctx.log(f"[ram diff failed: {e!r}]", "res")
+
+    def _press(self, fr: PressFrame) -> None:
+        ctx = self.ctx
         begin_press(ctx, fr)
         press_and_read(ctx, fr)
         record_interaction(ctx, fr)

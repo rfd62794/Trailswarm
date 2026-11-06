@@ -78,7 +78,7 @@ class Launcher:
         port = self._port()
         cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
-               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + role_args + segment_args(cfg["segment"])
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else []) + ["--ram-diff"]               + role_args + segment_args(cfg["segment"])
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
