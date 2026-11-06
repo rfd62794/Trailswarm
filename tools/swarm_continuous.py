@@ -5,6 +5,8 @@
 Stop with Ctrl+C or by creating runs/swarm.stop: running agents finish (or are killed with --stop-now), their
 memories are merged, nothing new starts. A second Ctrl+C kills what is left. A slot whose agent exits non-zero
 within FAST_S seconds twice in a row pauses refilling for PAUSE_S and says why (no respawn storm).
+
+Rolling upgrade (swarm_handoff.py): `--upgrade` / `--adopt` takes over a live supervisor's agents with no drain.
 """
 from __future__ import annotations
 
@@ -16,6 +18,9 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import swarm_handoff  # noqa: E402
 
 STARTERS = ["bulbasaur", "charmander", "squirtle"]
 BOX_PACES = [8, 16, 30]
@@ -36,6 +41,7 @@ class Slot:
     started: float = 0.0
     streak: int = 0           # consecutive fast non-zero exits
     paused_until: float = 0.0
+    retire: bool = False      # removed by a smaller --agents: no refill once its agent is done
 
 
 class Supervisor:
@@ -58,7 +64,10 @@ class Supervisor:
         self.watchers: dict[int, Any] = {}
         self.next_watch = 0.0
         self.solved: dict[str, float] = {}
-        roles = roles or ["exploiter", "explorer"]
+        roles = self.roles = roles or ["exploiter", "explorer"]
+        self.handed_over = False
+        self.handoff_file = self.root / "runs" / "swarm.handoff"
+        self.state, self.kill_pid = swarm_handoff.default_state()  # liveness / tree-kill of adopted agents (by pid)
         self.slots = [Slot(i, roles[i % len(roles)]) for i in range(n)]
         self.seq = self.finished = self.merged = 0
         self.stopping = False
@@ -109,7 +118,7 @@ class Supervisor:
         self.swarm_dir.mkdir(parents=True, exist_ok=True)
         if self.shared.exists():
             shutil.copy(self.shared, cfg["own"])  # the freshest merged memory: learning compounds
-        cfg["hash"] = self._digest(cfg["own"])
+        cfg["hash"], cfg["started_wall"] = self._digest(cfg["own"]), time.time()
         slot.cfg, slot.started = cfg, self.clock()
         if cfg["segment"] and self.segment_ok and not self.segment_ok(cfg["segment"]):
             self.log(f"WARNING segment {cfg['segment']}: no checkpoint, running a full agent")
@@ -137,7 +146,7 @@ class Supervisor:
             return
         now = self.clock()
         for s in self.slots:
-            if s.handle is not None or now < s.paused_until:
+            if s.handle is not None or s.retire or now < s.paused_until:
                 continue
             if self.running() >= min(len(self.slots), self.limit()):
                 return  # cap / headroom: never exceed it
@@ -187,6 +196,9 @@ class Supervisor:
         return Path(shutil.move(str(own), str(dest / own.name)))
 
     def tick(self) -> None:
+        if not self.stopping and self.handoff_file.exists():
+            swarm_handoff.hand_over(self)  # a new supervisor asked: pass the agents on, leave them running
+            return
         self._watch_progress()
         if self.heartbeat:
             self.heartbeat()  # keeps runs/spawn.lock fresh: a live swarm's lock must never look 6 h old
@@ -204,7 +216,11 @@ class Supervisor:
                 self.request_stop("stop file")
             elif self.deadline is not None and self.clock() >= self.deadline:
                 self.request_stop("duration reached")
+        self.slots = [s for s in self.slots if not (s.retire and s.handle is None)]
         self._refill()
+
+    def adopt(self, data: dict) -> int:
+        return swarm_handoff.adopt(self, data)
 
     def _watch_progress(self) -> None:
         """Every watch_s: stop agents that are alive but stuck, merge what they learned; _refill replaces them."""
@@ -238,11 +254,15 @@ class Supervisor:
 
     def run(self) -> None:
         self.stop_file.unlink(missing_ok=True)  # a stale stop file from last time must not stop this swarm
+        if not self.running():
+            self.handoff_file.unlink(missing_ok=True)  # fresh start: an old unanswered request is not ours
         interrupted = False
         try:
             while True:
                 try:
                     self.tick()
+                    if self.handed_over:
+                        return
                     if self.stopping and self.running() == 0:
                         break
                     self.sleep(POLL_S)
@@ -254,6 +274,8 @@ class Supervisor:
                     interrupted = True
                     self.request_stop("Ctrl+C; press again to kill")
         finally:
+            if self.handed_over:
+                return  # the agents belong to the new supervisor now
             self.kill_all()  # never leave agents holding ports
             for s in self.slots:
                 if s.handle is not None:
