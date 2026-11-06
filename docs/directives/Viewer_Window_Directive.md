@@ -156,4 +156,5 @@ anything you had to interpret.
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; deps V1 (#26), E1 (#30), World Legend (#34) merged
 - 2026-11-05 19:34 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
 - 2026-11-05 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-window-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4FJQFR2593W94K3YEZ4DH
+- 2026-11-05 19:38 · dispatcher · launched pid=5048; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-window-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
