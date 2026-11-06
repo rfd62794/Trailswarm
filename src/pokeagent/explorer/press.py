@@ -13,6 +13,7 @@ from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_goals import record_goals
 from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
+from pokeagent.explorer.text_press import fast_a_press
 from pokeagent.goals import GOALS, bag_contents, check_goals
 
 
@@ -81,8 +82,12 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
 def press_and_read(ctx: ExplorerContext, fr: PressFrame) -> None:
     """Press the button, wait for the position to settle, read the screen, track the dialog."""
     name, before, box_before = fr.name, fr.before, fr.box_before
-    ctx.emu.press(Button[name])
-    after = settle_position(ctx, before)
+    if box_before and name == "A" and ctx.opts.adaptive_pace:
+        fast_a_press(ctx)  # learned pace: A the moment the prompt shows, settle only as long as never dropped an input
+        after = ctx.pos() if box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN)) else settle_position(ctx, before)
+    else:
+        ctx.emu.press(Button[name])
+        after = settle_position(ctx, before)
     tm2 = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
     box_after = box_open(tm2)
     text = box_text(tm2) if box_after else ""

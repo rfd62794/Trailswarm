@@ -12,6 +12,8 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines, party_hp
 from pokeagent.goals import bag_contents
 
+from pokeagent.explorer.text_speed import OPTIONS_ADDR, text_speed_steps, check_text_speed
+
 # POKeMON, ITEM, <name>, SAVE, OPTION, EXIT (POKeMON appears once you have one). READ records the screen.
 PROCEDURES = {
     "check_health": [("START", r"POK.MON|ITEM"), ("A", r"\d+/\s*\d+|L\d+"), ("READ", None), ("B", None), ("B", None)],
@@ -21,6 +23,7 @@ PROCEDURES = {
     # A new discovery gets maximal exploration (Robert): the TOWN MAP is opened and read the moment we get it.
     "use_town_map": [("START", r"ITEM"), ("DOWN", r">ITEM"), ("A", r"TOWN MAP|CANCEL"), ("A", r"USE|TOSS"), ("A", None),
                      ("READ", None), ("B", None), ("B", None), ("B", None)],
+    "set_text_speed_fast": text_speed_steps,  # built per game: OPTION's place in the START menu depends on having a POKeMON
 }
 
 
@@ -28,6 +31,8 @@ class Procedures(BehaviourBase):
     name = "procedures"
 
     def applies(self, ctx: ExplorerContext) -> bool:
+        if ctx.opts.fast_text and "set_text_speed_fast" not in ctx.proc_done and ctx.emu.read(OPTIONS_ADDR) & 7 != 1:
+            ctx.proc_done.add("set_text_speed_fast"); ctx.proc_due.insert(0, "set_text_speed_fast")  # once, first thing
         if ctx.proc is not None:
             return True
         return bool(ctx.proc_due) and not ctx.view.box and ctx.emu.read(0xD057) == 0
@@ -38,7 +43,7 @@ class Procedures(BehaviourBase):
             name = ctx.proc_due.pop(0)
             if name in PROCEDURES:
                 rec = ctx.mem.data.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": ctx.opts.box_pace or 12})
-                ctx.proc = proc = {"name": name, "steps": list(PROCEDURES[name]), "i": 0, "retries": 0, "pace": rec["pace"], "wait": 0}
+                ctx.proc = proc = {"name": name, "steps": list(PROCEDURES[name](ctx) if callable(PROCEDURES[name]) else PROCEDURES[name]), "i": 0, "retries": 0, "pace": rec["pace"], "wait": 0}
                 ctx.log(f"[procedure {name}: start, pace {proc['pace']} frames]", "res")
         if proc:
             if proc["wait"] > 0:
@@ -50,6 +55,10 @@ class Procedures(BehaviourBase):
                 ctx.proc = None
                 return no_press("procedure_done")
             btn, expect = proc["steps"][proc["i"]]
+            if btn == "CHECK_OPT":
+                check_text_speed(ctx)
+                proc["i"] += 1
+                return no_press("procedure_read")
             if btn == "READ":
                 lines = frame_lines(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
                 ctx.mem.data.setdefault("menus", {})[proc["name"]] = lines[:10]
