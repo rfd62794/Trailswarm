@@ -54,7 +54,9 @@ params getter is a dict lookup - no per-step file I/O.
 ## 4. What NOT to do
 
 - No in-process module reload (`importlib.reload`) of behaviours.
-- Never write `runs/maps.json` here (that is the journal's job); never kill processes the supervisor did not
+- Never write `runs/maps.json` directly here (edits are the journal's job); the only write is the agent's own
+  normal `MapMemory.save()` during `checkpoint_restart`, which re-applies the journal before writing (Brain Tools),
+  so no journal edit is lost. Never kill processes the supervisor did not
   spawn.
 - No new dependencies.
 
