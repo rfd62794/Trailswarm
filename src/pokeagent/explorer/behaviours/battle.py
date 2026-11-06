@@ -16,7 +16,9 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
+from pokeagent.explorer.stat_records import record_catch
 from pokeagent.goals import bag_contents, check_goals
+from pokeagent.ramstructs import read_party
 
 PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
 
@@ -190,6 +192,12 @@ class Battle(BehaviourBase):
                 caught = bool(dn) and bool(ctx.emu.read(0xD2F7 + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
                 ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k != "dex"}, "caught": caught}); del ctx.mem.data["catches"][:-100]
                 ctx.log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
+                try:  # record-only: a decode failure must never end a run
+                    rec = record_catch(ctx.mem.data, read_party(ctx.emu), ca["species"], ctx.step) if caught else None
+                except Exception as exc:
+                    rec = None; ctx.log(f"[dv record skipped: {exc}]", "res")
+                if rec and rec["duplicate"]:  # keep-best is report-only: no box juggling yet
+                    ctx.log(f"[duplicate #{ca['species']}: best DVs in party slot {rec['prefer_slot'] + 1}]", "res")
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             won = ctx.emu.read(0xD163) > 0 and (m, x, y) == ctx.battle_pos  # a blackout warps you away
             if won and ctx.trainer_npc is not None:

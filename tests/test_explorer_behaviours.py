@@ -8,7 +8,7 @@ import pytest
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.behaviours import (
     AdvanceDialog, Battle, BattleMoves, Catch, ExploreBurst, Frontier, Goto, Heal, LoopGuard, Menu, NamingKeyboard,
-    PlanGoal, Procedures, Readiness, ReplayBeat, ReplayInterrupt, SettleWait, StallGuard, default_behaviours,
+    Pickup, PlanGoal, Procedures, Readiness, ReplayBeat, ReplayInterrupt, SettleWait, StallGuard, default_behaviours,
 )
 from pokeagent.explorer.behaviours.base import Decision, no_press
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
@@ -196,7 +196,7 @@ def test_default_order_is_the_old_agent_step_order():
     names = [b.name for b in default_behaviours()]
     assert names == ["settle", "guards", "readiness", "replay_interrupt", "battle", "catch", "battle_moves",
                      "naming_keyboard", "beat_start", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
-                     "stall_guard", "heal", "explore_burst", "plan_goal", "frontier"]
+                     "stall_guard", "heal", "explore_burst", "pickup", "plan_goal", "frontier"]
     assert no_press("x").button == ""
 
 
@@ -259,7 +259,7 @@ def test_explorer_package_layering_and_size():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
-    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer"}
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld"}
     for f in root.rglob("*.py"):
         assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):

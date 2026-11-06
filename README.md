@@ -79,3 +79,6 @@ uv run pytest -q
 
 All tests run without a ROM or a model (FakeEmulator + StubBackend). Tests
 needing a real ROM skip unless `POKEAGENT_ROM` points at one.
+
+RAM labels in `src/pokeagent/data/ram_map.json` are derived from pret/pokered's `pokered.sym` (symbols branch); the
+upstream repository publishes no licence file, so the symbol file itself is not redistributed here.

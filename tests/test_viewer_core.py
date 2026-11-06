@@ -3,7 +3,7 @@ import time
 from pokeagent.control_server import ControlServer
 from pokeagent.snapshot import AgentSnapshot
 from pokeagent.viewer.commands import KEYMAP, next_speed, press_for_key, targets
-from pokeagent.viewer.layout import FocusState, grid
+from pokeagent.viewer.layout import CARD_ASPECT, FocusState, grid
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.sources import FakeSource, HttpShmSource, discover
 from pokeagent.agent_registry import register
@@ -64,16 +64,23 @@ def test_model_staleness():
 
 
 def test_grid_maximal():
-    ratio = 0.9 + 1.0
+    aw, ah = CARD_ASPECT
+    ratio = ah / aw  # card_h / card_w = 63/80 (two 10:9 panels over a 0.75-frame text block)
     for n in range(1, 13):
         cols, rows, w, h = grid(n, 1920, 1000)
         assert cols * rows >= n and cols * w <= 1920 and rows * h <= 1000
+        assert abs(w * ah - h * aw) <= aw  # cards keep the 80:63 aspect (int rounding)
         for c in range(1, n + 1):
             r = -(-n // c)
             cw = int(min(1920 / c, 1000 / (r * ratio)))
             assert w * h >= cw * int(cw * ratio)
     assert grid(1, 1920, 1000)[0] == 1
     assert grid(0, 1920, 1000) == (0, 0, 0, 0)
+
+
+def test_grid_columns():
+    cols = {n: grid(n, 1920, 1000)[0] for n in range(1, 13)}
+    assert cols == {1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 3, 10: 4, 11: 4, 12: 4}
 
 
 def test_focus_toggle():

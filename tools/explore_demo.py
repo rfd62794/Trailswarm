@@ -13,8 +13,6 @@ use arrows / a (A) / s (B) / Enter (START) / Shift (SELECT); p pauses the agent.
 """
 from __future__ import annotations
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -73,7 +71,7 @@ def main(argv=None) -> int:
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
     ap.add_argument("--frame-share", action="store_true",
-                    help="publish rendered frames to shared memory pokeagent_frames_<control-port> for tools/watch.py")
+                    help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
                     help="render+publish every Nth tick when frame-sharing (render cost only, no extra game frames)")
     ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
@@ -130,6 +128,26 @@ def main(argv=None) -> int:
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps))
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
+    frame_pub = None
+    if a.frame_share:
+        try:
+            from pokeagent.telemetry import FramePublisher
+            frame_pub = FramePublisher(a.control_port, emu)
+            log(f"[frame slot: {frame_pub.name}]", "res")
+        except Exception as e:
+            log(f"[frame share unavailable: {e}]", "res")
+
+    agent_view = None
+    try:  # viewer agent: snapshot+commands on pokeagent.control_server, frames via --frame-share/telemetry
+        import atexit
+        from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
+        agent_view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id=f"explore-{os.getpid()}",
+                                       frame_slot=frame_pub.name if frame_pub else "")
+        agent_view.serve(port=0)
+        atexit.register(agent_view.close)
+        log(f"[viewer agent registered: {agent_view.agent_id}]", "res")
+    except Exception as e:
+        log(f"[viewer agent unavailable: {e!r}]", "res")
     pos = ctx.pos
 
     def close_logs() -> None:
@@ -144,6 +162,7 @@ def main(argv=None) -> int:
             log(f"[turbo {ctx.speed}x]", "res"); return
         name = KEYS.get(ev.keysym)
         if name:
+            if agent_view is not None: agent_view.hold.touch()  # tk steering holds the agent like viewer steering
             presser.press(name, "human", f"you pressed {name}")
 
     # --- remote control (Claude via curl now, MCP later): handlers run on this thread between frames ---
@@ -217,20 +236,12 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
-    frame_pub = None
-    if a.frame_share:
-        try:
-            from pokeagent.telemetry import FramePublisher
-            frame_pub = FramePublisher(a.control_port, emu)
-            log(f"[frame slot: pokeagent_frames_{a.control_port}]", "res")
-        except Exception as e:
-            log(f"[frame share unavailable: {e}]", "res")
-
     def close_frame_shm() -> None:
         if frame_pub is not None:
             frame_pub.close()
 
     def frame():
+        agent_view and agent_view.tick()  # viewer commands + cached snapshot, on this (emulator) thread
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
             try:
@@ -259,6 +270,8 @@ def main(argv=None) -> int:
                 emu.tick(ctx.speed - 1)  # turbo: frameskip - run extra frames unrendered, draw one
             img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
             ctx.photo = ImageTk.PhotoImage(img); screen.configure(image=ctx.photo)
+            if frame_pub is not None:
+                frame_pub.publish(advance=False)  # reuse the frame screenshot() just rendered
         ctx.frame += 1
         if ctx.frame % 15 == 0 and not a.headless:
             try:
@@ -287,8 +300,9 @@ def main(argv=None) -> int:
             pace = a.box_pace if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
-            if not ctx.paused and ctx.frame % pace == 0:
-                engine.step()
+            hold = agent_view.hold.active() if agent_view is not None else False
+            if not ctx.paused and not hold and ctx.frame % pace == 0:
+                engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
         finally:

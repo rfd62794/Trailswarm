@@ -7,8 +7,9 @@ import os
 import time
 from pathlib import Path
 
-from pokeagent.explorer import legend, tilekind
+from pokeagent.explorer import items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
+from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
 
 # After a blackout the game drops us at the last Pokecenter's door (Viridian (23,26) once we healed there) or at home
@@ -18,7 +19,7 @@ from pokeagent.explorer.perceive import DIRS
 WHITEOUT_LANDINGS = {(1, 23, 26): 41, (0, 5, 6): 37}
 
 
-class MapMemory(NavMixin):
+class MapMemory(NavMixin, WarpsMixin):
     """Per-map memory in the runs/maps.json schema; the demo's version, merged with the old framework one.
 
     ``record_paths`` keeps the old framework module's ``paths`` edges (``m(id)["paths"]``); the demo passes
@@ -30,6 +31,7 @@ class MapMemory(NavMixin):
         self.record_paths = record_paths
         self.data = json.loads(self.path.read_text()) if self.path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
+        self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
         self.purge_bad_warps()
 
     def purge_bad_warps(self):
@@ -46,30 +48,6 @@ class MapMemory(NavMixin):
             d = self.data.get("maps", {}).get(mid, {})
             d.get("warps", {}).pop(key, None)
             d.get("warp_cand", {}).pop(key, None)  # or learn() would re-add it on the next sighting
-
-    def forget_warp(self, map_id: int, key: str, *, tombstone: bool = False):
-        """Drop a learned warp that presses disproved. Without `tombstone` it is recoverable: learn() re-adds it after
-        two real sightings. With it, bad_warps keeps learn() and the swarm merge from ever bringing it back."""
-        d = self.m(map_id)
-        d["warps"].pop(key, None)
-        d.get("warp_cand", {}).pop(key, None)
-        d.get("warp_taken", {}).pop(key, None)
-        if tombstone:
-            bad = self.data.setdefault("bad_warps", [])
-            if f"{map_id}:{key}" not in bad:
-                bad.append(f"{map_id}:{key}")
-
-    def _note_warp_disproof(self, m0: int, key: str):
-        """A learned warp's press moved us exactly one tile in the pressed direction inside the same map (after the
-        settle wait): the door is not there. 2 disproofs in a cycle pop it (recoverable); once it was
-        re-learned and 2 more come (4 in all, `warp_disproof_total`) it is tombstoned. A push-back (guard, locked gym) moves us the other way: no evidence."""
-        d = self.m(m0)
-        counts = d.setdefault("warp_disproof", {})      # this cycle: reset when the key really warps
-        totals = d.setdefault("warp_disproof_total", {})  # lifetime: never reset, so a re-learned warp is remembered
-        counts[key] = counts.get(key, 0) + 1
-        totals[key] = totals.get(key, 0) + 1
-        if counts[key] == 2:
-            self.forget_warp(m0, key, tombstone=totals[key] >= 4)
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -154,6 +132,7 @@ class MapMemory(NavMixin):
         memory itself recorded: blocked-edge targets for walls, interaction targets for objects."""
         d = self.m(map_id)
         trainers = tilekind.trainer_tiles(d)
+        item_map = tilekind.item_tiles(d)  # Remembers: balls seen before, from memory's own npc records
         tile_types = self.data.get("tile_types", {})
         grass_ids = self.data.get("grass_ids", {})
         kinds = set()
@@ -162,7 +141,7 @@ class MapMemory(NavMixin):
             line = ""
             for xx in range(x - radius, x + radius + 1):
                 kind = "you" if (xx, yy) == (x, y) else tilekind.classify(
-                    d, tile_types, grass_ids, 0, xx, yy, None, npcs, trainers)
+                    d, tile_types, grass_ids, 0, xx, yy, None, npcs, trainers, items=item_map)
                 kinds.add(kind)
                 line += legend.glyph(kind, tilekind.ledge_dir(d, xx, yy) if kind == "ledge" else None)
             rows.append(line)
@@ -202,6 +181,27 @@ class MapMemory(NavMixin):
             e["transitions"].append(transition)
         if npc:
             e["npc"] = {"pic": npc.get("pic"), "slot": npc.get("slot"), "last": npc.get("last")}
+        fdx, fdy = DIRS.get(facing, (0, 0))
+        if items.is_item_ball(self.npc_at(map_id, x + fdx, y + fdy)):
+            self.note_item_ball(map_id, x + fdx, y + fdy, text=text)
+        return e
+
+    def note_item_ball(self, map_id: int, x: int, y: int, *, text: str = "", seen: bool = True) -> dict:
+        """``maps[m]["items"]["x,y"]`` for a pic-61 ball tile: ``seen`` interactions, the fullest dialog
+        ``text``, the ``item`` parsed from "found/obtained X!", and ``picked`` = runs that got one (once
+        per run per ball). A world fact - whether the ball is still there is read live, never from here."""
+        e = self.m(map_id).setdefault("items", {}).setdefault(
+            f"{x},{y}", {"pic": items.BALL_PIC, "text": "", "item": None, "seen": 0, "picked": 0})
+        if seen:
+            e["seen"] = e.get("seen", 0) + 1
+        if text and len(text) > len(e.get("text") or ""):
+            e["text"] = text[:160]
+        found = items.parse_item_text(text)
+        if found and not e.get("item"):
+            e["item"] = found
+        if found and (map_id, x, y) not in self._item_picked_run:
+            self._item_picked_run.add((map_id, x, y))
+            e["picked"] = e.get("picked", 0) + 1
         return e
 
     def finish_interaction(self, e: dict, presses: int, menus: list, choices: list):

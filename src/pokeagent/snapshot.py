@@ -25,6 +25,7 @@ class Thinking:
     button: str = ""
     result: str = ""
     confidence: float | None = None
+    brain: str = ""  # e.g. the RL agent's decoded Q-brain line; "" for agents without one
 
 
 @dataclass
@@ -55,6 +56,8 @@ class PartyMon:
     level: int = 0
     hp: int = 0
     max_hp: int = 0
+    dvs: str = ""         # "A5 D12 S5 P7 H11" (Gen 1 DVs, 0-15 each)
+    stat_exp: str = ""    # "hp/atk/def/spd/spc" stat experience
 
 
 @dataclass

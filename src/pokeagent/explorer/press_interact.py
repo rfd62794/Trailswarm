@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
 from pokeagent.explorer.press_frame import PressFrame
 
@@ -30,6 +31,11 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
                     inter["menus"].append(menu)
         if not box_after and inter:
             ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
+            if inter.get("ball") is not None:  # the dialog is complete: record the fullest text + parsed item
+                bx, by = inter["ball"]
+                full = inter["entry"].get("text") or " / ".join(ctx.dialog)
+                ctx.mem.note_item_ball(before[0], bx, by, text=full, seen=False)
+                ctx.ball_result = (before[0], bx, by, parse_item_text(full))  # THIS press's own outcome
             extra["ram_diff"], fx = effects(inter["snap"], ctx.emu.read_range(*EFFECT_WINDOW))
             inter["entry"].setdefault("effects", [])
             if fx not in inter["entry"]["effects"]:
@@ -43,6 +49,9 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         # Record the A press either way, so a silent wall is tested once and never again.
         fdx, fdy = DIRS[ctx.facing]
         npc_in_front = ctx.mem.npc_at(before[0], before[1] + fdx, before[2] + fdy)
+        ball = (before[1] + fdx, before[2] + fdy) if is_item_ball(npc_in_front) else None
+        if ball is not None:
+            ctx.mem.note_item_ball(before[0], ball[0], ball[1], text=text)
         if npc_in_front is not None:  # people move: their results belong to the NPC record, not to the tile
             npc_in_front["talked"] = npc_in_front.get("talked", 0) + 1
             if len(text) > len(npc_in_front.get("text", "")):
@@ -54,7 +63,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.mem.recent_talk.add(f"{before[1]},{before[2]},{ctx.facing}")
         if box_after:
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
-                           "choices": [], "snap": snap_pre}
+                           "choices": [], "snap": snap_pre, "ball": ball}
             extra["sprites"] = sprite_snapshot(ctx.emu)
         result = (f"INTERACTION at ({before[1]},{before[2]}) facing {ctx.facing}: \"{text[:60]}\""
                   if box_after else f"nothing to interact with facing {ctx.facing} (remembered)")
