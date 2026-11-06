@@ -132,6 +132,9 @@ class ExplorerContext:
     yesno: dict | None = None
     pickup_await: tuple | None = None  # (map,x,y) ball whose A press is awaiting its item result
     pickup_ball: tuple | None = None  # committed item-ball target (map,x,y)
+    ball_result: tuple | None = None  # (map,x,y,item|None): the last item-ball dialog to close, from press_interact
+    pickup_gone: set = field(default_factory=set)  # (map,x,y) balls seen hidden or collected this run
+    pickup_approach: dict = field(default_factory=dict)  # (map,x,y) -> presses spent walking through unexplored ground toward it
     pickup_tries: dict = field(default_factory=dict)  # (map,x,y) -> presses that gave no item text this run
     trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---

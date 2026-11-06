@@ -16,10 +16,13 @@ TM = 0xC3A0
 MAP, PX, PY, PARTY = 0xD35E, 0xD362, 0xD361, 0xD163
 
 
-def ball_sprite(emu, slot: int, x: int, y: int, pic: int = 61, moving: int = 0) -> None:
-    """A sprite-table slot: pic at 0xC1x0, movement status at +1, map pos (x+4, y+4) at 0xC2x4/5."""
+def ball_sprite(emu, slot: int, x: int, y: int, pic: int = 61, moving: bool = False, img: int = 0x9C) -> None:
+    """A sprite-table slot as the ROM has it: pic at 0xC1x0, movement status 1 at +1, image index at +2
+    (0xFF = hidden/not drawn), map pos (x+4, y+4) at 0xC2x4/5, movement byte at 0xC2x6 (0xFF stay, 0xFE walk)."""
     emu.set(0xC100 + 16 * slot, pic)
-    emu.set(0xC101 + 16 * slot, moving)
+    emu.set(0xC101 + 16 * slot, 1)
+    emu.set(0xC102 + 16 * slot, img)
+    emu.set(0xC206 + 16 * slot, 0xFE if moving else 0xFF)
     emu.set(0xC204 + 16 * slot, y + 4)
     emu.set(0xC205 + 16 * slot, x + 4)
 
@@ -46,12 +49,24 @@ def applies(ctx) -> bool:
 def test_item_balls_finds_static_pic61_and_ignores_moving_hidden_and_other():
     emu = FakeEmulator()
     ball_sprite(emu, 1, 10, 20)                    # a real item ball
-    ball_sprite(emu, 2, 30, 30, moving=0x10)       # pic 61 but a movement in progress
+    ball_sprite(emu, 2, 30, 30, moving=True)       # pic 61 but a random-walk sprite (movement byte 0xFE)
     emu.set(0xC130, 61); emu.set(0xC131, 0)        # pic 61 but no map position (raw 0 -> -4,-4)
     ball_sprite(emu, 4, 15, 15, pic=7)             # an ordinary NPC
     ball_sprite(emu, 5, 40, 40)                    # a second real item ball
     ball_sprite(emu, 15, 50, 50)                   # the last slot counts too
     assert items.item_balls(emu) == [(1, 10, 20), (5, 40, 40), (15, 50, 50)]
+
+
+def test_item_balls_skips_a_hidden_sprite_in_view_but_keeps_an_offscreen_ff():
+    """Gen 1 HideObject leaves pic 61 and the position and sets the image index 0xFF; an off-screen live
+    ball also reads 0xFF (not drawn), so only an 0xFF ball inside the view window counts as hidden."""
+    emu = FakeEmulator({PX: 10, PY: 10})
+    ball_sprite(emu, 1, 11, 10, img=0xFF)      # next to the player, hidden: collected
+    ball_sprite(emu, 2, 10, 14, img=0xFF)      # 4 tiles away, hidden
+    ball_sprite(emu, 3, 30, 10, img=0xFF)      # far away, 0xFF only because it is off screen: still live
+    ball_sprite(emu, 4, 12, 10, img=0xA4)      # in view and drawn: live
+    assert items.item_balls(emu) == [(3, 30, 10), (4, 12, 10)]
+    assert items.hidden_balls(emu, within=2) == [(1, 11, 10)]
 
 
 def test_is_item_ball_needs_pic61_and_never_moved():
@@ -152,12 +167,11 @@ def test_pickup_does_not_apply_during_deliver_parcel(tmp_path):
     assert not applies(ctx)
 
 
-def test_pickup_does_not_apply_in_lab_before_first_pokemon(tmp_path):
+def test_pickup_never_applies_in_oaks_lab_even_with_a_pokemon(tmp_path):
     ctx = route_ctx(tmp_path, m=0x28, player=(6, 4), ball=(7, 4), xs=range(3, 10), ram={PARTY: 0})
-    # still inside Oak's lab with no Pokemon: the starter planner owns those balls
+    assert not applies(ctx)       # before the first pokemon the starter planner owns those balls
+    ctx.emu.set(PARTY, 1)         # a starter is in the party: the two leftover balls are still not ours
     assert not applies(ctx)
-    ctx.emu.set(PARTY, 1)  # a starter is in the party now: the lab gate lifts
-    assert applies(ctx)
 
 
 def test_pickup_skips_a_ball_after_two_empty_tries(tmp_path):
@@ -168,22 +182,62 @@ def test_pickup_skips_a_ball_after_two_empty_tries(tmp_path):
     assert applies(ctx)
 
 
-def test_pickup_resolve_counts_a_failed_try_then_a_success(tmp_path):
-    ctx = route_ctx(tmp_path, player=(9, 5))  # already beside the ball
+def beside(tmp_path, **kw):
+    """Player already beside the ball (facing it): the next Pickup step presses A."""
+    ctx = route_ctx(tmp_path, player=(9, 5), **kw)
     ctx.facing = "RIGHT"
+    return ctx
+
+
+def press_a(ctx):
     ctx.refresh()
     d = Pickup().step(ctx)
-    assert d.button == "A" and ctx.pickup_await == (13, 10, 5)
-    # the box closed with no item text -> one failed try, then it presses A again (tries=1 < 2)
-    ctx.refresh()
-    d = Pickup().step(ctx)
-    assert ctx.pickup_tries[(13, 10, 5)] == 1 and d.button == "A"
-    # now the dialog names an item -> success is recorded, no failed try added
+    return d.button if d else None
+
+
+def test_success_is_decided_by_this_presses_dialog_not_persisted_memory(tmp_path):
+    ctx = beside(tmp_path)
+    # maps.json remembers an item from an earlier run / an earlier walk-over: that is NOT this press's result
     ctx.mem.note_item_ball(13, 10, 5, text="BCN found POTION!", seen=False)
-    ctx.refresh()
-    Pickup().step(ctx)
-    assert ctx.mem.m(13)["items"]["10,5"]["item"] == "POTION"
-    assert ctx.pickup_tries[(13, 10, 5)] == 1  # unchanged: the success did not add a failure
+    assert press_a(ctx) == "A" and ctx.pickup_await == (13, 10, 5)
+    assert press_a(ctx) == "A"                      # the press had no dialog: a failed try, press again
+    assert ctx.pickup_tries[(13, 10, 5)] == 1
+    assert press_a(ctx) is None                     # second empty try: the ball is skipped for the run
+    assert ctx.pickup_tries[(13, 10, 5)] == 2
+
+
+def test_a_dialog_with_an_item_is_a_success_and_a_hidden_ball_is_never_pressed_again(tmp_path):
+    ctx = beside(tmp_path)
+    assert press_a(ctx) == "A"
+    ctx.ball_result = (13, 10, 5, "POTION")         # press_interact: this press closed on "found POTION!"
+    ball_sprite(ctx.emu, 1, 10, 5, img=0xFF)        # and the game hid the sprite
+    assert press_a(ctx) is None                     # resolved as a success; nothing left to pick
+    assert ctx.pickup_tries.get((13, 10, 5), 0) == 0 and (13, 10, 5) in ctx.pickup_gone
+
+
+def test_a_ball_that_stays_visible_after_success_does_not_loop(tmp_path):
+    ctx = beside(tmp_path)
+    presses = 0
+    for _ in range(10):
+        b = press_a(ctx)
+        if b != "A":
+            break
+        presses += 1
+        ctx.ball_result = (13, 10, 5, "POTION")     # every press "succeeds", yet the sprite never hides
+    assert presses == 2                             # a success with the ball still live counts as a try
+    assert ctx.pickup_tries[(13, 10, 5)] == 2
+    assert not applies(ctx)
+
+
+def test_a_ball_hidden_before_we_arrive_is_not_chosen_and_remembered_as_gone(tmp_path):
+    ctx = beside(tmp_path)
+    ball_sprite(ctx.emu, 1, 10, 5, img=0xFF)        # walked over earlier: pic 61 stays, image index 0xFF
+    assert not applies(ctx)
+    assert press_a(ctx) is None
+    assert (13, 10, 5) in ctx.pickup_gone
+    ball_sprite(ctx.emu, 1, 10, 5, img=0xFF)
+    ctx.emu.set(PX, 4)                              # walked away: 0xFF now reads as off screen, still not chosen
+    assert not applies(ctx)
 
 
 # --- legend: the '*' kind ------------------------------------------------------
@@ -214,3 +268,42 @@ def test_ascii_vision_and_render_memory_show_item_glyph(tmp_path):
     assert sees[7][7] == "*" and "* an item ball" in sees.legend
     rows = mem.render_memory(1, 5, 5, {(7, 7)})
     assert rows[9][9] == "*" and "* an item ball" in rows.legend
+
+
+# --- the A press returns before the box opens ----------------------------------
+
+def test_await_item_dialog_waits_for_the_late_box_and_records_this_presses_item(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours import pickup
+    ctx = make_ctx(tmp_path)
+    shown = iter([None, None, None, "BCN found", "BCN found | POTION!"])
+    monkeypatch.setattr(pickup, "read_box", lambda c: next(shown, None))
+    pickup.await_item_dialog(ctx, (13, 10, 5))
+    assert ctx.ball_result == (13, 10, 5, "POTION") and ctx.emu.frames >= 24
+    monkeypatch.setattr(pickup, "read_box", lambda c: None)  # nothing ever opens: no result, bounded wait
+    pickup.await_item_dialog(ctx, (13, 10, 5))
+    assert ctx.ball_result is None
+
+
+def test_the_a_decision_carries_the_dialog_hook(tmp_path):
+    ctx = beside(tmp_path)
+    ctx.refresh()
+    d = Pickup().step(ctx)
+    assert d.button == "A" and d.after is not None
+
+
+# --- a ball in unexplored ground: approach it ---------------------------------
+
+def test_pickup_explores_toward_a_ball_whose_side_tiles_are_unvisited(tmp_path):
+    from pokeagent.explorer.behaviours.pickup_approach import APPROACH_STEPS
+    ctx = route_ctx(tmp_path, ball=(8, 3), player=(5, 5), xs=range(5, 12))  # corridor on row 5, ball two rows up
+    assert applies(ctx)
+    ctx.refresh()
+    d = Pickup().step(ctx)
+    assert d.rule == "pickup" and d.button == "UP" and ctx.pickup_approach[(13, 8, 3)] == 1
+    ctx.pickup_approach[(13, 8, 3)] = APPROACH_STEPS   # spent its approach budget: given up for the run
+    assert not applies(ctx)
+
+
+def test_pickup_does_not_explore_toward_a_ball_beyond_the_detour_budget(tmp_path):
+    ctx = route_ctx(tmp_path, ball=(5 + PICKUP_DETOUR + 5, 3), player=(5, 5), xs=range(5, 12))
+    assert not applies(ctx)

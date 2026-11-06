@@ -38,5 +38,5 @@ def default_behaviours() -> list[Behaviour]:
         Battle(), Catch(), BattleMoves(),
         NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),
-        ExploreBurst(), PlanGoal(), Pickup(), Frontier(),
+        ExploreBurst(), Pickup(), PlanGoal(), Frontier(),
     ]

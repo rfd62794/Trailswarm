@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer.items import is_item_ball
+from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
 from pokeagent.explorer.press_frame import PressFrame
 
@@ -33,8 +33,9 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
             if inter.get("ball") is not None:  # the dialog is complete: record the fullest text + parsed item
                 bx, by = inter["ball"]
-                ctx.mem.note_item_ball(before[0], bx, by,
-                                       text=inter["entry"].get("text") or " / ".join(ctx.dialog), seen=False)
+                full = inter["entry"].get("text") or " / ".join(ctx.dialog)
+                ctx.mem.note_item_ball(before[0], bx, by, text=full, seen=False)
+                ctx.ball_result = (before[0], bx, by, parse_item_text(full))  # THIS press's own outcome
             extra["ram_diff"], fx = effects(inter["snap"], ctx.emu.read_range(*EFFECT_WINDOW))
             inter["entry"].setdefault("effects", [])
             if fx not in inter["entry"]["effects"]:
