@@ -14,7 +14,7 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands
+from pokeagent.viewer import commands, steering
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.panels import BG
@@ -43,7 +43,8 @@ class ViewerWindow:
         self.scope = "all"
         self._speed = 1
         self._paused = False
-        self._steer = False
+        self._throttle = steering.KeyThrottle()
+        self._shown_focus: str | None = None
         self._grid: GridView | None = None
         self._focus_view: FocusView | None = None
         self._bar: ControlBar | None = None
@@ -87,9 +88,9 @@ class ViewerWindow:
         self._paused = not self._paused
         self.send_to_targets("pause" if self._paused else "resume")
 
-    def set_steer(self, on: bool) -> None:
-        self._steer = on
-        self.send_to_targets("steer", on=on)
+    def steering(self) -> bool:
+        """Read-only: keyboard steering is on exactly while an agent is focused."""
+        return self.focus.focused is not None
 
     def target_snaps(self):
         return [s for aid in self._target_ids() if (s := self.model.snapshot(aid)) is not None]
@@ -122,25 +123,48 @@ class ViewerWindow:
                 self._outbox.put((src, cmd, args))
 
     def key_button(self, key_name: str) -> None:
-        """Steer-gated game key: reaches only the selected agent, only while Steer is on."""
-        button = commands.press_for_key(key_name, self._steer)
-        if button is None or self.selected is None:
-            return
-        src = self.sources.get(self.selected)
-        if src is not None:
-            self._outbox.put((src, "press", {"button": button, "source": "human"}))
+        """Game key: reaches only the focused agent (never in grid view), <=1 press / 120 ms / key."""
+        hit = steering.press_target(key_name, self.focus.focused, self._throttle)
+        if hit is not None:
+            self._send_one(hit[0], "press", button=hit[1], source="human")
+
+    def hotkey(self, name: str) -> None:
+        """P / T: transport hotkeys, focus view only (grid view reaches no agent)."""
+        if self.focus.focused is not None:
+            self.toggle_pause() if name == "pause" else self.cycle_speed()
 
     def escape(self) -> None:
-        self.focus.back()
+        self.leave_focus()
 
     # -- focus / selection --------------------------------------------------------
-    def _on_focus(self, agent_id: str) -> None:
-        self.focus.toggle(agent_id)
+    def _send_one(self, aid: str, cmd: str, **args) -> None:
+        src = self.sources.get(aid)
+        if src is not None:
+            self._outbox.put((src, cmd, args))
+
+    def toggle_focus(self, agent_id: str) -> None:
+        """Double-click: enter focus (steer on) or, on the focused card, leave it."""
+        if self.focus.focused == agent_id:
+            self.leave_focus()
+        elif self.focus.focused is None:
+            self.focus.focus(agent_id)
+            self.selected = agent_id
+            self._send_one(agent_id, "steer", on=True)
+
+    def leave_focus(self) -> None:
+        """Back to grid: hand the agent back (hold_release) and turn steering off."""
+        aid = self.focus.focused
+        self.focus.back()
+        if aid is not None:
+            self._send_one(aid, "hold_release")
+            self._send_one(aid, "steer", on=False)
 
     def _on_select(self, agent_id: str) -> None:
         self.selected = agent_id
 
     def _target_ids(self) -> list[str]:
+        if self.focus.focused is not None:  # control bar acts on the focused agent only
+            return [self.focus.focused]
         return commands.targets(self.selected, self.model.ids(), self.scope)
 
     def _pid_for(self, agent_id: str) -> int | None:
@@ -164,9 +188,9 @@ class ViewerWindow:
                        no_title_bar=True, no_scrollbar=True, width=10, height=10)
         dpg.add_texture_registry(tag="viewer_tex", show=False)
         self._grid = GridView(self._win, self.model, self._card_factory,
-                              self._on_focus, self._on_select)
+                              self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
-                                     self.focus.back, self._on_focus, self._on_select)
+                                     self.leave_focus, self.toggle_focus, self._on_select)
         self._bar = ControlBar(self._win, self)
         keys.install(self)
         self._fit()
@@ -194,8 +218,15 @@ class ViewerWindow:
                 view._sig = None
 
     # -- frame loop ----------------------------------------------------------------
+    def _title(self, fps: float | None = None) -> str:
+        mode = f"focus {self.focus.focused}" if self.focus.focused else "grid"
+        return f"PokeAgent viewer [{mode}]" + (f" - {fps:.0f} fps" if fps is not None else "")
+
     def tick(self) -> None:
         focused = self.focus.focused
+        if focused != self._shown_focus:  # the title always names the view (and what steers)
+            self._shown_focus = focused
+            dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
         if self._grid is not None:
             dpg.configure_item(self._grid.area, show=focused is None)
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):
@@ -206,6 +237,8 @@ class ViewerWindow:
         hold = self._hold_s_for
         if self._grid is not None and focused is None:
             self._grid.update(hold)
+            for aid, card in self._grid.cards.items():
+                card.set_selected(aid == self.selected)
         if self._focus_view is not None:
             self._focus_view.update(hold)
         if self._bar is not None:
@@ -228,7 +261,7 @@ class ViewerWindow:
             frames += 1
             if t0 - t_mark >= 5.0:  # fps counter: title + one log line per 5 s
                 self.ui_fps = frames / (t0 - t_mark)
-                dpg.set_viewport_title(f"PokeAgent viewer - {self.ui_fps:.0f} fps")
+                dpg.set_viewport_title(self._title(self.ui_fps))
                 log.info("ui fps %.1f", self.ui_fps)
                 frames, t_mark = 0, t0
             time.sleep(max(0.0, 1.0 / self.fps - (time.monotonic() - t0)))

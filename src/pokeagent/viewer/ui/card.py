@@ -17,7 +17,7 @@ from pokeagent.snapshot import AgentSnapshot
 from pokeagent.viewer.panels import BG, DIM, PANE, TEXT, driver_color, plain, span
 from pokeagent.viewer.panels import render as pres
 from pokeagent.viewer.panels import registry
-from pokeagent.viewer.panels.textimg import lines_texture
+from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
 
 _PAD = 5
 _HEADER_H = 15
@@ -62,8 +62,8 @@ def _frame_tex(rgb: bytes, w: int, h: int, pw: int, ph: int, dim: bool) -> tuple
     return px, pw, ph, key
 
 
-def _text_tex(lines, pw: int, ph: int) -> tuple[list[float], int, int, tuple]:
-    data, tw, th = lines_texture(lines, pw, ph)
+def _text_tex(lines, pw: int, ph: int, grid=None) -> tuple[list[float], int, int, tuple]:
+    data, tw, th = lines_texture(lines, pw, ph, grid=grid)
     key = (tw, th, hashlib.md5(repr(lines).encode()).digest()[:8])
     return data, tw, th, key
 
@@ -101,6 +101,7 @@ class CardView:
         self._img: dict[str, str | int] = {}
         self._parent = parent  # items are leaves: no container can nest inside cells/child_windows
         self._last_click = 0.0
+        self._sel: bool | None = None
         self._sees_cache: tuple = (None, None)
         self._top_at = 0.0
         self._memo: dict = {}  # panel -> input signature of what its texture shows now
@@ -115,6 +116,17 @@ class CardView:
         else:
             self._last_click = now
             self._on_select(self.agent_id)
+
+    def set_selected(self, on: bool) -> None:
+        """Highlight (full brightness + bright tint on the header) vs the dimmed rest of the grid."""
+        if getattr(self, "_sel", None) == on:
+            return
+        self._sel = on
+        for name, tint in (("top", (255, 255, 255, 255) if on else (170, 170, 170, 255)),
+                           ("header", (120, 220, 255, 255) if on else (255, 255, 255, 255))):
+            tag = self._img.get(name)
+            if tag is not None and dpg.does_item_exist(tag):
+                dpg.configure_item(tag, tint_color=tint)
 
     # -- layout -----------------------------------------------------------------
     def _geom(self) -> dict[str, tuple[int, int]]:
@@ -206,7 +218,7 @@ class CardView:
                     lkey = None
             skey = (sw_, th_, top_key[4])
             if self._sees_cache[0] != skey:  # the Sees text changes far less often than the frame
-                self._sees_cache = (skey, _text_tex(sees_lines, sw_, th_))
+                self._sees_cache = (skey, _text_tex(sees_lines, sw_, th_, SEES_GRID))
             rpx, rtw, rth, rkey = self._sees_cache[1]
             data, tw2, th2 = _hstack(left, rw_ * ss, rth, rpx, rtw, rth, _PAD * ss, _hex_rgba(PANE))
             tag = self._tex["top"].set(data, tw2, th2, ("top", lkey, rkey))
@@ -240,4 +252,5 @@ class CardView:
             self.delete()
             self._memo.clear()
             self._sees_cache = (None, None)
+            self._sel = None
             self._build()
