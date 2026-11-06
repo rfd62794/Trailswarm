@@ -205,7 +205,7 @@ def main(argv=None) -> int:
 
     @ctl.route("GET", "/vision")
     def _vision(**_):
-        return {"rows": battle_view(emu) if emu.read(0xD057) else ascii_vision(emu, mem, emu.read(0xD367))}
+        return {"rows": battle_view(emu, ctx.move_tag) if emu.read(0xD057) else ascii_vision(emu, mem, emu.read(0xD367))}
 
     @ctl.route("GET", "/peek")
     def _peek(addr="0xD35E", length="1", **_):
@@ -278,7 +278,7 @@ def main(argv=None) -> int:
             try:
                 m_, x_, y_ = pos(); npcs = npc_positions(emu)
                 if emu.read(0xD057):
-                    vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu)))
+                    vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu, ctx.move_tag)))
                 else:
                     sees = ascii_vision(emu, mem, emu.read(0xD367)); rem = mem.render_memory(m_, x_, y_, npcs)
                     vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(sees) + "\n" + sees.legend

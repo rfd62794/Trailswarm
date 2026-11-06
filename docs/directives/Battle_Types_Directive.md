@@ -113,11 +113,13 @@ Test tail, line counts, and anything that did not fit.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-battle-types-directive |
 | Base branch | - |
 | Base commit | 693a070d8d7840c8688bff459b89c9c8427372c4 |
+| Head commit | 7dcc2f06f72dfe7a1d8d6c596c140fa219169b2a |
+| Head remote | rfd62794/pokeagent |
 | Model | swe-2-flash-max |
 
 **Status log**
@@ -125,4 +127,6 @@ Test tail, line counts, and anything that did not fit.
 - 2026-11-05 19:43 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates
 - 2026-11-05 19:43 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-types-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4Z8KYRVZ2X524BCHC1H63
 - 2026-11-05 19:45 · dispatcher · launched pid=3080; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-types-directive; provisioned: uv sync --frozen
+- 2026-11-05 20:01 · devin · In progress → Review — 285 passed, 5 skipped (uv run pytest -q). STAB now reads wBattleMon 0xD019/0xD01A; battle_text.py parses super/weak/none/crit; type_effect + chart_disagreements + threat_by_species + damage_by_type ledgers live in MapMemory.data; move_choose Decision.rule and battle sees carry 'EMBER x2 FIRE>GRASS/POISON STAB'. ROM verification of 0xD019/0xD01A deferred to controller per directive. [origin] spent: devin 16 min est. n/a
+- 2026-11-05 20:24 · robert-claude-laptop · Review → Done — note: merged via PR #42 (6efa68c) with review fixes; ROM: battler types GRASS/POISON read at 0xD019/0xD01A in a wild battle; 3,000-step run recorded type_effect, no chart_disagreements
 <!-- queue:end -->
