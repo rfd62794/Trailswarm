@@ -145,11 +145,13 @@ anything you had to interpret.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
+| Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert approved all 2026-11-05; deps V1 (#26), E1 (#30), World Legend (#34) merged
+- 2026-11-05 19:34 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
 <!-- queue:end -->
