@@ -90,13 +90,15 @@ Test tail, line counts, where `pickup` sits in the selector order and why, anyth
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-item-balls-directive |
 | Base branch | - |
+| Base commit | 488b510af0ae92ce3e7be151c64524bbb1b263a9 |
 | Model | swe-2-flash-max |
 
 **Status log**
 - 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05; dep World Legend merged (#34)
 - 2026-11-05 19:40 · robert-claude-laptop · Queued → Approved — lint override: greenfield directive: cited new paths are files it creates; deps merged
+- 2026-11-05 19:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-item-balls-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4T3ZVNEZWZ51V3PT4GSNA
 <!-- queue:end -->
