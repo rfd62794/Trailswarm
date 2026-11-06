@@ -127,7 +127,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     carrying_parcel = goals.get("oaks_parcel") and not goals.get("deliver_parcel")
     # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
     # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
-    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36)
+    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36, 0x0E, 0x0F, 0x3B)
     if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5
             and not carrying_parcel and not beyond_viridian):
         # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
@@ -233,4 +233,51 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
             if p:
                 return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
+    if goals.get("beat_brock") and not goals.get("to_cerulean"):
+        return _east_road_step(g, maps, goals, pos)
+    return None
+
+
+# After the Boulder Badge, in geographic order (ROM map connections): Pewter E-> Route 3 N-> Route 4 (Mt Moon 1F is a warp
+# on Route 4) E-> Cerulean. Same order as pokeagent.goals.GOALS.
+EAST_ROAD = (("to_route3", 0x0E), ("to_route4", 0x0F), ("to_mt_moon", 0x3B), ("to_cerulean", 0x03))
+PEWTER, ROUTE3 = 0x02, 0x0E
+
+
+def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str) -> tuple[str, str] | None:
+    """Push toward a map edge ('RIGHT' = east, 'UP' = north): the extreme visited tile whose `side` is still unknown."""
+    d = maps.get(str(pos[0]), {})
+    visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
+    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
+    tiles = [tuple(map(int, k.split(","))) for k in visited]
+    tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
+             and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})]
+    order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
+    word = "easternmost" if side == "RIGHT" else "northernmost"
+    for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
+        if (pos[1], pos[2]) == (tx, ty):
+            return side, f"goal {stage}: at the {word} open tile, pushing {side} for the map edge"
+        p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
+        if p:
+            return p[0], f"goal {stage}: {len(p)} steps to the {word} known tile ({tx},{ty})"
+    return None
+
+
+def _east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[str, str] | None:
+    """Walk toward the next unmet map of EAST_ROAD over the learned world; if it is not mapped yet, push east out of
+    Pewter (Route 3) and north along Route 3 (Route 4). Mt Moon and the road to Cerulean are left to exploration."""
+    stage, target = next((s, t) for s, t in EAST_ROAD if not goals.get(s))
+    p = g.path(pos, lambda n: n[0] == target)
+    if p:
+        return p[0], f"goal {stage}: {len(p)} steps to map 0x{target:02X}"
+    if stage == "to_route3":
+        if pos[0] != PEWTER:
+            p = g.path(pos, lambda n: n[0] == PEWTER)
+            return (p[0], f"goal {stage}: {len(p)} steps back to Pewter City") if p else None
+        return _edge_frontier(g, maps, pos, stage, "RIGHT")
+    if stage == "to_route4":
+        if pos[0] != ROUTE3:
+            p = g.path(pos, lambda n: n[0] == ROUTE3)
+            return (p[0], f"goal {stage}: {len(p)} steps back to Route 3") if p else None
+        return _edge_frontier(g, maps, pos, stage, "UP")
     return None

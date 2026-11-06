@@ -82,3 +82,81 @@ def test_frontier_target_on_another_map_is_dropped(tmp_path):
     ctx.frontier_target, ctx.frontier_route, ctx.frontier_at = (7, 3, 3), ["UP"], None
     _frontier_move(ctx, 1, 4, 5)
     assert ctx.frontier_target is None and ctx.frontier_route == []
+
+
+def ledge_mem(tmp_path) -> MapMemory:
+    """Route 3 shape: a walkable row y=10 with a learned ledge DOWN from (14,10) to (14,12); (14,11) never stood on."""
+    mem = MapMemory(tmp_path / "maps.json")
+    d = mem.m(14)
+    for x in (13, 14, 15):
+        d["visited"][f"{x},10"] = 5
+        d["visited"][f"{x},12"] = 5
+    d.setdefault("jumps", {})["14,10,DOWN"] = [14, 12]
+    for x in (13, 14, 15):  # close every other side so the ledge is the only candidate
+        for n in ("UP",):
+            d["blocked"].append(f"{x},10,{n}")
+        d["blocked"].append(f"{x},12,DOWN")
+        d["blocked"].append(f"{x},12,UP")
+    for k in ("13,10,DOWN", "15,10,DOWN"):
+        d["blocked"].append(k)
+    for k in ("12,10", "16,10", "12,12", "16,12"):
+        d["visited"][k] = 5
+        d["blocked"] += [f"{k},UP", f"{k},DOWN", f"{k},LEFT", f"{k},RIGHT"]
+    return mem
+
+
+def test_ledge_side_counts_as_explored(tmp_path):
+    mem = ledge_mem(tmp_path)
+    assert not mem.is_frontier((14, 14, 10))  # (14,11) is hopped over; before the fix it stayed a 'frontier' forever
+    assert mem.frontier_plan(14, 14, 10) is None
+
+
+def test_choose_local_scores_a_ledge_by_its_landing(tmp_path):
+    mem = ledge_mem(tmp_path)
+    mem.m(14)["blocked"] += ["14,10,LEFT", "14,10,RIGHT"]
+    name, why, want_frontier = mem.choose_local(14, 14, 10, "DOWN")
+    assert name == "DOWN" and want_frontier  # landing seen 5x -> explored, not a fresh tile
+
+
+# --- goals after Brock: east road -------------------------------------------------------------------------------
+
+from pokeagent.goals import GOALS, check_goals  # noqa: E402
+
+AFTER_BROCK = {g: True for g in GOALS[:GOALS.index("beat_brock") + 1]}
+AFTER_BROCK.update({"to_route3": False, "to_route4": False, "to_mt_moon": False, "to_cerulean": False,
+                    "_hp": (30, 30), "_level": 20, "_train_level": 8})
+
+
+def test_east_road_goals_follow_seen_maps():
+    emu = FakeEmulator({MAP: 0x0E, 0xD356: 1})
+    st: dict = {}
+    g = check_goals(emu, st)
+    assert g["to_route3"] and not g["to_mt_moon"] and not g["to_route4"] and not g["to_cerulean"]
+    for m, k in ((0x3B, "to_mt_moon"), (0x0F, "to_route4"), (0x03, "to_cerulean")):
+        emu.set(MAP, m)
+        assert check_goals(emu, st)[k]
+    assert GOALS[-4:] == ["to_route3", "to_route4", "to_mt_moon", "to_cerulean"]
+
+
+def test_east_road_uses_the_learned_world_then_pushes_to_the_edge(tmp_path):
+    mem = MapMemory(tmp_path / "maps.json")
+    d = mem.m(2)  # Pewter: a row to a learned east connection into Route 3
+    for x in range(5, 9):
+        d["visited"][f"{x},10"] = 1
+    d["warps"]["8,10,RIGHT"] = [14, 0, 10]
+    r3 = mem.m(14)["visited"]
+    for x, y in ((0, 10), (1, 10), (2, 10), (2, 9)):
+        r3[f"{x},{y}"] = 1
+    maps = mem.data["maps"]
+    step = plan_step(AFTER_BROCK, maps, (2, 5, 10), "RIGHT")
+    assert step[0] == "RIGHT" and "to_route3" in step[1]
+    # Route 3 seen, Route 4 unmapped: go to the northernmost tile with an unknown UP, then push UP
+    goals = {**AFTER_BROCK, "to_route3": True}
+    step = plan_step(goals, maps, (14, 0, 10), "RIGHT")
+    assert step[0] == "RIGHT" and "to_route4" in step[1] and "northernmost" in step[1]
+    step = plan_step(goals, maps, (14, 2, 9), "UP")
+    assert step == ("UP", "goal to_route4: at the northernmost open tile, pushing UP for the map edge")
+    # from Pewter, go back through the learned connection to Route 3 first
+    assert plan_step(goals, maps, (2, 5, 10), "RIGHT")[1].startswith("goal to_route4: ")
+    # Route 4 seen: Mt Moon is a warp found by exploration
+    assert plan_step({**goals, "to_route4": True}, maps, (0x0F, 3, 3), "UP") is None
