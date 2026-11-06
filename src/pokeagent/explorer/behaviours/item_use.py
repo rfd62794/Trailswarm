@@ -46,6 +46,7 @@ def no_effect_shown(lines: list[str]) -> bool:
 
 def new_battle(ctx: ExplorerContext) -> None:
     ctx.item_attempts = 0
+    ctx.cave_runs = 0
     ctx.item_blocked = set()
 
 

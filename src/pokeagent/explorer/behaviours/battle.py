@@ -179,9 +179,11 @@ class Battle(BehaviourBase):
             gn = check_goals(ctx.emu, ctx)
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(0xCFE5)))
-            if kind == 1 and (weak or hurry or cave_run(ctx, kind, species)) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
+            if kind == 1 and (weak or hurry or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))) and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""
                 if ">RUN" in run_line:
+                    if not (weak or hurry):
+                        ctx.cave_runs += 1  # a cave-only run: capped per battle (a failed escape must not loop)
                     return Decision("A", "flee_run", f"BATTLE wild, HP {hp}/{mx}: RUN{tnote}")
                 cur = next((ln for ln in lines_now if ">" in ln), "")
                 if "FIGHT" in cur or "PKMN" in cur:

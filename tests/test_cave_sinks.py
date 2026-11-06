@@ -49,11 +49,16 @@ def test_magikarp_trainee_belongs_last_inside_the_cave_first_outside(tmp_path):
     assert trainee_home(ctx) == 0
 
 
-def test_cave_run_only_for_owned_species_in_wild_cave_fights(tmp_path, monkeypatch):
+def test_cave_run_for_wild_cave_fights_except_catch_targets_and_after_the_cap(tmp_path, monkeypatch):
     monkeypatch.setattr(br, "ROM_KB", {"dex_of_internal": {"107": 41, "34": 1}})
     ctx = make_ctx(tmp_path, {0xD35E: 0x3B, 0xD2F7 + 5: 0b00000001}); ctx.refresh()  # dex 41 owned
     assert br.cave_run(ctx, 1, 107)           # ZUBAT, owned
-    assert not br.cave_run(ctx, 1, 34)        # dex 1 not owned: a new species is still worth it
+    assert br.cave_run(ctx, 1, 34)            # not owned but no ball in the bag: nothing to catch it with, so run too
+    assert not br.cave_run(ctx, 1, 34, balls=3)  # a catch target (ball + unowned dex entry) is fought/caught
+    assert br.cave_run(ctx, 1, 107, balls=3)  # owned: never a target
+    ctx.cave_runs = br.MAX_CAVE_RUNS
+    assert not br.cave_run(ctx, 1, 107)       # a failed-escape loop gives up and fights
+    ctx.cave_runs = 0
     assert not br.cave_run(ctx, 2, 107)       # trainer battle: cannot run
     assert not br.cave_run(ctx, 1, 0)
     ctx.emu.set(0xD35E, 0x0E); ctx.refresh()
