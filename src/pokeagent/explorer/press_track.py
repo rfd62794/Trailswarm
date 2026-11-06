@@ -72,9 +72,12 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     if ctx.exp_prev is not None:
         ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})["steps"] += 1
     ctx.exp_prev = exp_now
-    sx_now = sum(int.from_bytes(ctx.emu.read_range(0xD17C + 2 * i, 2), "big") for i in range(5))  # wPartyMon1 stat exp
-    note_stat_exp(ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}}), sx_now, ctx.stat_exp_prev)
-    ctx.stat_exp_prev = sx_now
+    try:  # record-only stat-exp yield: never let it end a run
+        sx_now = sum(int.from_bytes(ctx.emu.read_range(0xD17C + 2 * i, 2), "big") for i in range(5))  # wPartyMon1 stat exp
+        note_stat_exp(ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}}), sx_now, ctx.stat_exp_prev)
+        ctx.stat_exp_prev = sx_now
+    except Exception:
+        ctx.stat_exp_prev = None
     bag_post = bag_contents(ctx.emu)
     if bag_post != bag_pre:  # an item was received, used, bought or sold: remember where and from what
         for item in set(bag_pre) | set(bag_post):
