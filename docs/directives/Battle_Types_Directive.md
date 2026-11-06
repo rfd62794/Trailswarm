@@ -107,3 +107,17 @@ WATER 21, GRASS 22, ELECTRIC 23, PSYCHIC 24, ICE 25, DRAGON 26.
 ## 8. Report
 
 Test tail, line counts, and anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-05 19:34 · robert-claude-laptop · none → Queued — Robert asked 2026-11-05 (type learning); STAB reads party slot 1
+<!-- queue:end -->
