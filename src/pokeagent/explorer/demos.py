@@ -65,4 +65,6 @@ def shutdown(ctx: ExplorerContext):
     inter = ctx.inter
     if inter:  # keep what an unfinished interaction taught us
         ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"]); ctx.inter = None
+    from pokeagent.explorer.trainee import record_trainee
+    record_trainee(ctx)
     ctx.mem.save()

@@ -15,9 +15,11 @@ from typing import Callable
 
 from pokeagent import agent_registry
 from pokeagent.adapters.bridge import EmuBridge
+from pokeagent.adapters.event_feed import EventFeed
 from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
+from pokeagent.goals import SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
 from pokeagent.ram import read_state
@@ -41,6 +43,7 @@ class ExplorerAgentView:
         self.ctx, self.emu, self.mem, self.engine, self.presser = ctx, emu, mem, engine, presser
         self.agent_id, self.root, self.frame_slot = agent_id, Path(root), frame_slot
         self.hold = HumanHold()
+        self.feed = EventFeed()
         self.recent: deque[Event] = deque(maxlen=MAX_RECENT)
         self._presses: dict[str, int] = {}
         self._ctl: ControlServer | None = None
@@ -89,9 +92,13 @@ class ExplorerAgentView:
         ctx = self.ctx
         done = bool(ctx.done)
         check = ctx.goals()
-        current = next((k for k, v in check.items() if not v), "")
+        current = next((k for k, v in check.items() if not v and k not in SIDE_GOALS), "")
         dec = self._last_decision()
         want = " ".join(str(ctx.goto)) if ctx.goto else (current or "explore")
+        try:  # the event stream is derived here, on the emulator thread; it must never break the snapshot
+            self.feed.observe(self.emu, ctx, self.mem, dec, self._last_outcome(), self.hold.active(), check)
+        except Exception:
+            logging.getLogger(__name__).warning("event feed failed", exc_info=True)
         return AgentSnapshot(
             agent_id=self.agent_id, kind="explorer",
             state="stopped" if done else "paused" if ctx.paused else "running",
@@ -160,7 +167,8 @@ class ExplorerAgentView:
     # -- serving ---------------------------------------------------------------------
     def serve(self, port: int = 0, agent_id: str | None = None) -> int:
         """Start the viewer-facing control server + registry entry; returns the port."""
-        self._ctl = ControlServer(self.snapshot, self.handlers(), port=port, token="")
+        self._ctl = ControlServer(self.snapshot, self.handlers(), port=port, token="",
+                                 events_fn=self.feed.bus.payload)
         self._port = self._ctl.start()
         agent_registry.register(self.root, agent_id or self.agent_id, "explorer", self._port,
                                 self.frame_slot, pid=os.getpid(), token=self._ctl.token)

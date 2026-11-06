@@ -19,6 +19,7 @@ import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
+from urllib.parse import parse_qs
 
 from pokeagent.snapshot import AgentSnapshot
 
@@ -67,7 +68,9 @@ def _check_args(cmd: str, args: dict) -> str | None:
 
 class ControlServer:
     def __init__(self, snapshot_fn: Callable[[], AgentSnapshot], handlers: dict[str, Callable[..., dict]],
-                 host: str = "127.0.0.1", port: int = 0, token: str | None = None) -> None:
+                 host: str = "127.0.0.1", port: int = 0, token: str | None = None,
+                 events_fn: Callable[[int], list] | None = None) -> None:
+        self.events_fn = events_fn   # since-seq -> list of event dicts (``GET /events?since=N``); None = 404
         self.token = token or secrets.token_urlsafe(24)
         self.snapshot_fn, self.handlers = snapshot_fn, handlers
         self.host, self.port = host, port
@@ -83,7 +86,7 @@ class ControlServer:
             def log_message(self, *a) -> None:  # silence request logging
                 pass
 
-            def _send(self, code: int, body: dict) -> None:
+            def _send(self, code: int, body) -> None:
                 raw = json.dumps(body).encode("utf-8")
                 self.send_response(code)
                 self.send_header("Content-Type", "application/json")
@@ -107,7 +110,16 @@ class ControlServer:
             def do_GET(self) -> None:
                 if not self._guard():
                     return
-                if self.path.split("?")[0] != "/snapshot":
+                route, _, query = self.path.partition("?")
+                if route == "/events" and outer.events_fn is not None:
+                    try:
+                        since = int(parse_qs(query).get("since", ["0"])[0])
+                        return self._send(200, outer.events_fn(max(0, since)))
+                    except ValueError:
+                        return self._send(400, {"ok": False, "error": "since must be an integer"})
+                    except Exception as exc:
+                        return self._send(500, {"ok": False, "error": str(exc)})
+                if route != "/snapshot":
                     return self._send(404, {"ok": False, "error": "not found"})
                 try:
                     self._send(200, outer.snapshot_fn().to_dict())

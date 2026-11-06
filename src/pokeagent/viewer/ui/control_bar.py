@@ -20,6 +20,7 @@ class ControlBar:
         self.speed_btn = None
         self.pause_btn = None
         self.steer_box = None
+        self.view_btn = None
         self.hand_btns: dict[str, str | int] = {}
         self._build(parent)
 
@@ -32,6 +33,7 @@ class ControlBar:
                                             callback=lambda s, a, u: self.host.toggle_pause())
             self.speed_btn = dpg.add_button(label="1x", width=44,
                                             callback=lambda s, a, u: self.host.cycle_speed())
+            self.view_btn = dpg.add_button(label="World view", width=84, callback=lambda s, a, u: self.host.focus.toggle_mode())
             self.steer_box = dpg.add_checkbox(label="Steering (focus view)", default_value=False, enabled=False)
         # row 2: hand-off + state slots
         with dpg.group(horizontal=True, parent=parent):
@@ -47,9 +49,10 @@ class ControlBar:
         with dpg.group(horizontal=True, parent=parent):
             dpg.add_combo(["explorer", "rl"], default_value="explorer", tag="spawn_kind", width=90)
             dpg.add_input_text(tag="spawn_args", width=170, hint="args (space separated)")
-            dpg.add_button(label="Spawn", width=56,
+            dpg.add_button(label="Spawn", width=56, tag="spawn_btn",
                            callback=lambda s, a, u: self.host.spawn_agent(
                                dpg.get_value("spawn_kind"), dpg.get_value("spawn_args")))
+            dpg.add_text("", tag="spawn_status")
             dpg.add_button(label="Stop", width=48, callback=lambda s, a, u: self.host.stop_targets())
             dpg.add_button(label="Release", width=64,
                            callback=lambda s, a, u: self.host.send_to_targets("hold_release"))
@@ -60,8 +63,14 @@ class ControlBar:
             dpg.set_item_label(self.speed_btn, SPEED_LABELS.get(self.host.speed(), "1x"))
         if self.pause_btn is not None and dpg.does_item_exist(self.pause_btn):
             dpg.set_item_label(self.pause_btn, "Resume" if self.host.paused() else "Pause")
+        if dpg.does_item_exist(self.view_btn):
+            dpg.set_item_label(self.view_btn, "Grid view" if self.host.focus.mode == "world" else "World view")
         if self.steer_box is not None and dpg.does_item_exist(self.steer_box):
             dpg.set_value(self.steer_box, self.host.steering())
+        if dpg.does_item_exist("spawn_btn"):
+            capped = self.host.at_agent_cap()
+            dpg.configure_item("spawn_btn", enabled=not capped)
+            dpg.set_value("spawn_status", self.host.spawn_msg or ("agent limit reached" if capped else ""))
         snaps = self.host.target_snaps()
         for drv, tag in self.hand_btns.items():
             if dpg.does_item_exist(tag):

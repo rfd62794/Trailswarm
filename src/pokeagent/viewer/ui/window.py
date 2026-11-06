@@ -23,6 +23,9 @@ from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
+from pokeagent.viewer.spawn_control import SpawnControl
+from pokeagent.viewer.ui.world_host import WorldHost
+from pokeagent.world.model import WorldModel
 
 log = logging.getLogger(__name__)
 _BAR_H = 120  # reserved height for the three control-bar rows
@@ -34,11 +37,13 @@ class ViewerWindow:
 
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
-                 root: Path | None = None) -> None:
+                 root: Path | None = None, world: WorldModel | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
+        self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
+        self.world = WorldHost(self, world)
         self.selected: str | None = None
         self.scope = "all"
         self._speed = 1
@@ -105,10 +110,17 @@ class ViewerWindow:
     def load_state(self, name: str) -> None:
         self.send_to_targets("load_state", name=name or "slot")
 
+    def at_agent_cap(self) -> bool:
+        """Cached (refreshed off the UI thread every 2 s): True when spawning is disabled."""
+        self._spawn.refresh()
+        return self._spawn.capped
+
+    @property
+    def spawn_msg(self) -> str:
+        return self._spawn.message
+
     def spawn_agent(self, kind: str, args: str) -> None:
-        if self.supervisor is not None:
-            argv = [kind] + (args.split() if args else [])
-            self.supervisor.spawn(*argv)
+        self._spawn.spawn(kind, args)
 
     def stop_targets(self) -> None:
         if self.supervisor is not None:
@@ -192,6 +204,7 @@ class ViewerWindow:
                               self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
+        self.world.build()
         self._bar = ControlBar(self._win, self)
         keys.install(self)
         self._fit()
@@ -208,6 +221,7 @@ class ViewerWindow:
         self._last_size = (vw, vh)
         dpg.configure_item(self._win, pos=[0, 0], width=vw, height=vh)
         avail = max(80, vh - _BAR_H)
+        self.world.fit(vw, avail)
         for view in (self._grid, self._focus_view):
             if view is not None and dpg.does_item_exist(view.area):
                 dpg.delete_item(view.area)
@@ -223,14 +237,14 @@ class ViewerWindow:
     # -- frame loop ----------------------------------------------------------------
     def area_visible(self, is_grid: bool) -> bool:
         """Which card area shows in the current mode (also used when areas are recreated on resize)."""
-        return is_grid == (self.focus.focused is None)
+        return self.focus.view == ("grid" if is_grid else "focus")
 
     def drop_lost_focus(self) -> None:
         if self.focus.focused is not None and self.focus.focused not in self.model.ids():
             self.leave_focus()  # the focused agent was lost/pruned: back to the grid
 
     def _title(self, fps: float | None = None) -> str:
-        mode = f"focus {self.focus.focused}" if self.focus.focused else "grid"
+        mode = f"focus {self.focus.focused}" if self.focus.focused else self.focus.mode
         return f"PokeAgent viewer [{mode}]" + (f" - {fps:.0f} fps" if fps is not None else "")
 
     def tick(self) -> None:
@@ -239,15 +253,17 @@ class ViewerWindow:
         if focused != self._shown_focus:  # the title always names the view (and what steers)
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
+        self.world.tick()
         if self._grid is not None:
-            dpg.configure_item(self._grid.area, show=focused is None)
+            dpg.configure_item(self._grid.area, show=self.focus.view == "grid")
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):
             dpg.configure_item(self._focus_view.area, show=focused is not None)
             self._focus_view.sync(focused)
         if self._grid is not None:
+            self._grid.pin = focused or self.selected  # the agent being watched/steered never pages out
             self._grid.sync()
         hold = self._hold_s_for
-        if self._grid is not None and focused is None:
+        if self._grid is not None and self.focus.view == "grid":
             self._grid.update(hold)
             for aid, card in self._grid.cards.items():
                 card.set_selected(aid == self.selected)
