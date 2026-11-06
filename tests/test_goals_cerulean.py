@@ -82,7 +82,7 @@ def test_mt_moon_floors_are_left_to_exploration(tmp_path):
 
 def test_pokecenter_is_left_not_explored(tmp_path):
     maps = _mem(tmp_path)
-    goals = {g: True for g in GOALS[:GOALS.index("to_route4") + 1]}
+    goals = {g: True for g in GOALS[:GOALS.index("buy_magikarp") + 1]}
     goals.update({"_hp": (40, 40), "_level": 20, "_train_level": 8})
     assert plan_step(goals, maps, (0x44, 3, 5), "UP") == ("DOWN", "goal to_mt_moon: walking out of the Pokecenter by its door")
     assert plan_step(goals, maps, (0x44, 6, 5), "UP")[0] == "LEFT"

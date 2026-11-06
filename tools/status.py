@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pokeagent.goals import GOALS
+from pokeagent.goals import GOALS, SIDE_GOALS
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
@@ -107,6 +107,20 @@ def _items_picked(d: Path) -> int:
     return n
 
 
+def _trainee_line(dirs: list[Path]) -> str:
+    """Newest run that recorded Magikarp numbers (meta.json "magikarp") plus the background goals (SIDE_GOALS)."""
+    for d in reversed(dirs):
+        meta = _meta(d)
+        mk = meta.get("magikarp")
+        if mk is None:
+            continue
+        side = ", ".join(f"{g}={'yes' if meta.get('side_goals', {}).get(g) else 'no'}" for g in SIDE_GOALS)
+        lvl = f"L{mk['level']}" if "level" in mk else "not owned"
+        return (f"magikarp ({d.name}): {lvl}, battles shared {mk.get('battles_shared', 0)} of {mk.get('battles', 0)}; "
+                f"background goals: {side}")
+    return "magikarp: no run has bought one yet; background goals: " + ", ".join(f"{g}=no" for g in SIDE_GOALS)
+
+
 def main() -> int:
     if not RUNS.exists():
         print("no runs/ data in this checkout (runs/ is gitignored; run the swarm here first)")
@@ -142,6 +156,7 @@ def main() -> int:
         print(f"backtrack ({dirs[-1].name}): reversals {s['reversal_pct']:.1f}% ({s['reversals']}/{s['moves']} agent moves), "
               f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
         print(f"items picked up ({dirs[-1].name}): {_items_picked(dirs[-1])}")
+    print(_trainee_line(dirs))
     return 0
 
 
