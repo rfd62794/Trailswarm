@@ -127,6 +127,8 @@ def main(argv=None) -> int:
     a.ram_diff and start_ram_diff(ctx, emu, run_dir, a.state, a.rom)  # fail-soft: runs unrecorded on any error
     from pokeagent.atlas.ladders import rom_ladders
     ctx.ladders = rom_ladders(a.rom)
+    from pokeagent.atlas.collision import rom_walkable_ids
+    mem.rom_walkable = rom_walkable_ids(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     frame_pub = None

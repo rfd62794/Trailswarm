@@ -18,12 +18,18 @@ LADDER_DEST = {("to_mt_moon", MT_MOON_1F): MT_MOON_B1F, ("mt_moon_b1f", MT_MOON_
                ("mt_moon_b2f", MT_MOON_B1F): MT_MOON_B2F, ("through_mt_moon", MT_MOON_B1F): ROUTE4,
                ("through_mt_moon", MT_MOON_B2F): MT_MOON_B1F, ("through_mt_moon", MT_MOON_1F): MT_MOON_B1F}
 
+# The way out of Mt Moon, from the swarm's through_mt_moon run (2026-11-06, 2228 steps): B2F ladder (5,7) -> B1F (23,3), then B1F (27,3).
+# B1F is split into regions; of B2F's four ladders only that one lands beside the exit, so through_mt_moon on B2F wants the ladder
+# whose landing is nearest the B1F exit tile.
+EXIT_NEAR = {("through_mt_moon", MT_MOON_B2F): (27, 3)}
+
 
 def ladder_step(g: WorldGraph, maps: dict, stage: str, pos: tuple, ladders=None) -> tuple[str, str] | None:
     """The next press toward the known tile nearest the stage's ladder; None when there is nothing to gain (already
     there, no ladder wanted on this floor, or the closest tile was tried ``MAX_PULL_VISITS`` times)."""
     dest = LADDER_DEST.get((stage, pos[0]))
-    targets = ladders(pos[0], dest) if ladders is not None and dest is not None else []
+    near = EXIT_NEAR.get((stage, pos[0]))
+    targets = (ladders(pos[0], dest, near) if near else ladders(pos[0], dest)) if ladders is not None and dest is not None else []
     if not targets:
         return None
     visited = maps.get(str(pos[0]), {}).get("visited", {})
