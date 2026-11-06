@@ -19,6 +19,7 @@ from pokeagent.adapters.event_feed import EventFeed
 from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
+from pokeagent.goals import SIDE_GOALS
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
 from pokeagent.human_hold import HumanHold
 from pokeagent.ram import read_state
@@ -91,7 +92,7 @@ class ExplorerAgentView:
         ctx = self.ctx
         done = bool(ctx.done)
         check = ctx.goals()
-        current = next((k for k, v in check.items() if not v), "")
+        current = next((k for k, v in check.items() if not v and k not in SIDE_GOALS), "")
         dec = self._last_decision()
         want = " ".join(str(ctx.goto)) if ctx.goto else (current or "explore")
         try:  # the event stream is derived here, on the emulator thread; it must never break the snapshot

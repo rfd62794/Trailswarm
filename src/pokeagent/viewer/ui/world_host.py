@@ -1,0 +1,32 @@
+"""The window's world-mode wiring (kept out of window.py): build, fit and per-frame tick of the world view."""
+from __future__ import annotations
+
+import dearpygui.dearpygui as dpg
+
+from pokeagent.viewer.ui.world_side import WorldSide
+from pokeagent.viewer.ui.world_view import WorldView
+from pokeagent.world.export import load_world
+from pokeagent.world.model import WorldModel
+
+
+class WorldHost:
+    def __init__(self, win, model: WorldModel | None = None) -> None:
+        self.win, self.model = win, model or WorldModel()
+        self.view: WorldView | None = None
+
+    def build(self) -> None:
+        w = self.win
+        self.view = WorldView(w._win, self.model, w.toggle_focus, w._on_select, load_world, WorldSide)
+        self.view.side.bind(w.model, w.toggle_focus)
+
+    def fit(self, vw: int, avail: int) -> None:
+        if self.view is not None:
+            self.view.fit(vw, avail)
+
+    def tick(self) -> None:
+        if self.view is None:
+            return
+        showing = self.win.focus.view == "world"
+        dpg.configure_item(self.view.area, show=showing)
+        if showing:
+            self.view.update()

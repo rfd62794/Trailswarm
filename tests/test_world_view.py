@@ -320,6 +320,7 @@ def test_dpg_world_mode_headless():
     bus.emit(ev.BattleStart(species="PIDGEY", enemy_level=4, hp=10, max_hp=10, enemy_hp=5, enemy_max_hp=5))
     wm.ingest("a0", bus.since(0))
     win = ViewerWindow(ViewerModel(), {}, world=wm)
+    wv = lambda: win.world.view
     try:
         win._build()
         dpg.setup_dearpygui()
@@ -327,13 +328,13 @@ def test_dpg_world_mode_headless():
     except Exception as e:
         pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
     try:
-        win._world._load(lambda: world)
-        win._world._started = True
-        win.toggle_view()
+        wv()._load(lambda: world)
+        wv()._started = True
+        win.focus.toggle_mode()
         assert win.focus.view == "world"
         for _ in range(3):
             win.tick()
-        assert "a0" in win._world._points
+        assert "a0" in wv()._points
         win.toggle_focus("a0")
         assert win.focus.view == "focus"
         win.leave_focus()

@@ -1,4 +1,4 @@
-"""Campaign goals: the single source of truth for the 24-goal ladder and its RAM detectors.
+"""Campaign goals: the single source of truth for the 25-goal ladder and its RAM detectors.
 
 tools/{explore_demo,overnight,swarm,review_runs,status}.py all read GOALS from here —
 tests/test_goal_order.py guards against new local copies. goals.json is a stale
@@ -6,11 +6,16 @@ sibling, not a source.
 """
 from __future__ import annotations
 
+from pokeagent.magikarp import gyarados_goal, magikarp_goal_settled
+
 GOALS = ["potion", "left_house", "first_pokemon", "won_battle",
          "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
          "to_route2", "to_pewter", "to_gym", "beat_brock",
-         "to_route3", "to_route4", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
+         "to_route3", "to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
          "heal_cerulean", "beat_misty", "nugget_bridge", "to_bill", "ss_ticket"]
+
+# Background goals: reported by check_goals and tools/status.py, never part of the ladder (they must not block the route).
+SIDE_GOALS = ["gyarados"]
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
 
@@ -75,7 +80,10 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # maps.json: 0x0E Route 3 (35x9), 0x0F Route 4 (45x9), 0x3B Mt Moon 1F (cavern tileset, 20x18), 0x03 Cerulean (20x18).
          # Geography (ROM connections): Pewter E-> Route 3 N-> Route 4 (Mt Moon 1F is a warp on Route 4) E-> Cerulean,
          # so the ladder runs route3, route4, mt_moon, cerulean.
-         "to_route3": 0x0E in seen, "to_route4": 0x0F in seen, "to_mt_moon": 0x3B in seen,
+         "to_route3": 0x0E in seen, "to_route4": 0x0F in seen,
+         # Robert 2026-11-05: buy the 500-yen Magikarp from the salesman in the Mt Moon Pokecenter (0x44) before the cave;
+         # settled when owned, or when it is no longer possible (< 500 money, full party) or Mt Moon 1F was entered.
+         "buy_magikarp": magikarp_goal_settled(emu, st, seen), "to_mt_moon": 0x3B in seen,
          # Mt Moon floors (ROM: Route 4 warps lead to 0x3B and 0x3C; B1F warps lead to 0x3D). The cave counts as crossed
          # when the player is back on Route 4 EAST of the exit: the exit warp (B1F -> Route 4 warp 2) lands at tile
          # (24,5); the west entrance is (18,5) and the Mt Moon Pokecenter door (11,5). So: map 0x0F, x >= 24, B2F seen.
@@ -91,4 +99,5 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
     for k in g:
         if k in st.get("goal_steps", {}) or k in st.get("initial_goals", set()):
             g[k] = True
+    g["gyarados"] = gyarados_goal(emu, st)  # side goal: informational, not in the ladder
     return g

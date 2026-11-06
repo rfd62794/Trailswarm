@@ -88,3 +88,49 @@ blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.
 - Decoders: `ramstructs.py` (party/battle mons, item lists), `ramworld.py` (badges, dex, map header, menu, event flags);
   stats awareness in `explorer/stats.py` and `explorer/stat_records.py` (DVs, stat exp, formula; catch keep-best and per-map stat-exp are report-only).
 - Gen 1 quirk: party stats are only recomputed at level-up, so they ignore stat exp earned since.
+
+## Magikarp: buy, reorder, switch-train (ROM-verified headless 2026-11-05)
+
+- Internal species ids (kb `name_of_internal`): 133 = MAGIKARP, 22 = GYARADOS. Party count 0xD163, species list 0xD164, mon structs 0xD16B stride 44.
+  A bought Magikarp arrives at level 5 with 17-18 HP. Money is BCD at 0xD347 (500 = 500 off the total).
+- The salesman is a wanderer in the Mt Moon Pokemon Center (0x44), pic id 10, pacing the row y=6 between x=8 and x=11. Stand on y=5 above him
+  facing DOWN and press A. His pitch runs ~17 presses before the YES/NO appears (the old "menu open for 12 presses -> B" guard answered NO for us
+  until `AdvanceDialog` exempted the MAGIKARP offer). Texts: "MAN Hello, there! Have I got a deal just for you! I'll let you have a swell MAGIKARP
+  for just 500! What do you say?" -> YES/NO box (with the money window "3553" above it) -> "BCN got MAGIKARP!" -> "Do you want to give a nickname to
+  MAGIKARP?" (YES/NO, we answer NO). Saying NO: "No? I only | doing this as a favor to you!". Afterwards he says "Well, I don't give refunds!".
+- Party screens (all unframed full-screen lists, so `frame_lines` is blind to them; `explorer/party_menu.py` decodes the whole tile map):
+  START menu is a frame "POKeDEX / POKeMON / ITEM / <name> / SAVE / OPTION / EXIT" (cursor remembered between opens; wCurrentMenuItem 0xCC26 = row);
+  A on POKeMON opens the list with the prompt "Choose a POKeMON."; wCurrentMenuItem is the party slot under the cursor; A on a member opens
+  "STATS / SWITCH / CANCEL" (outside a fight; STATS is row 0, SWITCH row 1); A on SWITCH prints "Move POKeMON where?" and the cursor starts on the
+  chosen member; moving it to another slot and pressing A swaps the two (RAM order changes at once); B closes the list, B again the START menu.
+- In a fight: battle menu is a frame ">FIGHT PKMN / ITEM RUN" (PKMN is RIGHT of FIGHT); A on PKMN opens the same "Choose a POKeMON." list; A on a
+  member opens ">SWITCH / STATS / CANCEL" (SWITCH is the FIRST row in a fight); A on SWITCH prints "MAGIKARP enough! Come back!" then "Go! WARTORTLE!".
+  Gen 1 does not reorder the party on an in-battle switch. The enemy then acts (turn one is spent). Seen: "MAGIKARP gained 30 EXP. Points!" and
+  "WARTORTLE gained 30 EXP. Points!" after the Zubat fainted - the switched-out Magikarp shares the experience.
+- No healthy member to send in (all fainted or under 25% HP): a Magikarp only knows SPLASH, so a wild fight is left with RUN (rule
+  `switch_train_run`); a trainer fight cannot be left and carries on. Headless runs from to_route3.state (seeds 7/11/23, 4,000 steps): Magikarp
+  reached L6-L7 and shared 4-9 battles; level 20 needs a few hundred shared fights (about 30 EXP each at these levels), so it is far off.
+- Engine notes: the buy_magikarp goal is settled (so the ladder never blocks) when a MAGIKARP/GYARADOS is owned, money < 500, the party is full, or
+  Mt Moon 1F has been entered. `gyarados` is in `SIDE_GOALS` (reported by check_goals and tools/status.py, never the planner's next goal).
+  With a Magikarp in the party, `party_hp`, the training level and the BattleView read the fighter (the battle's active mon, else the strongest
+  non-Magikarp), not party slot 0.
+
+## Game knowledge drain (ROM-verified 2026-11-05)
+
+`uv run python tools/rom_tables.py` writes `kb/rom_tables.json` (gitignored) ONLY if every check below passes. Offsets are from
+pret/pokered `pokered.sym` (symbols branch), file offset = bank*0x4000 + (addr - 0x4000). Query with `tools/knowledge.py`
+(moves / catch / train / trainer / map / ready) and `pokeagent.knowledge.*`.
+
+| table | symbol (bank:addr) | layout | check that passed |
+|---|---|---|---|
+| species base data | BaseStats 0e:43de | 28 B per dex no.; level-1 moves @15..18, growth rate @19 | CHARMANDER HP 39 FIRE; PIDGEY NORMAL/FLYING; GEODUDE and ONIX ROCK/GROUND |
+| learnsets + evolutions | EvosMovesPointerTable 0e:705c | 190 pointers by INTERNAL id; evolutions (1 level / 2 item+min level / 3 trade, species), 0, then (level, move) pairs, 0 | CHARMANDER EMBER at 9, evolves at 16; BULBASAUR VINE WHIP at 13 |
+| wild encounters | WildDataPointers 03:4eeb | pointer per MAP id; grass rate, 10 x (level, species), water rate, 10 x (level, species) | Route 1 (0x0C): PIDGEY and RATTATA, levels 2-5 |
+| trainer parties | TrainerDataPointers 0e:5d3b, TrainerNames 0e:59ff | 47 pointers; a class's parties back to back: `level, species..., 0` or `0xFF, (level, species)..., 0`; class ends at the next higher pointer (TrainerAI 0e:652e ends the last) | BROCK = GEODUDE L12, ONIX L14; MISTY = STARYU L18, STARMIE L21 |
+| trainer placement | map object data (rom_maps.py) | object text id bit 6 set -> 2 extra bytes (200 + class, party no.) | Pewter Gym 0x36 holds BROCK party 1 and a JR.TRAINER(M); Mt Moon 1F/B2F list their trainers |
+| items | ItemPrices 01:4608, ItemNames 01:472b | 3-byte BCD price; names 0x50-terminated, item ids 1..83 | POTION 300 (id 0x14) |
+
+Mt Moon (0x3B/0x3C/0x3D) trainers, from the ROM: 1F has HIKER, YOUNGSTER, 2 LASS, SUPER NERD, 2 BUG CATCHER; B1F none; B2F SUPER NERD and 4 ROCKET.
+Move meaning: `knowledge/moves.py` maps each ROM effect byte to an `Effect`; every effect id in the drained moves is covered (test-guarded).
+Party readiness (`knowledge/readiness.py`) replaces the fixed training-level table: it simulates our party (RAM stats, known moves) against the boss
+party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only the fallback when the data or the party is missing.

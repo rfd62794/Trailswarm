@@ -11,6 +11,8 @@ demonstrations union (with their grades), so the next watched run starts from ev
 from __future__ import annotations
 
 import argparse
+import atexit
+import contextlib
 import json
 import shutil
 import subprocess
@@ -19,6 +21,15 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+from pokeagent import resources  # noqa: E402
+from pokeagent.agent_registry import list_agents  # noqa: E402
+
+
+def plan_agents(root: Path, want: int, **limits) -> tuple[int, str]:
+    """Clip ``want`` to what the machine can run beside the agents already live; returns (n, why)."""
+    resources.measure_agent_rss(root)
+    return resources.room_for(want, root, **limits)
 
 
 def merge_memory(dst: dict, src: dict) -> dict:
@@ -188,8 +199,19 @@ def main() -> int:
     swarm_dir = ROOT / "runs" / "swarm"; swarm_dir.mkdir(parents=True, exist_ok=True)
 
     if not a.merge_only:
+        stack = contextlib.ExitStack(); atexit.register(stack.close)
+        try:  # one swarm at a time: two racing swarms would both read "room for N" and overshoot the cap
+            stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
+        except resources.LockBusy as e:
+            print(f"not starting: {e}"); return 1
+        n, why = plan_agents(ROOT, a.agents)
+        print(why)
+        if n == 0:
+            print("no room for more agents; not starting a swarm"); return 0
+        used = {e.get("port") for e in list_agents(ROOT)}
+        ports = [p for p in range(8800, 8900) if p not in used][:n]  # never reuse a live agent's control port
         procs = []
-        for i in range(a.agents):
+        for i in range(n):
             own = swarm_dir / f"agent{i}.json"
             if shared.exists():
                 shutil.copy(shared, own)
@@ -203,14 +225,14 @@ def main() -> int:
                     role = "trainer" if i % 2 == 0 else "explorer"
                     role_args = ["--state", str(start), "--explore-rate", "0.0" if role == "trainer" else "0.3"]
             cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(a.steps),
-                   "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(8800 + i),
+                   "--maps", str(own), "--seed", str(1000 + i), "--starter", starter, "--control-port", str(ports[i]),
                    "--box-pace", str([8, 16, 30][i % 3])] + (["--frame-share"] if a.share_frames else []) \
                    + (role_args or ["--explore-rate", "0.5" if i % 2 else "0.0"]) + seg_args
             if role:
                 print(f"agent {i}: role {role}, starting from {Path(role_args[1]).name}")
             log = (swarm_dir / f"agent{i}.log").open("w")
             procs.append((i, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)))
-            print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {8800 + i}")
+            print(f"agent {i}: starter {starter}, {'explorer' if i % 2 else 'exploiter'}, port {ports[i]}")
         t0 = time.time()
         deadline = t0 + max(240, a.steps * 1.2)  # ONE wall-clock budget for the whole round
         try:

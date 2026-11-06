@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from pokeagent.explorer.grind import record_battle_result
 from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -18,6 +19,7 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
 from pokeagent.goals import bag_contents, check_goals
+from pokeagent.magikarp import fighter
 from pokeagent.ramstructs import read_party
 
 PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
@@ -130,7 +132,7 @@ class Battle(BehaviourBase):
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
             # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
             species = ctx.emu.read(0xCFE5)
-            my_sp, my_lvl, e_lvl = ctx.emu.read(0xD16B), ctx.emu.read(0xD18C), ctx.emu.read(0xCFF3)
+            my_sp, my_lvl = fighter(ctx.emu)[:2]; e_lvl = ctx.emu.read(0xCFF3)
             if ctx.last_battle_hp is not None and hp < ctx.last_battle_hp:
                 taken = ctx.last_battle_hp - hp
                 dmg = ctx.mem.data.setdefault("enemy_damage", {}).setdefault(str(species), [])
@@ -205,6 +207,7 @@ class Battle(BehaviourBase):
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
+            record_battle_result(ctx, won=won, moved_away=ctx.emu.read(0xD163) > 0 and (m, x, y) != ctx.battle_pos)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy
