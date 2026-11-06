@@ -16,6 +16,7 @@ from typing import Callable
 
 from pokeagent import agent_registry
 from pokeagent.adapters.bridge import EmuBridge
+from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer.perceive import BATTLE_FLAG, battle_view
 from pokeagent.ram import read_state
@@ -79,7 +80,7 @@ class RlAgentView:
     def _screen(self) -> Screen:
         try:
             rs = read_state(self.env.emu)
-            return Screen(in_battle=bool(self.env.emu.read(BATTLE_FLAG)), party=int(self.env.emu.read(0xD163)),
+            return Screen(in_battle=bool(self.env.emu.read(BATTLE_FLAG)), party=party_rows(self.env.emu),
                           money=rs.money)
         except Exception:
             return Screen()

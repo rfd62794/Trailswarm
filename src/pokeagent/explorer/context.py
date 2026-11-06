@@ -86,6 +86,7 @@ class ExplorerContext:
     episode: dict | None = None
     events_prev: bytes | None = None
     exp_prev: int | None = None
+    stat_exp_prev: int | None = None
     explore_burst: int = 0
     forget_move: str | None = None
     frontier_at: tuple | None = None  # position the committed route's next button was chosen at

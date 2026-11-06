@@ -130,6 +130,11 @@ def apply_overrides(entries: list[dict], overrides: dict[str, dict]) -> None:
             by_name[name].update(patch)
 
 
+def write_map(path: Path, entries: list[dict]) -> None:
+    body = ",\n".join(json.dumps(e, separators=(", ", ": ")) for e in entries)
+    path.write_text("[\n" + body + "\n]\n", encoding="utf-8")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("sym", type=Path)

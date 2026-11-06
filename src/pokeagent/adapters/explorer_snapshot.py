@@ -15,6 +15,7 @@ from typing import Callable
 
 from pokeagent import agent_registry
 from pokeagent.adapters.bridge import EmuBridge
+from pokeagent.adapters.party_panel import party_rows
 from pokeagent.control_server import ControlServer
 from pokeagent.explorer import perceive
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
@@ -77,7 +78,7 @@ class ExplorerAgentView:
             lines = frame_lines(tm) if box_open(tm) else []
             rs = read_state(self.emu)
             return Screen(box_text=" | ".join(lines)[:200], in_battle=bool(self.emu.read(BATTLE_FLAG)),
-                          party=int(self.emu.read(0xD163)), money=rs.money, bag_summary="")
+                          party=party_rows(self.emu), money=rs.money, bag_summary="")
         except Exception:
             return Screen()
 
