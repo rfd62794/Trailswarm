@@ -42,6 +42,7 @@ def main() -> int:
         return 0
     if a.reap:
         from multiprocessing import shared_memory
+        from pokeagent.telemetry import slot_name
         killed = 0
         for port, info in reg.items():
             try:
@@ -50,7 +51,7 @@ def main() -> int:
             except Exception:
                 pass
             try:  # unlink any slot the dead process left behind
-                shared_memory.SharedMemory(name=f"pokeagent_frames_{port}").unlink()
+                shared_memory.SharedMemory(name=slot_name(port, int(info["pid"]))).unlink()
             except Exception:
                 pass
         save({})
