@@ -11,16 +11,18 @@ from pokeagent.explorer.behaviours.goto import Goto
 from pokeagent.explorer.behaviours.guards import LoopGuard, StallGuard
 from pokeagent.explorer.behaviours.heal import Heal
 from pokeagent.explorer.behaviours.menu import Menu
+from pokeagent.explorer.behaviours.party_order import PartyOrder
 from pokeagent.explorer.behaviours.pickup import Pickup
 from pokeagent.explorer.behaviours.plan_goal import PlanGoal
 from pokeagent.explorer.behaviours.procedures import Procedures
 from pokeagent.explorer.behaviours.readiness import Readiness, SettleWait
 from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, ReplayInterrupt
+from pokeagent.explorer.behaviours.switch_out import SwitchOut
 
 __all__ = [
     "AdvanceDialog", "Battle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "Decision",
     "ExploreBurst", "Frontier", "Goto", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
-    "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard",
+    "PartyOrder", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "SettleWait", "StallGuard", "SwitchOut",
     "default_behaviours", "no_press",
 ]
 
@@ -34,8 +36,8 @@ def default_behaviours() -> list[Behaviour]:
     and finally plain exploration.
     """
     return [
-        SettleWait(), LoopGuard(), Readiness(), ReplayInterrupt(),
-        Battle(), Catch(), BattleMoves(),
+        SettleWait(), LoopGuard(), PartyOrder(), Readiness(), ReplayInterrupt(),
+        Battle(), SwitchOut(), Catch(), BattleMoves(),
         NamingKeyboard(), BeatStart(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(),
         ExploreBurst(), Pickup(), PlanGoal(), Frontier(),

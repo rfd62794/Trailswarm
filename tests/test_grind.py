@@ -112,7 +112,7 @@ def test_plan_goal_lifts_the_gate_when_the_budget_is_spent_and_logs_it(monkeypat
     from pokeagent.goals import GOALS
     goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}                      # next stage: BROCK
     logs = []
-    emu = SimpleNamespace(read=lambda a: 8)                                           # lead level 8
+    emu = SimpleNamespace(read=lambda a: 8, read_range=lambda a, n: bytes(n))        # lead level 8, no Magikarp
     ctx = SimpleNamespace(emu=emu, step=0, battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: logs.append(t))
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 12
     ctx.step, ctx.battles = 300, GRIND_BATTLES

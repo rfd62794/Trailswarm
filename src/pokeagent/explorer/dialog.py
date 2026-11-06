@@ -35,8 +35,19 @@ def offered_starter(question: str) -> str | None:
     return None
 
 
-def yesno_answer(question: str, starter: str = "any") -> tuple[str, str]:
+def magikarp_offer(question: str) -> bool:
+    """The Mt Moon salesman's offer ("...a swell MAGIKARP for just 500! What do you say?"), not the nickname prompt."""
     q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "
+    return "magikarp" in q and " 500 " in q and "nickname" not in q and "name" not in q.split()
+
+
+def yesno_answer(question: str, starter: str = "any", buy_magikarp: bool = False, offer_text: str = "") -> tuple[str, str]:
+    q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "
+    pitch = " " + "".join(ch for ch in (offer_text or question).lower() if ch.isalnum() or ch == " ") + " "
+    if "magikarp" in pitch and " for just " in pitch and "nickname" not in pitch and not magikarp_offer(pitch):
+        return "NO", "a MAGIKARP pitch, but not the 500 offer"
+    if magikarp_offer(offer_text or question):  # YES only for this offer at 500, and only while the buy_magikarp goal is open
+        return ("YES", "the MAGIKARP offer at 500 (goal buy_magikarp)") if buy_magikarp else ("NO", "MAGIKARP offer, but buy_magikarp is not wanted now")
     offered = offered_starter(question)
     if offered:  # "So! You want CHARMANDER?"
         if starter == "any" or starter.upper() == offered:
