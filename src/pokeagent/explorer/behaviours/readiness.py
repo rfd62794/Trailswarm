@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.explorer.mash_skill import WAIT, MashSkill, gap_frames, signature
 
 
@@ -25,7 +26,10 @@ _BALL_PIC = 61     # the +6 movement byte is 0xFF for wanderers too, so it canno
 
 
 def walker_near(ctx: ExplorerContext) -> bool:
-    """A walking (mid-move) NPC sprite within WALKER_RADIUS tiles of the player (sprite tables, slots 1-15)."""
+    """A walking (mid-move) NPC sprite within WALKER_RADIUS tiles of the player (sprite tables, slots 1-15). Only inside a
+    dungeon: elsewhere a scripted walker (rival, Oak, a cutscene) is exactly what the busy-A nudge exists for."""
+    if ctx.view.m not in DUNGEON_MAPS:
+        return False
     emu, px, py = ctx.emu, ctx.view.x, ctx.view.y
     for i in range(1, 16):
         pic = emu.read(0xC100 + 16 * i)

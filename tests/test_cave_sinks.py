@@ -21,7 +21,7 @@ def _npc(ctx, slot, x, y, move=2):
 
 
 def test_walker_near_only_for_random_walkers_within_radius(tmp_path):
-    ctx = make_ctx(tmp_path)           # player at (5,6)
+    ctx = make_ctx(tmp_path, {0xD35E: 0x3B})  # player at (5,6) on Mt Moon 1F
     ctx.refresh()
     assert not walker_near(ctx)
     _npc(ctx, 1, 6, 6, move=1)         # standing NPC: not a walker
@@ -33,7 +33,7 @@ def test_walker_near_only_for_random_walkers_within_radius(tmp_path):
 
 
 def test_a_walker_nearby_is_not_busy_but_a_still_changing_empty_screen_is(tmp_path):
-    ctx = make_ctx(tmp_path)
+    ctx = make_ctx(tmp_path, {0xD35E: 0x3B})
     ctx.refresh(); ctx.stable_frames = 0
     assert Readiness()._busy(ctx)      # cutscene-like: screen moving, nobody walking
     _npc(ctx, 3, 6, 6)
@@ -84,3 +84,29 @@ def test_rom_header_ladders_for_mt_moon():
     ladders = rom_ladders()
     assert (5, 5) in ladders(0x3B, 0x3C)
     assert ladders(0x3C, 0x0F) == [(27, 3)]
+
+
+# --- the walker / NPC-in-the-way rules are dungeon-only ---
+from pokeagent.explorer.press_frame import PressFrame  # noqa: E402
+from pokeagent.explorer.press_interact import record_interaction  # noqa: E402
+
+
+def test_walker_rule_is_off_outside_dungeons(tmp_path):
+    """A scripted walker (rival, Oak) on a town map must still get the busy-A nudge."""
+    ctx = make_ctx(tmp_path, {0xD35E: 0x00})  # Pallet Town
+    ctx.refresh(); ctx.stable_frames = 0
+    _npc(ctx, 3, 6, 6)
+    assert not walker_near(ctx) and Readiness()._busy(ctx)
+    ctx.emu.set(0xD35E, 0x3B); ctx.refresh()
+    assert walker_near(ctx) and not Readiness()._busy(ctx)
+
+
+@pytest.mark.parametrize("map_id,blocked", [(0x3B, True), (0x00, False), (0x44, False)])
+def test_person_in_the_way_temp_blocks_only_in_dungeons(tmp_path, map_id, blocked):
+    """A person ahead blocks routing for a while inside the cave; in a town/Pokecenter they may be the target (Mom, nurse)."""
+    ctx = make_ctx(tmp_path, {0xD35E: map_id})
+    _npc(ctx, 1, 6, 6, move=1)  # an NPC at (6,6): the tile east of the player at (5,6)
+    ctx.refresh()
+    record_interaction(ctx, PressFrame("RIGHT", "agent", "t", before=(map_id, 5, 6), after=(map_id, 5, 6)))
+    assert ((map_id, 6, 6) in ctx.mem.temp_blocked) is blocked
+    assert not any("6,6,RIGHT" in k or k.startswith("5,6,RIGHT") for k in ctx.mem.m(map_id)["blocked"])  # never a wall
