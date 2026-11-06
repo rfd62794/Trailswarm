@@ -61,15 +61,15 @@ class MapMemory(NavMixin):
 
     def _note_warp_disproof(self, m0: int, key: str):
         """A learned warp's press moved us exactly one tile in the pressed direction inside the same map (after the
-        settle wait): the door is not there. 2 disproofs pop it (recoverable); disproven again after it was
-        re-learned (4 in all) it is tombstoned. A push-back (guard, locked gym) moves us the other way: no evidence."""
+        settle wait): the door is not there. 2 disproofs in a cycle pop it (recoverable); once it was
+        re-learned and 2 more come (4 in all, `warp_disproof_total`) it is tombstoned. A push-back (guard, locked gym) moves us the other way: no evidence."""
         d = self.m(m0)
-        counts = d.setdefault("warp_disproof", {})
+        counts = d.setdefault("warp_disproof", {})      # this cycle: reset when the key really warps
+        totals = d.setdefault("warp_disproof_total", {})  # lifetime: never reset, so a re-learned warp is remembered
         counts[key] = counts.get(key, 0) + 1
+        totals[key] = totals.get(key, 0) + 1
         if counts[key] == 2:
-            self.forget_warp(m0, key)
-        elif counts[key] >= 4:
-            self.forget_warp(m0, key, tombstone=True)
+            self.forget_warp(m0, key, tombstone=totals[key] >= 4)
 
     def m(self, map_id: int) -> dict:
         return self.data["maps"].setdefault(str(map_id), {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})

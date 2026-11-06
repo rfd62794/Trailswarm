@@ -58,19 +58,25 @@ def test_two_disproofs_pop_the_warp_without_a_tombstone(tmp_path):
     assert "9,11,UP" in d["warps"]
 
 
+def forced_walk(mem, n=2):
+    for _ in range(n):
+        mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
+
+
 def test_disproven_again_after_relearning_is_tombstoned(tmp_path):
     mem = pallet_mem(tmp_path)
-    disprove(mem, 2)
-    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
-    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)  # re-learned (and it really warped: count resets)
-    assert "warp_disproof" not in mem.m(0) or "9,11,UP" not in mem.m(0)["warp_disproof"]
-    mem.m(0)["warp_disproof"] = {"9,11,UP": 2}  # history of a warp that keeps being disproven after a re-learn
+    del mem.m(0)["warps"]["9,11,UP"]
+    forced_walk(mem)                                   # learned from a forced walk
+    assert "9,11,UP" in mem.m(0)["warps"]
+    disprove(mem, 2)                                   # popped, recoverable
+    assert "9,11,UP" not in mem.m(0)["warps"] and not mem.data.get("bad_warps")
+    forced_walk(mem)                                   # re-learned (the real-warp reset zeroes the per-cycle count)
+    assert "9,11,UP" in mem.m(0)["warps"]
     disprove(mem, 1)
-    assert "9,11,UP" in mem.m(0)["warps"] and not mem.data.get("bad_warps")  # 3: still only a doubt
+    assert "9,11,UP" in mem.m(0)["warps"] and not mem.data.get("bad_warps")  # 3 in all: still a doubt
     disprove(mem, 1)
     assert "9,11,UP" not in mem.m(0)["warps"] and "0:9,11,UP" in mem.data["bad_warps"]
-    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
-    mem.learn((0, 9, 11), "UP", (40, 5, 11), confirmed=False)
+    forced_walk(mem)
     assert "9,11,UP" not in mem.m(0)["warps"]
 
 

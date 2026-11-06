@@ -41,8 +41,12 @@ def merge_memory(dst: dict, src: dict) -> dict:
         wd = d.setdefault("warp_disproof", {})
         for k, n in s.get("warp_disproof", {}).items():
             wd[k] = max(wd.get(k, 0), n)
-        if not d["warp_disproof"]:
-            del d["warp_disproof"]  # keep maps.json free of an empty key
+        wdt = d.setdefault("warp_disproof_total", {})
+        for k, n in s.get("warp_disproof_total", {}).items():
+            wdt[k] = max(wdt.get(k, 0), n)
+        for name in ("warp_disproof", "warp_disproof_total"):
+            if not d[name]:
+                del d[name]  # keep maps.json free of an empty key
         inter = d.setdefault("interactions", {})
         for k, e in s.get("interactions", {}).items():
             cur = inter.setdefault(k, {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
