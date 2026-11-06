@@ -269,3 +269,17 @@ def test_edit_flush_stays_dirty_when_save_fails():
     assert e._dirty_at is not None                                         # kept for a retry
     e.tick(e._dirty_at + 1.0)
     assert len(tries) == 2 and e._dirty_at is None
+
+
+def test_inset_mode_keeps_agents_in_their_grid_room_not_pinned_to_doors(monkeypatch):
+    from types import SimpleNamespace
+    from pokeagent.atlas import inplace as ip
+    from pokeagent.viewer.ui import world_interiors as wi
+    H, L = world()
+    plan = SimpleNamespace(anchors={99: object()}, hidden=frozenset(), xf=lambda mode: {})
+    monkeypatch.setattr(wi.inplace, "plan_interiors", lambda *a, **k: plan)
+    view = SimpleNamespace(world=SimpleNamespace(layout=L, rom=b"", headers=H, source=None), wm=SimpleNamespace(rev=0, union_model=lambda: {}))
+    layer = wi.InteriorLayer(view)
+    layer.mode = "inset"
+    out = layer.layout(1.0, ())
+    assert out is L and not getattr(out, "pins", None) and layer.shown == set() and layer.vl is None

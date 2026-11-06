@@ -82,6 +82,9 @@ class InteriorLayer:
                 self._rev, self._erev, self._wid = v.wm.rev, self.edit.rev, id(w)
                 self.plan = inplace.plan_interiors(w.rom, w.headers, w.layout, v.wm.union_model(), self._walk, self.ov)
             mode = self.eff_mode
+            if mode == "inset":  # the original atlas: agents stay inside their room in the grid, never pinned to doors
+                self.shown, self.vl = set(), None
+                return w.layout
             self.shown = inplace.shown_set(mode, self.plan.anchors, zoom, self.hover, self.selected, inside, self.plan.hidden)
             top = self.hover if self.hover in self.shown else self.selected
             self.vl = inplace.view_layout(w.layout, self.plan.anchors, self.plan.xf(mode), self.shown, top)
