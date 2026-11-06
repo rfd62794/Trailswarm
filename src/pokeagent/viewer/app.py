@@ -17,6 +17,8 @@ import numpy as np
 from pokeagent.agent_registry import list_agents
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
 from pokeagent.viewer.model import ViewerModel
+from pokeagent.world.events import BattleEnd, BattleStart, EventBus, Move
+from pokeagent.world.model import WorldModel
 from pokeagent.viewer.sources import AgentSource, HttpShmSource, discover
 
 log = logging.getLogger(__name__)
@@ -44,6 +46,10 @@ class _Throttle:
     def frame(self):
         return self._src.frame()
 
+    def events(self, since: int = 0) -> dict:
+        fn = getattr(self._src, "events", None)
+        return fn(since) if fn else {"events": []}
+
     def send(self, cmd: str, **args) -> dict:
         return self._src.send(cmd, **args)
 
@@ -55,6 +61,22 @@ class _AnimatedFake:
         self.agent_id = agent_id
         self._t = 0
         self.sent: list[tuple[str, dict]] = []
+        self._bus = EventBus()
+        self._pos = [[0, 5, 6], [1, 12, 10], [2, 10, 9], [3, 14, 10]][hash(agent_id) % 4]
+
+    def events(self, since: int = 0) -> dict:
+        """Wander on a loop (one cell per poll) and fight every 40th step, so --fake shows the world view moving."""
+        t, (m, x, y) = self._t, self._pos
+        face = ("RIGHT", "DOWN", "LEFT", "UP")[t // 6 % 4]
+        dx, dy = {"RIGHT": (1, 0), "DOWN": (0, 1), "LEFT": (-1, 0), "UP": (0, -1)}[face]
+        self._pos[1], self._pos[2] = x + dx, y + dy
+        self._bus.emit(Move(map=m, x=x + dx, y=y + dy, facing=face, step=t))
+        if t % 40 == 20:
+            self._bus.emit(BattleStart(species="PIDGEY", enemy_level=3, own_species="CHARMANDER", own_level=5,
+                                       hp=19, max_hp=19, enemy_hp=12, enemy_max_hp=12))
+        if t % 40 == 30:
+            self._bus.emit(BattleEnd(result="won", turns=3))
+        return self._bus.payload(since)
 
     def snapshot(self) -> AgentSnapshot:
         self._t += 1
@@ -110,10 +132,11 @@ def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
     return added, gone
 
 
-def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899) -> int:
+def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False) -> int:
     root = Path(root)
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
+    world = WorldModel()
     holder = {"sources": {aid: _Throttle(s) for aid, s in sources.items()}, "entries": entries}
     stop = threading.Event()
 
@@ -134,6 +157,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
                         log.exception("agent re-discovery failed (further failures suppressed)")
                         warned = True
             model.poll(list(holder["sources"].values()))
+            world.poll(list(holder["sources"].values()))
             time.sleep(1.0 / fps)
 
     threading.Thread(target=poller, daemon=True).start()
@@ -145,8 +169,10 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     from pokeagent.viewer.ui.window import ViewerWindow
     from pokeagent.supervisor import Supervisor
     win = ViewerWindow(model, holder["sources"], fps=fps, supervisor=Supervisor(root),
-                       root=root)
+                       root=root, world=world)
     win.entries = entries
+    if world_mode:
+        win.focus.set_mode("world")
     try:
         win.run()
     finally:
