@@ -175,7 +175,8 @@ def test_party_order_presses_start_then_follows_the_screens(tmp_path):
     ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51), (MAGIKARP, 5, 17, 17)])
     po = PartyOrder()
     d = po.step(ctx)
-    assert d.button == "START" and d.rule.startswith("reorder_party: ['MAGIKARP'")
+    # species names come from the gitignored kb/rom_tables.json; without it the rule shows the internal id (#133)
+    assert d.button == "START" and d.rule.split(", ")[0] in ("reorder_party: ['MAGIKARP'", "reorder_party: ['#133'")
     ctx.party_order["wait"] = 0
     draw(ctx.emu, ["WARTORTLE 18", "51/ 51", "MAGIKARP 5", "17/ 17", "Choose a POKéMON."])
     ctx.emu.set(0xCC26, 0)
