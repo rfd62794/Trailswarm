@@ -13,6 +13,7 @@ from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_goals import record_goals
 from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
+from pokeagent.explorer.press_value import fingerprint, observe
 from pokeagent.goals import GOALS, bag_contents, check_goals
 
 
@@ -76,6 +77,7 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     fr.extra = extra
     fr.snap_pre = snap_pre
     fr.bag_pre = bag_pre
+    fr.fp_pre = fingerprint(ctx.emu)
 
 
 def press_and_read(ctx: ExplorerContext, fr: PressFrame) -> None:
@@ -143,6 +145,7 @@ class Presser:
         press_and_read(ctx, fr)
         record_interaction(ctx, fr)
         track_progress(ctx, fr)
+        observe(ctx, fr)
         write_transition(ctx, fr)
         if record_goals(ctx, fr):
             return

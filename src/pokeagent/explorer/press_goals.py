@@ -9,6 +9,7 @@ from pathlib import Path
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.press_value import get_pv
 from pokeagent.goals import GOALS, check_goals
 
 
@@ -36,6 +37,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             pass
     for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
         if goals[g] and g not in ctx.goal_steps and g not in ctx.initial_goals:
+            get_pv(ctx).mark_progress()
             ctx.goal_steps[g] = ctx.step; ctx.log(f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
             with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
                 fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame}) + chr(10))

@@ -140,9 +140,18 @@ class BattleMoves(BehaviourBase):
         if any("DISABLED" in ln.upper() for ln in lines_now):
             # "The move is disabled!" leaves the move list on screen WITHOUT its PP line, with the cursor on the refused move:
             # remember it and step the cursor off it (the PP-line branch above never saw this screen; 1,195 presses lost, 2026-11-05)
+            names = [ln.replace(">", "").strip() for ln in lines_now
+                     if "DISABLED" not in ln.upper() and ln.replace(">", "").strip().upper() not in MENU_CURSORS]
             stuck = next((ln.replace(">", "").strip() for ln in lines_now
                           if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
-            if stuck:
+            if stuck and stuck in ctx.no_pp:
+                # Already excluded: walk straight to the first usable move (never UP then back DOWN onto it - Route 3 loop)
+                usable = [n for n in names if n not in ctx.no_pp]
+                if usable:
+                    return Decision("DOWN" if names.index(usable[0]) > names.index(stuck) else "UP", "disabled_move",
+                                    f"move {stuck} is disabled: heading straight to {usable[0]}")
+            elif stuck and not any(n in ctx.no_pp for n in names):
                 ctx.no_pp.add(stuck)
                 return Decision("UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
+            # cursor already on a usable move (the notice is still drawn): fall through and take it
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

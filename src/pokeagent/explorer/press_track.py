@@ -8,6 +8,7 @@ from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.press_value import get_pv
 from pokeagent.explorer.stat_records import note_stat_exp
 from pokeagent.goals import GOALS, bag_contents, check_goals
 
@@ -119,5 +120,6 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
             src = "human" if "human" in bt["sources"] else "claude" if "claude" in bt["sources"] else "agent"
             ctx.mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
             if progressed:
+                get_pv(ctx).mark_progress()
                 ctx.log(f"[beat learned for \"{bt['sig'][:40]}\": {len(bt['buttons'])} presses ({src})]", "res")
     fr.result = result

@@ -92,3 +92,16 @@ def test_weak_lead_trains_on_route3_before_the_cave(tmp_path):
     assert s and "train" in s[1] and "Route 3" in s[1]
     assert plan_step(goals, mem.data["maps"], (0x0E, 3, 3), "UP") is None  # roam the grass
     assert plan_step({**goals, "_level": 15}, mem.data["maps"], (0x0F, 3, 4), "UP") is None  # strong: on to the cave
+
+
+def test_disabled_move_does_not_alternate_with_the_cursor_walk(tmp_path):
+    """Route 3 vs a Jigglypuff trainer: UP off the disabled move, then DOWN onto it, forever."""
+    rows = ("disabled!", ">TACKLE", "BUBBLE")
+    ctx = _battle_ctx(tmp_path, rows)
+    first = BattleMoves().step(ctx)
+    assert first.button == "UP" and "TACKLE" in ctx.no_pp
+    again = BattleMoves().step(ctx)  # UP at the top of the list changed nothing: same screen
+    assert (again.button, again.rule) == ("DOWN", "disabled_move") and "BUBBLE" in again.why
+    ctx = _battle_ctx(tmp_path, ("disabled!", "TACKLE", ">BUBBLE"))
+    ctx.no_pp.add("TACKLE")
+    assert BattleMoves().step(ctx).rule != "disabled_move"  # on a usable move: no more cursor shuffling

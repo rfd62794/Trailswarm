@@ -282,6 +282,9 @@ class MapMemory(NavMixin, WarpsMixin):
             e["best"] = presses_to_goal
 
     def save(self):
+        if "press_value" in self.data:
+            from pokeagent.explorer.press_value import trim  # keep the 500 most-used contexts on disk
+            trim(self.data["press_value"])
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".json.tmp")  # atomic replace: a kill mid-write cannot corrupt the memory

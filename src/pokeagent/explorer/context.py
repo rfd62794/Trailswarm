@@ -116,7 +116,11 @@ class ExplorerContext:
     busy_sig: str = ""  # the situation signature of the stretch
     busy_strategy: str = ""  # the mash_skill strategy chosen for it
     busy_last_press: int = 0  # ctx.frame of the last nudge
+    busy_noeffect: int = 0  # nudges in the current busy stretch that changed nothing (charged to the strategy's grade)
     skill: object = None  # MashSkill, built lazily over mem.data
+    pv: Any = None  # press_value.PressValue, built lazily over mem.data
+    pv_pending: tuple | None = None  # (fine sig, coarse sig, button) of the A/B decision about to be pressed
+    pv_last_effect: bool = True  # did the last observed agent A/B press have an effect
     mom_failed_until: int = 0
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0

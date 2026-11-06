@@ -5,6 +5,7 @@ from typing import Iterable
 
 from pokeagent.explorer.behaviours.base import Behaviour, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.press_value import gate, get_pv
 
 
 class Selector:
@@ -16,12 +17,14 @@ class Selector:
         bookkeeping behaviours (guards, the Mom-heal check) can run every step without pressing."""
         ctx.bv = None
         ctx.refresh()
+        get_pv(ctx).watch(ctx)
+        ctx.pv_pending = None
         for behaviour in self.behaviours:
             if behaviour.applies(ctx):
                 decision = behaviour.step(ctx)
                 if decision is not None:
                     decision.behaviour = behaviour.name
-                    return decision
+                    return gate(ctx, decision)  # a wasted A/B press becomes a bounded wait
         return None
 
     def first_applicable(self, ctx: ExplorerContext) -> Behaviour | None:

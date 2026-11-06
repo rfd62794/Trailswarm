@@ -143,6 +143,9 @@ def merge_memory(dst: dict, src: dict) -> dict:
         for key, dest in list(d.get("warps", {}).items()):
             if tuple(dest) in {(1, 23, 26): 41, (0, 5, 6): 37} and int(mid) != {(1, 23, 26): 41, (0, 5, 6): 37}[tuple(dest)]:
                 d["warps"].pop(key, None); d.get("warp_cand", {}).pop(key, None)
+    sys.path.insert(0, str(ROOT / "src"))
+    from pokeagent.explorer.press_value import merge_press_value
+    merge_press_value(dst, src)  # which A/B presses do anything, per context: larger n wins per entry
     beats = dst.setdefault("beats", {})
     for sig, b in src.get("beats", {}).items():
         cur = beats.get(sig)

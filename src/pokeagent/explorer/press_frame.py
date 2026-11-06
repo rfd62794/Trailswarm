@@ -23,3 +23,4 @@ class PressFrame:
     extra: dict = field(default_factory=dict)
     snap_pre: Any = None
     bag_pre: dict = field(default_factory=dict)
+    fp_pre: Any = None  # press_value.fingerprint before the press

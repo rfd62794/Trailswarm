@@ -19,6 +19,7 @@ class SettleWait(BehaviourBase):
         return no_press("settle", "pause after a map change")
 
 
+NOEFFECT_FRAMES = 2  # grade penalty (frames) per nudge that had no effect
 BUSY_STABLE_FRAMES = 4  # the overworld screen must be unchanged this many frames to count as settled
 
 
@@ -40,6 +41,12 @@ class Readiness(BehaviourBase):
         return bool(not ctx.view.box and (ctx.stable_frames < BUSY_STABLE_FRAMES or ctx.emu.read(0xCD6B)))
 
     @staticmethod
+    def _charge(ctx: ExplorerContext) -> None:
+        """Runs right after a nudge was pressed: count it against the strategy if it changed nothing."""
+        if not ctx.pv_last_effect:
+            ctx.busy_noeffect += 1
+
+    @staticmethod
     def _skill(ctx: ExplorerContext) -> MashSkill:
         if ctx.skill is None:
             ctx.skill = MashSkill(ctx.mem.data)
@@ -51,6 +58,7 @@ class Readiness(BehaviourBase):
         ctx.busy_strategy = self._skill(ctx).choose(ctx.busy_sig)
         ctx.busy_start = ctx.frame
         ctx.busy_presses = 0
+        ctx.busy_noeffect = 0
         # A strategies press at once; WAIT lets BOUND_FRAMES pass before its single nudge
         ctx.busy_last_press = ctx.frame if ctx.busy_strategy == WAIT else ctx.frame - gap_frames(ctx.busy_strategy)
         ctx.log(f"[busy {ctx.busy_sig}: {'joypad ignored (0x%02X)' % joy_ignore if joy_ignore else 'screen moving'}"
@@ -73,13 +81,15 @@ class Readiness(BehaviourBase):
             if (ctx.view.m, ctx.view.x, ctx.view.y, ctx.facing) in ctx.declined_balls:
                 # The box we declined just closed and the screen is still settling: A would re-open the same ball's
                 # offer (131 times in Oak's lab, 2026-11-05). B is as good at skipping text and touches nothing.
-                return Decision("B", f"mash {tag}", "busy at a declined starter ball: B so A does not re-open it")
-            return Decision("A", f"mash {tag}", "busy: A in case text is waiting")
+                return Decision("B", f"mash {tag}", "busy at a declined starter ball: B so A does not re-open it", after=self._charge)
+            return Decision("A", f"mash {tag}", "busy: A in case text is waiting", after=self._charge)
         frames = ctx.frame - ctx.busy_start
-        skill.record(ctx.busy_sig, ctx.busy_strategy, frames, ctx.busy_presses)
+        graded = frames + NOEFFECT_FRAMES * ctx.busy_noeffect  # a press that changed nothing costs frames, so WAIT wins ties
+        skill.record(ctx.busy_sig, ctx.busy_strategy, graded, ctx.busy_presses)
         ctx.log(f"[busy over: {ctx.busy_strategy} took {frames}f, {ctx.busy_presses} presses]", "res")
         ctx.mash = 0
         ctx.busy_presses = 0
+        ctx.busy_noeffect = 0
         return None
 
     def done(self, ctx: ExplorerContext) -> bool:
