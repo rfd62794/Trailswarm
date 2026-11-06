@@ -4,7 +4,9 @@ Trailswarm is a rule-based agent that plays Pokemon Red through the PyBoy emulat
 
 The Python package and CLI are still named `pokeagent` (`uv run pokeagent ...`); the project was renamed from PokeAgent on 2026-11-06.
 
-<!-- TODO: World view GIF -->
+![World view: agents from an overnight swarm run moving across Kanto](docs/media/world.gif)
+
+*Seven real overnight explore runs replayed on the ROM-rendered Kanto map, Pallet Town to Cerulean, with trails.*
 
 ## Highlights
 
