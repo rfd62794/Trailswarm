@@ -93,9 +93,15 @@ def pick(points: dict[str, tuple[float, float]], vp: Viewport, sx: float, sy: fl
 
 def locate(layout, wx: float, wy: float) -> tuple[int, int, int] | None:
     """(map id, cell x, cell y) under a world pixel, or None between maps."""
+    from pokeagent.atlas.inplace import locate_in
     from pokeagent.atlas.world import CELL
+    inside = locate_in(layout, wx / CELL, wy / CELL)
+    if inside:
+        return inside
     cx, cy = int(wx // CELL), int(wy // CELL)
     for m, p in layout.places.items():
+        if m in layout.pins or m in layout.xf:
+            continue
         if p.x <= cx < p.x + p.w and p.y <= cy < p.y + p.h:
             return m, cx - p.x, cy - p.y
     return None

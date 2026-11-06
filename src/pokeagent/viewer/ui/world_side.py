@@ -5,6 +5,7 @@ import time
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.atlas import inplace
 from pokeagent.atlas.overlay import LAYERS
 from pokeagent.viewer.panels.render import frame_rgba
 from pokeagent.viewer.ui_scale import get_scale, px
@@ -71,6 +72,11 @@ class WorldSide:
                 dpg.add_checkbox(label="NPCs", callback=lambda s, a, u: setattr(view, "npcs", a))
                 dpg.add_button(label="Fit", callback=lambda s, a, u: view.vp.fit())
                 dpg.add_button(label="1:1", callback=lambda s, a, u: view.vp.one_to_one(get_scale()))
+            with dpg.group(horizontal=True):
+                dpg.add_text("Interiors")
+                names = {v: k for k, v in inplace.LABELS.items()}
+                dpg.add_combo(list(names), default_value=inplace.LABELS["auto"], width=px(170),
+                              callback=lambda s, a, u: setattr(view.interiors, "mode", names[a]))
             dpg.add_separator()
             self.strip_title = dpg.add_text("Stadium")
             self.slots_parent = dpg.add_group()

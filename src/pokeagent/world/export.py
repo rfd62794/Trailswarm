@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pokeagent.atlas.inplace import plan_interiors
 from pokeagent.atlas.rom_maps import MapHeader, all_headers, load
 from pokeagent.atlas.world import WorldLayout, build_layout
 from pokeagent.atlas.world_render import render_world
@@ -58,9 +59,10 @@ def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track
 
 
 def export_png(path: str | Path, world: World, tracks: list[Track], model: dict | None = None, layers: tuple[str, ...] = (),
-               crop: tuple[int, int, int, int] | None = None, scale: float = 1.0, now: float | None = None) -> tuple[int, int]:
+               crop: tuple[int, int, int, int] | None = None, scale: float = 1.0, now: float | None = None, interiors: str = "inset") -> tuple[int, int]:
+    plan = plan_interiors(world.rom, world.headers, world.layout, model) if interiors != "inset" else None
     img = render_state(world.base, world.layout, tracks, world.book, time.monotonic() if now is None else now, model,
-                       world.headers, layers, crop=crop, scale=scale)
+                       world.headers, layers, crop=crop, scale=scale, interiors=interiors, plan=plan)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(img).save(path)
     return img.shape[1], img.shape[0]

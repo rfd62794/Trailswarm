@@ -12,8 +12,9 @@ from collections import OrderedDict
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from pokeagent.atlas import sprites
+from pokeagent.atlas import inplace, sprites
 from pokeagent.viewer import ui_scale
+from pokeagent.viewer.ui.world_interiors import InteriorLayer
 from pokeagent.world import anim, draw
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
@@ -35,6 +36,8 @@ class WorldView:
         self.trails = True
         self.npcs = False
         self.hover_text: list[str] = []
+        self.interiors = InteriorLayer(self)
+        self.vl = None                          # this frame's view layout (in-place interiors)
         self.status = "loading Kanto from the ROM..."
         self._tex: OrderedDict = OrderedDict()
         self._sprite_tex: dict = {}
@@ -148,7 +151,8 @@ class WorldView:
             if aid:
                 self._on_select(aid)
             elif self.side:
-                loc = locate(self.world.layout, *self.vp.to_world(*m))
+                loc = locate(self.vl or self.world.layout, *self.vp.to_world(*m))
+                self.interiors.selected = loc[0] if loc and self.interiors.plan and loc[0] in self.interiors.plan.anchors else None
                 if loc:
                     self.side.show_tile(*loc)
 
@@ -207,6 +211,10 @@ class WorldView:
                 dpg.draw_image(tex, a, b, parent=dl)
             else:
                 self._draw_coarser(f, cx, cy, a, b)
+        tracks = tuple(t.map for t in self.wm.tracks() if t.placed)
+        self.interiors.update_hover(self._mouse())
+        self.vl = self.interiors.layout(vp.zoom, tracks)
+        self.interiors.draw(dl)
         self._draw_agents(now)
         self._draw_hover()
         if self.side:
@@ -225,17 +233,18 @@ class WorldView:
 
     def _draw_agents(self, now: float) -> None:
         w, vp, dl = self.world, self.vp, self.canvas
+        lay = self.vl or w.layout
         tracks = self.wm.tracks()
         ids = [t.id for t in tracks]
         self._points = {}
         for t in tracks:
             col = draw.agent_colour(t.id, ids)
             if self.trails:
-                pts = [vp.to_screen(*p) for p in anim.trail_points(t, w.layout, 120)]
+                pts = [vp.to_screen(*p) for p in anim.trail_points(t, lay, 120)]
                 n = len(pts)
                 for a in range(0, n - 1, 8):
                     dpg.draw_polyline(pts[a:a + 9], color=(*col, 60 + 180 * a // max(n, 1)), thickness=max(2, ui_scale.px(2)), parent=dl)
-            pos = anim.place(t, w.layout, now)
+            pos = anim.place(t, lay, now)
             if pos is None:
                 continue
             x, y, phase = pos
@@ -245,6 +254,9 @@ class WorldView:
             dpg.draw_circle((cx, cy), half + 3, color=(*col, 255), thickness=2, parent=dl)
             dpg.draw_image(self._agent_tex(t.facing, phase, col), (cx - half, cy - half), (cx + half, cy + half), parent=dl)
             dpg.draw_text((cx + half + 4, cy - ui_scale.px(8)), t.id[-8:], color=(255, 255, 255, 255), size=ui_scale.px(14), parent=dl)
+            tag = inplace.badge(lay, t.map)
+            if tag:
+                dpg.draw_text((cx + half + 4, cy + ui_scale.px(8)), tag, color=(255, 235, 150, 255), size=ui_scale.px(13), parent=dl)
             if t.battle and t.battle.ended_at is None:
                 for a, b in (((-7, -34), (7, -20)), ((7, -34), (-7, -20))):
                     dpg.draw_line((cx + a[0], cy + a[1]), (cx + b[0], cy + b[1]), color=(230, 40, 40, 255), thickness=3, parent=dl)
@@ -259,8 +271,9 @@ class WorldView:
             t = self.wm.track(aid)
             lines = [aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
         else:
-            loc = locate(self.world.layout, *self.vp.to_world(*m))
+            loc = locate(self.vl or self.world.layout, *self.vp.to_world(*m))
             lines = [f"{loc}"] if loc else []
+            lines += self.interiors.tooltip(loc[0] if loc and loc[0] in (self.interiors.plan.anchors if self.interiors.plan else ()) else self.interiors.hover)
         lines = [s for s in lines if s]
         for i, s in enumerate(lines):
             dpg.draw_text((m[0] + ui_scale.px(14), m[1] + ui_scale.px(8 + 15 * i)), s, color=(255, 255, 160, 255), size=ui_scale.px(14), parent=self.canvas)
