@@ -22,7 +22,8 @@ class LoopGuard(BehaviourBase):
     def step(self, ctx: ExplorerContext) -> Decision | None:
         pw = ctx.pos()
         hist = ctx.pos_hist
-        hist.append(pw); del hist[:-150]
+        if ctx.emu.read(0xD057) == 0:  # a long battle on one tile is not a loop: it would arm the shake the moment it ends
+            hist.append(pw); del hist[:-150]
         gnow = tuple(sorted(ctx.goal_steps))
         if ctx.shake_goals_150 != gnow:  # a goal landed: restart the 150-press window (it went dead after goal 1)
             ctx.shake_goals_150 = gnow; hist.clear(); hist.append(pw)

@@ -232,3 +232,17 @@ def test_mash_grade_charges_frames_for_presses_without_effect(tmp_path):
     Readiness().step(ctx)
     e = ctx.mem.data["mash_skill"][mash_signature(0x28, False, False)]["A/4"]
     assert e["mean_frames"] == 40 + 2 and e["mean_presses"] == 1  # WAIT now beats A on a tie
+
+
+def test_a_long_battle_on_one_tile_does_not_arm_the_loop_shake(tmp_path):
+    """Waiting/paging steps in a battle filled the position history, so the shake fired the moment the battle ended
+    and walked the player off the battle tile before the win was counted (branch run, step 566)."""
+    from pokeagent.explorer.behaviours import LoopGuard
+    ctx = make_ctx(tmp_path, memory={0xD057: 1})
+    ctx.refresh()
+    for _ in range(80):
+        assert LoopGuard().step(ctx) is None
+    ctx.emu.set(0xD057, 0)  # the battle ends
+    ctx.refresh()
+    LoopGuard().step(ctx)
+    assert ctx.shake == 0
