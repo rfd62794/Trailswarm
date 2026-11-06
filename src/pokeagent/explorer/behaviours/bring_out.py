@@ -21,8 +21,22 @@ def able_slot(emu) -> int | None:
     return (real or alive or [None])[0]
 
 
+BATTLER_HP = 0xD015  # wBattleMonHP (2 bytes): our active Pokemon in the fight
+
+
+def forced_faint_prompt(ctx: ExplorerContext, lines: list[str]) -> bool:
+    """The party list asked because our active battler FAINTED. The same 'Bring out which POKeMON?' text also heads the
+    voluntary PKMN list (and its STATS/SWITCH/CANCEL submenu), which the switch-training swap drives: leave those alone."""
+    text = " ".join(lines)
+    if "bring out" not in text.lower() or "SWITCH" in text or "STATS" in text:
+        return False
+    if ctx.switch_train is not None:
+        return False
+    return (ctx.emu.read(BATTLER_HP) << 8 | ctx.emu.read(BATTLER_HP + 1)) == 0
+
+
 def bring_out_press(ctx: ExplorerContext, lines: list[str]) -> Decision | None:
-    if "bring out" not in " ".join(lines).lower():
+    if not forced_faint_prompt(ctx, lines):
         return None
     target = able_slot(ctx.emu)
     if target is None:

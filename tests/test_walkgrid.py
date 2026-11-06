@@ -75,3 +75,64 @@ def test_a_person_just_bumped_stays_blocked_even_when_it_is_the_only_way(tmp_pat
     assert straight and straight[0] == "UP"
     detour = plan(start, {(0x3D, 12, 3)}, blocked={0x3D: {(12, 8)}})
     assert detour is None or detour[0] != "UP"          # never the bumped tile again while the block lasts
+
+
+class StubPlan:
+    """A one-corridor 'planner': RIGHT x4 along B1F y=3, counting calls and the hard walls it was given."""
+    def __init__(self):
+        self.calls, self.hard_seen = 0, []
+
+    def __call__(self, start, goals, walls=None, blocked=None, hard=None):
+        self.calls += 1
+        self.hard_seen.append({m: set(v) for m, v in (hard or {}).items()})
+        return ["RIGHT"] * (27 - start[1]) if start[0] == 0x3C else None
+
+    def follow(self, start, buttons):
+        return [(start[0], start[1] + i, start[2]) for i in range(len(buttons) + 1)]
+
+    def warp_tiles(self, m, d=None):
+        return set()
+
+
+def test_route_is_planned_once_and_replanned_only_when_we_leave_it_or_the_block_set_changes():
+    from pokeagent.explorer.cave_route import rom_route_step
+    plan, cache = StubPlan(), {}
+    for x in (23, 24, 25, 26):
+        assert rom_route_step({}, "through_mt_moon", (0x3C, x, 3), plan, (), cache)[0] == "RIGHT"
+    assert plan.calls == 1                                              # one BFS for four presses
+    rom_route_step({}, "through_mt_moon", (0x3C, 25, 4), plan, (), cache)   # knocked off the path: re-plan
+    assert plan.calls == 2
+    rom_route_step({}, "through_mt_moon", (0x3C, 25, 4), plan, ((0x3C, 26, 4),), cache)  # an NPC block appeared
+    assert plan.calls == 3
+
+
+def test_an_edge_that_fails_repeatedly_becomes_a_hard_wall_for_the_run():
+    from pokeagent.explorer.cave_route import MAX_BUMPS, rom_route_step
+    plan, cache = StubPlan(), {}
+    pos = (0x3C, 23, 3)
+    for _ in range(MAX_BUMPS + 1):                                       # asked again from the same tile: the press went nowhere
+        rom_route_step({}, "through_mt_moon", pos, plan, (), cache)
+    assert "23,3,RIGHT" in cache["hard"][0x3C]
+    assert any("23,3,RIGHT" in h.get(0x3C, ()) for h in plan.hard_seen[1:])  # and the planner is told on every later pass
+    cache2 = {}
+    for x in range(23, 27):                                              # moving along resets the count: never a wall
+        rom_route_step({}, "through_mt_moon", (0x3C, x, 3), plan, (), cache2)
+    assert not cache2["hard"]
+
+
+@needs_rom
+def test_walk_cells_never_raises_for_any_parsable_header():
+    """Unused ids (11, 204-206, 237-238, 241-244, ...) used to raise IndexError in walk_cells (same on main): empty grid instead."""
+    from pokeagent.atlas import rom_maps
+    from pokeagent.atlas.fit import walk_cells
+    rom = rom_maps.load()
+    n = 0
+    for i in range(256):
+        try:
+            hd = rom_maps.header(rom, i)
+        except IndexError:
+            continue  # the header itself does not parse (callers use all_headers, which filters these)
+        grid = walk_cells(rom, hd)
+        assert grid.ndim == 2 and grid.dtype == bool
+        n += 1
+    assert n > 200

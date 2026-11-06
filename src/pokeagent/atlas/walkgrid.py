@@ -24,6 +24,8 @@ DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 def cell_tiles(rom: bytes, hd: rom_maps.MapHeader) -> np.ndarray:
     """(h*2, w*2) tile ids: the stepping tile (bottom-left of each 2x2 cell) the collision rules look at."""
     bs = load_tileset(rom, hd.tileset).blockset
+    if len(bs) == 0 or hd.h * hd.w == 0:  # an unused map id: the header points at nothing (205, 206, 237, ... 255)
+        return np.zeros((hd.h * 2, hd.w * 2), dtype=np.uint8)
     blocks = np.frombuffer(hd.blocks(rom), dtype=np.uint8)
     if blocks.size < hd.w * hd.h:
         blocks = np.pad(blocks, (0, hd.w * hd.h - blocks.size))
@@ -114,7 +116,7 @@ def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
 def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B, 0x3C, 0x3D})):
     """A multi-floor planner over the ROM grids of ``maps`` (a dungeon): walking is a grid step, stepping on a warp tile
     arrives on the header's destination warp tile of the destination floor. ``plan(start, goals, walls=None, blocked=None)``:
-    ``start`` is (map, x, y), ``goals`` a set of (map, x, y) cells (stepping onto one ends the route, so an exit warp can be a
+    ``start`` is (map, x, y), ``hard`` maps a floor to "x,y,DIR" edges that stay blocked in every pass; ``goals`` a set of (map, x, y) cells (stepping onto one ends the route, so an exit warp can be a
     goal), ``walls``/``blocked`` map a floor id to learned "x,y,DIR" strings / temporarily occupied (x, y) cells. Returns the
     buttons for the whole chain (floor changes included) or None. Same pass order as ``rom_planner``: learned walls and
     NPC blocks first, then without the learned walls, then without the static objects (a person in a corridor is
@@ -170,13 +172,14 @@ def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B
                 q.append(nxt)
         return None
 
-    def plan(start, goals, walls=None, blocked=None):
+    def plan(start, goals, walls=None, blocked=None, hard=None):
         goals, start = {tuple(g) for g in goals}, tuple(start)
         if start[0] not in heads:
             return None
-        walls, blocked = walls or {}, blocked or {}
+        walls, blocked, hard = walls or {}, blocked or {}, hard or {}
         for solid, w, b in ((objs, walls, blocked), (objs, {}, blocked), ({}, {}, blocked), ({}, {}, {})):
-            path = search(start, goals, solid, w, b)
+            # ``hard`` edges (the ROM model called them open but presses failed repeatedly) hold in every pass
+            path = search(start, goals, solid, {m: set(w.get(m, ())) | set(hard.get(m, ())) for m in set(w) | set(hard)}, b)
             if path is not None:
                 return path
         return None

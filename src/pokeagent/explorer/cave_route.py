@@ -29,10 +29,18 @@ EXIT_B1F = (MT_MOON_B1F, 27, 3)   # the east mouth: B1F's warp to the outside (R
 STAGE_GOAL = {"to_mt_moon": MT_MOON_B1F, "mt_moon_b1f": MT_MOON_B1F, "mt_moon_b2f": MT_MOON_B2F}
 
 
-def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()) -> tuple[str, str] | None:
+MAX_BUMPS = 4  # presses in a row from one tile that went nowhere before that edge is held blocked for the rest of the run
+
+
+def _route_cache(cache: dict | None) -> dict:
+    return cache if cache is not None else {}
+
+
+def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=(), cache: dict | None = None) -> tuple[str, str] | None:
     """The first button of the ROM route (all floors, ladders included) to this stage's goal: the exit mouth for
     through_mt_moon, else a warp to the floor the stage names. None when no plan is wired, no route exists, or we stand on
-    the goal floor already."""
+    the goal floor already. ``cache`` (ctx.rom_route) keeps the planned path: it is re-planned only when we leave it or the
+    NPC-block set changes, and an edge that failed MAX_BUMPS presses in a row becomes a hard wall (not persisted)."""
     if cave_plan is None or pos[0] not in (MT_MOON_1F, MT_MOON_B1F, MT_MOON_B2F):
         return None
     if stage == "through_mt_moon":
@@ -42,14 +50,35 @@ def rom_route_step(maps: dict, stage: str, pos: tuple, cave_plan, blocked_now=()
                               if m != STAGE_GOAL[stage]))
     else:
         return None
-    walls = {m: set(maps.get(str(m), {}).get("blocked", [])) for m in (MT_MOON_1F, MT_MOON_B1F, MT_MOON_B2F)}
+    c = _route_cache(cache)
+    hard = c.setdefault("hard", {})
+    last = c.get("last")                      # (pos, button) of the previous answer
+    if last and last[0] == pos:               # asked again from the same tile: the press went nowhere (wall, NPC, fight, page)
+        c["bumps"] = c.get("bumps", 0) + 1
+        if c["bumps"] >= MAX_BUMPS:
+            x, y = pos[1:]
+            hard.setdefault(pos[0], set()).add(f"{x},{y},{last[1]}")
+            c["bumps"], c["path"] = 0, None
+    else:
+        c["bumps"] = 0
     temp: dict = {}
     for m, x, y in blocked_now:
         temp.setdefault(m, set()).add((x, y))
-    path = cave_plan(pos, goals, walls, temp)
-    if not path:
+    key = (stage, frozenset(blocked_now), sum(len(v) for v in hard.values()))
+    path = c.get("path")
+    if c.get("key") == key and path and pos in path["cells"][:-1]:
+        i = path["cells"].index(pos)
+        buttons = path["buttons"][i:]
+    else:
+        walls = {m: set(maps.get(str(m), {}).get("blocked", [])) for m in (MT_MOON_1F, MT_MOON_B1F, MT_MOON_B2F)}
+        buttons = cave_plan(pos, goals, walls, temp, hard)
+        c["key"] = key
+        c["path"] = {"cells": cave_plan.follow(pos, buttons), "buttons": list(buttons)} if buttons else None
+    if not buttons:
+        c["last"] = None
         return None
-    return path[0], f"goal {stage}: ROM route, {len(path)} steps across floors"
+    c["last"] = (pos, buttons[0])
+    return buttons[0], f"goal {stage}: ROM route, {len(buttons)} steps across floors"
 
 
 def ladder_step(g: WorldGraph, maps: dict, stage: str, pos: tuple, ladders=None) -> tuple[str, str] | None:
