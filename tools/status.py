@@ -118,6 +118,13 @@ def main() -> int:
     maps = _load_json(RUNS / "maps.json", {})
     tiles = sum(len(m.get("visited", {})) for m in maps.get("maps", {}).values())
     print(f"world: {len(maps.get('maps', {}))} maps, {tiles} tiles, team_best_level={maps.get('team_best_level', '?')}")
+
+    dirs = _run_dirs()
+    if dirs:
+        from backtrack_report import backtrack_stats
+        s = backtrack_stats(dirs[-1] / "transitions.jsonl")
+        print(f"backtrack ({dirs[-1].name}): reversals {s['reversal_pct']:.1f}% ({s['reversals']}/{s['moves']} agent moves), "
+              f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
     return 0
 
 
