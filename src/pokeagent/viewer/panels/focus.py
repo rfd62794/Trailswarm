@@ -26,6 +26,8 @@ def focus_lines(snap: AgentSnapshot) -> list[Line]:
         for m in screen.party:
             name = m.species or "?"
             out.append(plain(f"  {name} L{m.level}  {m.hp}/{m.max_hp}"))
+            if m.dvs:
+                out.append(plain(f"    DV {m.dvs}  statexp {m.stat_exp}", DIM))
         if screen.money is not None:
             out.append(plain(f"  money {screen.money}"))
         if screen.bag_summary:
