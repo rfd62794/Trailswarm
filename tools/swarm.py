@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
 from swarm_proc import TreeProc  # noqa: E402
+from swarm_watch import ProgressWatch, record_stall  # noqa: E402
 from swarm_merge import merge_memory, merge_file_into  # noqa: E402,F401
 
 
@@ -85,6 +86,10 @@ class Launcher:
         return h
 
 
+def make_watch(cfg: dict):
+    return ProgressWatch(ROOT, cfg["seed"], trainer=cfg["role"] == "trainer")
+
+
 def touch_lock() -> None:
     with contextlib.suppress(OSError):
         os.utime(ROOT / "runs" / "spawn.lock")
@@ -115,7 +120,7 @@ def run_continuous(a) -> int:
     sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
-                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock,
+                             firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
                              segment_ok=lambda g: bool(segment_args(g))))
     print(f"continuous swarm: {n} slots, {a.steps} steps each; stop with Ctrl+C or create runs/swarm.stop")
     sup[0].run()
