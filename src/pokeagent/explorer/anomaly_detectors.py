@@ -13,6 +13,7 @@ PLAYER_BLOCK_PRESSES = 12   # the agent stood still next to a wanderer that coul
 FROZEN_PRESSES = 30         # nothing on screen/in the sprite table/position changed, with >= FROZEN_BUTTONS different buttons
 FROZEN_BUTTONS = 3
 BATTLE_MAX_PRESSES = 500    # a battle lasting longer
+FAILED_TILE_PRESSES = 30    # direction presses that did not move the player, from ONE tile (summed over the run)
 TEXT_MAX_PRESSES = 200      # a text box open longer
 IMPOSSIBLE_DEBOUNCE = 2     # consecutive observations a broken invariant must persist (fades read garbage)
 TELEPORT_MIN_JUMP = 2       # Manhattan tiles
@@ -42,6 +43,7 @@ class Obs:
     joy_ignore: int = 0
     screen_sig: int = 0                # hash(tilemap, sprite table)
     broken: list = field(default_factory=list)    # impossible_state invariant names
+    blocked_here: tuple = ()           # directions memory has learned as walls from this tile (stuck_tile diagnosis)
 
 
 @dataclass
@@ -70,6 +72,7 @@ class Detectors:
         self.battle_n = 0
         self.text_n = 0
         self.window: deque = deque(maxlen=FROZEN_PRESSES)
+        self.failed: dict = {}     # (map, x, y) -> {button: failed presses}
         self.broken_n: dict = {}
         self.pending_tp: Finding | None = None   # a teleport held one observation, until the screen proves it was no cutscene
 
@@ -79,7 +82,7 @@ class Detectors:
     def update(self, o: Obs) -> list[Finding]:
         self.still = self.still + 1 if o.prev == _pos(o) and not o.box else 0
         return (self._doorway(o) + self._blocking(o) + self._player_blocking(o) + self._teleport(o)
-                + self._impossible(o) + self._frozen(o) + self._endless(o))
+                + self._impossible(o) + self._frozen(o) + self._endless(o) + self._stuck_tile(o))
 
     @staticmethod
     def _bump(table: dict, slot: int, tile: tuple) -> int:
@@ -195,3 +198,15 @@ class Detectors:
         if self.text_n >= TEXT_MAX_PRESSES:
             out.append(Finding("endless_text", o.map, o.x, o.y, (o.x, o.y), {"presses": self.text_n}))
         return out
+
+    def _stuck_tile(self, o: Obs) -> list[Finding]:
+        """One tile ate FAILED_TILE_PRESSES direction presses that moved nothing (no box, no fight): learned false walls or an
+        ignored joypad. The record carries per-button counts, the walls memory believes, and the joypad flag to tell them apart."""
+        if o.button not in DIRS or o.prev != _pos(o) or o.box or o.box_before or o.battle:
+            return []
+        per = self.failed.setdefault(_pos(o), {})
+        per[o.button] = per.get(o.button, 0) + 1
+        if sum(per.values()) != FAILED_TILE_PRESSES + 1:  # fire once, on the press that crosses the threshold
+            return []
+        return [Finding("stuck_tile", o.map, o.x, o.y, (o.x, o.y),
+                        {"failed": dict(per), "learned_blocked": list(o.blocked_here), "joy_ignore": o.joy_ignore})]
