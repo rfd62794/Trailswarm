@@ -79,22 +79,40 @@ class PartyLog:
             self.money_before = self.potions_before = None
 
     def end_battle(self, ctx, won: bool, fled: bool) -> dict:
-        """The new battle-record fields ({} when the party cannot be read); also appends the levels.jsonl line."""
+        """The new battle-record fields; also appends the levels.jsonl line. Never raises.
+        party_before comes from the battle-start snapshot, party_after from RAM now: a failed read leaves a
+        ``party_error`` (repr of the exception) on the record instead of silently dropping the whole party."""
+        out: dict = {}
+        before, self.before = self.before, None
         try:
             after = snapshot(ctx.emu)
-            before = self.before if self.before is not None else after
-            self.before = None
-            d = diff(before, after)
-            self.exp_total += sum(g for g in d["exp_gained"] if g > 0)
-            for lu in d["level_ups"]:
-                self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
-            if not won and not fled:
-                self.blackouts += 1
-            self.prev = after
-            self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
-            return {"party_before": rows(before), "party_after": rows(after), **d, **self._money(ctx, won, fled)}
-        except Exception:
-            return {}
+        except Exception as exc:  # noqa: BLE001
+            after = None
+            out["party_error"] = repr(exc)
+        if before is None:
+            before = after  # no start snapshot: the after read stands in for both (as before)
+        try:
+            if before is not None:
+                out["party_before"] = rows(before)
+            if after is not None:
+                out["party_after"] = rows(after)
+        except Exception as exc:  # noqa: BLE001
+            out.setdefault("party_error", repr(exc))
+        if before is not None and after is not None:
+            try:
+                d = diff(before, after)
+                self.exp_total += sum(g for g in d["exp_gained"] if g > 0)
+                for lu in d["level_ups"]:
+                    self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
+                self.prev = after
+                self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
+                out.update(d)
+            except Exception as exc:  # noqa: BLE001
+                out.setdefault("party_error", repr(exc))
+        if not won and not fled:
+            self.blackouts += 1
+        out.update(self._money(ctx, won, fled))
+        return out
 
     def _money(self, ctx, won: bool, fled: bool) -> dict:
         """money_before / money_after for the battle record; the ledger books the prize or the blackout loss."""

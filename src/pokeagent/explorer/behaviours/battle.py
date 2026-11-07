@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pokeagent.bandit.hook import wild_flee
-from pokeagent.explorer.grind import battle_outcome, record_battle_result
+from pokeagent.explorer.grind import battle_outcome, outcome_of, record_battle_result
 from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -49,6 +49,17 @@ class BattleView:
     want_potion: bool = False
     cur: str = ""
     threat: float = 0.0  # worst ROM-estimated threat this enemy species has shown
+
+
+def build_record(bl: dict, *, step: int, run: str, won: bool, hp_end: list, outcome: str,
+                 battle_map: int, end_map: int, stage: str | None, trainer: dict | None) -> dict:
+    """End-of-battle fields on the record ``bl`` (mutated, returned): every legacy key plus the fidelity keys.
+    ``map`` is the map the fight happened on (``battle_map``; for a blackout ``end_map`` is the respawn town) and
+    ``fled`` means a wild flee - a blackout is ``outcome == "blackout"``, never a flee."""
+    bl.update({"end": step, "won": won, "run": run, "map": battle_map, "presses": step - bl["start"],
+               "hp_end": hp_end, "fled": outcome == "fled", "outcome": outcome,
+               "battle_map": battle_map, "end_map": end_map, "stage": stage, "trainer": trainer})
+    return bl
 
 
 def _record_observed(ctx: ExplorerContext, move: str, observed: str) -> None:
@@ -227,6 +238,14 @@ class Battle(BehaviourBase):
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             trainer = bool(ctx.battle_log and ctx.battle_log.get("kind") == 2) or ctx.trainer_npc is not None
             won, moved_away = battle_outcome(trainer=trainer, start=ctx.battle_pos or (-1, -1, -1), end=(m, x, y), party_count=ctx.emu.read(0xD163))
+            outcome = outcome_of(trainer=trainer, won=won, moved_away=moved_away, party_count=ctx.emu.read(0xD163))
+            battle_map = ctx.battle_pos[0] if ctx.battle_pos else m
+            npc = ctx.trainer_npc  # the NPC this fight was pinned to; captured before the field is cleared below
+            trainer_info = None
+            if npc is not None:
+                trainer_info = {"map": battle_map, **{k: npc[k] for k in ("pic", "x", "y") if k in npc}}
+                if "x" not in trainer_info and isinstance(npc.get("last"), (list, tuple)) and len(npc["last"]) == 2:
+                    trainer_info["x"], trainer_info["y"] = npc["last"]  # npc entries keep the position in 'last'
             if won and ctx.trainer_npc is not None:
                 ctx.trainer_npc["beaten"] = True
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
@@ -237,8 +256,13 @@ class Battle(BehaviourBase):
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy
                 hp_end, mx_end = party_hp(ctx.emu)
-                bl.update({"end": ctx.step, "won": won, "run": ctx.run_dir.name, "map": m, "presses": ctx.step - bl["start"],
-                           "hp_end": [hp_end, mx_end], "fled": not won and hp_end > 0})
+                try:
+                    from pokeagent.explorer import training
+                    stage = training.stage_goal(ctx.goals())  # e.g. "rival_ss_anne": which stage this fight belonged to
+                except Exception:  # noqa: BLE001
+                    stage = None
+                build_record(bl, step=ctx.step, run=ctx.run_dir.name, won=won, hp_end=[hp_end, mx_end],
+                             outcome=outcome, battle_map=battle_map, end_map=m, stage=stage, trainer=trainer_info)
                 bl.update(party_log.of(ctx).end_battle(ctx, won, bl["fled"]))  # party_before/after, exp_gained, level_ups, ...
                 with Path("runs/battles.jsonl").open("a", encoding="utf-8") as fh:
                     fh.write(json.dumps(bl) + "\n")

@@ -620,9 +620,9 @@
   "addr": "0xD719",
   "size": 1,
   "encoding": "u8",
-  "verified": false,
+  "verified": true,
   "source": "pokered.sym (pret, symbols branch)",
-  "note": "",
+  "note": "2026-11-07: read from 229 save states with one headless emulator: all 49 leg states on Vermilion and ship maps read 5 (Vermilion) after the Pokecenter heal; ship checkpoints saved before the heal read 3 (Cerulean); values seen 0,1,2,3,5,15. Spec docs/superpowers/specs/2026-11-07-save-state-ledger.md.",
   "sym": "wLastBlackoutMap"
  },
  {

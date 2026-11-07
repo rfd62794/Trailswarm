@@ -23,6 +23,18 @@ def battle_outcome(*, trainer: bool, start: tuple, end: tuple, party_count: int)
     return party_count > 0 and end == start, party_count > 0 and end != start
 
 
+def outcome_of(*, trainer: bool, won: bool, moved_away: bool, party_count: int) -> str:
+    """One word for how the battle ended: "won" | "lost" | "fled" | "blackout".
+    A loss that warped us away is a blackout; so is ending with no party standing (party_count == 0) even without a
+    warp. A wild fight we survived without winning is a flee; a trainer fight we survived without winning is a "lost"
+    (rare in Gen 1 - a script moved us - so it gets its own label instead of being folded into another)."""
+    if won:
+        return "won"
+    if moved_away or party_count == 0:
+        return "blackout"
+    return "lost" if trainer else "fled"
+
+
 def record_battle_result(ctx, *, won: bool, moved_away: bool) -> None:
     """Blackouts in a row: a lost battle that warped us away counts, a win resets, a flee (same spot) changes nothing."""
     if won:
