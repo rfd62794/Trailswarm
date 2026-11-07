@@ -25,6 +25,7 @@ def pokecenter_maps(names_path: Path | None = None) -> tuple[int, ...]:
 POKECENTER_MAPS = pokecenter_maps()  # computed once at import: Viridian 41, Pewter 58, Cerulean 0x40, Mt Moon 0x44, Rock Tunnel, Vermilion, ...
 MT_MOON_MAPS = frozenset({0x3B, 0x3C, 0x3D})  # 1F, B1F, B2F
 DUNGEON_MAPS = MT_MOON_MAPS  # no training gate inside: grind outside (Route 3/4), inside head for the exit
+SHIP_MAPS = frozenset(range(0x5E, 0x69))  # Vermilion dock + S.S. Anne decks/rooms (0x5E..0x68): no grass, no training gate
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 

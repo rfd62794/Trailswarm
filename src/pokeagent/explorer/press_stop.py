@@ -17,7 +17,7 @@ def save_end_state(ctx: ExplorerContext) -> None:
     try:
         tmp = ctx.run_dir / f"end.{os.getpid()}.tmp"
         ctx.emu.save_state(tmp); os.replace(tmp, ctx.run_dir / "end.state")
-        write_completed(ctx.run_dir / "end.state", completed_goals(check_goals(ctx.emu, ctx), ctx.initial_goals, GOALS))
+        write_completed(ctx.run_dir / "end.state", completed_goals(check_goals(ctx.emu, ctx), ctx.initial_goals, GOALS), ctx.emu.read(0xD719))
     except Exception as e:
         ctx.log(f"[end state save failed: {e!r}]", "res")
 

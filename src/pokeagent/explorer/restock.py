@@ -11,6 +11,7 @@ from pokeagent.explorer.kb import ROM_KB
 
 BALL_ID, BALL_MIN, BALL_BUY, MONEY_RESERVE = 0x04, 5, 10, 300
 MAX_TRIES, MAX_TRIP_STEPS, MAX_PATH, RECHECK_EVERY = 3, 220, 60, 25
+MAX_LEAVE_STEPS, DOOR = 40, (3, 7)  # presses allowed to walk out of the Mart after the purchase; the door tile of every Mart
 MART_MAPS = frozenset({42, 56, 67, 91, 150, 152, 172, 180})  # Viridian Pewter Cerulean Vermilion Lavender Fuchsia Cinnabar Saffron
 VIRIDIAN_MART = 42  # the clerk only sells after the parcel is delivered
 SHOP_SPOT, SHOP_FACING = (2, 5), "LEFT"

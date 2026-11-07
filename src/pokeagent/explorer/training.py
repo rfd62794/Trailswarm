@@ -7,7 +7,7 @@ TRAIN_LEVEL_BY_GOAL is the fallback when the ROM tables or the party are missing
 """
 from __future__ import annotations
 
-from pokeagent.explorer.world import DUNGEON_MAPS
+from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import trainers
 from pokeagent.knowledge.readiness import Readiness, assess
@@ -98,5 +98,6 @@ def train_level_for(goals: dict, floor: int = 8, party: list | None = None) -> i
 
 
 def gate_for(map_id: int, need: int) -> int:
-    """The training level the planner may enforce on this map: none (0) inside a dungeon, ``need`` elsewhere."""
-    return 0 if map_id in DUNGEON_MAPS else need
+    """The training level the planner may enforce on this map: none (0) inside a dungeon or aboard the S.S. Anne (no grass there;
+    ship_gate walks an under-level agent off the ship), ``need`` elsewhere."""
+    return 0 if map_id in DUNGEON_MAPS or map_id in SHIP_MAPS else need

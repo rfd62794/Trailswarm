@@ -9,6 +9,7 @@ from __future__ import annotations
 from pokeagent.explorer.cave_route import ladder_step, rom_route_step
 from pokeagent.explorer.planner_checkpoint import checkpoint_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
+from pokeagent.explorer.ship_gate import ship_gate_step
 from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
@@ -82,6 +83,9 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     ckpt = checkpoint_step(g, goals, pos, facing)  # new town: move the respawn point forward before pushing on
     if ckpt:
         return ckpt
+    gate = ship_gate_step(g, goals, stage, pos, goals.get("_grid_get"))  # ready before boarding; the way back to Vermilion after a blackout
+    if gate:
+        return gate
     target = TARGETS.get(stage)
     if stage is None or target is None:
         return None

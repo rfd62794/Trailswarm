@@ -8,6 +8,12 @@ Capped at CAP planner steps per town per run (the caller counts them) so a missi
 from __future__ import annotations
 
 from pokeagent.explorer.world import WorldGraph
+from pokeagent.explorer.ship_gate import ship_stage, weak
+
+
+def ship_weak(goals: dict) -> bool:
+    """Respawn is already Vermilion but the fighter is hurt and the ship is next: heal before boarding anyway."""
+    return ship_stage(goals) and weak(goals)
 
 CENTER_OF = {0x05: 0x59}  # town map -> its Pokecenter (Vermilion; add a town once its door is mapped and heal verified)
 CAP = 150
@@ -19,7 +25,7 @@ def checkpoint_step(g: WorldGraph, goals: dict, pos: tuple, facing: str = "UP") 
     if town is None or respawn is None or goals.get("_ckpt_steps", {}).get(town, 0) >= CAP:
         return None
     center = CENTER_OF[town]
-    if respawn == town:  # healed: the town's center is a stop, not a goal - walk out (no plan reaches here past ss_ticket)
+    if respawn == town and not (town == 0x05 and ship_weak(goals)):  # healed: the town's center is a stop, not a goal - walk out (no plan reaches here past ss_ticket)
         if pos[0] != center or goals.get("_center_intent"):
             return None
         p = g.path(pos, lambda n: n[0] == town)
