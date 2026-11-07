@@ -10,7 +10,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
 from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import area_grind, par_follow
+from pokeagent.explorer import area_grind, par_follow, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import blackout_tax
@@ -92,8 +92,9 @@ class PlanGoal(BehaviourBase):
         need = area_grind.capped_need(ctx, m, need, lead_level(ctx.emu), bool(goals_now_all.get("to_route2")))
         need = train_need(ctx, goals_now_all, need)  # bandit decision point: grind or skip (unchanged when off)
         ctx.train_need = need  # frontier reads it to seek grass while below the target
+        training_live = 0 < lead_level(ctx.emu) < need
         if gyarados_stage:
-            self._gyarados_idle(ctx, 0 < lead_level(ctx.emu) < need, lead_level(ctx.emu))
+            self._gyarados_idle(ctx, training_live, lead_level(ctx.emu))
         else:
             ctx.gyarados_idle = 0  # left the stage: "consecutive" restarts on re-entry
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
@@ -101,6 +102,8 @@ class PlanGoal(BehaviourBase):
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
                              "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {})},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
+        if planned is None and gyarados_stage and training_live:
+            planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp_now, mx_now)  # no planner target: go to the grass
         if planned and planned[1].startswith("goal checkpoint"):
             ck = ctx.__dict__["ckpt_steps"]; ck[5] = ck.get(5, 0) + 1  # Vermilion is the only checkpoint town so far
         if planned and "at Mom, talking" in planned[1]:
