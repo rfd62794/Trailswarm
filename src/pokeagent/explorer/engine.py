@@ -11,6 +11,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.decisions import DecisionLog, classify_outcome, goal_stage, make_record
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
+from pokeagent.explorer.press_goals import seed_initial_goals
 from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
@@ -38,6 +39,7 @@ class Engine:
         ctx = self.ctx
         if ctx.bandit is not None:
             ctx.bandit.begin_step()
+        seed_initial_goals(ctx)  # before the first decision, not after the first press
         decision = self.selector.choose(ctx)
         party_log.of(ctx).tick(ctx)  # level timeline: out-of-battle level/exp changes, grind/travel step counts
         self.last_decision = decision
