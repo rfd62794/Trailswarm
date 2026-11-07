@@ -47,6 +47,10 @@ class Emulator(Protocol):
         """Read length bytes of RAM starting at start."""
         ...
 
+    def write(self, addr: int, value: int) -> None:
+        """Write one byte of RAM."""
+        ...
+
     def screenshot(self) -> Image.Image:
         """Current screen as a 160x144 RGB PIL image."""
         ...
@@ -104,6 +108,9 @@ class PyBoyEmulator:
     def read_range(self, start: int, length: int) -> bytes:
         return bytes(self._pyboy.memory[start : start + length])
 
+    def write(self, addr: int, value: int) -> None:
+        self._pyboy.memory[addr] = value & 0xFF
+
     def screenshot(self) -> Image.Image:
         # Headless ticks never render, so the screen buffer would be stale/blank: render one frame first.
         self._pyboy.tick(1, True)
@@ -157,6 +164,9 @@ class FakeEmulator:
 
     def set(self, addr: int, value: int) -> None:
         self.memory[addr] = value
+
+    def write(self, addr: int, value: int) -> None:
+        self.set(addr, value)
 
     def press(self, button: Button, hold_frames: int = 8, settle_frames: int = 16) -> None:
         if button is not Button.NONE:

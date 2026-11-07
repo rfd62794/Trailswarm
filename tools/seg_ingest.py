@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from pokeagent import checkpoint_goals as cg
+from pokeagent import statefp
 from pokeagent.segment_names import BEST_SUFFIX
 from seg_store import KEEP_ATTEMPTS, fps, input_path, job_dir, layout, remove_tree, stat
 
@@ -89,7 +90,23 @@ def _stop_name(seg) -> str:
     return seg.stop_goal if seg.stop_goal else f"map:{seg.stop_map:#04x}"
 
 
+def _synthetic_start(root: Path, run: Path, tag: str | None) -> bool:
+    """True when this attempt started from a tool-edited (synthetic) state: the job's kept start copy, or a start
+    path named in the run's meta.json. A missing or odd meta reads as "not synthetic"."""
+    if tag:
+        start = _job_record(root, tag).get("start")
+        if start and statefp.is_synthetic(Path(start)):
+            return True
+    try:
+        start = json.loads((run / "meta.json").read_text(encoding="utf-8")).get("start")
+    except (OSError, ValueError, AttributeError):
+        start = None
+    return bool(start) and statefp.is_synthetic(Path(str(start)))
+
+
 def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | None) -> None:
+    if _synthetic_start(root, run, tag):
+        return  # a solve from an edited state never counts: no attempt, no checkpoint copy, no best
     st = stat(doc, seg.key)
     st["attempts"] = (st["attempts"] + [att])[-KEEP_ATTEMPTS:]
     st["n"] += 1
@@ -138,6 +155,10 @@ def record_confirm(root: Path, doc: dict, seg, cand_run: str, att: dict) -> str:
     b = st["best"]
     if not b or b["run"] != cand_run:
         return "stale"
+    if b.get("start") and statefp.is_synthetic(Path(b["start"])):
+        b["rejected"] = True
+        st["best"] = st["confirmed"]  # started from an edited state: never a confirmed best
+        return "rejected"
     if att["outside"] or (not att["solved"] and att["budget"] and att["steps"] < ABORTED_BELOW * att["budget"]):
         b["tries"] = max(0, b["tries"] - 1)
         return "inconclusive"  # outside input or cut short: say nothing about the route, try the replay again

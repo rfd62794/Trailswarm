@@ -22,6 +22,7 @@ import seg_ingest
 import seg_janitor
 import seg_split
 import seg_store as ss
+from pokeagent import checkpoint_goals as cg
 
 SHARE_UNSOLVED = 0.40
 SHARE_FRONTIER = 0.45
@@ -211,6 +212,7 @@ class Curriculum:
         shutil.copy(cfg["own"], ss.input_path(self.root, job["tag"]))
         src = Path(job["start"])
         shutil.copy(src, d / src.name)
+        cg.copy_sidecar(src, d / src.name)   # the fingerprint travels with the copy (the synthetic gate reads it)
         job["start"] = str(d / src.name)
         (d / "job.json").write_text(json.dumps({"start_name": src.name, "start_sha": ss.sha256(d / src.name)}), encoding="utf-8")
 
