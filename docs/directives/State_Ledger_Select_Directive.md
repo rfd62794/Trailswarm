@@ -206,4 +206,5 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new test file and gitignored runs/ evidence path (greenfield)
 - 2026-11-07 12:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (tests/test_statelog.py) and gitignored evidence paths (runs/checkpoints/*.fp.json); known false positive
 - 2026-11-07 12:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-ledger-select-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGEY0J9T6GMN03W7TCWA4T
+- 2026-11-07 12:29 · dispatcher · launched pid=1268; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-state-ledger-select-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
