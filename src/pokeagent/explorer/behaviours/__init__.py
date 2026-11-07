@@ -6,6 +6,8 @@ from pokeagent.explorer.behaviours.advance_dialog import AdvanceDialog, NamingKe
 from pokeagent.explorer.behaviours.base import Behaviour, BehaviourBase, Decision, no_press
 from pokeagent.explorer.behaviours.battle import Battle
 from pokeagent.explorer.behaviours.battle_moves import BattleMoves
+from pokeagent.explorer.behaviours.battle_yesno import BattleYesNo
+from pokeagent.explorer.behaviours.already_out import AlreadyOutGuard
 from pokeagent.explorer.behaviours.battle_text_wait import BattleTextWait
 from pokeagent.explorer.behaviours.box_settle import BoxSettle, PostTalkSettle
 from pokeagent.explorer.behaviours.catch import Catch
@@ -30,7 +32,7 @@ from pokeagent.explorer.behaviours.switch_out import SwitchOut
 from pokeagent.explorer.behaviours.use_items import UseItems
 
 __all__ = [
-    "AdvanceDialog", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
+    "AdvanceDialog", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BattleYesNo", "AlreadyOutGuard", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
     "ExploreBurst", "Frontier", "GoalTalk", "Goto", "GrindDrill", "Heal", "LearnerHunt", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "Restock", "SettleWait", "StallGuard", "SwitchOut",
     "UseItems", "default_behaviours", "no_press",
@@ -47,7 +49,7 @@ def default_behaviours() -> list[Behaviour]:
     """
     return [
         SettleWait(), LoopGuard(), PartyOrder(), PostTalkSettle(), Readiness(), AnomalyWait(), ReplayInterrupt(),
-        BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
+        AlreadyOutGuard(), BattleYesNo(), BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
         NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), UseItems(), GoalTalk(), GrindDrill(),
         ExploreBurst(), Pickup(), PlanGoal(), LearnerHunt(), Frontier(),
