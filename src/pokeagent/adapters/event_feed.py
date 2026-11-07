@@ -10,6 +10,7 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.world import events as ev
 
 BATTLE_FLAG = 0xD057
+ENEMY_SPECIES = 0xCFE5   # wEnemyMonSpecies (internal id); 0xCFD7 is wPlayerMoveMaxPP, not a species
 STALL_STEPS = 200      # game steps without moving before a stall event
 _DELTA = {(0, -1): "UP", (0, 1): "DOWN", (-1, 0): "LEFT", (1, 0): "RIGHT"}
 _LEARN = (("blocked", "wall"), ("warps", "warp"), ("jumps", "jump"), ("encounters", "encounter"))
@@ -71,7 +72,7 @@ class EventFeed:
         hp = (_u16(emu, 0xD015), _u16(emu, 0xD023), _u16(emu, 0xCFE6), _u16(emu, 0xCFF4)) if on else ()
         if on and not self._battle:
             self._turn, self._last_hp = 0, hp
-            self.bus.emit(ev.BattleStart(species=self._mon(emu.read(0xCFD7)), enemy_level=emu.read(0xCFF3),
+            self.bus.emit(ev.BattleStart(species=self._mon(emu.read(ENEMY_SPECIES)), enemy_level=emu.read(0xCFF3),
                                          own_species=self._mon(emu.read(0xD014)), own_level=emu.read(0xD022),
                                          hp=hp[0], max_hp=hp[1], enemy_hp=hp[2], enemy_max_hp=hp[3]))
         elif on and hp != self._last_hp:
