@@ -6,7 +6,7 @@ first battle (FIGHT), then the road to Pewter.
 from __future__ import annotations
 
 from pokeagent.explorer.planner_east import east_road_step
-from pokeagent.explorer.world import POKECENTER_MAPS, STARTERS, WorldGraph, interaction_spots
+from pokeagent.explorer.world import POKECENTER_MAPS, STARTERS, WorldGraph, interaction_spots, parcel_spots
 
 # No-grind list for everything east of Pewter (Route 3/4, Mt Moon 1F/B1F/B2F, Cerulean + Pokecenter + Gym, Routes 24/25, Bill's house):
 # never turn back to Route 1 to train from here.
@@ -145,12 +145,16 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):
         # Already known from earlier agents: the spot where "got OAK PARCEL" was seen. Go there and talk (known facts first).
         known = [tuple(goals["_parcel_spot"])] if goals.get("_parcel_spot") else []  # (map, x, y, facing) from the item log
-        for (m, x, y, f) in known + interaction_spots(maps, "OAK PARCEL") + interaction_spots(maps, "PARCEL"):
+        best = None  # the NEAREST known spot, not the first listed: map order once sent a Viridian agent home to Pallet
+        for (m, x, y, f) in known + parcel_spots(maps):
             if pos == (m, x, y):
                 return ("A" if facing == f else f), f"goal parcel: at the mart clerk spot ({x},{y}), {'talking' if facing == f else 'facing him'}"
             p = g.path(pos, lambda n: n == (m, x, y))
-            if p:
-                return p[0], f"goal parcel: {len(p)} steps to the known mart clerk spot ({x},{y}) on map 0x{m:02X}"
+            if p and (best is None or len(p) < len(best[0])):
+                best = (p, x, y, m)
+        if best:
+            p, x, y, m = best
+            return p[0], f"goal parcel: {len(p)} steps to the known mart clerk spot ({x},{y}) on map 0x{m:02X}"
         # The parcel is at the Viridian Mart: explore Viridian's buildings - take warps on map 0x01 never taken yet.
         if pos[0] == 0x01:
             d = maps.get("1", {})

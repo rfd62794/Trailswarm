@@ -236,3 +236,8 @@ the item (press 27); the replay from the pre-talk state is deterministic and no 
 cannot learn CUT (Bulbasaur, Charmander and Oddish lines, Paras, Bellsprout, Sandshrew can), so a Wartortle + Magikarp party holds HM01 with nobody to teach.
 Item-list rows read "x10" for a stack of ten, which `toss_guard` used to mistake for the TOSS quantity box (vetoing every A of the HM teach flow).
 
+
+Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugget Bridge, stands still after his fight. `choose_local`'s reason text starts "at (x,y) ...", not "frontier", so
+`press_interact` did not treat the press as exploring and never temp-blocked his tile; memory_purge had also healed the learned wall, so 1,500 UP presses went into him. The press now carries
+the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
+and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.

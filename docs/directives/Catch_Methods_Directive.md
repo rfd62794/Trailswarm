@@ -18,6 +18,12 @@ Today (read from the code): `catch.py` weakens a wanted wild species to <= 35% H
 `min(0.95, (catch_rate + 1) / 256 * CATCH_HP_FACTOR)`. There is no capture formula, no choice of ball, no status-aware stopping rule, and nothing handles the overpower gate: when the active mon (the high-level lead) KOs any wild mon with every move, the wild mon cannot be weakened
 and the catch fails or never starts.
 
+**HARD RULE (Robert, 2026-11-07): "We can teach the agent a hard rule, you CANNOT Capture an Owned Pokemon, ONLY Wild Pokemon can be caught, Stealing is wrong."**
+A ball is thrown ONLY in a WILD battle, never in a trainer battle. The battle kind the behaviours already use: `catch.py` reads `bv.kind` (`ctx.bv.kind`, 1 = wild, 2 = trainer) and `battle.py` derives `trainer = bool(ctx.battle_log and ctx.battle_log.get("kind") == 2) or ctx.trainer_npc is not None`. Implement ONE pure predicate
+`may_throw(kind: int | None, trainer_npc: object | None = None, battle_log_kind: int | None = None) -> bool` in `knowledge/catch_policy.py` (True iff the kind is 1 and neither `trainer_npc` is set nor the battle log says 2; unknown/None kind -> False) plus a thin `may_throw_ctx(ctx)` that reads exactly those fields. Everything below obeys it:
+`catch_policy.decide` returns `skip` (why "trainer battle: cannot catch") whenever `may_throw` is false, and NEVER returns `throw`, `status_move`-for-catching, `damage_move`-for-catching or `switch`-to-catcher in a trainer battle (the overpower/catcher switch must not trigger there either: in a trainer battle the normal win path decides everything, untouched); `catch.py` sets `ctx.catch_hint` / `ctx.catch_mode` only when `may_throw_ctx(ctx)` holds, and keeps its existing `kind == 1` guard.
+Test: `may_throw`/`may_throw_ctx` -> False for a trainer battle (kind 2, or `trainer_npc` set, or log kind 2) and True for a wild one (kind 1, no trainer); `decide(...)` with a trainer battle returns `skip` for every fixture (including a lone overpowering lead and a qualifying catcher in the party).
+
 ## 2. Facts (pasted; you cannot look outside the worktree)
 
 - `uv run python --version` prints `Python 3.12.12`. Always `uv run`. Full suite: `uv run pytest -q` (about 100-210 s; 1557 passed, 1 skipped on the live checkout today before V2, plus one environment-dependent failure
@@ -174,7 +180,7 @@ with no catcher and P below it -> `skip`; (4) ball choice: with Poke and Great b
 
 - [ ] `knowledge/catch_math.py` (formula, `best_ball`, `status_kind`), the three worked examples reproduced; every unverified constant named and commented
 - [ ] `knowledge/catcher.py` with the damaging-move HARD RULE (Splash-only Magikarp rejected, Tackle Magikarp qualifies only when it cannot KO at the minimum roll), `catcher_slot`, `level_band_ok`; V2's `catcher_value` uses it
-- [ ] `knowledge/catch_policy.py` (`decide`: overpower gate, status first, minimum damage, best ball); `ctx.catch_hint` seam in `catch.py` and the one added branch in `battle_moves.py`; the win path untouched
+- [ ] `knowledge/catch_policy.py` (`decide`: overpower gate, status first, minimum damage, best ball) gated by the pure `may_throw` predicate (wild only; trainer battle never throws, never switches to a catcher; tested); `ctx.catch_hint` seam in `catch.py` and the one added branch in `battle_moves.py`; the win path untouched
 - [ ] Three new test files pass; V2's tests unedited and green; `uv run pytest -q` green (tail pasted); `git diff --stat main` pasted; no forbidden file changed
 - [ ] Status row moved to Review with the branch name
 
@@ -195,4 +201,6 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 **Status log**
 - 2026-11-07 15:19 · robert-claude-laptop · none → Draft — Claude 2026-11-07: Gen 1 capture formula, catch policy, damaging-catcher rule; depends on Team_Builder_V2
 - 2026-11-07 15:20 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on Team_Builder_V2 merging first; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/baselines paths
+- 2026-11-07 15:52 · robert-claude-laptop · Queued → Draft — Claude: amend with Robert's hard rule (wild only, never catch an owned/trainer Pokemon)
+- 2026-11-07 15:52 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; wild-only hard rule added; depends on Team_Builder_V2; lint_override: dispatch-path-missing greenfield/gitignored
 <!-- queue:end -->

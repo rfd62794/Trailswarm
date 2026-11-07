@@ -8,6 +8,7 @@ Every refill the Supervisor asks ``Curriculum.next_job(n)`` what the free slot s
      segments, slowest expected time first, run as explorers to look for tiny optimisations).
 Each job starts from the PREVIOUS segment's best checkpoint (daisy chain), stops at its own end, and gets its own
 step budget instead of one huge run.
+A curriculum hold (runs/curriculum_hold.json, see tools/curriculum_hold.py) removes a segment from every category until it expires.
 """
 from __future__ import annotations
 
@@ -15,9 +16,11 @@ import contextlib
 import json
 import shutil
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+import seg_hold
 import seg_ingest
 import seg_janitor
 import seg_split
@@ -50,6 +53,8 @@ class Curriculum:
         self.session = int(clock())
         self._depth = 0
         self._warned = False
+        self.holds = seg_hold.HoldFile(self.root)   # runs/curriculum_hold.json, re-read only when it changes
+        self._hold_seen: dict[tuple[str, str], seg_hold.Hold] = {}   # holds already logged (once each)
         with self._guard("start-up sweep"):
             with self.txn():
                 seg_janitor.sweep(self.root, self.doc, clock(), log=log)
@@ -109,8 +114,32 @@ class Curriculum:
         frontier = [nxt] if nxt is not None and ss.ckpt_valid(self.root, nxt.start) else []
         return {"unsolved": unsolved, "frontier": frontier, "polish": polish}
 
+    def _live_holds(self) -> list:
+        """Unexpired holds from the hold file (read at most once per call). Logs each new hold once, and each expiry once.
+        A hold cleared by the operator before it expires is dropped silently."""
+        now = datetime.fromtimestamp(self.clock()).astimezone()
+        on_disk = {(h.segment, h.until_text): h for h in self.holds.current()}
+        for key, h in list(self._hold_seen.items()):
+            if h.until <= now:
+                self.log(f"curriculum: hold on {h.segment} expired")
+                del self._hold_seen[key]
+            elif key not in on_disk:
+                del self._hold_seen[key]
+        live = []
+        for key, h in on_disk.items():
+            if h.until <= now:
+                continue
+            if key not in self._hold_seen:
+                self._hold_seen[key] = h
+                self.log(f"curriculum: holding {h.segment} until {h.until_text} ({h.reason})")
+            live.append(h)
+        return live
+
     def choose(self) -> tuple[str, object] | None:
         g = self.groups()
+        live = self._live_holds()
+        if live:   # a held segment is dropped from every category; an emptied category falls out of the shares
+            g = {k: [s for s in v if not any(h.covers(s.key) for h in live)] for k, v in g.items()}
         avail = {k: v for k, v in g.items() if v}
         if not avail:
             return None

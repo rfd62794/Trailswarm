@@ -30,7 +30,7 @@ def run_agent(rom: Path, state: Path, maps: Path, run_dir: Path, steps: int, *, 
     decisions = DecisionLog(run_dir / "decisions.jsonl")
     ctx = ExplorerContext(emu=emu, mem=MapMemory(Path(maps), record_paths=False), run_dir=run_dir, trans=trans,
                           explore_run=False,
-                          opts=ExplorerOptions(starter=starter, state_stem=Path(state).stem, steps=steps, headless=True,
+                          opts=ExplorerOptions(starter=starter, state_stem=Path(state).stem, state_path=str(state), steps=steps, headless=True,
                                                box_pace=box_pace, frames_per_step=frames_per_step, maps_path=str(maps)))
     if ram_diff:
         from pokeagent.explorer.ram_diff import start_ram_diff

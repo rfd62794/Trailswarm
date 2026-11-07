@@ -1,6 +1,7 @@
 """Interaction bookkeeping for one press (moved from the demo's do_press)."""
 from __future__ import annotations
 
+from pokeagent.explorer import blocked_cap
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.interaction_record import close_interaction
 from pokeagent.explorer.items import is_item_ball, parse_item_text
@@ -8,6 +9,7 @@ from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, 
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.world import DUNGEON_MAPS
 
+EXPLORE_RULES = {"frontier", "explore_burst"}  # choose_local's 'at (x,y) ...' reason does not start with 'frontier', so the rule name decides
 NPC_BLOCK_FRAMES = 240  # how long a person in the way keeps their tile out of routing
 
 
@@ -78,7 +80,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         dx, dy = DIRS.get(name, (0, 0))
         npc_ahead = name in DIRS and after == before and (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
         result = ctx.mem.learn(before, name, after, confirmed=confirmed, npc_ahead=npc_ahead)
-        exploring = fr.why.startswith("frontier")  # exploration never needs a person's tile: route around the person (Route 25 trainers, 2026-11-06)
+        exploring = ctx.deciding_rule in EXPLORE_RULES or fr.why.startswith("frontier")  # exploration never needs a person's tile: route around the person (Route 25 trainers, 2026-11-06)
         if npc_ahead and (before[0] in DUNGEON_MAPS or exploring):  # elsewhere the person may be the target (nurse, Mom, clerk); the tile decays and is never learned as a wall
             tb = ctx.mem.temp_blocked
             for k in [k for k, until in tb.items() if until <= ctx.frame]:
@@ -86,6 +88,11 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             tb[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
             if exploring:
                 ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = [], None, None  # replan around the person
+        if name in DIRS and not box_after and blocked_cap.note(ctx.blocked_streak, before, name, after != before):
+            tb = ctx.mem.temp_blocked  # the same tile+direction failed again and again: stop pressing, route around it for a while
+            tb[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + blocked_cap.CAP_BLOCK_FRAMES
+            ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = [], None, None
+            result += "; blocked-press cap hit - tile ahead out of routing for a while"
         if "ahead_tiles" in extra and after[0] == before[0]:
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
                 ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False, stand=extra.get("stand_tile"))  # a real wall, not a person

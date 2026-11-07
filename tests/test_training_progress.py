@@ -111,3 +111,17 @@ def test_route_back_to_grass():
     assert train_route.step({}, (train_route.ROUTE24, 1, 1), (), 20, 20) is None   # already on Route 24
     assert train_route.step({}, (3, 1, 1), (), 5, 20) is None                      # hurt: heal logic decides
     assert train_route.step({}, (3, 1, 1), (), 20, 20) is None                     # no learned way
+
+
+def test_frontier_on_route_24_will_not_leave_for_cerulean_while_training():
+    assert train_route.stay_on_route(train_route.ROUTE24, True) == {train_route.CERULEAN}
+    assert train_route.stay_on_route(train_route.ROUTE24, False) is None  # not training: roam freely
+    assert train_route.stay_on_route(3, True) is None  # elsewhere step() walks back to Route 24
+
+
+def test_train_route_walks_to_route_24_grass_once_the_map_is_fully_seen():
+    maps = {str(train_route.ROUTE24): {"visited": {"1,1": 1, "1,2": 1, "1,3": 1}, "blocked": [], "warps": {}, "encounters": {"1,3": 2}}}
+    first = train_route.step(maps, (train_route.ROUTE24, 1, 1), (), 20, 20)
+    assert first and first[0] == "DOWN" and "grass" in first[1], first
+    assert train_route.step(maps, (train_route.ROUTE24, 1, 3), (), 20, 20) is None   # on the grass: frontier roams it
+    assert train_route.step(maps, (train_route.ROUTE24, 1, 1), {(train_route.ROUTE24, 1, 2)}, 20, 20) is None  # a person in the corridor: no way

@@ -22,6 +22,7 @@ class ExplorerOptions:
 
     starter: str = "any"
     state_stem: str = ""  # Path(--state).stem, "" when no state
+    state_path: str = ""  # the --state file itself: its <state>.goals.json sidecar is the source of truth for goals done at the start
     steps: int = 300
     stop_at_goal: str | None = None
     stop_at_map: int | None = None  # sub-segment runs end on first entry into this map id
@@ -115,6 +116,9 @@ class ExplorerContext:
     forget_move: str | None = None
     frontier_at: tuple | None = None  # position the committed route's next button was chosen at
     frontier_route: list = field(default_factory=list)  # buttons left to the committed frontier_target
+    train_route_live: bool = False  # the team_ready stage is training the trainee (plan_goal sets it each step; frontier reads it)
+    deciding_rule: str = ""  # Decision.rule of the press in flight (set by the engine around presser.press)
+    blocked_streak: dict = field(default_factory=dict)  # (pos, button) -> consecutive blocked presses (blocked_cap)
     frontier_target: tuple | None = None  # (map, x, y) frontier tile the frontier behaviour is committed to
     goal_left_house: bool = False
     goto: list | None = None
@@ -223,6 +227,7 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    already_out_until: int = 0  # step until which the active mon's party slot is off limits ("<name> is already out!" just showed)
     pickup_await: tuple | None = None  # (map,x,y) ball whose A press is awaiting its item result
     pickup_ball: tuple | None = None  # committed item-ball target (map,x,y)
     ball_result: tuple | None = None  # (map,x,y,item|None): the last item-ball dialog to close, from press_interact

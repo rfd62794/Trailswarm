@@ -60,3 +60,58 @@ def test_frontier_press_into_a_person_blocks_that_tile_and_replans(tmp_path):
     ctx.mem.temp_blocked.clear()
     record_interaction(ctx, PressFrame("DOWN", "agent", "plan_goal: to the nurse", before=(36, 13, 6), after=(36, 13, 6)))
     assert not ctx.mem.temp_blocked
+
+
+def test_blocked_cap_counts_one_tile_and_direction_and_resets_on_a_move():
+    from pokeagent.explorer import blocked_cap
+    streak: dict = {}
+    pos = (35, 11, 32)
+    assert not any(blocked_cap.note(streak, pos, "UP", False) for _ in range(blocked_cap.BLOCKED_PRESS_CAP - 1))
+    assert blocked_cap.note(streak, pos, "UP", False) and not streak  # the cap press fires once, then the streak restarts
+    blocked_cap.note(streak, pos, "UP", False)
+    blocked_cap.note(streak, pos, "LEFT", False)  # another direction: a new streak
+    assert streak == {(pos, "LEFT"): 1}
+    blocked_cap.note(streak, pos, "UP", True)
+    assert not streak
+
+
+def test_choose_local_press_into_a_beaten_trainer_blocks_the_tile(tmp_path):
+    """Route 24 (2026-11-07): choose_local's reason ('at (x,y) ...') is not 'frontier...'; the rule name must still count as exploring."""
+    from pokeagent.explorer.press_frame import PressFrame
+    from pokeagent.explorer.press_interact import record_interaction
+    from test_item_balls import MAP, PX, PY, ball_sprite, make_ctx
+    ctx = make_ctx(tmp_path, memory={MAP: 35, PX: 11, PY: 32})
+    ball_sprite(ctx.emu, 9, 11, 31, pic=4)  # the Bug Catcher on the bridge, one tile above
+    ctx.deciding_rule = "frontier"
+    record_interaction(ctx, PressFrame("UP", "agent", "at (11,32) blocked=['RIGHT']; UP leads to a tile seen 0x",
+                                       before=(35, 11, 32), after=(35, 11, 32)))
+    assert (35, 11, 31) in ctx.mem.temp_blocked
+    assert "11,32,UP" not in ctx.mem.m(35)["blocked"]
+
+
+def test_capped_blocked_presses_temp_block_the_tile_even_without_a_visible_person(tmp_path):
+    from pokeagent.explorer import blocked_cap
+    from pokeagent.explorer.press_frame import PressFrame
+    from pokeagent.explorer.press_interact import record_interaction
+    from test_item_balls import MAP, PX, PY, make_ctx
+    ctx = make_ctx(tmp_path, memory={MAP: 35, PX: 11, PY: 32})
+    ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = ["UP"], (35, 11, 20), (35, 11, 32)
+    for _ in range(blocked_cap.BLOCKED_PRESS_CAP):
+        record_interaction(ctx, PressFrame("UP", "agent", "plan_goal: north", before=(35, 11, 32), after=(35, 11, 32)))
+    assert (35, 11, 31) in ctx.mem.temp_blocked and ctx.frontier_route == []
+
+
+def test_a_person_tile_is_not_a_frontier_side(tmp_path):
+    """Route 24 bridge (2026-11-07): the frontier tile whose only unexplored side is a beaten trainer's tile sent the agent
+    (11,33) <-> (11,32) forever, because the trainer's tile is never 'visited'."""
+    mem = MapMemory(tmp_path / "maps.json")
+    mem.visit(0x23, 11, 33, 1); mem.visit(0x23, 11, 32, 1)
+    for y in (32, 33):  # a one-wide corridor: walls both sides, the south end already walked
+        mem.m(0x23)["blocked"] += [f"11,{y},LEFT", f"11,{y},RIGHT"]
+    mem.m(0x23)["blocked"].append("11,33,DOWN")
+    assert mem.is_frontier((0x23, 11, 32))  # (11,31) was never visited
+    mem.temp_blocked[(0x23, 11, 31)] = 10**9
+    assert not mem.is_frontier((0x23, 11, 32))
+    mem.temp_blocked.clear()
+    mem.m(0x23)["npcs"] = {"slot7:pic4": {"pic": 4, "last": [11, 31], "moves": False}}
+    assert not mem.is_frontier((0x23, 11, 32))
