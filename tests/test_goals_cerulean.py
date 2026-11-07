@@ -70,7 +70,7 @@ def test_after_misty_push_north_then_east(tmp_path):
     step = plan_step(goals, maps, (0x03, 5, 5), "UP")  # Route 24 already learned: walk to it
     assert step[0] == "UP" and "nugget_bridge" in step[1]
     goals["nugget_bridge"] = True
-    goals["gyarados"] = True  # settled (no Magikarp was ever owned): the planner moves on to Bill's
+    goals["team_ready"] = True  # settled (the sim says the party beats the next boss): the planner moves on to Bill's
     assert "to_bill" in plan_step(goals, maps, (0x23, 3, 9), "UP")[1]
 
 

@@ -62,15 +62,45 @@ def read(state: Path) -> dict | None:
         return None
 
 
+LINEAGES = ("organic", "synthetic", "promoted")
+
+
+def lineage_of(fp: dict | None) -> str:
+    """Lineage of a fingerprint dict: the ``lineage`` key when valid; else ``synthetic`` when ``synthetic`` is true
+    (every state tools/state_edit.py wrote before lineage existed); else ``organic``."""
+    fp = fp or {}
+    lin = fp.get("lineage")
+    if lin in LINEAGES:
+        return lin
+    return "synthetic" if fp.get("synthetic") else "organic"
+
+
+def lineage(state: Path) -> str:
+    """The state's lineage; a missing or unreadable sidecar reads ``organic`` (legacy checkpoints)."""
+    return lineage_of(read(state))
+
+
+def is_organic(state: Path) -> bool:
+    return lineage(state) == "organic"
+
+
 def is_synthetic(state: Path) -> bool:
-    """True when the state's fingerprint marks it tool-edited; False on a missing or unreadable stamp."""
-    fp = read(state)
-    return bool(fp and fp.get("synthetic"))
+    """True only for lineage ``synthetic``: a promoted state is NOT synthetic (it may seed drills/segments)."""
+    return lineage(state) == "synthetic"
 
 
-def stamp(emu, state: Path, source_run: str | None = None) -> dict:
-    """Fingerprint the current RAM and store it beside ``state`` (call right after the state is saved)."""
+def stamp(emu, state: Path, source_run: str | None = None, *, inherit: Path | str | None = None) -> dict:
+    """Fingerprint the current RAM and store it beside ``state`` (call right after the state is saved).
+
+    ``inherit`` is the run's start state: when its lineage is not organic the new fingerprint keeps that lineage
+    (synthetic stays synthetic, promoted stays promoted) and records it as ``parent`` - a run cannot launder a
+    synthetic start into an organic descendant."""
     fp = fingerprint(emu, source_run)
+    if inherit is not None:
+        lin = lineage(Path(inherit))
+        if lin != "organic":
+            fp["lineage"] = lin
+            fp["parent"] = Path(inherit).name
     write(state, fp)
     return fp
 

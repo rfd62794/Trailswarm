@@ -25,6 +25,7 @@ Binding hard rules for this PR: **no changes to steering** (the rules in the 202
 - Anomalies: files `runs/anomalies/<run>-<step>-<type>.png` and `.state` (e.g. `explore-20261105-224401-19936-2940-endless_battle.png`), and rows in `runs/anomalies.jsonl`: `{"ts": "2026-11-05T22:55:20-0500", "run": ..., "step": 2940, "frame": 34368, "type": "endless_battle", "map": 59, "x": 30, "y": 7, "details": {...}, "cause_hint": ..., "decisions": [...]}`. There is NO existing reader function for the directory: add `anomalies_for(root) -> list[AnomalyRef]` in the new health module (parse the file stem: run, step, type; pair `.png` and `.state`; read `anomalies.jsonl` only for `cause_hint`, tolerant of bad lines).
 - Invariants: `invariants.runner.run_all(runs_dir: Path, load_states=False, rom=None) -> list[Finding]` where `Finding(check, level in ERROR|WARN|INFO, kind, message, data)`; `has_errors(findings)`. `run_all` reads several files and can take seconds: it MUST NOT run on the render thread or inside the 30 Hz loop. Findings are global (warps, milestones, states, segments, tables), not per agent.
 - `snapshot.py` (v1) publishes per agent: state/stop_reason, segment (+record), goals, thinking, driver-share counts, last 20 events, sees grid, party, money, human_hold, claude_hold_s. **Nothing for stall/anomaly health.** Rule for this PR: add the health data to what the VIEWER polls (a new `viewer/health.py` fed from the files above), NOT to what agents publish; do not change `snapshot.py` or the adapters.
+- Provenance (standing rule, section 7): the health data shown by the viewer is read-only and already carries whatever provenance its source file has; do not add provenance fields to what agents publish. A dossier or anomaly from a synthetic-lineage run may be shown with a `(synthetic)` suffix in the panel line when the dossier carries `provenance`; absent means unlabelled.
 - The research doc's gaps relevant here: "no layout persistence (no init_file use)"; the Stadium "strip inside World" (`world_side.py`, max `stadium.MAX_CARDS` panels, `Slot` per card with a live frame and HP bars) is a strip, not a toggleable pane.
 - Existing viewer test patterns (use them, name them in your report): `tests/test_viewer_core.py`, `tests/test_viewer_fixes.py` (line ~256: `dpg = pytest.importorskip("dearpygui.dearpygui")` then `dpg.create_context()` with NO viewport), `tests/test_viewer_agents.py` (~164, also calls `dpg.setup_dearpygui()` and skips when headless), `tests/test_viewer_panels.py`, `tests/test_viewer_tiles_world.py`, `tests/test_viewer_focus_steering.py`, `tests/test_viewer_no_frame_hint.py`, `tests/test_world_view.py`, `tests/test_world_events.py`, `tests/test_world_follow.py`, `tests/test_world_legend.py`.
 - **Files you must NOT modify:** `src/pokeagent/viewer/steering.py`, `src/pokeagent/viewer/ui/keys.py`, `src/pokeagent/viewer/commands.py` (steering and keys), `snapshot.py`, `adapters/*`, `src/pokeagent/viewer/web.py` (read-only page; no rewrite), `world/model.py` (the opponent reader belongs to the other PR), any explorer behaviour, `ship_gate.py`, `planner*.py`.
@@ -104,7 +105,7 @@ Existing tests stay green unedited except where a moved widget forces an update 
 ## 5. What NOT to do
 
 - No change to steering, keys, human hold or commands (the 3 s hold, noise rule, focused-only keys all stay). No new keyboard shortcuts. No web rewrite and no change to `web.py`. No per-frame file reads; nothing added to the 30 Hz path except dict lookups. No new top-level windows other than the Stadium pane. No external windows or OS shell calls to open images or paths.
-- Do not change `snapshot.py`, `adapters/*`, `world/model.py` (the opponent reader is the other PR's), or any agent/explorer code; do not add health to what agents publish. Do not run the viewer, create a viewport, or send any input on the laptop: tests only. No emulator runs; no `uv run pokeagent ...`.
+- Do not change `snapshot.py`, `adapters/*`, `world/model.py` (the opponent reader is the other PR's), or any agent/explorer code; do not add health to what agents publish. Do not run the viewer, create a viewport, or send any input on the laptop: tests only. No emulator runs and no entry-point invocation of any kind.
 - Not in this PR (ranked 4-7 in the research doc): the delta-vs-record strip, the keyboard pass, the filterable decision log, replay/scrub. No chart-first layouts, no hosted dashboards, no stream overlays.
 - No new dependencies; each module under 300 lines; no changes to `runs/` contents (read-only; the only file the viewer writes is `runs/viewer/layout.ini` via the menu).
 
@@ -127,6 +128,7 @@ Existing tests stay green unedited except where a moved widget forces an update 
 - Create no scratch or debug files (deleting is denied and ends the run). If one is truly needed it goes under `.devin-scratch/` and stays.
 - If a tool call is genuinely blocked, stop and write why in the Status row; do not try another way around it.
 - SOLID/SRP/KISS is a hard rule here: small new modules (under 300 lines), no new dependencies.
+- **Standing rule (Robert, 2026-11-07, verbatim): "We can use synthetic data and states and saves throughout, with a standing rule that a synthetic result must be verified by organic data and states and saves, as a proof system."** Every learned record this work writes carries `"provenance": "organic" | "synthetic" | "unknown"`, taken from the start state's lineage (`statefp` lineage, PR #147: if it is not merged or a state has no lineage record the value is `"unknown"`, never guessed, and `unknown` is treated like organic for display and like synthetic for promotion: it can never be promoted by itself). Synthetic-born records are HYPOTHESES: usable for drills, A/B and planning, NEVER a chain best, a confirmed segment, a shared-memory veto or a KNOWLEDGE fact until an organic run reproduces them, at which point they are promoted (same semantics as state promotion). Tests use fixture lineage values only.
 
 ## 8. Completion criteria
 
@@ -140,7 +142,7 @@ Existing tests stay green unedited except where a moved widget forces an update 
 
 Findings first: test tails (before/after), `git diff --stat`, the final signatures and every named constant, the tag list, which `configure_app` keywords the installed Dear PyGui supports, how the card header colour is applied, where the 1 Hz refresh sits in `poller()`, the join rule you used for agent to run, and whether item 3 was done or stopped.
 
-**Robert's real-window check (5 items; the controller asks Robert to run `pokeagent view` and report pass/fail per line):**
+**Robert's real-window check (5 items; not run by Devin: the controller asks Robert to start the viewer himself and report pass/fail per line):**
 1. Start the viewer with at least 3 agents (or `--fake 6`): the window opens at the usual size, cards render, and frame rate feels unchanged (no stutter while the health refresh runs; the old 444 fps figure is the reference).
 2. A stalled agent (or the `--fake` stalled one) shows a RED card header with the likely cause on hover, an anomaly agent shows a MAGENTA header, and a healthy one keeps the normal header; the World view badge matches the counts.
 3. Click an anomaly line or card: the anomaly image and the `.state` path appear in the side panel, no other window opens, and clicking a missing file shows "file missing" without an error.
@@ -152,12 +154,18 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-viewer-ux-v1-directive |
 | Base branch | - |
+| Base commit | e150b67f146a3a26495a70386f88563c5c91cbab |
 
 **Status log**
 - 2026-11-07 15:45 · robert-claude-laptop · none → Draft — Claude 2026-11-07: viewer layout persistence, stall/break state, Stadium pane (depends on fix/stadium-opponent)
 - 2026-11-07 15:46 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on fix/stadium-opponent; lint_override: dispatch-path-missing on greenfield test file and gitignored runs/kb paths
+- 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: reword entry-point mentions (preflight), add provenance rule
+- 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; entry-point mentions reworded; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
+- 2026-11-07 16:27 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on gitignored kb/rom_tables.json, runs/anomalies.jsonl and the new tests/test_viewer_stadium_pane.py; known false positives. Entry-point mentions reworded. Dependency fix/stadium-opponent merged as PR #149.
+- 2026-11-07 16:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-ux-v1-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VYJD6XMRJQBXSNCYPZ2EJW
+- 2026-11-07 16:31 · dispatcher · launched pid=276; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-ux-v1-directive; provisioned: uv sync --frozen
 <!-- queue:end -->

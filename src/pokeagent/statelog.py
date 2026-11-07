@@ -121,7 +121,7 @@ def _kept(e: Entry, w: Want) -> bool:
 
 def _check(e: Entry, w: Want) -> bool:
     fp = e.fp
-    if fp.get("synthetic"):
+    if statefp.lineage_of(fp) == "synthetic":
         return False
     if w.stem is not None and e.stem != w.stem:
         return False

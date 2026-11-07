@@ -56,7 +56,7 @@ def run(args) -> dict:
     emu.press = lambda b, hold=8, settle=16: (count.__setitem__("frames", count["frames"] + hold), press(b, hold, settle))[1]
     trans = (work / "transitions.jsonl").open("a", encoding="utf-8")
     ctx = ExplorerContext(emu=emu, mem=mem, log=lambda t, tag=None: print(t) if args.verbose else None, run_dir=work, trans=trans,
-                          explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), stop_at_goal=args.stop_at_goal, frames_per_step=4,
+                          explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), state_path=str(args.state), stop_at_goal=args.stop_at_goal, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
                                                                    bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow,

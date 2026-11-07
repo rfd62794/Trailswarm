@@ -24,7 +24,8 @@ BASE = {"hp": 55, "attack": 55, "defense": 50, "speed": 55, "special": 40}
 def world(respawn=5):
     """Two party mons on map 0x61 (x13, y6), one potion stack, 1,234 money, two badges, respawn 5."""
     emu = FakeEmulator({0xD35E: 0x61, 0xD362: 13, 0xD361: 6, 0xD719: respawn, 0xD356: 0b11,
-                        0xD347: 0x00, 0xD348: 0x12, 0xD349: 0x34, 0xD163: 2})
+                        0xD347: 0x00, 0xD348: 0x12, 0xD349: 0x34, 0xD163: 2,
+                        0xD164: 133, 0xD165: 179, 0xD166: 0xFF})
     for off, v in ((0, 133), (1, 0), (2, 0), (3, 12), (4, 0x08), (8, 40), (9, 150),
                    (29, 0x45), (30, 0x10), (33, 12), (34, 0), (35, 27)):       # L12, 0/27 HP, poisoned, 2 moves
         emu.memory[LEAD + off] = v
@@ -79,26 +80,39 @@ def test_set_hp_above_max_or_bad_slot_raises_and_writes_nothing():
 
 
 # --- 3. set_level ----------------------------------------------------------------------------------------------
-def test_set_level_recomputes_level_hp_and_stats():
+def test_set_level_recomputes_level_hp_stats_and_exp():
     emu = world()
-    surgery.apply(emu, {"set_level": {0: 20}}, base_stats=lambda s: BASE if s == 133 else None)
+    surgery.apply(emu, {"set_level": {0: 20}}, base_stats=lambda s: BASE if s == 133 else None,
+                  growth=lambda s: "SLOW" if s == 133 else None)
     new_max = stats.stat_value(55, 0, 0, 20, hp=True)                              # DVs and stat exp are 0 in the fixture
     assert (emu.memory[LEAD + 3], emu.memory[LEAD + 33]) == (20, 20)               # box level and level
     assert (emu.memory[LEAD + 34] << 8) | emu.memory[LEAD + 35] == new_max
     assert (emu.memory[LEAD + 1] << 8) | emu.memory[LEAD + 2] == new_max - 27      # HP rose by what max HP rose
     for i, k in enumerate(("attack", "defense", "speed", "special")):
         assert (emu.read(LEAD + 36 + 2 * i) << 8) | emu.read(LEAD + 37 + 2 * i) == stats.stat_value(BASE[k], 0, 0, 20)
+    # the exp rewrite: the old level's exp on a raised level is illegal (party_exp)
+    exp = 5 * 20 ** 3 // 4                                                          # SLOW L20 = 10000
+    assert tuple(emu.read(LEAD + 14 + i) for i in range(3)) == (exp >> 16, exp >> 8 & 255, exp & 255)
 
 
-def test_set_level_lowering_or_missing_base_stats_raises():
+def test_set_level_to_the_same_level_is_a_noop_on_exp():
+    emu = world()
+    emu.memory[LEAD + 14], emu.memory[LEAD + 15], emu.memory[LEAD + 16] = 0, 0, 50  # some earned exp at L12
+    surgery.apply(emu, {"set_level": {0: 12}}, base_stats=lambda s: BASE, growth=lambda s: "SLOW")
+    assert tuple(emu.read(LEAD + 14 + i) for i in range(3)) == (0, 0, 50)
+
+
+def test_set_level_lowering_missing_stats_or_growth_raises():
     emu = world()
     snap = dict(emu.memory)
     with pytest.raises(surgery.SurgeryError):
-        surgery.apply(emu, {"set_level": {0: 5}}, base_stats=lambda s: BASE)
+        surgery.apply(emu, {"set_level": {0: 5}}, base_stats=lambda s: BASE, growth=lambda s: "SLOW")
     with pytest.raises(surgery.SurgeryError):
-        surgery.apply(emu, {"set_level": {0: 20}}, base_stats=lambda s: None)
+        surgery.apply(emu, {"set_level": {0: 20}}, base_stats=lambda s: None, growth=lambda s: "SLOW")
     with pytest.raises(surgery.SurgeryError):
-        surgery.apply(emu, {"set_level": {0: 101}}, base_stats=lambda s: BASE)
+        surgery.apply(emu, {"set_level": {0: 101}}, base_stats=lambda s: BASE, growth=lambda s: "SLOW")
+    with pytest.raises(surgery.SurgeryError, match="growth rate"):
+        surgery.apply(emu, {"set_level": {0: 20}}, base_stats=lambda s: BASE)
     assert emu.memory == snap
 
 
@@ -253,8 +267,31 @@ def test_state_edit_stamps_the_output_synthetic(tmp_path, monkeypatch):
     fp = statefp.read(out)
     assert fp["synthetic"] is True and fp["parent"] == "in.state" and fp["money"] == 500
     assert fp["edited"] == {"heal": True, "money": 500}
-    assert statefp.is_synthetic(out)
+    assert fp["lineage"] == "synthetic" and fp["edit_class"] == "shortcut"          # a bare money edit is a shortcut
+    assert fp["edit_context"] == {"money_before": 1234, "parent_lineage": "organic"}
+    assert fp["legal"]["ok"] is True and statefp.is_synthetic(out)
     assert not (out.parent / (out.name + ".goals.json")).exists()                  # the goals sidecar is NOT copied
+
+
+def test_state_edit_refuses_an_edit_that_makes_the_state_illegal(tmp_path, monkeypatch):
+    src = _edit_main(tmp_path, monkeypatch)
+    out = tmp_path / "out.state"
+    assert state_edit.main([str(src), "--out", str(out), "--give", "0xFE:1"]) == 2  # 0xFE is not a real item id
+    assert not out.exists()
+    assert state_edit.main([str(src), "--out", str(out), "--give", "0xFE:1", "--allow-illegal"]) == 0
+    fp = statefp.read(out)
+    assert fp["legal"]["ok"] is False and any(v.startswith("bag:") for v in fp["legal"]["violations"])
+
+
+def test_an_input_already_illegal_does_not_block_a_legal_edit(tmp_path, monkeypatch):
+    src = _edit_main(tmp_path, monkeypatch)
+    emu = FakeEmulator()
+    emu.load_state(src)
+    emu.memory[0xD31D], emu.memory[0xD31E], emu.memory[0xD31F], emu.memory[0xD320] = 1, 0xFE, 1, 0xFF  # illegal bag
+    emu.save_state(src)
+    out = tmp_path / "out.state"
+    assert state_edit.main([str(src), "--out", str(out), "--money", "500"]) == 0    # same violations in and out
+    assert statefp.read(out)["legal"]["ok"] is False
 
 
 def test_state_edit_refusals(tmp_path, monkeypatch):

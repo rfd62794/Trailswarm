@@ -142,7 +142,7 @@ class LegStateSaver:
         self.done: set[tuple] = set()
         self.saved = 0
         self.count: int | None = None
-        self.trainee_level = 0   # highest trainee level seen at the gyarados stage this run
+        self.trainee_level = 0   # highest trainee level seen at the team_ready stage this run
         self.trainee_pending = 0  # a level gained mid-battle, saved at the next calm press
 
     def observe(self, ctx, fr) -> Path | None:
@@ -159,7 +159,8 @@ class LegStateSaver:
             fresh = not (self.dir / name(*a, self.keep - 1)).exists()
             p = save_entry(ctx.emu, self.dir, *a, keep=self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)   # respawn, party, money, bag beside the state
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)   # lineage carries from the run's start
             except Exception as e:  # noqa: BLE001  an unstamped state is still a state
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             self.saved += 1
@@ -172,10 +173,10 @@ class LegStateSaver:
             return None
 
     def observe_trainee(self, ctx, fr) -> Path | None:
-        """At the gyarados stage, save ``gyarados@L<level>.state`` when the Magikarp gains a level (at the next calm press), so the
-        long training segment has resume points. Gated on ctx.gyarados_steps: other stages never read the party here."""
+        """At the team_ready stage, save ``gyarados@L<level>.state`` when the Magikarp gains a level (at the next calm press), so the
+        long training segment has resume points. Gated on ctx.team_ready_steps: other stages never read the party here."""
         try:
-            if getattr(ctx, "gyarados_steps", 0) <= 0:
+            if getattr(ctx, "team_ready_steps", 0) <= 0:
                 return None
             from pokeagent.magikarp import magikarp_stats
             st = magikarp_stats(ctx.emu)
@@ -188,7 +189,8 @@ class LegStateSaver:
                 return None
             p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)
             except Exception as e:  # noqa: BLE001
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")

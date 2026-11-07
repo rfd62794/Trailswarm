@@ -18,7 +18,7 @@ PREFIX = ["potion", "left_house", "first_pokemon", "won_battle",
           "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
           "to_route2", "to_pewter", "to_gym", "beat_brock",
           "to_route3", "to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
-          "heal_cerulean", "beat_misty", "nugget_bridge", "gyarados", "to_bill", "ss_ticket"]
+          "heal_cerulean", "beat_misty", "nugget_bridge", "team_ready", "to_bill", "ss_ticket"]
 SPECS = list(campaign.load_campaign())
 
 
@@ -208,6 +208,6 @@ def test_overnight_attempt_rule_ignores_far_goals():
 def test_snapshot_goals_come_in_ladder_order():
     from pokeagent.adapters import explorer_snapshot as es
     key = lambda k: (goals.GOALS.index(k) if k in goals.GOALS else len(goals.GOALS), k)
-    names = ["to_route5", "potion", "gyarados", "beat_champion", "to_bill"]
-    assert sorted(names, key=key) == ["potion", "gyarados", "to_bill", "to_route5", "beat_champion"]
+    names = ["to_route5", "potion", "team_ready", "beat_champion", "to_bill"]
+    assert sorted(names, key=key) == ["potion", "team_ready", "to_bill", "to_route5", "beat_champion"]
     assert es.GOALS is goals.GOALS

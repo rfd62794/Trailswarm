@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from pokeagent import statefp
 from pokeagent.explorer import stats
+from pokeagent.grind.xpmath import exp_for_level
 from pokeagent.ramstructs import (BAG_CAPACITY, BAG_COUNT, MAX_PARTY, PARTY_COUNT, PARTY_MON_SIZE, PARTY_MON1,
                                   decode_item_list, read_party)
 
@@ -32,6 +33,7 @@ RESPAWN_TOWNS = range(11)   # 0 Pallet .. 10 Saffron; 15 was seen in the wild bu
 class _Ctx:
     max_pp: Callable[[int], int | None] | None        # move id -> base PP (None = leave that move's PP byte alone)
     base_stats: Callable[[int], dict | None]          # species id -> base stats (None = cannot set_level)
+    growth: Callable[[int], str | None] | None        # species id -> growth group (None = cannot set_level)
 
 
 def _u16(v: int) -> tuple[int, int]:
@@ -117,6 +119,9 @@ def _set_level(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
                     for k in stats.STAT_KEYS}
         except (KeyError, TypeError):
             raise SurgeryError("set_level needs base stats (kb/rom_tables.json)") from None
+        growth = ctx.growth(mon.species) if ctx.growth else None
+        if growth is None:
+            raise SurgeryError("set_level needs the growth rate (kb/rom_tables.json)")
         base = PARTY_MON1 + slot * PARTY_MON_SIZE
         hp = max(0, min(mon.hp + vals["hp"] - mon.max_hp, vals["hp"]))   # HP rises by what max HP rose, never above max
         hi, lo = _u16(hp)
@@ -126,6 +131,9 @@ def _set_level(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
         for i, k in enumerate(("attack", "defense", "speed", "special")):
             hi, lo = _u16(vals[k])
             writes += [(base + 36 + 2 * i, hi), (base + 37 + 2 * i, lo)]
+        if level != mon.level:                                           # an unchanged level leaves exp alone
+            exp = exp_for_level(growth, level)                           # the old exp on a new level is illegal (party_exp)
+            writes += [(base + 14, exp >> 16 & 0xFF), (base + 15, exp >> 8 & 0xFF), (base + 16, exp & 0xFF)]
     return writes
 
 
@@ -205,7 +213,7 @@ _PLAN = {"heal": _heal, "set_hp": _set_hp, "set_level": _set_level, "money": _mo
 _CONFLICTS = (("give", "take"), ("heal", "set_hp"), ("heal", "set_level"), ("set_hp", "set_level"))
 
 
-def apply(emu, edits: dict, *, max_pp=None, base_stats=None) -> list[tuple[int, int, int]]:
+def apply(emu, edits: dict, *, max_pp=None, base_stats=None, growth=None) -> list[tuple[int, int, int]]:
     """Validate EVERY edit first (raise SurgeryError before the first write), then write.
 
     Returns the writes applied as [(addr, old_byte, new_byte)] in order (only bytes whose value changed)."""
@@ -215,7 +223,7 @@ def apply(emu, edits: dict, *, max_pp=None, base_stats=None) -> list[tuple[int, 
         if a in edits and b in edits:
             raise SurgeryError(f"{a} and {b} cannot be combined in one edit (they clobber each other); "
                                f"run them as two sequential edits")
-    ctx = _Ctx(max_pp, base_stats if base_stats is not None else stats.base_stats_of)
+    ctx = _Ctx(max_pp, base_stats if base_stats is not None else stats.base_stats_of, growth)
     plan: list[tuple[int, int]] = []
     for name, value in edits.items():
         fn = _PLAN.get(name)
