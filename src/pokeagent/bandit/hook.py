@@ -5,6 +5,16 @@ from __future__ import annotations
 from pokeagent.bandit import points as pt
 from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.perceive import party_hp
+from pokeagent.goals import bag_contents
+
+
+FIGHT_FLOOR = 0.25  # shield: the bandit never chooses fight below this lead HP fraction
+
+
+def catch_target(ctx, species: int, balls: int) -> bool:
+    """The catch rule's own test (lazy import: the behaviours package imports this module)."""
+    from pokeagent.explorer.behaviours.battle_run import catch_target as rule
+    return rule(ctx, species, balls)
 
 
 def _safe(ctx, name: str, exc: Exception) -> None:
@@ -17,8 +27,12 @@ def wild_flee(ctx, rule_flee: bool) -> bool:
     if drv is None:
         return rule_flee
     try:
+        hp, mx = party_hp(ctx.emu)
+        if mx and hp / mx < FIGHT_FLOOR:
+            return True  # shield: too hurt to fight; no decision, no episode
+        if catch_target(ctx, ctx.emu.read(0xCFE5), bag_contents(ctx.emu).get(0x04, 0)):
+            return rule_flee  # the rules would try a catch here: not the bandit's call
         def key() -> str:
-            hp, mx = party_hp(ctx.emu)
             return pt.context_key("wild_battle", goal_stage(ctx.goals()), ctx.view.m, hp, mx, pt.wild_gap(ctx))
         return drv.decide("wild_battle", ctx.battles, key, "flee" if rule_flee else "fight") == "flee"
     except Exception as exc:  # noqa: BLE001

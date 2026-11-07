@@ -51,8 +51,12 @@ default. Items marked **(builder)** were settled while building; everything else
   untouched or unmergeable). A standalone run writes `<run dir>/bandit_delta.json`. Only `--continuous` is wired.
 - **Saves.** The delta is rewritten every 10 closed episodes and at exit, so a killed agent keeps what it learned.
 
+## Shields (controller, round 2)
+
+- `wild_battle` does not apply when the rules would try a catch (`battle_run.catch_target`: a POKe BALL in the bag and
+  an unowned species); the Explorer's answer stands and no episode opens.
+- `hook.FIGHT_FLOOR = 0.25`: below 25% lead HP the bandit never chooses `fight` (flee, no episode).
+
 ## Known limits
 
-- `flee` can pre-empt a catch the rules would have made (flee runs before `catch`).
-- Few episodes close per 400-step swarm run (goals are far apart); expect slow learning until runs are long.
-- `fight` can override the weak-HP flee; the -3 blackout is what teaches against it.
+- Few episodes close per short run; swarm runs use 3000-8000 steps, which helps.

@@ -242,7 +242,7 @@ def test_wild_battle_override_reaches_the_battle_behaviour(tmp_path, monkeypatch
 
 
 def test_wild_fight_arm_overrides_a_weak_flee(tmp_path, monkeypatch):
-    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: 5, 0xD18D: 0, 0xD18E: 30})  # 5/30 HP: the Explorer flees
+    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: 9, 0xD18D: 0, 0xD18E: 30})  # 9/30 HP (above the 25% shield): the Explorer flees
     ctx.emu.set(BATTLE, 1)
     put_box(ctx, menu=True, text_rows=(" RUN",))
     ctx.refresh()
@@ -307,3 +307,33 @@ def test_train_skip_lifts_the_gate_in_plan_goal(tmp_path, monkeypatch):
     keep.refresh()
     PlanGoal().step(keep)
     assert keep.train_need == need
+
+
+def test_wild_point_skips_catch_targets(tmp_path, monkeypatch):
+    from pokeagent.bandit import hook as hk
+    ctx = wild_ctx(sub(tmp_path, "catch"), monkeypatch, "flee")
+    monkeypatch.setattr(hk, "catch_target", lambda *a: True)
+    assert hk.wild_flee(ctx, False) is False and ctx.bandit.open == []  # rules would catch: untouched, no episode
+    monkeypatch.setattr(hk, "catch_target", lambda *a: False)
+    assert hk.wild_flee(ctx, False) is True and len(ctx.bandit.open) == 1
+
+
+def test_catch_target_needs_a_ball_and_an_unowned_species(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours import battle_run as br
+    monkeypatch.setattr(br, "ROM_KB", {"dex_of_internal": {"5": 7}})
+    ctx = make_ctx(tmp_path)
+    assert br.catch_target(ctx, 5, 3) and not br.catch_target(ctx, 5, 0)  # no ball: no catch
+    ctx.emu.set(0xD2F7, 0x40)  # dex 7 owned
+    assert not br.catch_target(ctx, 5, 3)
+
+
+def test_fight_floor_shield_below_25_percent(tmp_path, monkeypatch):
+    from pokeagent.bandit import hook as hk
+    monkeypatch.setattr(hk, "catch_target", lambda *a: False)
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "fight")
+    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: 7, 0xD18D: 0, 0xD18E: 30})  # 7/30 = 23%
+    attach(ctx, tmp_path / "none.json", seed=0)
+    ctx.refresh()
+    assert hk.wild_flee(ctx, False) is True and ctx.bandit.open == []
+    ctx.emu.set(0xD16D, 9)  # 30%: the bandit may choose again
+    assert hk.wild_flee(ctx, False) is False
