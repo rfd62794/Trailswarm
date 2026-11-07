@@ -10,7 +10,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
 from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal
-from pokeagent.explorer import area_grind
+from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
@@ -65,8 +65,11 @@ class PlanGoal(BehaviourBase):
         if planned and "at Mom, talking" in planned[1]:
             ctx.mom_talk_step = ctx.step; ctx.mom_talk_hp = hp_now
             ctx.slow_until = ctx.step + 12  # healing has a fade: slow down so completion is recognised
+        driver = ""
+        if planned and ctx.opts.par_follow:
+            planned, driver = par_follow.refine(ctx, planned, [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)])
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
-            return Decision(planned[0], "plan_goal", planned[1])
+            return Decision(planned[0], "plan_goal", planned[1], driver=driver)
         return None
 
     @staticmethod
