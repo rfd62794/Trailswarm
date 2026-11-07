@@ -98,7 +98,7 @@ def main(argv=None) -> int:
     legs_attach.add_args(ap)
     a = ap.parse_args(argv)
     drill_plan = legs_attach.plan(a.drill_leg, a.drill_grind, a.drill_steps, a.leg_states_dir, a.rom,
-                                  a.state if a.state != "baselines/bedroom.state" else None)
+                                  a.state if a.state != "baselines/bedroom.state" else None, min_hp=a.drill_min_hp)
     if drill_plan:  # a drill starts from its saved entry state and runs its own step budget
         a.state, a.steps = str(drill_plan.state), drill_plan.steps + 2
     if a.seed is not None:
