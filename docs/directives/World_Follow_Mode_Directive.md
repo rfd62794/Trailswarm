@@ -188,11 +188,12 @@ clicking empty map stops it).
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-06 21:14 · robert-claude-laptop · none → Queued
+- 2026-11-06 21:15 · robert-claude-laptop · Queued → Approved — lint override: follow.py and tests/test_world_follow.py are new files this directive creates (greenfield false positive)
 <!-- queue:end -->
