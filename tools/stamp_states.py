@@ -21,6 +21,8 @@ def stamp_all(emu, states, force: bool = False) -> list[Path]:
     """Load each state into ``emu`` and write its fingerprint; returns the states stamped. A state that will not load is skipped."""
     done = []
     for p in states:
+        if not force and statefp.is_synthetic(p):
+            continue  # an edited state keeps its synthetic stamp (a re-stamp would drop the edited/parent record)
         if statefp.sidecar(p).exists() and not force:
             continue
         try:

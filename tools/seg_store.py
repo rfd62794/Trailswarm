@@ -22,6 +22,7 @@ from pathlib import Path
 from functools import lru_cache
 
 from pokeagent import checkpoint_goals as cg
+from pokeagent import statefp
 from pokeagent.campaign import agent_capabilities, selectable
 from pokeagent.goals import GOALS
 from pokeagent.segment_names import BEST_SUFFIX
@@ -212,7 +213,8 @@ def ckpt(root: Path, name: str) -> Path | None:
         p = root / "baselines" / "bedroom.state"
         return p if p.exists() else None
     d = root / "runs" / "checkpoints"
-    found = [p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state") if p.exists()]
+    found = [p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state")
+             if p.exists() and not statefp.is_synthetic(p)]   # a tool-edited state is never a segment start
     # a ship-segment state whose blackout lands behind Vermilion loses to one that does not (when both exist)
     return next((p for p in found if not cg.respawn_behind(name, p)), found[0] if found else None)
 
@@ -233,7 +235,10 @@ def ckpt_valid(root: Path, name: str) -> bool:
         return ckpt(root, name) is not None
     if refusal(root, name):
         return False
-    return cg.valid(name, ckpt(root, name), selectable_goals(), lambda g: ckpt(root, g) is not None)
+    p = ckpt(root, name)
+    if p is not None and statefp.is_synthetic(p):
+        return False                                    # guard: synthetic states live outside runs/checkpoints/
+    return cg.valid(name, p, selectable_goals(), lambda g: ckpt(root, g) is not None)
 
 
 def chain(doc: dict) -> dict:
@@ -274,4 +279,6 @@ def replayable(b: dict | None) -> bool:
     both kept under runs/segments/inputs/) are all still there and unchanged."""
     if not b or not b.get("input") or not b.get("start") or not Path(b["input"]).exists() or not Path(b["start"]).exists():
         return False
+    if statefp.is_synthetic(Path(b["start"])):
+        return False                                    # a solve from an edited state can never be confirmed
     return all(b.get(k) is not None for k in REPLAY_KEYS) and sha256(b["start"]) == b.get("start_sha")

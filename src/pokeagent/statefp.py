@@ -62,6 +62,12 @@ def read(state: Path) -> dict | None:
         return None
 
 
+def is_synthetic(state: Path) -> bool:
+    """True when the state's fingerprint marks it tool-edited; False on a missing or unreadable stamp."""
+    fp = read(state)
+    return bool(fp and fp.get("synthetic"))
+
+
 def stamp(emu, state: Path, source_run: str | None = None) -> dict:
     """Fingerprint the current RAM and store it beside ``state`` (call right after the state is saved)."""
     fp = fingerprint(emu, source_run)
