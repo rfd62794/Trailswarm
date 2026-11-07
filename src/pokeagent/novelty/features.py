@@ -26,15 +26,17 @@ class Snapshot:
     party: tuple = ()        # ((species, level, exp, moves, ident), ...); ident = (ot_id, dv_word) follows a mon across slots
     in_battle: bool = False
     enemy: int = 0
+    hp: int = 0              # total current HP across the party (a heal visit is progress with no other trace)
 
 
 def read_snapshot(emu) -> Snapshot:
     from pokeagent.ram import read_state
     from pokeagent.ramstructs import read_bag, read_party, read_pc_items
     s = read_state(emu)
-    party = tuple((m.species, m.level, m.exp, tuple(m.moves), (m.ot_id, m.dv_word)) for m in read_party(emu))
+    mons = read_party(emu)
+    party = tuple((m.species, m.level, m.exp, tuple(m.moves), (m.ot_id, m.dv_word)) for m in mons)
     return Snapshot(s.map_id, s.x, s.y, bytes(emu.read_range(FLAGS_ADDR, FLAGS_LEN)), tuple(read_bag(emu)), tuple(read_pc_items(emu)),
-                    s.money, party, s.in_battle, emu.read(ENEMY_SPECIES) if s.in_battle else 0)
+                    s.money, party, s.in_battle, emu.read(ENEMY_SPECIES) if s.in_battle else 0, hp=sum(m.hp for m in mons))
 
 
 def flag_bits(cur: bytes, prev: bytes | None = None) -> list[int]:
