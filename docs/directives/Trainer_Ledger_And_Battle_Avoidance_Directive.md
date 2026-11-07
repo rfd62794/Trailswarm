@@ -143,7 +143,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -152,4 +152,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:19 · robert-claude-laptop · none → Draft — Claude 2026-11-07: trainer ledger (per-save beaten state), next-target/avoid/save, resistance report
 - 2026-11-07 16:19 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: add provenance standing rule
+- 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 <!-- queue:end -->
