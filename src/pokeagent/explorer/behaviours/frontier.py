@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer import train_route
 from pokeagent.explorer.perceive import lead_level, party_hp
 from pokeagent.novelty import steer as novelty_steer
 
@@ -124,6 +125,6 @@ class Frontier(BehaviourBase):
         weak = mx_now and hp_now / mx_now < 0.4
         training = (ctx.hunt_grass and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
         name, why = _memory_step(ctx, m, x, y,
-                                 avoid_maps={0x00} if (training and m == 0x0C) else None,
+                                 avoid_maps={0x00} if (training and m == 0x0C) else train_route.stay_on_route(m, ctx.train_route_live),
                                  grass="seek" if training else "avoid" if weak else "neutral")
         return Decision(name, "frontier", why)

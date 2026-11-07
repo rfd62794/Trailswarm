@@ -91,11 +91,20 @@ class NavMixin:
         """A tile that still has an unexplored side (same predicate the demo's frontier_step used)."""
         for name, (dx, dy) in DIRS.items():
             key = f"{n[1]},{n[2]},{name}"
+            if self._person_tile(n[0], n[1] + dx, n[2] + dy):
+                continue  # a person's tile is never 'visited', so it would stay a frontier forever (Route 24 bridge trainer)
             if (key not in blocked and f"{n[1] + dx},{n[2] + dy}" not in visited
                     and key not in d.get("warps", {})
                     and key not in d.get("jumps", {})):  # a ledge tile is hopped over, never visited
                 return True
         return False
+
+    def _person_tile(self, map_id: int, x: int, y: int) -> bool:
+        """A person is standing there now (temp_blocked) or a stationary NPC was last seen there."""
+        if (map_id, x, y) in self.temp_blocked:
+            return True
+        npc = self.npc_at(map_id, x, y)
+        return npc is not None and npc.get("moves") is False
 
     def is_frontier(self, node: tuple) -> bool:
         """True while `node` (map, x, y) still has an unexplored side."""

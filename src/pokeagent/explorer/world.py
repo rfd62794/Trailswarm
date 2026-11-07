@@ -126,3 +126,18 @@ def interaction_spots(maps: dict, needle: str) -> list[tuple[int, int, int, str]
                 x, y, f = key.split(",")
                 out.append((int(mid), int(x), int(y), f))
     return out
+
+
+PLAYER_HOUSE_MAPS = (0x25, 0x26)  # Red's house and bedroom: the parcel is never handed out there
+
+
+def parcel_spots(maps: dict) -> list[tuple[int, int, int, str]]:
+    """Spots where the OAK'S PARCEL was handed over, from recorded interactions. A bag/START-menu overlay is also recorded as
+    the text of whatever the player faced ('OAK PARCEL | CANCEL | USE | This isn't yours to use'), and in Red's house that
+    matched "OAK PARCEL" and sent every oaks_parcel run home to the bedroom (2026-11-07 15:00): those are not hand-overs."""
+    menu = {(m, x, y, f) for m, x, y, f in interaction_spots(maps, "CANCEL")}
+    out = []
+    for s in interaction_spots(maps, "OAK PARCEL") + interaction_spots(maps, "PARCEL"):
+        if s not in menu and s[0] not in PLAYER_HOUSE_MAPS and s not in out:
+            out.append(s)
+    return out

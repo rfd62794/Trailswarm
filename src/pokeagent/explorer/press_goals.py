@@ -10,8 +10,9 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
-from pokeagent.checkpoint_goals import completed_goals, stamp_fingerprint, write_completed
+from pokeagent.checkpoint_goals import completed_goals, read_completed, stamp_fingerprint, write_completed
 from pokeagent.goals import GOALS, check_goals, is_unverified
+from pokeagent.segment_names import state_goal
 
 
 def seed_initial_goals(ctx: ExplorerContext) -> None:
@@ -22,13 +23,19 @@ def seed_initial_goals(ctx: ExplorerContext) -> None:
     goals = check_goals(ctx.emu, ctx)
     ctx.initial_goals_ready = True
     ctx.initial_goals = {g for g in GOALS if goals[g]}
-    # A checkpoint named after a goal implies every earlier goal too (a used potion must not send a run that
-    # starts in Viridian City all the way home to the PC - seen 2026-11-03 06:00).
+    # The start state's goals sidecar is the source of truth (it lists exactly what was complete when the state was written).
+    # Only a state with no sidecar falls back to its NAME: a checkpoint named after a goal implies every earlier goal too (a used
+    # potion must not send a run that starts in Viridian City all the way home to the PC - seen 2026-11-03 06:00).
     stem = ctx.opts.state_stem
-    if stem in GOALS:
-        ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
-    elif stem == "team_best":
-        ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
+    side = read_completed(Path(ctx.opts.state_path)) if getattr(ctx.opts, "state_path", "") else None
+    if side is not None:
+        ctx.initial_goals |= {g for g in side if g in GOALS}
+    else:
+        stem = state_goal(stem)  # 'x.best' -> 'x', 'g@63' -> the goal before g (also for callers that pass a raw stem)
+        if stem in GOALS:
+            ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
+        elif stem == "team_best":
+            ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
     if ctx.initial_goals:
         ctx.log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(ctx.initial_goals)}]", "res")
     try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past

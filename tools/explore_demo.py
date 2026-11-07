@@ -142,8 +142,7 @@ def main(argv=None) -> int:
     decisions = DecisionLog(run_dir / "decisions.jsonl")
     ctx = ExplorerContext(
         emu=emu, mem=mem, log=log, run_dir=run_dir, trans=trans, explore_run=explore_run,
-        opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "",
-                             state_path=str(a.state) if a.state else "", steps=a.steps,
+        opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", state_path=a.state or "", steps=a.steps,
                              stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
