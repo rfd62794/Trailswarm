@@ -147,7 +147,7 @@ differed from section 3 (say exactly what you used).
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Superseded |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -155,4 +155,5 @@ differed from section 3 (say exactly what you used).
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — one-window viewer + human steering; Robert asked 2026-11-02; needs Agent_Loop_And_CLI merged
 - 2026-11-06 20:35 · robert-claude-laptop · Draft → Queued — closing as superseded
+- 2026-11-06 20:35 · robert-claude-laptop · Queued → Superseded — superseded: work already merged at main - note: viewer/ + intervene/ on main; triage AgentFlow/docs/notes/2026-11-06-pokeagent-brain-tools-merged-drafts-triage.md
 <!-- queue:end -->
