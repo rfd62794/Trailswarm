@@ -188,7 +188,7 @@ clicking empty map stops it).
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-world-follow-mode-directive |
 | Base branch | - |
@@ -202,4 +202,5 @@ clicking empty map stops it).
 - 2026-11-06 21:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6SWMY1ANRG5X42PVQJN0YQZ
 - 2026-11-06 21:25 · dispatcher · launched pid=6980; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; provisioned: uv sync --frozen
 - 2026-11-06 21:29 · devin · In progress → Review — [origin] spent: devin 3 min est. n/a
+- 2026-11-06 21:32 · robert-claude-laptop · Review → Done — note: merged PR #105 (a1f22d9); controller review + 43 tests re-run
 <!-- queue:end -->
