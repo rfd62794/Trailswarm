@@ -18,6 +18,7 @@ TEXT_MAX_PRESSES = 200      # a text box open longer
 IMPOSSIBLE_DEBOUNCE = 2     # consecutive observations a broken invariant must persist (fades read garbage)
 TELEPORT_MIN_JUMP = 2       # Manhattan tiles
 FORCED_WALK_MAX = 10        # a straight jump this long on a spinner map is a forced walk, not a teleport
+TOSS_WINDOW = 40            # presses after a toss quantity/confirm screen in which a bag-total drop counts as a toss
 SPINNER_MAPS = frozenset({0x2D, 0xC7, 0xC8, 0xC9, 0xCA})  # Viridian Gym, Rocket Hideout B1F-B4F (arrow tiles)
 
 
@@ -43,6 +44,9 @@ class Obs:
     joy_ignore: int = 0
     screen_sig: int = 0                # hash(tilemap, sprite table)
     broken: list = field(default_factory=list)    # impossible_state invariant names
+    toss_screen: str = ""              # which toss screen (quantity / confirm) is up, else ""
+    threw_away: bool = False           # the "Threw away <ITEM>." text is on screen
+    bag_total: int = -1                # sum of bag quantities (-1 = unread)
     blocked_here: tuple = ()           # directions memory has learned as walls from this tile (stuck_tile diagnosis)
 
 
@@ -74,6 +78,9 @@ class Detectors:
         self.window: deque = deque(maxlen=FROZEN_PRESSES)
         self.failed: dict = {}     # (map, x, y) -> {button: failed presses}
         self.broken_n: dict = {}
+        self.toss_left = 0         # presses left in which a bag drop is blamed on a toss
+        self.bag_prev = -1
+        self.threw_prev = False
         self.pending_tp: Finding | None = None   # a teleport held one observation, until the screen proves it was no cutscene
 
     def reset(self) -> None:
@@ -82,7 +89,7 @@ class Detectors:
     def update(self, o: Obs) -> list[Finding]:
         self.still = self.still + 1 if o.prev == _pos(o) and not o.box else 0
         return (self._doorway(o) + self._blocking(o) + self._player_blocking(o) + self._teleport(o)
-                + self._impossible(o) + self._frozen(o) + self._endless(o) + self._stuck_tile(o))
+                + self._impossible(o) + self._frozen(o) + self._endless(o) + self._stuck_tile(o) + self._item_tossed(o))
 
     @staticmethod
     def _bump(table: dict, slot: int, tile: tuple) -> int:
@@ -210,3 +217,16 @@ class Detectors:
             return []
         return [Finding("stuck_tile", o.map, o.x, o.y, (o.x, o.y),
                         {"failed": dict(per), "learned_blocked": list(o.blocked_here), "joy_ignore": o.joy_ignore})]
+
+    def _item_tossed(self, o: Obs) -> list[Finding]:
+        """An item left the bag outside a USE: the "Threw away" text, or the bag total dropping soon after the toss quantity /
+        confirm screens (a USE never shows those, so potions and ropes used on purpose do not fire)."""
+        prev, self.bag_prev = self.bag_prev, o.bag_total
+        new_text, self.threw_prev = o.threw_away and not self.threw_prev, o.threw_away
+        self.toss_left = TOSS_WINDOW if o.toss_screen in ("quantity", "confirm") else max(0, self.toss_left - 1)
+        dropped = 0 <= o.bag_total < prev and not o.battle and self.toss_left > 0
+        if not (new_text or dropped):
+            return []
+        self.toss_left = 0
+        return [Finding("item_tossed", o.map, o.x, o.y, (o.x, o.y), {"reason": "text" if new_text else "bag_drop",
+                        "bag_before": prev, "bag_after": o.bag_total, "button": o.button})]

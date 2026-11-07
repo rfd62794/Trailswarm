@@ -13,7 +13,9 @@ from pokeagent.explorer.anomaly_detectors import Detectors, Obs
 from pokeagent.explorer.anomaly_ram import impossible_state
 from pokeagent.explorer.anomaly_record import RECENT_DECISIONS, AnomalyLog
 from pokeagent.explorer.anomaly_sprites import doorway_tiles, read_sprites, walkable_tiles, wanderer_slots
-from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN
+from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN, frame_lines
+from pokeagent.explorer.toss_guard import toss_screen
+from pokeagent.goals import bag_contents
 
 WAIT_FRAMES = 90          # emulator frames (no-press waits) spent waiting for a blocking wanderer to move before routing around it
 TEMP_BLOCK_FRAMES = 300   # frames the blocker's tile stays temporarily blocked for routing (never learned as a wall)
@@ -59,12 +61,15 @@ class AnomalyMonitor:
         battle, joy = emu.read(0xD057) != 0, emu.read(JOY_IGNORE)
         candidate = tuple(fr.before) == (m, x, y) and not fr.box_after and not battle and not joy  # a frozen-screen candidate
         sig = hash(emu.read_range(TILEMAP, TILEMAP_LEN) + emu.read_range(*SPRITE_TABLE)) if candidate else 0
+        lines = frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN)) if fr.box_after else []
         return Obs(step=ctx.step, frame=ctx.frame, map=m, x=x, y=y, button=fr.name, prev=tuple(fr.before),
                    sprites=read_sprites(emu), wanderers=wanderer_slots(md.get("npcs", {})),
                    doors=doorway_tiles(md.get("warps", {})), walkable=walkable_tiles(md), warps=md.get("warps", {}),
                    jumps=md.get("jumps", {}), box=fr.box_after, box_before=fr.box_before, battle=battle,
                    joy_ignore=joy, screen_sig=sig, broken=impossible_state(emu, self.valid_maps),
-                   blocked_here=tuple(d for d in DIRS if f"{x},{y},{d}" in md.get("blocked", [])))
+                   blocked_here=tuple(d for d in DIRS if f"{x},{y},{d}" in md.get("blocked", [])),
+                   toss_screen=toss_screen(lines) or "", threw_away=any("threw away" in ln.lower() for ln in lines),
+                   bag_total=sum(bag_contents(emu).values()))
 
     def observe(self, ctx, fr) -> list[dict]:
         """Run every detector on the press just made; returns the records written."""

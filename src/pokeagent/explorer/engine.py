@@ -12,8 +12,14 @@ from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
 from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
+from pokeagent.explorer.toss_guard import toss_veto
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
+
+
+def _tossed(ctx: ExplorerContext) -> int:
+    """How many item_tossed anomalies the monitor has recorded this run."""
+    return sum(f["type"] == "item_tossed" for f in ctx.anomalies.findings) if ctx.anomalies is not None else 0
 
 
 class Engine:
@@ -36,9 +42,13 @@ class Engine:
         why_veto = veto(ctx, decision)
         if why_veto:  # the policy table says this talk teaches nothing: B instead of A (keeps the loop guards counting)
             decision = Decision("B", "retalk_veto", why_veto, behaviour=decision.behaviour)
+        why_toss = toss_veto(ctx.view.lines, decision)
+        if why_toss:  # a toss screen is up: nothing may advance it, whichever behaviour pressed (B backs out, NO then A declines)
+            decision = Decision("B", "toss_veto", why_toss, behaviour=decision.behaviour)
         view = ctx.view
         before, box, battle = (view.m, view.x, view.y), view.box, view.battling
         stage, goals_reached = goal_stage(ctx.goals()), len(ctx.goal_steps)
+        tossed_before = _tossed(ctx)
         self.presser.press(decision.button, "agent", decision.why)
         if decision.after is not None:
             decision.after(ctx)
@@ -54,6 +64,8 @@ class Engine:
             self.decision_log.write(rec)
         if ctx.anomalies is not None:
             ctx.anomalies.note_decision(rec)
+        if self.decision_log is not None and _tossed(ctx) > tossed_before:  # an item was thrown away: the bandit reward counts this line
+            self.decision_log.write({**rec, "event": "item_tossed", "outcome": "item_tossed"})
         self._pending_outcomes.append(rec)
         del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
         if len(ctx.goal_steps) > goals_reached:
