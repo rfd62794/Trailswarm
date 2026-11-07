@@ -217,6 +217,7 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    already_out_until: int = 0  # step until which the active mon's party slot is off limits ("<name> is already out!" just showed)
     pickup_await: tuple | None = None  # (map,x,y) ball whose A press is awaiting its item result
     pickup_ball: tuple | None = None  # committed item-ball target (map,x,y)
     ball_result: tuple | None = None  # (map,x,y,item|None): the last item-ball dialog to close, from press_interact
