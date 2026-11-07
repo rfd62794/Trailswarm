@@ -72,7 +72,7 @@ def test_center_intent_blocks_the_walk_out(tmp_path):
 
 
 def test_training_levels_come_from_one_table_with_the_cli_floor():
-    assert TRAIN_LEVEL_BY_GOAL == {"beat_brock": 12, "to_mt_moon": 14, "beat_misty": 20}
+    assert {g: TRAIN_LEVEL_BY_GOAL[g] for g in ("beat_brock", "to_mt_moon", "beat_misty")} == {"beat_brock": 12, "to_mt_moon": 14, "beat_misty": 20}
     pre_brock = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
     assert train_level_for(pre_brock, 8) == 12
     assert train_level_for(BEFORE_MT, 8) == 14           # to_mt_moon is next

@@ -21,20 +21,25 @@ class ControlBar:
         self.speed_btn = None
         self.pause_btn = None
         self.steer_box = None
-        self.view_btn = None
+        self.tab_btns: dict[str, str | int] = {}
+        self._themes: dict[bool, int] = {}
         self.hand_btns: dict[str, str | int] = {}
         self._build(parent)
 
     def _build(self, parent) -> None:
-        # row 1: scope + transport
+        # row 0: status line (mode, agents, selected, follow)
+        dpg.add_text("", tag="status_line", parent=parent)
+        # row 1: Tiles | World switcher, scope + transport
         with dpg.group(horizontal=True, parent=parent):
+            for mode, name in (("grid", "Tiles"), ("world", "World")):
+                self.tab_btns[mode] = dpg.add_button(label=name, width=px(64), tag=f"mode_{mode}",
+                                                     callback=handler(self.host.set_view_mode, mode))
             dpg.add_combo(["All agents", "Selected"], default_value="All agents", width=px(100), tag=BAR_TAG,
                           callback=lambda s, a, u: self.host.set_scope("all" if a == "All agents" else "selected"))
             self.pause_btn = dpg.add_button(label="Pause", width=px(64),
                                             callback=lambda s, a, u: self.host.toggle_pause())
             self.speed_btn = dpg.add_button(label="1x", width=px(44),
                                             callback=lambda s, a, u: self.host.cycle_speed())
-            self.view_btn = dpg.add_button(label="World view", width=px(84), callback=lambda s, a, u: self.host.focus.toggle_mode())
             self.steer_box = dpg.add_checkbox(label="Steering (focus view)", default_value=False, enabled=False)
         # row 2: hand-off + state slots
         with dpg.group(horizontal=True, parent=parent):
@@ -58,14 +63,32 @@ class ControlBar:
             dpg.add_button(label="Release", width=px(64),
                            callback=lambda s, a, u: self.host.send_to_targets("hold_release"))
 
+    def _theme(self, active: bool) -> int:
+        if active not in self._themes:
+            with dpg.theme() as t:
+                with dpg.theme_component(dpg.mvButton):
+                    col = (40, 110, 190, 255) if active else (45, 45, 55, 255)
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, col)
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (60, 130, 210, 255) if active else (70, 70, 85, 255))
+            self._themes[active] = t
+        return self._themes[active]
+
+    def _refresh_modes(self) -> None:
+        """Segmented control: the active mode is highlighted. Also the status line."""
+        cur = self.host.view_mode()
+        for mode, tag in self.tab_btns.items():
+            if dpg.does_item_exist(tag):
+                dpg.bind_item_theme(tag, self._theme(mode == cur))
+        if dpg.does_item_exist("status_line"):
+            dpg.set_value("status_line", self.host.status_line())
+
     def refresh(self) -> None:
         """Per-frame cheap updates: speed label, pause label, hand-off availability."""
         if self.speed_btn is not None and dpg.does_item_exist(self.speed_btn):
             dpg.set_item_label(self.speed_btn, SPEED_LABELS.get(self.host.speed(), "1x"))
         if self.pause_btn is not None and dpg.does_item_exist(self.pause_btn):
             dpg.set_item_label(self.pause_btn, "Resume" if self.host.paused() else "Pause")
-        if dpg.does_item_exist(self.view_btn):
-            dpg.set_item_label(self.view_btn, "Grid view" if self.host.focus.mode == "world" else "World view")
+        self._refresh_modes()
         if self.steer_box is not None and dpg.does_item_exist(self.steer_box):
             dpg.set_value(self.steer_box, self.host.steering())
         if dpg.does_item_exist("spawn_btn"):

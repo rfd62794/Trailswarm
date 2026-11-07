@@ -110,6 +110,8 @@ def test_poller_keeps_agents_across_rediscovery(monkeypatch):
     class Win:
         def __init__(self, model, sources, **kw):
             self.model, self.sources = model, sources
+            from pokeagent.viewer.layout import FocusState
+            self.focus = FocusState()                    # run() sets the start mode (default World)
 
         def run(self):
             time.sleep(1.0)                              # >= 2 rediscoveries (every 60 ticks at 120 fps)

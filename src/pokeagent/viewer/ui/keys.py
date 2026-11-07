@@ -39,9 +39,14 @@ def install(host) -> None:
         if not typing():
             host.hotkey(name)
 
+    def tab():
+        if not typing():
+            host.toggle_view_mode()
+
     with dpg.handler_registry(show=True, tag="viewer_keys"):
         for name, dpg_key in _DPG_KEYS.items():
             dpg.add_key_press_handler(dpg_key, callback=handler(button, name))
+        dpg.add_key_press_handler(dpg.mvKey_Tab, callback=handler(tab))
         dpg.add_key_press_handler(dpg.mvKey_Escape, callback=handler(host.escape))
         dpg.add_key_press_handler(dpg.mvKey_P, callback=handler(hotkey, "pause"))
         dpg.add_key_press_handler(dpg.mvKey_T, callback=handler(hotkey, "speed"))

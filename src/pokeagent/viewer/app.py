@@ -16,6 +16,7 @@ import numpy as np
 
 from pokeagent.agent_registry import list_agents
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
+from pokeagent.viewer import modes
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.world.events import BattleEnd, BattleStart, EventBus, Move
 from pokeagent.world.model import WorldModel
@@ -148,7 +149,9 @@ def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=N
     return gone
 
 
-def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False) -> int:
+def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False,
+        mode: str = modes.DEFAULT_MODE) -> int:
+    """One entry point: the same window for `view` and `world`; ``mode`` ('tiles' | 'world') only picks the start view."""
     root = Path(root)
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
@@ -185,8 +188,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     win = ViewerWindow(model, holder["sources"], fps=fps, supervisor=Supervisor(root),
                        root=root, world=world)
     win.entries = entries
-    if world_mode:
-        win.focus.set_mode("world")
+    win.focus.set_mode(modes.internal("world" if world_mode else mode))
     try:
         win.run()
     finally:
@@ -201,9 +203,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--web", action="store_true", help="also serve the read-only web view")
     p.add_argument("--port", type=int, default=8899, help="web view port (default 8899)")
     p.add_argument("--fps", type=int, default=30, help="poll/UI rate (default 30)")
+    p.add_argument("--mode", choices=modes.CHOICES, default=modes.DEFAULT_MODE, help="start view (default world)")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port)
+    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode)
 
 
 if __name__ == "__main__":

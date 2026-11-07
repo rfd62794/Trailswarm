@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pokeagent.bandit.hook import wild_flee
-from pokeagent.explorer.grind import record_battle_result
+from pokeagent.explorer.grind import battle_outcome, record_battle_result
 from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -217,13 +217,14 @@ class Battle(BehaviourBase):
                 if rec and rec["duplicate"]:  # keep-best is report-only: no box juggling yet
                     ctx.log(f"[duplicate #{ca['species']}: best DVs in party slot {rec['prefer_slot'] + 1}]", "res")
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
-            won = ctx.emu.read(0xD163) > 0 and (m, x, y) == ctx.battle_pos  # a blackout warps you away
+            trainer = bool(ctx.battle_log and ctx.battle_log.get("kind") == 2) or ctx.trainer_npc is not None
+            won, moved_away = battle_outcome(trainer=trainer, start=ctx.battle_pos or (-1, -1, -1), end=(m, x, y), party_count=ctx.emu.read(0xD163))
             if won and ctx.trainer_npc is not None:
                 ctx.trainer_npc["beaten"] = True
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
-            record_battle_result(ctx, won=won, moved_away=ctx.emu.read(0xD163) > 0 and (m, x, y) != ctx.battle_pos)
+            record_battle_result(ctx, won=won, moved_away=moved_away)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy

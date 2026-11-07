@@ -22,6 +22,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import swarm_handoff  # noqa: E402
 from swarm_slot import Slot  # noqa: E402
 
+def write_stall_dossier(root, watch, slot, seed, reason) -> None:
+    """Diagnostic only: a dossier from the run's files (the run is still alive, nothing is waited on). Swallows every error."""
+    try:
+        from pokeagent import stalls
+        run = watch.run_dir.name if getattr(watch, "run_dir", None) else None
+        stalls.safe_write_for_stall(root, run, {"slot": slot, "seed": seed, "reason": reason, "pos": getattr(watch, "last_pos", None),
+                                                "presses": getattr(watch, "presses", 0), "t": time.strftime("%Y-%m-%dT%H:%M:%S")})
+    except Exception:  # noqa: BLE001
+        pass
+
+
 STARTERS = ["bulbasaur", "charmander", "squirtle"]
 BOX_PACES = [8, 16, 30]
 FAST_S = 60.0
@@ -257,6 +268,7 @@ class Supervisor:
                 self.log(f"slot {s.idx} stalled: {reason} (last position {w.last_pos})")
                 if self.on_stall:
                     self.on_stall(self.swarm_dir, s.idx, s.cfg["seed"], reason, w)
+                write_stall_dossier(self.root, w, s.idx, s.cfg["seed"], reason)  # runs/stalls/<run>.json; never raises
                 if self._kill(s, "stalled"):  # the whole process tree we launched
                     self._finish(s, "stalled")
 

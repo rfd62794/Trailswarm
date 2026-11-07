@@ -14,7 +14,7 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands, steering, ui_scale
+from pokeagent.viewer import commands, modes, steering, ui_scale
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.panels import BG
@@ -29,7 +29,7 @@ from pokeagent.viewer.ui.world_host import WorldHost
 from pokeagent.world.model import WorldModel
 
 log = logging.getLogger(__name__)
-_BAR_H = 120  # reserved height for the three control-bar rows
+_BAR_H = 145  # reserved height for the four control-bar rows (status line + three)
 
 
 class ViewerWindow:
@@ -174,7 +174,40 @@ class ViewerWindow:
             self._send_one(aid, "steer", on=False)
 
     def _on_select(self, agent_id: str) -> None:
+        """The one selection, shared by Tiles (highlight + page pin) and World (follow)."""
         self.selected = agent_id
+
+    # -- Tiles | World ----------------------------------------------------------
+    def set_view_mode(self, mode: str) -> None:
+        """Switch between Tiles ('grid') and World. Leaves focus view first. Entering World with a
+        selected agent centres the camera on it and starts follow."""
+        if mode not in FocusState.MODES:
+            return
+        if self.focus.focused is not None:
+            self.leave_focus()
+        prev = self.focus.mode
+        self.focus.set_mode(mode)
+        if mode == "world" and prev != "world" and self.selected is not None:
+            self.world.follow(self.selected)
+
+    def toggle_view_mode(self) -> None:
+        self.set_view_mode("world" if self.focus.mode == "grid" else "grid")
+
+    def follow_agent(self, agent_id: str) -> None:
+        """Card 'Follow' button: select, switch to World and follow."""
+        self.selected = agent_id
+        self.set_view_mode("world")
+        self.world.follow(agent_id)
+
+    def view_mode(self) -> str:
+        return self.focus.mode
+
+    def following(self) -> str | None:
+        v = self.world.view
+        return v.follow.agent_id if v is not None else self.world.pending_follow
+
+    def status_line(self) -> str:
+        return modes.status_text(self.focus.view, len(self.model.ids()), self.selected, self.following())
 
     def _target_ids(self) -> list[str]:
         if self.focus.focused is not None:  # control bar acts on the focused agent only
@@ -188,7 +221,8 @@ class ViewerWindow:
 
     # -- build --------------------------------------------------------------------
     def _card_factory(self, parent, agent_id, w, h, on_focus, on_select, big=False):
-        return CardView(parent, agent_id, w, h, on_focus, on_select, big=big)
+        return CardView(parent, agent_id, w, h, on_focus, on_select, big=big,
+                        on_follow=None if big else self.follow_agent)
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
