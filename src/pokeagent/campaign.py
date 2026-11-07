@@ -12,7 +12,7 @@ Each goal is {id, name, after, detector, needs, note}. ``detector`` is one of
   {"map_past_x": {"map": [ids], "x": n}}              standing on one of these maps NOW at wXCoord >= n (past a blocker)
   "unverified"                    no verified RAM detector; check_goals infers it from later goals, but only once its ``after``
                                   predecessor is reached too (never a segment target, never recorded)
-The first 25 goals carry ``"special": true``: pokeagent.goals keeps their hand-coded detectors, byte for byte.
+The first 26 goals carry ``"special": true``: pokeagent.goals keeps their hand-coded detectors, byte for byte.
 ``needs`` are capability tags (cut, surf, strength, flash, poke_flute, silph_scope, bike, puzzle, safari, dex10) the
 current agent behaviours may lack; see ``reachable`` / ``selectable``.
 """

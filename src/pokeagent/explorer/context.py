@@ -162,6 +162,11 @@ class ExplorerContext:
     switch_train: dict | None = None  # switch_out_lead in progress for this battle
     switch_gave_up: int = -1  # ctx.battles value of the battle whose switch was abandoned
     magikarp_shared: int = 0  # battles in which the trainee was sent out and swapped on turn one
+    gyarados_steps: int = 0  # steps with gyarados the next unmet goal and a Magikarp in the party
+    gyarados_idle: int = 0  # consecutive plan steps at the gyarados stage with the training gate closed or lifted
+    gyarados_skipped: bool = False  # GYARADOS_STEP_CAP spent: the gyarados goal is settled for this run
+    train_member: int | None = None  # party slot team_readiness names as the shortfall (None when the team is ready)
+    team_note: str = ""  # last team-readiness verdict logged (plan_goal)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None

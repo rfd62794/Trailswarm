@@ -15,10 +15,20 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
-from pokeagent.magikarp import MAGIKARP, MAX_RUNS, switch_candidate
+from pokeagent.magikarp import MAGIKARP, MAX_RUNS, party_species, switch_candidate, trainee_slot_for
 from pokeagent.ramstructs import read_battle_mon
 
 MAX_PRESSES = 30  # a switch is about 6 presses; past this the menus are not what we think: fight on
+
+
+def trainee_out(ctx: ExplorerContext) -> int | None:
+    """Party slot of the switch-trainee actually out in this battle, else None. The active mon only counts when its
+    own party_pos AND species agree with the trainee slot (a Magikarp party: identical to the old species match)."""
+    t = trainee_slot_for(ctx.emu, ctx.train_member)
+    if t is None:
+        return None
+    b, sp = read_battle_mon(ctx.emu), party_species(ctx.emu)
+    return t if b.party_pos == t and t < len(sp) and b.species == sp[t] else None
 
 
 def switch_press(frames: list[str], screen: list[str], cur: int, target: int) -> str | None:
@@ -58,23 +68,23 @@ class SwitchOut(BehaviourBase):
     def applies(self, ctx: ExplorerContext) -> bool:
         if not ctx.view.battling or ctx.bv is None or ctx.switch_gave_up == ctx.battles:
             return False
-        return ctx.switch_train is not None or read_battle_mon(ctx.emu).species == MAGIKARP
+        return ctx.switch_train is not None or trainee_out(ctx) is not None
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        b = read_battle_mon(ctx.emu)
         sw = ctx.switch_train
-        if b.species != MAGIKARP:
+        t = trainee_out(ctx)
+        if t is None:
             if sw is not None:
                 ctx.magikarp_shared += 1
                 ctx.log(f"[{sw['rule']}: done after {sw['presses']} presses (Magikarp shared {ctx.magikarp_shared} battles)]", "res")
                 ctx.switch_train = None
             return None
-        target = switch_candidate(ctx.emu)
+        target = switch_candidate(ctx.emu, t)
         tm = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
         if target is None:
             # Nobody fit to send in. A Magikarp only knows SPLASH: leave a wild fight (the first sighting is logged once),
             # a trainer fight cannot be left, so it carries on as before.
-            if ctx.emu.read(0xD057) == 1:
+            if ctx.emu.read(0xD057) == 1 and party_species(ctx.emu)[t] == MAGIKARP:  # only a Magikarp is useless: a fighter trainee never flees
                 wild_run = run_press(frame_lines(tm))
                 if wild_run is None:
                     return None
@@ -96,7 +106,8 @@ class SwitchOut(BehaviourBase):
             return None  # text scrolling / animation: the usual dialog handling runs
         if sw is None:
             names = species_names(ctx.emu)
-            rule = f"switch_train: MAGIKARP L{b.level} -> out, {names[target]} in"
+            who = "MAGIKARP" if t < len(names) and party_species(ctx.emu)[t] == MAGIKARP else names[t]
+            rule = f"switch_train: {who} L{read_battle_mon(ctx.emu).level} -> out, {names[target]} in"
             sw = ctx.switch_train = {"rule": rule, "presses": 0}
         sw["presses"] += 1
         if sw["presses"] > MAX_PRESSES:

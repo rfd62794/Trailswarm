@@ -57,9 +57,11 @@ def draw_framed(emu: FakeEmulator, rows: list[str]) -> None:
 
 # --- goals -------------------------------------------------------------------------------------------------------
 
-def test_buy_magikarp_sits_before_mt_moon_and_gyarados_is_a_side_goal():
+def test_buy_magikarp_sits_before_mt_moon_and_gyarados_is_a_ladder_goal():
     assert GOALS.index("to_route4") < GOALS.index("buy_magikarp") < GOALS.index("to_mt_moon")
-    assert SIDE_GOALS == ["gyarados"] and "gyarados" not in GOALS
+    assert GOALS.index("gyarados") == GOALS.index("nugget_bridge") + 1
+    assert GOALS.index("to_bill") == GOALS.index("gyarados") + 1
+    assert SIDE_GOALS == []
 
 
 def test_buy_magikarp_detector():
@@ -75,14 +77,15 @@ def test_buy_magikarp_detector():
     assert check_goals(emu, st)["buy_magikarp"]
     emu.memory.update(party_mem([(STARTER, 14, 30, 30), (GYARADOS, 20, 60, 60)]))
     g = check_goals(emu, st)
-    assert g["buy_magikarp"] and g["gyarados"]  # evolved: still bought, side goal met
+    assert g["buy_magikarp"] and g["gyarados"]  # evolved: still bought, the gyarados goal is met
     assert check_goals(FakeEmulator({**rich, MAP: 0x3B}), {})["buy_magikarp"]  # Mt Moon 1F entered: the chance is gone
 
 
 def test_gyarados_never_blocks_the_ladder():
     g = check_goals(FakeEmulator({**party_mem([(STARTER, 14, 30, 30)]), **bcd(3000)}), {})
-    assert not g["gyarados"]
-    assert next((k for k in GOALS if not g[k]), None) not in SIDE_GOALS
+    assert g["gyarados"]  # settled without a Magikarp ever being owned: the ladder goal cannot stall
+    karp = FakeEmulator({**party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 17, 17)]), **bcd(3000)})
+    assert not check_goals(karp, {})["gyarados"]  # open only while a Magikarp is actually being raised
 
 
 # --- the salesman's YES / the nickname NO ------------------------------------------------------------------------
@@ -292,14 +295,14 @@ def test_trainee_numbers_reach_meta_json_and_status(tmp_path):
     ctx.magikarp_shared, ctx.battles = 4, 9
     record_trainee(ctx)
     meta = json.loads((tmp_path / "meta.json").read_text())
-    assert meta["magikarp"]["level"] == 7 and meta["magikarp"]["battles_shared"] == 4 and meta["side_goals"] == {"gyarados": False}
+    assert meta["magikarp"]["level"] == 7 and meta["magikarp"]["battles_shared"] == 4 and meta["side_goals"] == {}
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "tools"))
     import status
     run = tmp_path / "explore-1"
     run.mkdir()
     (run / "meta.json").write_text(json.dumps(meta))
     line = status._trainee_line([run])
-    assert "L7" in line and "battles shared 4 of 9" in line and "gyarados=no" in line
+    assert "L7" in line and "battles shared 4 of 9" in line and "background goals:" in line
 
 
 def test_run_attempts_are_capped_per_battle(tmp_path):
@@ -337,3 +340,12 @@ def test_buy_stage_step_cap_settles_the_goal(tmp_path):
     assert not ctx.goals()["buy_magikarp"]
     PlanGoal().step(ctx)
     assert ctx.buy_skipped and ctx.center_intent is None and ctx.goals()["buy_magikarp"]
+
+
+def test_switch_out_wild_run_is_for_the_magikarp_only(tmp_path):
+    mons = [(STARTER, 30, 0, 79), (0x54, 9, 20, 20)]            # lead fainted: nobody to send in; slot 1 is the fighter trainee
+    ctx = battle_ctx(tmp_path, mons, battle_species=0x54, kind=1)
+    ctx.emu.set(0xD017, 1)                                      # the battle mon is party slot 1
+    ctx.train_member = 1
+    draw_framed(ctx.emu, [">FIGHT PKMN", "ITEM RUN"])
+    assert SwitchOut().step(ctx) is None and ctx.switch_gave_up == 1   # fights on; no RUN walk for a real fighter
