@@ -35,6 +35,11 @@ class ExplorerOptions:
     bandit: bool = False  # behaviour bandit overrides the Explorer at three decision points (pokeagent.bandit)
     bandit_path: str = "runs/bandit.json"  # shared table the bandit loads at start
     bandit_delta: str = ""  # where this run's delta goes ("" = <run_dir>/bandit_delta.json)
+    role: str = ""  # swarm role ("explorer" / "exploiter" / ...); only "explorer" is steered and paid by novelty
+    novelty: bool = False  # track global novelty + discoveries (pokeagent.novelty); bonuses reach only role == "explorer"
+    novelty_path: str = "runs/novelty.json"
+    novelty_runs: str = "runs"  # the runs directory the discovery log and its review saves go under
+    novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     par_follow: bool = False  # plan_goal's route is walked along the ROM par path (pokeagent.explorer.par_follow)
 
 
@@ -212,6 +217,7 @@ class ExplorerContext:
     econ: Any = None  # explorer.economy.ledger.Ledger, made on first use (income/spend/blackouts, Pokecenters visited)
     shop_intent: Any = None  # ("mart", map|None) while restock walks to a Mart: par_follow treats the trip as a "mart" trip
     bandit: Any = None  # pokeagent.bandit.driver.BanditDriver (None = bandit off: every hook answers as the Explorer would)
+    novelty: Any = None  # pokeagent.novelty.tracker.NoveltyTracker (None = novelty off: nothing below changes)
     par: Any = None  # explorer.par_follow.ParState, created on first use when opts.par_follow is on
 
     # --- dict-protocol shim for goals.check_goals ---

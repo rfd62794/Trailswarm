@@ -69,6 +69,11 @@ class BanditDriver:
                     self._close(ep)
         return [e for e in events if e.get("event") == "blackout"]  # the engine already writes item_tossed itself
 
+    def add_novelty(self, bonus: float) -> None:
+        """Pay an explorer-role novelty bonus into every open episode (capped per episode by reward.NOVELTY_CAP)."""
+        for ep in self.open:
+            ep.add({"event": "novelty", "bonus": bonus})
+
     def _close(self, ep: rw.Episode) -> None:
         self.open.remove(ep)
         record(self.cells, ep.key, ep.arm, ep.reward)

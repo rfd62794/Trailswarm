@@ -90,6 +90,10 @@ def main(argv=None) -> int:
     ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--bandit-delta", default="", help="where this run writes its bandit delta (default <run dir>/bandit_delta.json)")
+    ap.add_argument("--role", default="", help="swarm role (explorer/exploiter/...); with --novelty only explorer is steered and paid by novelty")
+    ap.add_argument("--novelty", action="store_true", help="count global novelty and log discoveries (runs/novelty.json, runs/discoveries.jsonl)")
+    ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start")
+    ap.add_argument("--novelty-delta", default="", help="where this run writes its novelty delta (default <run dir>/novelty_delta.json)")
     a = ap.parse_args(argv)
     if a.seed is not None:
         random.seed(a.seed)
@@ -136,10 +140,14 @@ def main(argv=None) -> int:
                              stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
-                             bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow))
+                             bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
+                             role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
     if a.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, a.bandit_path, a.bandit_delta or None, a.seed)
+    if a.novelty:
+        from pokeagent.novelty.tracker import attach as attach_novelty
+        attach_novelty(ctx)
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
