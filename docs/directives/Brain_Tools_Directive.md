@@ -99,7 +99,7 @@ Test tail, line counts, one example JSON output per CLI command, anything that d
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-brain-tools-directive |
 | Base branch | - |
@@ -115,4 +115,5 @@ Test tail, line counts, one example JSON output per CLI command, anything that d
 - 2026-11-05 20:21 · dispatcher · launched pid=19908; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-tools-directive; provisioned: uv sync --frozen
 - 2026-11-06 21:20 · devin-overseer · Review → Review — resync: merged origin/main into the branch (5 conflicts; journal fold moved into swarm_merge.merge_file_into, classify override kept above the new item kind); uv run pytest -q on merged tree: 977 passed, 28 skipped; head re-pinned 87db60d → 2c352ee
 - 2026-11-05 20:44 · devin-overseer (delegated) · In progress → Review — Brain tools complete: edit journal (runs/memory_edits.jsonl, 11 ops + undo, pure idempotent apply) folded on MapMemory load/pre-save/reload_edits/swarm-merge; tile_kind overrides win in classify; pure pokeagent.brain query lib (maps/map/tile/find/diff/lessons/q); pokeagent brain CLI + tools/brain.py (JSON default, --text); 8 brain_* MCP tools; apply --backup folds journal with backup and refuses while agents live; Q --set/--patch-save always back up first. uv run pytest -q: 312 passed, 5 skipped. All modules <=300 lines.; under delegate.envelope [origin] spent: devin 18 min est. n/a
+- 2026-11-06 20:20 · devin-overseer (delegated) · Review → Done — note: Merged PR #95 -> e306c55 (merge commit). Resynced onto main first (5 conflicts; journal fold lives in swarm_merge.merge_file_into now). Verify on pinned head 2c352ee: 980 passed, 0 failed, 28 asset-skips (ROM/checkpoints gitignored). Independent review: journal/ops/CLI/MCP/fileops all sound; apply refuses while agents live; Q writes always back up.; under delegate.done_if_merged
 <!-- queue:end -->
