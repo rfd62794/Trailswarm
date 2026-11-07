@@ -119,11 +119,13 @@ class Restock(BehaviourBase):
             led.sale(ctx, item, r.money_before, r.money_after)
         bag, money = bag_contents(ctx.emu), read_money(ctx.emu)
         led.ref_money, led.ref_step = max(money, led.reserve_ref(ctx.step)), ctx.step
-        floor = budget.reserve(ctx.goals(), money, led.ref_money)
-        for item, qty in plan.make_list(ctx, bag, money) if ok else ():
+        reserve = budget.reserve(ctx.goals(), money, led.ref_money)
+        unsold = st.setdefault("unsold", {})
+        listed = plan.make_list(ctx, bag, money, mart=m, stock=lambda i, mm: stocked(i, mm) and i not in unsold.get(mm, ())) if ok else ()
+        for item, qty in listed:
             if item in st.setdefault("unsold", {}).get(m, ()) or not stocked(item, m):
                 continue
-            qty = min(qty, max(0, (read_money(ctx.emu) - floor) // max(1, price(item))))  # the reserve is never breached
+            qty = min(qty, max(0, (read_money(ctx.emu) - reserve) // max(1, price(item))))  # the reserve is never breached
             if qty < 1:
                 continue
             res = shop.buy(ctx.emu, item, qty)

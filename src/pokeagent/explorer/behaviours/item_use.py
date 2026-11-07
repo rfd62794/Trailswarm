@@ -16,6 +16,7 @@ from pokeagent.explorer.context import ExplorerContext
 
 MAX_ITEM_ATTEMPTS = 3  # confirmations of one item per battle before it is written off
 POTION = 0x14
+HEAL_NAME = {0x14: "POTION", 0x13: "SUPER POTION"}  # economy.heal_items.HEAL_ITEMS
 BAG_COUNT, BAG_START = 0xD31D, 0xD31E
 MENU_ITEM, LIST_SCROLL, PLAYER_MON = 0xCC26, 0xCC36, 0xCC2F
 _QTY_ROW = re.compile(r"x ?\d+", re.IGNORECASE)

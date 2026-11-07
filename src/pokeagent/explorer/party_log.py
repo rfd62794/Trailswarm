@@ -11,7 +11,7 @@ import json
 from collections import Counter
 from typing import Any
 
-from pokeagent.explorer.economy import ledger
+from pokeagent.explorer.economy import heal_items, ledger
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.goals import bag_contents
 from pokeagent.ramstructs import read_party
@@ -74,7 +74,7 @@ class PartyLog:
         except Exception:
             self.before = None
         try:
-            self.money_before, self.potions_before = read_money(ctx.emu), bag_contents(ctx.emu).get(0x14, 0)
+            self.money_before, self.potions_before = read_money(ctx.emu), heal_items.heal_count(bag_contents(ctx.emu))
         except Exception:
             self.money_before = self.potions_before = None
 
