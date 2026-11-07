@@ -6,6 +6,7 @@ and needs the ROM unless ``--dry-run``.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,6 +15,22 @@ from pokeagent import statefp, statelog
 
 DEFAULT_DIRS = (Path("runs/checkpoints"), Path("runs/legs/states"))
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROM = ROOT / "roms" / "Pokemon Red.gb"
+
+
+def make_emulator(rom):
+    """The emulator the legal check drives (a seam so tests inject a FakeEmulator)."""
+    from pokeagent.emulator import PyBoyEmulator
+    return PyBoyEmulator(Path(rom), headless=True)
+
+
+def _kb_json(name: str) -> dict | None:
+    """A kb/ table (rom_tables.json, items.json, hm_compat.json) or None when absent/unreadable."""
+    try:
+        return json.loads((ROOT / "kb" / name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def _dirs(args) -> list[Path]:
@@ -51,9 +68,42 @@ def cmd_list(args) -> int:
     return 0
 
 
+def _legal(args) -> int:
+    """``states check --legal``: legality.check every state in the dirs; --envelope adds the organic-envelope verdicts."""
+    from pokeagent import envelope, legality
+    dirs = _dirs(args)
+    kb, catalog, hm = _kb_json("rom_tables.json"), _kb_json("items.json"), _kb_json("hm_compat.json")
+    rom_bytes = Path(args.rom).read_bytes() if args.rom and Path(args.rom).exists() else None
+    env = envelope.build(dirs) if getattr(args, "envelope", False) else None
+    emu, fail = None, False
+    try:
+        for e in _entries(dirs):
+            if emu is None:
+                emu = make_emulator(Path(args.rom) if args.rom else DEFAULT_ROM)
+            emu.load_state(e.path)
+            r = legality.check(emu, kb, catalog=catalog, hm=hm, rom=rom_bytes)
+            fail = fail or not r.ok
+            for line in ([f"{e.path.name}\tok"] if r.ok else [f"{e.path.name}\t{v}" for v in r.violations]):
+                print(line)
+            for w in r.warnings:
+                print(f"{e.path.name}\twarning: {w}")
+            if env is not None:
+                inside, reasons = envelope.within_envelope(e.fp, envelope.stage_key(e.path.name, e.fp), env)
+                for reason in reasons:
+                    print(f"{e.path.name}\tenvelope: {reason}")
+                if r.ok and not inside:
+                    print(f"{e.path.name}\tlegal, unreachable")
+    finally:
+        if emu is not None:
+            emu.close()
+    return 1 if fail else 0
+
+
 def cmd_check(args) -> int:
     """Exit 1 when a ship state (ship-goal stem, or a fingerprint on a ship map) respawns behind Vermilion or has a
-    missing/stale sidecar; other bad states are listed but do not fail."""
+    missing/stale sidecar; other bad states are listed but do not fail. ``--legal`` runs the legality checker instead."""
+    if getattr(args, "legal", False):
+        return _legal(args)
     from pokeagent.explorer.world import SHIP_MAPS
     fail, rows = False, []
     for e in _entries(_dirs(args)):
@@ -72,6 +122,28 @@ def cmd_check(args) -> int:
         print(r)
     print(f"{len(rows)} bad state(s)" if rows else "no bad states")
     return 1 if fail else 0
+
+
+def cmd_promote(args) -> int:
+    """``states promote END --from START``: promote a legal, in-envelope descendant of an organic-equivalent
+    synthetic start to lineage ``promoted``. Exit 1 with the reasons when the promotion does not hold."""
+    from pokeagent import envelope, lineage
+    end, start = Path(args.path), Path(args.start)
+    kb, catalog, hm = _kb_json("rom_tables.json"), _kb_json("items.json"), _kb_json("hm_compat.json")
+    rom_bytes = Path(args.rom).read_bytes() if args.rom and Path(args.rom).exists() else None
+    emu = make_emulator(Path(args.rom) if args.rom else DEFAULT_ROM)
+    try:
+        emu.load_state(end)
+        ok, reasons = lineage.promote(end, start, emu, kb, catalog=catalog, hm=hm, rom=rom_bytes,
+                                      env=envelope.build(_dirs(args)))
+    finally:
+        emu.close()
+    if ok:
+        print(f"promoted {end.name} (descended from {start.name})")
+        return 0
+    for reason in reasons:
+        print(f"{end.name}\t{reason}")
+    return 1
 
 
 def cmd_restamp(args) -> int:
@@ -111,8 +183,18 @@ def add_parser(sub) -> None:
     lp.set_defaults(func=cmd_list)
 
     cp = s.add_parser("check", help="fail when a ship state respawns behind Vermilion or is unstamped/stale")
+    cp.add_argument("--legal", action="store_true", help="run the legality checker on every state (exit 1 on any violation)")
+    cp.add_argument("--envelope", action="store_true", help="with --legal: also print the organic-envelope verdicts")
+    cp.add_argument("--rom", type=Path, default=DEFAULT_ROM, metavar="ROM", help="ROM for the emulator and walk-grid check")
     dirs(cp)
     cp.set_defaults(func=cmd_check)
+
+    pp = s.add_parser("promote", help="promote a legal in-envelope descendant of an organic-equivalent synthetic start")
+    pp.add_argument("path", type=Path, metavar="END.state")
+    pp.add_argument("--from", dest="start", type=Path, required=True, metavar="START.state")
+    pp.add_argument("--rom", type=Path, default=DEFAULT_ROM, metavar="ROM")
+    dirs(pp)
+    pp.set_defaults(func=cmd_promote)
 
     rp = s.add_parser("restamp", help="re-run tools/stamp_states.py on the state dirs (needs the ROM unless --dry-run)")
     rp.add_argument("--force", action="store_true", help="re-stamp states that already have a sidecar")

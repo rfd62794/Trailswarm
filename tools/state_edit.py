@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +54,32 @@ def _max_pp():
         except (KeyError, TypeError, ValueError):
             return None
     return pp_of
+
+
+def _growth():
+    """species id -> growth group from the ROM-drained species table (kb/rom_tables.json); None without it."""
+    from pokeagent.knowledge import kb
+    species_by_dex, dex_of = kb.table(None, "species_by_dex"), kb.table(None, "dex_of_internal")
+    if not species_by_dex:
+        return None
+
+    def growth_of(species: int) -> str | None:
+        row = species_by_dex.get(str(int(dex_of.get(str(species), 0) or 0))) or {}
+        return row.get("growth")
+    return growth_of
+
+
+def _legality_inputs():
+    """(kb, catalog, hm) the legality checker reads: the ROM-drained tables when present, else Nones."""
+    from pokeagent.knowledge import hm_compat, items_catalog, kb
+    return kb.ROM_KB, items_catalog.load(), hm_compat.load()
+
+
+def _respawns_seen():
+    """Respawn town ids organic states carry (envelope over the state dirs); empty when there is no data."""
+    from pokeagent import envelope
+    env = envelope.build([ROOT / "runs" / "checkpoints", ROOT / "runs" / "legs" / "states"])
+    return envelope.respawns_seen(env)
 
 
 def _edits(a) -> dict:
@@ -120,6 +147,8 @@ def main(argv=None) -> int:
                          "shifted); A/B drills must not use it")
     ap.add_argument("--dry-run", action="store_true", help="apply in memory and print the writes; save nothing")
     ap.add_argument("--force", action="store_true", help="overwrite an existing OUT")
+    ap.add_argument("--allow-illegal", action="store_true",
+                    help="save even when the edit makes the state illegal (stamps legal.ok: false with the violations)")
     a = ap.parse_args(argv)
     for flag in ("give", "take", "set_hp", "set_level"):
         setattr(a, flag, [p for group in getattr(a, flag) for p in group])
@@ -133,23 +162,44 @@ def main(argv=None) -> int:
     edits = _edits(a)
     emu = make_emulator(a.rom)
     try:
+        from pokeagent import legality, lineage
+        from pokeagent.ramstructs import read_party
         emu.load_state(a.state)
+        kb, catalog, hm = _legality_inputs()
+        before = legality.check(emu, kb, catalog=catalog, hm=hm)
+        money_before = statefp.fingerprint(emu).get("money")
+        hp_before = [m.hp for m in read_party(emu)]
         try:
-            writes = surgery.apply(emu, edits, max_pp=_max_pp())
+            writes = surgery.apply(emu, edits, max_pp=_max_pp(), growth=_growth())
         except surgery.SurgeryError as e:
             print(f"refused: {e}", file=sys.stderr)
             return 2
         for addr, old, new in writes:
             print(f"0x{addr:04X} 0x{old:02X} -> 0x{new:02X}")
+        after = legality.check(emu, kb, catalog=catalog, hm=hm)
+        new_violations = [v for v in after.violations if v not in before.violations]
         if a.dry_run:
+            print(f"legality: ok={after.ok} violations={after.violations} warnings={after.warnings}")
             print(f"dry run: {len(writes)} writes; nothing saved")
             return 0
+        if new_violations and not a.allow_illegal:
+            print(f"refused: the edit makes the state illegal: {'; '.join(new_violations)} "
+                  f"(use --allow-illegal to save anyway)", file=sys.stderr)
+            return 2
         out.parent.mkdir(parents=True, exist_ok=True)
         emu.save_state(out)
         fp = statefp.stamp(emu, out, source_run=f"edit:{a.state.name}")
-        fp.update(synthetic=True, edited=edits, parent=a.state.name)
+        parent_fp = statefp.read(a.state) or {}
+        parent_lineage = statefp.lineage(a.state)
+        context = {"money_before": money_before, "parent_lineage": parent_lineage}
+        eclass = ("shortcut" if parent_lineage != "organic" and parent_fp.get("edit_class") != "organic_equivalent"
+                  else lineage.edit_class(edits, {**context, "hp": hp_before}, catalog, _respawns_seen()))
+        fp.update(synthetic=True, edited=edits, parent=a.state.name, lineage=lineage.SYNTHETIC,
+                  edit_class=eclass, edit_context=context,
+                  legal={"ok": not after.violations, "violations": after.violations,
+                         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
         statefp.write(out, fp)
-        print(f"saved {out} ({len(writes)} writes, stamped synthetic)")
+        print(f"saved {out} ({len(writes)} writes, stamped synthetic/{eclass}, legal.ok={not after.violations})")
         return 0
     finally:
         emu.close()

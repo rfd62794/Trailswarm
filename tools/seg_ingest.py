@@ -90,23 +90,23 @@ def _stop_name(seg) -> str:
     return seg.stop_goal if seg.stop_goal else f"map:{seg.stop_map:#04x}"
 
 
-def _synthetic_start(root: Path, run: Path, tag: str | None) -> bool:
-    """True when this attempt started from a tool-edited (synthetic) state: the job's kept start copy, or a start
-    path named in the run's meta.json. A missing or odd meta reads as "not synthetic"."""
+def _non_organic_start(root: Path, run: Path, tag: str | None) -> bool:
+    """True when this attempt started from a non-organic (synthetic or promoted) state: the job's kept start copy,
+    or a start path named in the run's meta.json. A missing or odd meta reads as organic."""
     if tag:
         start = _job_record(root, tag).get("start")
-        if start and statefp.is_synthetic(Path(start)):
+        if start and not statefp.is_organic(Path(start)):
             return True
     try:
         start = json.loads((run / "meta.json").read_text(encoding="utf-8")).get("start")
     except (OSError, ValueError, AttributeError):
         start = None
-    return bool(start) and statefp.is_synthetic(Path(str(start)))
+    return bool(start) and not statefp.is_organic(Path(str(start)))
 
 
 def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | None) -> None:
-    if _synthetic_start(root, run, tag):
-        return  # a solve from an edited state never counts: no attempt, no checkpoint copy, no best
+    if _non_organic_start(root, run, tag):
+        return  # a solve from an edited or promoted state never counts: no attempt, no checkpoint copy, no best
     st = stat(doc, seg.key)
     st["attempts"] = (st["attempts"] + [att])[-KEEP_ATTEMPTS:]
     st["n"] += 1
@@ -155,9 +155,9 @@ def record_confirm(root: Path, doc: dict, seg, cand_run: str, att: dict) -> str:
     b = st["best"]
     if not b or b["run"] != cand_run:
         return "stale"
-    if b.get("start") and statefp.is_synthetic(Path(b["start"])):
+    if b.get("start") and not statefp.is_organic(Path(b["start"])):
         b["rejected"] = True
-        st["best"] = st["confirmed"]  # started from an edited state: never a confirmed best
+        st["best"] = st["confirmed"]  # started from an edited or promoted state: never a confirmed best
         return "rejected"
     if att["outside"] or (not att["solved"] and att["budget"] and att["steps"] < ABORTED_BELOW * att["budget"]):
         b["tries"] = max(0, b["tries"] - 1)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from pokeagent.checkpoint_goals import stamp_fingerprint
 from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
@@ -59,6 +60,7 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
                 cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
                 side.write_text(str(lvl))
                 tmp = cp / f"team_best.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / "team_best.state")
+                stamp_fingerprint(ctx.emu, cp / "team_best.state", ctx.run_dir.name, inherit=getattr(ctx.opts, "state_path", "") or None)  # lineage carries from the run's start
                 ctx.mem.data["team_best_level"] = lvl; ctx.log(f"*** TEAM CHECKPOINT: level {lvl} saved as team_best.state ***", "res")
             except Exception as e:
                 ctx.log(f"[team checkpoint failed: {e!r}]", "res")
