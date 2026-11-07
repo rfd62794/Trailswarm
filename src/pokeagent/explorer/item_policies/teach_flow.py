@@ -62,9 +62,9 @@ def teach_press(lines: list[str], cursor: int, plan: HmPlan, moves_now: tuple[st
             want = "YES" if state.get("abort") else "NO"
             why = "abort: really abandoning" if want == "YES" else "never cancelling into 'didn't learn': back to the move list"
         elif "make room" in text or "delete an older" in text:
-            want, why = "YES", f"delete a move to make room for {plan.move}"
+            want, why = ("NO", "abort: declining to delete a move") if state.get("abort") else ("YES", f"delete a move to make room for {plan.move}")
         elif "teach" in text:
-            want, why = "YES", f"teaching {plan.move}"
+            want, why = ("NO", "abort: declining to teach") if state.get("abort") else ("YES", f"teaching {plan.move}")
         else:
             return "B", "teach_unknown_yesno", "an unrecognised YES/NO inside the teach flow: backing out"
         if yes_no_cursor(lines) == want:
@@ -72,6 +72,8 @@ def teach_press(lines: list[str], cursor: int, plan: HmPlan, moves_now: tuple[st
         return ("UP" if want == "YES" else "DOWN"), "teach_yesno_cursor", f"moving to {want}: {why}"
     rows = move_rows(lines, moves_now)
     if len(rows) == 4:  # the 'Which move should be forgotten?' list: all four moves on screen
+        if state.get("abort"):
+            return "B", "teach_abort", "aborting: leaving the move list for the 'Abandon learning?' prompt"
         if plan.forget_move is None or plan.forget_slot is None:
             state["abort"] = True
             return "B", "teach_abort", "the move list is up but no overwrite was planned: backing out"

@@ -8,7 +8,7 @@ from typing import Callable
 from pokeagent.explorer.item_policies import ids
 from pokeagent.explorer.item_policies.view import MAGIKARP, Mon
 
-Compare = Callable[[Mon, str], "bool | None"]      # (mon, evolved species) -> True not worse / False worse / None cannot tell
+Compare = Callable[[Mon, str], "bool | None"]      # (mon, evolved species) -> True not worse / False worse / None cannot tell (None never evolves)
 LearnsAt = Callable[[str, int], list]               # (species, level) -> moves learned at exactly that level
 
 
@@ -39,7 +39,7 @@ def should_use(*, bag: dict[int, int], party: list[Mon], evolutions: dict[str, l
                 continue
             if move_risk(mon, learns_at(into, mon.level), needed.get(mon.slot, set())):
                 continue
-            if compare(mon, into) is False:
+            if compare(mon, into) is not True:   # only an explicit 'not worse' evolves; no data = wait
                 continue
             return item, mon.slot, f"{mon.species} L{mon.level} evolves into {into} with the {stone_name} (not worse for the next boss)"
     return None

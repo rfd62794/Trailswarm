@@ -22,7 +22,9 @@ from pokeagent.goals import bag_contents
 CALM_FRAMES = 8        # the screen must have been still this long before a sequence starts
 CHECK_EVERY = 10       # steps between policy evaluations
 MAX_PRESSES = {"teach": 110, "party": 60, "self": 40}
+TEACH_CLOSE_PRESSES = 60  # a failed teach may need several prompts walked out
 CLOSE_PRESSES = 25     # B presses to get back out to the overworld
+BIKE_COOLDOWN = 600     # steps after mounting before the BICYCLE is considered again
 COOLDOWN = 400         # steps a failed item is left alone
 NO_EFFECT_COOLDOWN = 4000
 TEACH_MAX_WAITS = 40   # consecutive unrecognised teach screens before the flow is abandoned
@@ -117,10 +119,12 @@ class UseItems(BehaviourBase):
                 text = " ".join(lines).lower()
                 if state["waits"] > TEACH_MAX_WAITS:
                     state["abort"] = True
-                    return Decision("B", "teach_abort", "the teach flow stopped making sense: backing out")
+                    return None   # _finish -> _close walks the prompts out with the abort answers
                 if "abandon" in text or "be forgotten" in text or "which move" in text or not ctx.view.box:
                     return no_press("teach_wait", "teach flow: waiting for the prompt to finish drawing")
                 return Decision("A", "teach_text", "advancing the teach dialog")
+        if pick.category == "stone" and seq["dec_at"] is not None:  # the stone is spent: the evolution is playing; no menu driver may touch it
+            return no_press("stone_settle", "evolution in progress: waiting")
         ctx.item_attempts = 0   # the item list's attempt counter is per battle; this sequence has its own press budget
         dec = rope_press(ctx, ctx.view.lines, pick.item, ids.name_of(pick.item), pick.reason, pick.slot)
         if pick.kind == "teach" and dec.rule == "rope_use" and dec.button == "A":
@@ -130,6 +134,10 @@ class UseItems(BehaviourBase):
     def _finish(self, ctx: ExplorerContext, seq: dict, outcome: str) -> Decision | None:
         pick = seq["pick"]
         seq["phase"], seq["ok"] = "close", outcome == "ok"
+        if outcome != "ok" and pick.kind == "teach":
+            seq["state"]["abort"] = True   # whatever teach prompt is up is now answered by the abort rules (NO on Delete, YES on Abandon)
+        if outcome == "ok" and pick.item == ids.BICYCLE:
+            ctx.item_cooldown[pick.item] = ctx.step + BIKE_COOLDOWN   # a self-dismount must not re-mount via START every goal leg
         if outcome == "ok":
             uselog.record(ctx, pick.item, pick.category, pick.reason, seq["before"], uselog.snapshot(ctx.emu, pick.slot, pick.item))
         else:
@@ -141,6 +149,15 @@ class UseItems(BehaviourBase):
     def _close(self, ctx: ExplorerContext, seq: dict) -> Decision | None:
         """Back out to the overworld with B. A level-up move prompt (YES/NO) is handed to Menu, which already answers it."""
         lines = _screen(ctx)
+        pick = seq["pick"]
+        if pick.kind == "teach" and not seq["ok"] and seq["closing"] < TEACH_CLOSE_PRESSES:
+            # a teach prompt may be up (Delete? / Abandon?): never hand it to Menu, whose rules could forget another move
+            mons = read_mons(ctx.emu)
+            now = mons[pick.slot].moves if pick.slot < len(mons) else ()
+            hit = teach_press(lines, ctx.emu.read(MENU_ITEM), pick.plan, now, {**seq["state"], "abort": True})
+            if hit is not None:
+                seq["closing"] += 1
+                return Decision(hit[0], hit[1], hit[2])
         open_menu = ctx.view.box or menu_open(" | ".join(lines))
         if not open_menu or yes_no_open(lines) or seq["closing"] >= CLOSE_PRESSES:
             ctx.item_seq = None

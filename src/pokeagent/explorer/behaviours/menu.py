@@ -9,6 +9,8 @@ from pokeagent.explorer.dialog import goal_menu_choice, learn_decision, offered_
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import frame_lines, is_menu, party_hp
 from pokeagent.goals import check_goals
+from pokeagent.explorer.catch_list import upcoming_needs
+from pokeagent.explorer.item_policies.ids import HM_MOVE
 
 
 class Menu(BehaviourBase):
@@ -32,7 +34,8 @@ class Menu(BehaviourBase):
                 ctx.forget_move = None
             elif "learn" in context.lower() and ("make room" in ql or "delete" in ql):
                 cur_moves = [ROM_KB["moves"].get(str(ctx.emu.read(0xD173 + i)), {}).get("name", "?") for i in range(4) if ctx.emu.read(0xD173 + i)] if ROM_KB else []
-                ans, why, forget = learn_decision(context, cur_moves)
+                needed = {HM_MOVE[t] for t in upcoming_needs(check_goals(ctx.emu, ctx)) if t in HM_MOVE}
+                ans, why, forget = learn_decision(context, cur_moves, needed)
                 ctx.forget_move = forget
             else:
                 ans, why = yesno_answer(context, ctx.opts.starter, buy_magikarp=not check_goals(ctx.emu, ctx)["buy_magikarp"],

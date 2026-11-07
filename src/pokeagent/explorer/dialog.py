@@ -14,13 +14,16 @@ YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit",
 STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
 
 
-def learn_decision(question: str, current_moves: list[str]) -> tuple[str, str, str | None]:
+def learn_decision(question: str, current_moves: list[str], protected: frozenset | set = frozenset()) -> tuple[str, str, str | None]:
     """'X is trying to learn Y! ... Delete a move to make room for Y?' -> (YES/NO, why, move to forget)."""
     m = re.search(r"LEARN ([A-Z][A-Z ]+?)[!?]", question.upper())
     new = m.group(1).strip() if m else None
     if not new or not current_moves:
         return "YES", "new move: default accept", None
-    worst = min(current_moves, key=move_value)
+    free = [m for m in current_moves if m not in protected]   # never forget a move the campaign still needs (an HM)
+    if not free:
+        return "NO", "every move is one the campaign needs", None
+    worst = min(free, key=move_value)
     if move_value(new) > move_value(worst):  # a status move (0) never replaces a damaging one
         return "YES", f"{new} ({move_value(new):.0f}) beats {worst} ({move_value(worst):.0f})", worst
     return "NO", f"{new} ({move_value(new):.0f}) is not better than our weakest {worst} ({move_value(worst):.0f})", None

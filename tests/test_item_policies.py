@@ -155,7 +155,7 @@ def test_stone_waits_when_the_evolved_form_is_worse_or_the_comparison_picks_anot
     assert stone([mon(0, "PIKACHU")], {ids.THUNDERSTONE: 1}, compare=lambda m, i: False) is None
     pick = stone([mon(0, "EEVEE")], {ids.FIRE_STONE: 1, ids.WATER_STONE: 1}, compare=lambda m, i: i == "VAPOREON")
     assert pick[0] == ids.WATER_STONE
-    assert stone([mon(0, "PIKACHU")], {ids.THUNDERSTONE: 1}, compare=lambda m, i: None)   # cannot tell: evolve
+    assert stone([mon(0, "PIKACHU")], {ids.THUNDERSTONE: 1}, compare=lambda m, i: None) is None   # cannot tell: wait
 
 
 def test_stone_never_risks_a_needed_move_to_a_forget_prompt():
@@ -383,3 +383,104 @@ def test_fighter_slot_follows_the_trainee_rule():
     assert fighter_slot_of([mon(0, "MAGIKARP", 9, ()), mon(1, level=5), mon(2, level=15)]) == 2
     assert fighter_slot_of([mon(0, "MAGIKARP", 9, ())]) is None
     assert fighter_slot_of([]) is None
+
+
+# --- 10. end-to-end UseItems.step: the teach cap and the stone settle -----------------------------------------------------------
+from pokeagent.explorer.behaviours import use_items as ui   # noqa: E402
+from pokeagent.explorer.dialog import learn_decision   # noqa: E402
+from test_toss_guard import draw, new_ctx   # noqa: E402
+
+TEACH_MONS = [Mon(0, "MAGIKARP", 9, ("SPLASH",), 24, 24), Mon(1, "IVYSAUR", 22, MOVES_NOW, 60, 60)]
+TEACH_PICK = policy.Pick(ids.HM01, "hm", 1, "x", "teach", PLAN)
+
+
+def teach_ctx(tmp_path, monkeypatch, rows, cursor=0, presses=0, mons=TEACH_MONS):
+    ctx = new_ctx(tmp_path)
+    monkeypatch.setattr(ui, "read_mons", lambda emu: mons)
+    monkeypatch.setattr("pokeagent.explorer.item_policies.uselog.read_mons", lambda emu: mons)
+    draw(ctx, rows)
+    ctx.emu.set(0xCC26, cursor)
+    ctx.refresh()
+    ctx.item_seq = {"pick": TEACH_PICK, "presses": presses, "phase": "use", "state": {"inside": True}, "closing": 0, "ok": None,
+                    "before": {"bag": 1, "species": "IVYSAUR"}, "dec_at": None}
+    return ctx
+
+
+def test_the_press_cap_on_the_delete_prompt_answers_it_here_and_never_hands_it_to_menu(tmp_path, monkeypatch):
+    delete = [*PARTY, ">YES", "NO", "move to make room", "for CUT?"]
+    ctx = teach_ctx(tmp_path, monkeypatch, delete, presses=ui.MAX_PRESSES["teach"] + 1)
+    b = UseItems(active_only=True)
+    d = b.step(ctx)
+    assert (d.button, d.rule) == ("DOWN", "teach_yesno_cursor")           # NO on 'Delete an older move', never YES
+    assert ctx.item_seq is not None and ctx.item_seq["state"]["abort"]    # still ours: Menu / learn_decision never sees the prompt
+    assert ctx.item_cooldown[ids.HM01] > ctx.step
+    draw(ctx, [*PARTY, "YES", ">NO", "move to make room", "for CUT?"]); ctx.refresh()
+    assert b.step(ctx).button == "A"
+    draw(ctx, [*PARTY, ">YES", "NO", "Abandon learning", "CUT?"]); ctx.refresh()
+    d = b.step(ctx)
+    assert d.button == "A" and ctx.item_seq is not None                    # a deliberate abort may abandon
+    for i in range(360):
+        ctx.emu.set(TM + i, 0x7F)
+    ctx.refresh()
+    assert b.step(ctx) is None and ctx.item_seq is None                    # screen clear: released
+
+
+def test_the_wait_cap_aborts_the_same_way(tmp_path, monkeypatch):
+    ctx = teach_ctx(tmp_path, monkeypatch, [*PARTY, ">YES", "NO", "move to make room", "for CUT?"])
+    ctx.item_seq["state"]["waits"] = ui.TEACH_MAX_WAITS
+    draw(ctx, ["MAGIKARP 9", "WARTORTLE 22", "ABLE"]); ctx.refresh()          # an unrecognised screen
+    UseItems(active_only=True).step(ctx)
+    assert ctx.item_seq["state"]["abort"]
+
+
+def test_abort_answers_no_to_teach_and_never_confirms_the_move_list():
+    st = {"abort": True}
+    assert teach_press(["HM01 >YES", "CANCEL NO", "Teach CUT", "to a POKeMON?"], 0, PLAN, MOVES_NOW, st)[:2] == ("DOWN", "teach_yesno_cursor")
+    assert teach_press(["TACKLE", ">TAIL WHIP", "BUBBLE", "WATER GUN"], 1, PLAN, MOVES_NOW, st)[0] == "B"
+
+
+STONE_MONS = [Mon(0, "PIKACHU", 22, ("THUNDERSHOCK",), 50, 50)]
+
+
+def test_stone_settle_presses_nothing_until_the_species_changes(tmp_path, monkeypatch):
+    ctx = teach_ctx(tmp_path, monkeypatch, ["What? PIKACHU", "is evolving!"], mons=STONE_MONS)   # bag memory is empty: the stone is gone
+    ctx.item_seq = {"pick": policy.Pick(ids.THUNDERSTONE, "stone", 0, "x", "party"), "presses": 3, "phase": "use", "state": {}, "closing": 0,
+                    "ok": None, "before": {"bag": 1, "species": "PIKACHU"}, "dec_at": None}
+    b = UseItems(active_only=True)
+    for _ in range(5):
+        d = b.step(ctx)
+        assert d.button == "" and d.rule == "stone_settle"                 # no START / B from the rope driver
+    evolved = [Mon(0, "RAICHU", 22, ("THUNDERSHOCK",), 50, 50)]
+    monkeypatch.setattr(ui, "read_mons", lambda emu: evolved)
+    monkeypatch.setattr("pokeagent.explorer.item_policies.uselog.read_mons", lambda emu: evolved)
+    b.step(ctx)
+    assert ctx.item_seq["ok"] is True and ledger.of(ctx).uses[-1]["category"] == "stone"
+
+
+def test_stone_settle_gives_up_after_the_settle_window(tmp_path, monkeypatch):
+    ctx = teach_ctx(tmp_path, monkeypatch, [], mons=STONE_MONS)
+    ctx.item_seq = {"pick": policy.Pick(ids.THUNDERSTONE, "stone", 0, "x", "party"), "presses": 3, "phase": "use", "state": {}, "closing": 0,
+                    "ok": None, "before": {"bag": 1, "species": "PIKACHU"}, "dec_at": None}
+    b = UseItems(active_only=True)
+    for _ in range(ui.STONE_SETTLE + 3):
+        b.step(ctx)
+    assert ctx.item_seq["ok"] is False and ids.THUNDERSTONE in ctx.item_cooldown
+
+
+def test_bicycle_gets_a_cooldown_after_mounting(tmp_path, monkeypatch):
+    ctx = teach_ctx(tmp_path, monkeypatch, [], mons=STONE_MONS)
+    ctx.emu.set(key_items.WALK_BIKE_SURF_STATE, key_items.BIKE)
+    ctx.item_seq = {"pick": policy.Pick(ids.BICYCLE, "key_item", None, "x", "self"), "presses": 2, "phase": "use", "state": {}, "closing": 0,
+                    "ok": None, "before": {"bag": 1}, "dec_at": None}
+    UseItems(active_only=True).step(ctx)
+    assert ctx.item_cooldown[ids.BICYCLE] >= ctx.step + ui.BIKE_COOLDOWN
+
+
+# --- 11. level-up move prompts never forget a needed move ---------------------------------------------------------------------
+def test_learn_decision_never_forgets_a_protected_move(monkeypatch):
+    values = {"CUT": 30.0, "TACKLE": 35.0, "GROWL": 0.0, "THUNDERBOLT": 90.0, "SURF": 95.0}
+    monkeypatch.setattr("pokeagent.explorer.dialog.move_value", lambda n: values[n])
+    q = "X is trying to LEARN THUNDERBOLT! Delete a move to make room"
+    assert learn_decision(q, ["CUT", "TACKLE"])[2] == "CUT"                                      # unshielded: CUT is the weakest
+    assert learn_decision(q, ["CUT", "TACKLE"], {"CUT"})[2] == "TACKLE"                          # shielded: the next weakest
+    assert learn_decision(q, ["CUT", "SURF"], {"CUT", "SURF"})[:2][0] == "NO"                    # everything needed: decline
