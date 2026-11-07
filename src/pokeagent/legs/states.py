@@ -11,6 +11,8 @@ import json
 import os
 from pathlib import Path
 
+from pokeagent import statefp
+
 STATES_DIR = Path("runs/legs/states")
 KEEP, MAX_FILES = 3, 2000
 BATTLE_FLAG, HP_FRACTION = 0xD057, 0.5
@@ -76,8 +78,17 @@ def save_entry(emu, d: str | Path, m: int, x: int, y: int, keep: int = KEEP) -> 
         src = d / name(m, x, y, i - 1)
         if src.exists():
             os.replace(src, d / name(m, x, y, i))
+            _move_fp(src, d / name(m, x, y, i))
     os.replace(tmp, d / name(m, x, y))
+    statefp.sidecar(d / name(m, x, y)).unlink(missing_ok=True)   # a stale stamp must not describe the new state
     return d / name(m, x, y)
+
+
+def _move_fp(src: Path, dst: Path) -> None:
+    if statefp.sidecar(src).exists():
+        os.replace(statefp.sidecar(src), statefp.sidecar(dst))
+    else:
+        statefp.sidecar(dst).unlink(missing_ok=True)
 
 
 def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
@@ -95,6 +106,7 @@ def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
             break
         for f in groups[k]:
             f.unlink(missing_ok=True)
+            statefp.sidecar(f).unlink(missing_ok=True)
         dropped += len(groups[k])
     return dropped
 
@@ -127,6 +139,10 @@ class LegStateSaver:
                 self.count = len(list(self.dir.glob("*.state"))) if self.dir.is_dir() else 0
             fresh = not (self.dir / name(*a, self.keep - 1)).exists()
             p = save_entry(ctx.emu, self.dir, *a, keep=self.keep)
+            try:
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)   # respawn, party, money, bag beside the state
+            except Exception as e:  # noqa: BLE001  an unstamped state is still a state
+                ctx.log(f"[leg state unstamped: {e!r}]", "res")
             self.saved += 1
             self.count += 1 if fresh else 0
             if self.count > self.max_files:
