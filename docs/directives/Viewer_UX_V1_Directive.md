@@ -12,7 +12,7 @@ From the merged research doc (its section 7, the three cheapest ranked recommend
 
 The biggest gap (doc section 6, "Stall/break alerts"): the diagnosis data lives OUTSIDE the viewer. `runs/stalls/*.json` (one dossier per stalled run), `runs/anomalies/*.png` + `.state` (endless_battle and others) and the invariant checker are read by no viewer panel; the only alert surface is a dimmed stopped card.
 
-Binding hard rules for this PR: **no changes to steering** (the rules in the 2026-11-05 spec section 4.2: human input is noise, 3 s hold, keys only to the focused agent; do not touch `steering.py`, `human_hold.py`, `keys.py`, `commands.py`); **keep the measured 444 fps budget** (12 cards, spec 4.1): no per-frame file reads, stalls/anomalies polled at <= 1 Hz on the EXISTING poll thread; **no web rewrite**; no new windows outside the one main viewport.
+Binding hard rules for this PR: **no changes to steering** (the rules in the 2026-11-05 spec section 4.2: human input is noise, 3 s hold, keys only to the focused agent; do not touch steering.py, keys.py or commands.py (the human-hold logic lives with them; there is no viewer human_hold.py on this branch)); **keep the measured 444 fps budget** (12 cards, spec 4.1): no per-frame file reads, stalls/anomalies polled at <= 1 Hz on the EXISTING poll thread; **no web rewrite**; no new windows outside the one main viewport.
 
 ## 2. Facts (verified on the live checkout 2026-11-07; pasted because you cannot read `runs/` in the worktree)
 
@@ -27,7 +27,7 @@ Binding hard rules for this PR: **no changes to steering** (the rules in the 202
 - `snapshot.py` (v1) publishes per agent: state/stop_reason, segment (+record), goals, thinking, driver-share counts, last 20 events, sees grid, party, money, human_hold, claude_hold_s. **Nothing for stall/anomaly health.** Rule for this PR: add the health data to what the VIEWER polls (a new `viewer/health.py` fed from the files above), NOT to what agents publish; do not change `snapshot.py` or the adapters.
 - The research doc's gaps relevant here: "no layout persistence (no init_file use)"; the Stadium "strip inside World" (`world_side.py`, max `stadium.MAX_CARDS` panels, `Slot` per card with a live frame and HP bars) is a strip, not a toggleable pane.
 - Existing viewer test patterns (use them, name them in your report): `tests/test_viewer_core.py`, `tests/test_viewer_fixes.py` (line ~256: `dpg = pytest.importorskip("dearpygui.dearpygui")` then `dpg.create_context()` with NO viewport), `tests/test_viewer_agents.py` (~164, also calls `dpg.setup_dearpygui()` and skips when headless), `tests/test_viewer_panels.py`, `tests/test_viewer_tiles_world.py`, `tests/test_viewer_focus_steering.py`, `tests/test_viewer_no_frame_hint.py`, `tests/test_world_view.py`, `tests/test_world_events.py`, `tests/test_world_follow.py`, `tests/test_world_legend.py`.
-- **Files you must NOT modify:** `viewer/steering.py`, `viewer/human_hold.py`, `viewer/ui/keys.py`, `viewer/commands.py` (steering and keys), `snapshot.py`, `adapters/*`, `viewer/web.py` (read-only page; no rewrite), `world/model.py` (the opponent reader belongs to the other PR), any explorer behaviour, `ship_gate.py`, `planner*.py`.
+- **Files you must NOT modify:** `src/pokeagent/viewer/steering.py`, `src/pokeagent/viewer/ui/keys.py`, `src/pokeagent/viewer/commands.py` (steering and keys), `snapshot.py`, `adapters/*`, `src/pokeagent/viewer/web.py` (read-only page; no rewrite), `world/model.py` (the opponent reader belongs to the other PR), any explorer behaviour, `ship_gate.py`, `planner*.py`.
 
 ## 3. Scope (one PR, in order)
 
@@ -152,11 +152,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 15:45 · robert-claude-laptop · none → Draft — Claude 2026-11-07: viewer layout persistence, stall/break state, Stadium pane (depends on fix/stadium-opponent)
+- 2026-11-07 15:46 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on fix/stadium-opponent; lint_override: dispatch-path-missing on greenfield test file and gitignored runs/kb paths
 <!-- queue:end -->
