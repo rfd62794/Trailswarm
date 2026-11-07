@@ -121,6 +121,34 @@ def test_gated_out_applies_do_not_advance_the_step_counter_and_clear_the_plan():
     assert c.team_hunt_steps == 0 and c.team_plan == []
 
 
+def test_gate_blip_then_pass_rebuilds_immediately():
+    h = TeamHunt(); c = _ok_ctx(); c.step = 10
+    h.applies(c)
+    assert h._plan_key is not None
+    c.emu.set(0xD31F, 0)                                                         # blip: no balls
+    assert not h.applies(c) and h._plan_key is None
+    c.emu.set(0xD31F, 3); c.step = 11
+    built = []
+    h._refresh = lambda *a: built.append(1)
+    h.applies(c)
+    assert built                                                                 # rebuilt on the very next passing step
+
+
+def test_owned_magikarp_pick_fires_team_need():
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.knowledge.catch_plan import plan_catches
+    from pokeagent.magikarp import EVOLVE_LEVEL
+    from pokeagent.knowledge.readiness import TEAM_GAP
+    import test_catch_plan as tc
+    plan = tc._plan(party=[tc._mon("PIDGEY", 20), tc._mon("MAGIKARP", 15)], bosses=[("HARD", [(22, "ONIX")])],
+                    magikarp_level=15, owned_species={"PIDGEY"}, xp_for_map=lambda m: 130)
+    goals = {g: True for g in GOALS[:GOALS.index("team_ready")]}
+    ctx = SimpleNamespace(emu=FakeEmulator(party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 17, 17)])),
+                          team_plan=plan, train_member=None)
+    assert plan[0].species == "MAGIKARP" and plan[0].member.candidate.source == "magikarp"
+    assert PlanGoal._team_need(ctx, goals, 19) >= EVOLVE_LEVEL + TEAM_GAP
+
+
 def test_announce_once_per_target():
     from pokeagent.knowledge.catch_plan import CatchAction
     logs = []

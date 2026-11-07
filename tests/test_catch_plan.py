@@ -152,7 +152,8 @@ def test_magikarp_is_one_candidate():
     win = _plan(party=[_mon("PIDGEY", 20), _mon("MAGIKARP", 15)], bosses=[("HARD", [(22, "ONIX")])], magikarp_level=15,
                 owned_species=owned_all, xp_for_map=lambda m: 130)
     top = win[0]
-    assert top.member.candidate.source in ("magikarp", "party-evolution") and top.species == "MAGIKARP" and top.member.gain >= 1
+    assert top.member.candidate.source == "magikarp" and top.species == "MAGIKARP" and top.member.gain >= 1
+    assert sum(a.species == "MAGIKARP" for a in win) == 1  # exactly one Magikarp action, no party-evolution twin
 
 
 def test_unowned_magikarp_is_never_planned_and_empty_inputs_give_nothing():

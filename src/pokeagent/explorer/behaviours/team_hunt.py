@@ -69,6 +69,7 @@ class TeamHunt(BehaviourBase):
         if not ok:
             ctx.team_wants = {}
             ctx.team_plan = []
+            self._plan_key = None  # a gate blip must not leave the plan empty until the refresh interval
             return False
         self._refresh(ctx, goals, bag)
         return bool(ctx.team_plan)

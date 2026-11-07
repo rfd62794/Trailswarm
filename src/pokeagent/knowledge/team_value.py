@@ -239,7 +239,7 @@ def candidates_for(party: list, wild_by_map: dict, maps, magikarp_level: int | N
                 continue
             out.append(Candidate(sp, min(lv for lv, n in grass if n == sp), f"wild:{int(m)}"))
     for c in party or ():
-        if c.name in EVOLUTIONS:
+        if c.name in EVOLUTIONS and c.name != "MAGIKARP":  # an owned Magikarp is the one "magikarp" candidate below
             out.append(Candidate(c.name, c.level, "party-evolution"))
     owned = next((c.level for c in party or () if c.name == "MAGIKARP"), None)
     out.append(Candidate("MAGIKARP", owned or magikarp_level or MAGIKARP_START_LEVEL, "magikarp"))

@@ -134,7 +134,8 @@ class PlanGoal(BehaviourBase):
             return need
         top = next((a for a in (getattr(ctx, "team_plan", None) or []) if not a.blocked), None)
         species, slot = party_species(ctx.emu), getattr(ctx, "train_member", None)
-        plan_pick = (getattr(getattr(getattr(top, "member", None), "candidate", None), "source", "") == "magikarp"
+        plan_pick = (getattr(getattr(getattr(top, "member", None), "candidate", None), "source", "")
+                     in ("magikarp", "party-evolution") and getattr(top, "species", "MAGIKARP") == "MAGIKARP"
                      and MAGIKARP in species)
         named = slot is not None and 0 <= slot < len(species) and species[slot] == MAGIKARP
         return max(need, EVOLVE_LEVEL + TEAM_GAP) if plan_pick or named else need
