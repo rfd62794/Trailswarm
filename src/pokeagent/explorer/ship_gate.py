@@ -152,9 +152,8 @@ def board_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None
         return (p[0], f"goal boarding: {len(p)} steps to the S.S. Anne dock") if p else None
     if pos[0] not in SHIP_MAPS or pos[0] in (BOW, CAPTAIN):
         return None
-    p = g.path(pos, _on(BOW))
-    if p:
-        return p[0], f"goal boarding: {len(p)} steps to the bow over the learned world"
+    if g.path(pos, _on(BOW)):
+        return None  # the learned world reaches the bow: east_road_step's own target walk takes it
     plan = goals.get("_ship_plan")
     buttons = plan(pos, plan.warp_tiles(DECK, BOW)) if plan is not None else None
     return (buttons[0], f"goal boarding: {len(buttons)} steps to the bow by the ROM route") if buttons else None
