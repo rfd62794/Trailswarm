@@ -222,11 +222,12 @@ where the gate reads the team (`perceive.lead_level` + `plan_goal.py`), and anyt
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 13:01 · robert-claude-laptop · none → Draft — Claude 2026-11-07: team-centric readiness + gyarados ladder goal
+- 2026-11-07 13:02 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on gitignored runs/ and kb/ evidence paths only
 <!-- queue:end -->
