@@ -84,6 +84,22 @@ def save_entry(emu, d: str | Path, m: int, x: int, y: int, keep: int = KEEP) -> 
     return d / name(m, x, y)
 
 
+def save_named(emu, d: str | Path, stem: str, keep: int = KEEP) -> Path:
+    """Like save_entry for a state named ``<stem>.state`` (e.g. ``gyarados@L15``), rotating older ones the same way."""
+    d = Path(d)
+    d.mkdir(parents=True, exist_ok=True)
+    tmp = d / f".{os.getpid()}.tmp"
+    emu.save_state(tmp)
+    nm = lambda n: f"{stem}.state" if n == 0 else f"{stem}.{n}.state"  # noqa: E731
+    for i in range(keep - 1, 0, -1):
+        if (d / nm(i - 1)).exists():
+            os.replace(d / nm(i - 1), d / nm(i))
+            _move_fp(d / nm(i - 1), d / nm(i))
+    os.replace(tmp, d / nm(0))
+    statefp.sidecar(d / nm(0)).unlink(missing_ok=True)
+    return d / nm(0)
+
+
 def _move_fp(src: Path, dst: Path) -> None:
     if statefp.sidecar(src).exists():
         os.replace(statefp.sidecar(src), statefp.sidecar(dst))
@@ -126,8 +142,11 @@ class LegStateSaver:
         self.done: set[tuple] = set()
         self.saved = 0
         self.count: int | None = None
+        self.trainee_level = 0   # highest trainee level seen at the gyarados stage this run
+        self.trainee_pending = 0  # a level gained mid-battle, saved at the next calm press
 
     def observe(self, ctx, fr) -> Path | None:
+        self.observe_trainee(ctx, fr)
         try:
             b, a = fr.before, fr.after
             if a[0] == b[0] or (self.route and a[0] not in self.route) or tuple(a) in self.done:
@@ -150,4 +169,32 @@ class LegStateSaver:
             return p
         except Exception as e:  # noqa: BLE001  saving states must never end a run
             ctx.log(f"[leg state skipped: {e!r}]", "res")
+            return None
+
+    def observe_trainee(self, ctx, fr) -> Path | None:
+        """At the gyarados stage, save ``gyarados@L<level>.state`` when the Magikarp gains a level (at the next calm press), so the
+        long training segment has resume points. Gated on ctx.gyarados_steps: other stages never read the party here."""
+        try:
+            if getattr(ctx, "gyarados_steps", 0) <= 0:
+                return None
+            from pokeagent.magikarp import magikarp_stats
+            st = magikarp_stats(ctx.emu)
+            level = st["level"] if st else 0
+            if self.trainee_level == 0 and level:
+                self.trainee_level = level  # the level the stage started at is not a gain
+            elif level > self.trainee_level:
+                self.trainee_level = self.trainee_pending = level
+            if not self.trainee_pending or not calm(ctx.emu, bool(fr.box_after)):
+                return None
+            p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
+            try:
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)
+            except Exception as e:  # noqa: BLE001
+                ctx.log(f"[leg state unstamped: {e!r}]", "res")
+            ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")
+            self.trainee_pending = 0
+            self.saved += 1
+            return p
+        except Exception as e:  # noqa: BLE001  saving states must never end a run
+            ctx.log(f"[trainee state skipped: {e!r}]", "res")
             return None
