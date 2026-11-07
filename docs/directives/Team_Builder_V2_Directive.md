@@ -311,10 +311,11 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-team-builder-v2-directive |
 | Base branch | - |
+| Base commit | cb732b47c9a207a4a6d6d9bc46740ba3010795d4 |
 
 **Status log**
 - 2026-11-07 15:16 · robert-claude-laptop · none → Draft — Claude 2026-11-07: value-ranked catch plan, Pokedex objective, team_ready gate (supersedes Team_Builder_Directive draft)
@@ -322,4 +323,5 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 - 2026-11-07 15:17 · robert-claude-laptop · Queued → Draft — Claude: lint path fix (hp_stats full path)
 - 2026-11-07 15:18 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: catcher requires a damaging move (Robert); lint path fix; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ paths
 - 2026-11-07 15:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield modules (team_value.py, catch_plan.py, dex_value.py, tests) and gitignored kb/*.json evidence; known false positives.
+- 2026-11-07 15:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-builder-v2-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VTS7Y1KSVFM8YCHATZQNZ6
 <!-- queue:end -->
