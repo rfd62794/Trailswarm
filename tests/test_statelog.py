@@ -167,3 +167,73 @@ def test_states_cli_restamp_dry_run(tmp_path, capsys):
     (tmp_path / "x.state").write_bytes(b"x")
     assert statescmd.cmd_restamp(SimpleNamespace(dir=[str(tmp_path)], force=False, dry_run=True)) == 0
     assert "x.state" in capsys.readouterr().out
+
+
+def test_states_help_renders(capsys):
+    """argparse formats every help string; a bare % in one (HP%) crashed `pokeagent states --help`."""
+    from pokeagent.cli import _build_parser
+    with pytest.raises(SystemExit) as exc:
+        _build_parser().parse_args(["states", "--help"])
+    assert exc.value.code == 0
+    assert "HP%" in capsys.readouterr().out
+
+
+def test_select_skips_malformed_sidecars(tmp_path):
+    """Corrupt-but-valid-JSON fingerprints are stale or non-matching; select never raises on them."""
+    good = saved(tmp_path, "g.state", world(hp=79), 1000)
+    for name, mutate in (
+        ("v_str.state", lambda fp: fp.update(v="1")),                       # v as a string: stale
+        ("party_str.state", lambda fp: fp.update(party="abc")),             # party as a string
+        ("party_short.state", lambda fp: fp.update(party=[[1, 2]])),        # party rows too short
+    ):
+        p = saved(tmp_path, name, world(hp=79), 3000)                       # newest: would win if it were kept
+        fp = statefp.read(p)
+        mutate(fp)
+        statefp.write(p, fp)
+    es = statelog.entries(tmp_path)
+    for want in (statelog.Want(), statelog.Want(strongest=True), statelog.Want(min_hp=0.5),
+                 statelog.Want(min_lead_level=1, strongest=True)):
+        assert statelog.select(es, want).path == good
+    only_bad = [e for e in es if e.path.name != "g.state"]
+    assert statelog.select(only_bad, statelog.Want(strongest=True, min_hp=0.5)) is None
+    assert statelog.pick(tmp_path, statelog.Want(strongest=True, min_hp=0.5)) == good
+    for e in es:
+        statelog.bad(e)                                                     # reports, never raises
+    assert statescmd.cmd_list(SimpleNamespace(dir=[str(tmp_path)], map=None, bad=True)) == 0
+
+
+def test_synthetic_candidate_is_never_selected(tmp_path):
+    real = saved(tmp_path, "r.state", world(hp=79), 1000)
+    edited = saved(tmp_path, "e.state", world(hp=79), 3000)                 # newer, and edited by hand
+    fp = statefp.read(edited)
+    fp["synthetic"] = True
+    statefp.write(edited, fp)
+    es = statelog.entries(tmp_path)
+    assert statelog.select(es, statelog.Want()).path == real
+    assert statelog.pick(tmp_path, statelog.Want()) == real
+    assert statelog.select([e for e in es if e.path == edited], statelog.Want()) is None
+
+
+def test_retire_never_overwrites_a_same_named_state(tmp_path, monkeypatch):
+    rdir = tmp_path / "retired"
+    a = saved(tmp_path, "a.state", world(respawn=5))
+    a.write_bytes(b"first")
+    first = statelog.retire(a, "one", retired_dir=rdir)
+    a2 = saved(tmp_path, "a.state", world(respawn=3))
+    a2.write_bytes(b"second")
+    second = statelog.retire(a2, "two", retired_dir=rdir)
+    assert first == rdir / "a.state" and second != first
+    assert first.read_bytes() == b"first" and second.read_bytes() == b"second"
+    assert second.name.startswith("a.") and second.name.endswith(".state") and second.name != "a.state"
+    assert (rdir / (second.name + statefp.SUFFIX)).exists()                  # its sidecar shares the suffix
+    assert (rdir / "a.state.fp.json").exists()                               # the first one's sidecar survives too
+    assert len(list(rdir.glob("a*.state"))) == 2
+
+
+def test_retire_missing_path_is_an_error(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert statescmd.cmd_retire(SimpleNamespace(path=tmp_path / "nope.state", why="x")) == 1
+    assert "no such state" in capsys.readouterr().err
+    assert not (tmp_path / "runs" / "retired").exists()
+    with pytest.raises(FileNotFoundError):
+        statelog.retire(tmp_path / "nope.state", "x", retired_dir=tmp_path / "r")

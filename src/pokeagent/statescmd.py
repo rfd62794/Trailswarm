@@ -39,8 +39,12 @@ def cmd_list(args) -> int:
             continue
         g = lambda k: str(fp.get(k, "?"))
         pos = f"{fp.get('x', '?')},{fp.get('y', '?')}" if fp else "?"
-        hp = f"{statefp.party_hp_fraction(fp):.0%}" if fp.get("party") else "?"
-        row = [e.path.name, g("map"), pos, g("respawn"), _party(fp) or "?", hp, g("money"), g("source_run"), statelog.status(e)]
+        try:
+            hp = f"{statefp.party_hp_fraction(fp):.0%}" if fp.get("party") else "?"
+            party = _party(fp) or "?"
+        except statelog.CORRUPT:
+            hp = party = "?"
+        row = [e.path.name, g("map"), pos, g("respawn"), party, hp, g("money"), g("source_run"), statelog.status(e)]
         if args.bad:
             row.append(reason or "")
         print("\t".join(row))
@@ -54,8 +58,12 @@ def cmd_check(args) -> int:
     fail, rows = False, []
     for e in _entries(_dirs(args)):
         reason = statelog.bad(e)
-        ship = e.stem in cg.SHIP_GOALS or e.fp.get("map") in SHIP_MAPS
-        if ship and (e.fp.get("respawn") in cg.BEHIND_VERMILION or statelog.status(e) != "fresh"):
+        try:
+            ship = e.stem in cg.SHIP_GOALS or e.fp.get("map") in SHIP_MAPS
+            behind = e.fp.get("respawn") in cg.BEHIND_VERMILION
+        except statelog.CORRUPT:
+            ship, behind = e.stem in cg.SHIP_GOALS, False
+        if ship and (behind or statelog.status(e) != "fresh"):
             fail = True
             reason = reason or "ship state with respawn behind Vermilion or a missing/stale sidecar"
         if reason:
@@ -79,6 +87,9 @@ def cmd_restamp(args) -> int:
 
 def cmd_retire(args) -> int:
     """Move a state and its sidecars into runs/retired (statelog.retire) and say where it went."""
+    if not Path(args.path).is_file():
+        print(f"no such state: {args.path}", file=sys.stderr)
+        return 1
     dest = statelog.retire(Path(args.path), args.why)
     print(f"retired {Path(args.path).name} -> {dest}")
     return 0
@@ -93,7 +104,7 @@ def add_parser(sub) -> None:
         sp.add_argument("--dir", action="append", default=None, metavar="D",
                         help="state dir (repeatable; default runs/checkpoints and runs/legs/states)")
 
-    lp = s.add_parser("list", help="one row per state: name, map, x,y, respawn, party, HP%, money, source run, status")
+    lp = s.add_parser("list", help="one row per state: name, map, x,y, respawn, party, HP%%, money, source run, status")
     lp.add_argument("--map", type=lambda v: int(v, 0), default=None, metavar="M", help="only states on this map id")
     lp.add_argument("--bad", action="store_true", help="only states statelog.bad flags, with the reason")
     dirs(lp)

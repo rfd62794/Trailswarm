@@ -19,6 +19,9 @@ from pokeagent import checkpoint_goals, statefp
 # map id ranks 5 - a documented simplification: every later town (Lavender, Celadon, ...) is at or past Vermilion.
 RESPAWN_RANK = {0: 0, 1: 1, 2: 2, 3: 3, 5: 4}
 RETIRED_DIR = Path("runs/retired")
+# What a corrupt-but-valid-JSON fingerprint raises when a field has the wrong type or shape: such an entry is stale or
+# non-matching, never an error that escapes select() (ckpt() runs inside the swarm scheduler).
+CORRUPT = (TypeError, IndexError, ValueError, KeyError, ZeroDivisionError)
 
 
 @dataclass(frozen=True)
@@ -75,15 +78,31 @@ def entries(directory: str | Path) -> list[Entry]:
     return _entries_of(d.glob("*.state")) if d.is_dir() else []
 
 
+def _version(fp: dict) -> int:
+    """The sidecar's ``v`` as an int; anything that is not an int (a string, a list, a missing key) counts as -1."""
+    v = fp.get("v", 0)
+    return v if isinstance(v, int) and not isinstance(v, bool) else -1
+
+
 def status(entry: Entry) -> str:
     """``fresh`` | ``stale`` | ``retired``: stale = no sidecar or an older ``v`` than the code that reads it."""
     if entry.path.parent.name == "retired":
         return "retired"
-    return "stale" if not entry.fp or entry.fp.get("v", 0) < statefp.VERSION else "fresh"
+    return "stale" if not entry.fp or _version(entry.fp) < statefp.VERSION or _malformed(entry.fp) else "fresh"
+
+
+def _malformed(fp: dict) -> bool:
+    """True when the party cannot be read at all (a string, short rows, non-numbers): such a fingerprint is stale."""
+    try:
+        statefp.party_hp_fraction(fp)
+        _power(fp)
+    except CORRUPT:
+        return True
+    return False
 
 
 def _power(fp: dict) -> float:
-    """sum(level * hp / max_hp) over the party - how much fight is left in it."""
+    """sum(level * hp / max_hp) over the party - how much fight is left in it. Raises CORRUPT on a malformed party."""
     return sum(m[1] * m[2] / m[3] for m in fp.get("party") or [] if m[3] > 0)
 
 
@@ -92,7 +111,18 @@ def _respawn_rank(map_id: int) -> int:
 
 
 def _kept(e: Entry, w: Want) -> bool:
+    """True when ``e`` passes every hard filter in ``w``. A synthetic (edited) state is never auto-selected, and a
+    fingerprint too malformed to evaluate fails the filter instead of raising."""
+    try:
+        return _check(e, w)
+    except CORRUPT:
+        return False
+
+
+def _check(e: Entry, w: Want) -> bool:
     fp = e.fp
+    if fp.get("synthetic"):
+        return False
     if w.stem is not None and e.stem != w.stem:
         return False
     if w.map is not None and fp.get("map") != w.map:
@@ -113,8 +143,17 @@ def _kept(e: Entry, w: Want) -> bool:
 
 def select(items: list[Entry], want: Want) -> Entry | None:
     """The best fresh entry satisfying ``want``'s hard filters, ranked (power if strongest, mtime) descending; else None."""
-    ok = [e for e in items if status(e) == "fresh" and _kept(e, want)]
-    return max(ok, key=lambda e: ((_power(e.fp) if want.strongest else 0.0), e.mtime), default=None)
+    best, best_key = None, None
+    for e in items:
+        if status(e) != "fresh" or not _kept(e, want):
+            continue
+        try:
+            key = (_power(e.fp) if want.strongest else 0.0, e.mtime)
+        except CORRUPT:
+            continue
+        if best_key is None or key > best_key:
+            best, best_key = e, key
+    return best
 
 
 def pick(directory: str | Path, want: Want) -> Path | None:
@@ -129,18 +168,34 @@ def pick(directory: str | Path, want: Want) -> Path | None:
     return e.path if e is not None else None
 
 
+def _targets(retired_dir: Path, names: list, tag: str) -> list:
+    """Destinations for ``names`` (the state first, then its sidecars). A non-empty ``tag`` goes before the ``.state``
+    part so every file of one retire shares it: ``a.state`` -> ``a.<tag>.state``, ``a.state.fp.json`` -> ``a.<tag>.state.fp.json``."""
+    state = names[0]
+    head = state[:-len(".state")] if state.endswith(".state") else Path(state).stem
+    return [retired_dir / ((head + tag + n[len(head):]) if tag else n) for n in names]
+
+
 def retire(path: str | Path, why: str, retired_dir: str | Path = RETIRED_DIR) -> Path:
     """Move a state and its sidecars (.fp.json, .goals.json) into ``retired_dir`` - a rename, never a delete - and log
-    one ``<UTC ISO>\\t<name>\\t<why>`` line in RETIRED.log. Returns where the state went."""
+    one ``<UTC ISO>\\t<name>\\t<why>`` line in RETIRED.log. A name already taken there gets a UTC timestamp suffix
+    before ``.state`` (the sidecars share it), so nothing already retired is overwritten. Returns where the state went."""
     if not why or not str(why).strip():
         raise ValueError("retire() needs a non-empty reason")
     path, retired_dir = Path(path), Path(retired_dir)
+    if not path.is_file():
+        raise FileNotFoundError(f"no such state: {path}")
     retired_dir.mkdir(parents=True, exist_ok=True)
     sides = [s for s in (statefp.sidecar(path), checkpoint_goals.sidecar(path)) if s.exists()]
-    dest = retired_dir / path.name
+    names = [path.name, *(s.name for s in sides)]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    tags = ["", f".{stamp}", *(f".{stamp}-{i}" for i in range(2, 1000))]
+    targets = next(t for t in (_targets(retired_dir, names, tag) for tag in tags)
+                   if not any(d.exists() for d in t))
+    dest = targets[0]
     os.replace(path, dest)
-    for s in sides:
-        os.replace(s, retired_dir / s.name)
+    for s, d in zip(sides, targets[1:]):
+        os.replace(s, d)
     with (retired_dir / "RETIRED.log").open("a", encoding="utf-8") as fh:
         fh.write(f"{datetime.now(timezone.utc).isoformat(timespec='seconds')}\t{path.name}\t{why}\n")
     return dest
@@ -151,8 +206,12 @@ def bad(entry: Entry) -> str | None:
     whose blackout respawns behind Vermilion. None = nothing wrong on record."""
     if not entry.fp:
         return "no fingerprint sidecar"
-    if entry.fp.get("v", 0) < statefp.VERSION:
+    if _version(entry.fp) < statefp.VERSION:
         return f"stale fingerprint (v{entry.fp.get('v', 0)}, want {statefp.VERSION})"
-    if entry.stem in checkpoint_goals.SHIP_GOALS and entry.fp.get("respawn") in checkpoint_goals.BEHIND_VERMILION:
+    try:
+        behind = entry.stem in checkpoint_goals.SHIP_GOALS and entry.fp.get("respawn") in checkpoint_goals.BEHIND_VERMILION
+    except CORRUPT:
+        return "unreadable fingerprint (malformed field)"
+    if behind:
         return f"ship checkpoint respawns behind Vermilion (map {entry.fp['respawn']})"
     return None
