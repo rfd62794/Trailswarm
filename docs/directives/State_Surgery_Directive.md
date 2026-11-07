@@ -224,7 +224,7 @@ function, what you could not do without a ROM, and anything that did not fit.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-state-surgery-directive |
 | Base branch | - |
@@ -239,4 +239,5 @@ function, what you could not do without a ROM, and anything that did not fit.
 - 2026-11-07 13:03 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJWPNNBEW8JP4PNY8DARJ1
 - 2026-11-07 13:09 · dispatcher · launched pid=24552; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; provisioned: uv sync --frozen
 - 2026-11-07 13:17 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 0 min est. n/a
+- 2026-11-07 13:54 · robert-claude-laptop · Review → Done — note: PR #140 merged (merge commit) at 7b24850 after resolving seg_store overlap with #139; Sonnet code review APPROVE + ROM validation (8/9; --pos refused by default); verify at 7b24850 1490 passed 36 skipped
 <!-- queue:end -->
