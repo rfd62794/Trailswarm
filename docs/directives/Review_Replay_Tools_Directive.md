@@ -18,7 +18,7 @@ no check that a run is reproducible, and no way to diff two runs. The same four 
 - `runs/`, `roms/`, `baselines/`, `kb/rom_tables.json` are gitignored: **no run data, ROM or `kb/` in your worktree.** Every test uses SYNTHETIC fixture run directories that you commit under `tests/fixtures/review/` (tiny: tens of rows, hand-written, clearly marked synthetic in a README line inside the fixture folder name or a `meta.json` field `"synthetic": true`). Never copy a real run into the repo.
 - **A run directory today** (`runs/explore-YYYYMMDD-HHMMSS-<pid>/`, local time in the name) holds exactly these files on the live checkout: `meta.json`, `decisions.jsonl`, `levels.jsonl`, `transitions.jsonl`. `goal_frames.jsonl` exists only on some runs (swarm segment runs write it; `seg_ingest` and `evaluation_ab` read it) - treat it as optional. There is NO end-of-run marker file today. Shapes (real examples):
   - `meta.json`: `{"start": "nugget_bridge", "stop_at_goal": "gyarados", "stop_at_map": null, "tag": "seg:gyarados:1794079641-402", "steps": 3000, "explore_rate": 0.0, "box_pace": 8, "starter": "bulbasaur", "seed": 80043, "frame_share": true, "train_level": 8, "window": false, "git_sha": "d99055f2...", "initial_goals": [..23 goal ids..]}`.
-    There is NO `state` key: the start state of a segment run is `runs/checkpoints/<start>.state`, which is overwritten over time, so the faithful copy is the one `seg_ingest` keeps under `runs/segments/inputs/<tag>/` (with its sha256 and a map-memory snapshot) while a candidate is pending; it may be gone. `review replay` must say "start state not recoverable" instead of guessing.
+    There is NO `state` key: the start state of a segment run is `runs/checkpoints/<start>.state`, which is overwritten over time, so the faithful copy is the one `seg_ingest` keeps under `runs/segments/inputs/<tag>/` (with its sha256 and a map-memory snapshot) while a candidate is pending; it may be gone. the replay tool must say "start state not recoverable" instead of guessing.
   - `decisions.jsonl` (one line per press; extra lines with an `"event"` key are bandit/anomaly extras and MUST be skipped for press counts): `{"step": 1, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 35, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}`.
   - `transitions.jsonl` (one line per press): `{"step": 1, "from": [35, 10, 35], "button": "UP", "to": [35, 10, 34], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent", "ahead_tiles": [..], "stand_tile": 60}`. `text` is the screen text when a box is up; `source` is `agent`, `human` or `claude`. There is NO `rule` key here: the rule lives in `decisions.jsonl`; join the two on `step`.
   - `levels.jsonl`: `{"step": 0, "frame": 4, "map": 35, "cause": "start", "party": [[133, 9, 938, 23, 23], [179, 26, 13936, 63, 72]]}` - party rows are `[species id, level, exp, hp, max_hp]`; `cause` is `start` or `battle_end` (others may appear).
@@ -54,7 +54,7 @@ review/events.py     # build_events(RunData) -> list[Event]   (Event = {step, fr
 review/loops.py      # find_loops(transitions, decisions) -> list[Episode]
 review/rules.py      # top_rules(decisions, n=10) -> [{rule, behaviour, presses, share}]
 review/render.py     # text renderers (one function per tool) + json helpers
-review/timeline.py   # summarise(RunData) -> the dict `review run` prints
+review/timeline.py   # summarise(RunData) -> the dict the run tool prints
 ```
 
 `pokeagent review run <run-dir> [--json] [--runs-dir runs] [--max-events 200]`. `<run-dir>` is a path or a bare run name resolved under `--runs-dir`. Output sections (text and the same keys in JSON):
@@ -79,7 +79,7 @@ Exit code: 1 when the run shows a break: `crashed`, an `already_out` or `blocked
 
 `pokeagent review swarm --since <time> [--until <time>] [--runs-dir runs] [--json] [--segment NAME] [--top 5] [--invariants]`. `<time>` accepts `HH:MM` (today, local time), `YYYY-MM-DDTHH:MM[:SS]` or `Nm`/`Nh` (N minutes/hours ago); a run is in range by the timestamp in its directory name (`explore-YYYYMMDD-HHMMSS-pid`, local time), falling back to the file mtime of `meta.json`. Sections:
 1. **runs**: count, how many are segment runs (`meta.stop_at_goal` or `stop_at_map`), how many were watched/human-driven (`window` true or non-`agent` sources).
-2. **per segment** (key = `meta.stop_at_goal` or `meta.stop_at_map`): attempts, solves (judged exactly as `seg_ingest.build_attempt` does: `goal_frames.jsonl` first, else `milestones.json`), solve rate, frames to solve (best, median; `None` when no frames are recorded), presses, stall rate (runs with a dossier / attempts), blackout rate (blackouts per attempt, from `battles.jsonl` `outcome == "blackout"`), loop-episode count (from `find_loops`), the seeds that failed.
+2. **per segment** (grouped by `meta.stop_at_goal` or `meta.stop_at_map`): attempts, solves (judged exactly as `seg_ingest.build_attempt` does: `goal_frames.jsonl` first, else `milestones.json`), solve rate, frames to solve (best, median; `None` when no frames are recorded), presses, stall rate (runs with a dossier / attempts), blackout rate (blackouts per attempt, from `battles.jsonl` outcome field equal to blackout), loop-episode count (from `find_loops`), the failing run names.
 3. **top stall causes** (`likely_cause` from the dossiers in range, counted, with the `signature_key` of the biggest cluster and one example run each; reuse `stalls.load_dossiers` / `stalls.cluster` rather than re-implementing), **top rules** across the swarm (presses), **new checkpoints** (files in `runs/checkpoints/*.state` with mtime in range, with the `.fp.json` fingerprint summary: map, badges, party levels, money, when present).
 4. **breaks** - the section the exit code depends on: (a) invariant violations: `invariants.runner.run_all(Path(runs_dir))` ERROR-level findings (WARN counted, listed with `--invariants`; skip silently if `run_all` raises and report `invariants: "unavailable: <message>"`); (b) legality violations: if `pokeagent.legality` imports and exposes `check`, call it per its signature on the checkpoints in range and report its findings; otherwise emit `"legality": "unavailable (no pokeagent.legality on this branch)"` - a SEAM, not an error; (c) runs that ended by crash/exception: `crashed` per 4.1 plus any run whose `decisions.jsonl` is missing or empty while `meta.json` exists (`no_decisions`), listed with names; (d) the `already_out` / `blocked_loop` episodes at or over `BREAK_LOOP_ROWS`.
 Exit 1 when (a) has an ERROR, (b) has a violation, or (c)/(d) is non-empty; else 0.
@@ -129,7 +129,7 @@ def run_replay(run_dir, steps, runs_dir, runner=None, head_sha=None) -> ReplayRe
 
 - `uv run pytest -q tests/test_review_run.py tests/test_review_swarm.py tests/test_review_replay.py tests/test_review_diff.py tests/test_cli_review.py tests/test_cli.py` - new tests pass, the existing CLI test unedited (paste the tail).
 - `uv run pytest -q` green; paste the before/after tails and `git diff --stat main`; confirm no forbidden file changed and that `cli.py` changed by the import and the one `register` call only.
-- **Controller validation (not Devin; the real `runs/` is on the laptop):** run `review run` on today's gyarados stall runs (for example `explore-20261107-153827-24324`, which has a dossier: `no new goal and only 3 new tiles in the last 600 presses`, map 35, signature `35|frontier|frontier|UP|blocked|True`) and `review swarm --since 14:50`, and check the numbers against the swarm log; run `review replay` on one segment run with a pending input copy and wire the real runner's last inch; run `review diff` on two same-seed runs.
+- **Controller validation (not Devin; the real `runs/` is on the laptop):** run the run tool on today's gyarados stall runs (for example `explore-20261107-153827-24324`, which has a dossier: `no new goal and only 3 new tiles in the last 600 presses`, map 35, signature `35|frontier|frontier|UP|blocked|True`) and the swarm tool with --since 14:50, and check the numbers against the swarm log; run the replay tool on one segment run with a pending input copy and wire the real runner's last inch; run the diff tool on two same-seed runs.
 
 ## 7. Rules for this run
 
@@ -162,7 +162,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -170,4 +170,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 **Status log**
 - 2026-11-07 15:41 · robert-claude-laptop · none → Draft — Claude 2026-11-07: review run/swarm/replay/diff operator CLI tools
 - 2026-11-07 15:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests/fixtures and gitignored runs/kb paths
+- 2026-11-07 15:43 · robert-claude-laptop · Queued → Draft — Claude: lint rewording (command-looking mentions, secret false positive)
 <!-- queue:end -->
