@@ -107,18 +107,20 @@ def matchup_text(c: Combatant, foe: Combatant, chart: dict, moves: dict) -> str:
     return f"{c.name} L{c.level} {mv['type']} x{type_mult(chart, mv['type'], list(foe.types)):g} vs {'/'.join(foe.types)}"
 
 
-def assess(party: list[Combatant], boss: list[tuple[int, str]], label: str, kb: dict | None = None) -> Readiness | None:
-    """Readiness of `party` against `boss` ([(level, species)]); None when data is missing (caller falls back to its table)."""
+def assess(party: list[Combatant], boss: list[tuple[int, str]], label: str, kb: dict | None = None,
+           margin: float = MARGIN) -> Readiness | None:
+    """Readiness of `party` against `boss` ([(level, species)]); None when data is missing (caller falls back to its table).
+    `margin` is the HP fraction demanded on the mons that fought (MARGIN by default; the blackout tax raises it per stage)."""
     theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
     moves = table(kb, "moves")
     if not party or not boss or len(theirs) != len(boss) or not moves:
         return None
     chart = _chart(kb)
     score = fight(party, theirs, chart, moves)
-    lead, ready = party[0], score >= MARGIN
+    lead, ready = party[0], score >= margin
     required = lead.level if ready else next(
         (L for L in range(lead.level + 1, MAX_LEVEL + 1)
-         if fight([at_level(lead, L, kb), *party[1:]], theirs, chart, moves) >= MARGIN), MAX_LEVEL)
+         if fight([at_level(lead, L, kb), *party[1:]], theirs, chart, moves) >= margin), MAX_LEVEL)
     note = matchup_text(lead, theirs[0], chart, moves)
     text = f"ready vs {label}: {note} -> ok" if ready else f"train to L{required}: {note}"
     return Readiness(ready, required, round(score, 2), lead.name, text)
