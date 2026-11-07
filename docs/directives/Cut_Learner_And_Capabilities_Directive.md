@@ -191,4 +191,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 13:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR 141 merging first; lint_override: dispatch-path-missing/verification-path-missing on new modules/tests and gitignored kb/ evidence paths
 - 2026-11-07 13:43 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield files (unlocks.py, cut_learner.py, learner_hunt.py, tests) and gitignored evidence (kb/hm_compat.json, kb/rom_tables.json); known false positives. Dependency PR #141 merged as 10a3aa5.
 - 2026-11-07 13:43 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-cut-learner-and-capabilities-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VN5KPHQKJM3BAFX4QR816S
+- 2026-11-07 13:48 · dispatcher · launched pid=22692; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-cut-learner-and-capabilities-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
