@@ -190,11 +190,12 @@ and `tools/explore_demo.py` were present (and what you did about each), and anyt
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — build step 9 (world KB), design settled with Robert 2026-11-02; queue after Map_Memory merges
+- 2026-11-06 21:10 · robert-claude-laptop · Draft → Queued — closing as superseded
 <!-- queue:end -->
