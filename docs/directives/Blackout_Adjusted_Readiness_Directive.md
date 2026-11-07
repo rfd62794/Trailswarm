@@ -174,4 +174,5 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new module and new test (greenfield)
 - 2026-11-07 12:49 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files knowledge/blackout_tax.py and tests/test_blackout_tax.py; known false positive. Held until Battle_Log_Fidelity merged (shared battle.py edits); it merged as #136.
 - 2026-11-07 12:49 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJ2YZ0BDDN8RQ9F2871WRF
+- 2026-11-07 12:56 · dispatcher · launched pid=3808; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
