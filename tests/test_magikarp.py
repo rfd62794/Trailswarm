@@ -340,3 +340,12 @@ def test_buy_stage_step_cap_settles_the_goal(tmp_path):
     assert not ctx.goals()["buy_magikarp"]
     PlanGoal().step(ctx)
     assert ctx.buy_skipped and ctx.center_intent is None and ctx.goals()["buy_magikarp"]
+
+
+def test_switch_out_wild_run_is_for_the_magikarp_only(tmp_path):
+    mons = [(STARTER, 30, 0, 79), (0x54, 9, 20, 20)]            # lead fainted: nobody to send in; slot 1 is the fighter trainee
+    ctx = battle_ctx(tmp_path, mons, battle_species=0x54, kind=1)
+    ctx.emu.set(0xD017, 1)                                      # the battle mon is party slot 1
+    ctx.train_member = 1
+    draw_framed(ctx.emu, [">FIGHT PKMN", "ITEM RUN"])
+    assert SwitchOut().step(ctx) is None and ctx.switch_gave_up == 1   # fights on; no RUN walk for a real fighter

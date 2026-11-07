@@ -29,6 +29,12 @@ def party_hp(emu) -> tuple[int, int]:
     return hp, mx
 
 
+def true_lead_level(emu) -> int:
+    """The fighter's real level (party lead, or the strongest non-Magikarp while a trainee is out): bandit features and
+    atlas priors are keyed by this, not by the trainee-band level the training gate sees."""
+    return fighter(emu)[1] if trainee_slot(emu) is not None else emu.read(0xD18C)
+
+
 def lead_level(emu) -> int:
     """Level the training gate sees: the fighter's (the party lead, or the strongest non-Magikarp while a Magikarp is
     in training). While a Magikarp trainee is in the party it is min(fighter level, trainee level + TEAM_GAP):

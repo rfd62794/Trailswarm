@@ -84,7 +84,7 @@ class SwitchOut(BehaviourBase):
         if target is None:
             # Nobody fit to send in. A Magikarp only knows SPLASH: leave a wild fight (the first sighting is logged once),
             # a trainer fight cannot be left, so it carries on as before.
-            if ctx.emu.read(0xD057) == 1:
+            if ctx.emu.read(0xD057) == 1 and party_species(ctx.emu)[t] == MAGIKARP:  # only a Magikarp is useless: a fighter trainee never flees
                 wild_run = run_press(frame_lines(tm))
                 if wild_run is None:
                     return None

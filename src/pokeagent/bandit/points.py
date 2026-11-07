@@ -1,7 +1,7 @@
 """The three decision points: arms, context keys and when each applies. Pure reads of the context; no presses."""
 from __future__ import annotations
 
-from pokeagent.explorer.perceive import lead_level
+from pokeagent.explorer.perceive import lead_level, true_lead_level
 
 ARMS = {"wild_battle": ("fight", "flee"), "heal": ("heal_now", "push_on"), "train": ("grind", "skip")}
 HEAL_BELOW = 0.5
@@ -24,7 +24,7 @@ def context_key(point: str, stage: str, map_id: int, hp: int, mx: int, gap: int)
 
 def wild_gap(ctx) -> int:
     """Lead level minus the wild enemy's level."""
-    return lead_level(ctx.emu) - ctx.emu.read(0xCFF3)
+    return true_lead_level(ctx.emu) - ctx.emu.read(0xCFF3)
 
 
 def train_gap(ctx, need: int) -> int:
