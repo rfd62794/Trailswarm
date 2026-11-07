@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 PRESS, GOAL, STALL, BLACKOUT, TOSS = -0.01, 1.0, -2.0, -3.0, -5.0
 MAX_PRESSES = 300
+NOVELTY_SCALE, NOVELTY_CAP = 0.1, 0.5  # explorer role only: novelty bonus x scale, at most CAP per episode (a goal is +1)
 STALL_RULE = "stall_escalate"  # the StallGuard's escalation: the in-process stand-in for the swarm's stall-kill
 
 
@@ -22,13 +23,19 @@ class Episode:
     reward: float = 0.0
     stalled: bool = False
     done: bool = False
+    novelty: float = 0.0
 
     def add(self, rec: dict) -> bool:
         """Fold in one record; True when the episode just ended."""
         if self.done:
             return False
         event = rec.get("event")
-        if event == "item_tossed":
+        if event == "novelty":
+            room = NOVELTY_CAP - self.novelty
+            paid = max(0.0, min(room, NOVELTY_SCALE * rec.get("bonus", 0.0)))
+            self.novelty += paid
+            self.reward += paid
+        elif event == "item_tossed":
             self.reward += TOSS
         elif event == "blackout":
             self.reward += BLACKOUT

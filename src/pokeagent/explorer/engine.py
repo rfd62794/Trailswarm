@@ -78,6 +78,7 @@ class Engine:
                     self.decision_log.write(ev)
         if self.decision_log is not None and _tossed(ctx) > tossed_before:  # an item was thrown away: the bandit reward counts this line
             self.decision_log.write({**rec, "event": "item_tossed", "outcome": "item_tossed"})
+        self._note_novelty()
         self._pending_outcomes.append(rec)
         del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
         if len(ctx.goal_steps) > goals_reached:
@@ -87,6 +88,18 @@ class Engine:
         if ctx.done:
             ctx.mem.save()  # shutdown() already saved inside the press, before the outcomes were back-filled
         return decision
+
+    def _note_novelty(self) -> None:
+        """Novelty off (ctx.novelty None): nothing. On: count what this press found; an explorer-role bandit run is paid for it."""
+        ctx = self.ctx
+        if ctx.novelty is None:
+            return
+        try:
+            gain = ctx.novelty.observe(ctx.emu, ctx.step)
+            if gain and ctx.bandit is not None:
+                ctx.bandit.add_novelty(gain)
+        except Exception as exc:  # noqa: BLE001  novelty is an add-on: it must never stop a run
+            ctx.log(f"[novelty skipped: {exc!r}]", "res")
 
     def _flush_outcomes(self, goal_step: int | None) -> None:
         """Back-fill goal-keyed tile outcomes for a finished goal segment: every pending press gets

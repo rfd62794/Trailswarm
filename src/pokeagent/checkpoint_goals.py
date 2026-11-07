@@ -60,6 +60,9 @@ def valid(name: str, state: Path | None, order: tuple[str, ...], has_checkpoint:
     """May the checkpoint ``state`` (called ``name``) start a segment? See the module docstring."""
     if state is None:
         return False
+    from pokeagent.novelty.discoveries import is_discovery_state
+    if is_discovery_state(state):
+        return False  # a discovery save may be glitch-corrupted: evidence for review, never a starting point
     need = required(name, order)
     done = read_completed(state)
     if done is not None:

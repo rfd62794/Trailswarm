@@ -4,6 +4,7 @@ from __future__ import annotations
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp
+from pokeagent.novelty import steer as novelty_steer
 
 REVERSE_PENALTY = 2   # visits added to a direction that undoes the last successful move (choose_local)
 TABU_LEN = 8          # tiles stood on in the last N moves on a map count +1 visit in choose_local
@@ -47,6 +48,8 @@ def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int) -> tuple[str, s
         return ctx.frontier_route[0], f"frontier: {len(ctx.frontier_route)} steps left to ({t[1]},{t[2]})"
     ctx.frontier_at = None
     plan = mem.frontier_plan(m, x, y)
+    if novelty_steer.active(ctx):  # explorer role only: prefer the frontier whose unexplored side the swarm has seen least
+        plan = novelty_steer.plan(ctx, m, x, y) or plan
     if plan is None or not plan[1]:
         ctx.frontier_target = None
         return None

@@ -189,6 +189,7 @@ class Supervisor:
             if keep:
                 note += f", kept in {self._keep(cfg['own'])} for --merge-only"
         self._merge_bandit(cfg["own"])
+        self._merge_novelty(cfg["own"])
         if self.finished % GRIND_REFRESH_EVERY == 0:
             self._refresh_grind()
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
@@ -210,6 +211,16 @@ class Supervisor:
             merge_delta(self.shared.with_name("bandit.json"), delta)
         except Exception as e:  # the delta stays on disk for a later merge; never block the slot
             self.log(f"bandit delta not merged ({e!r}); kept {delta.name}")
+
+    def _merge_novelty(self, own: Path) -> None:
+        """A novelty-tracking agent leaves its delta beside its memory file: add it into runs/novelty.json (each run once). Never raises."""
+        try:
+            from pokeagent.novelty.store import delta_path_for, merge_delta
+            delta = delta_path_for(own)
+            if delta.exists():
+                merge_delta(self.shared.with_name("novelty.json"), delta)
+        except Exception as e:  # the delta stays on disk for a later merge; never block the slot
+            self.log(f"novelty delta not merged ({e!r})")
 
     def _refresh_grind(self) -> None:
         """Fold newly finished battles into runs/grind_atlas.json (continuous learning; never blocks a slot)."""
