@@ -185,3 +185,21 @@ def test_unknown_respawn_is_not_behind(tmp_path):
     p.write_bytes(b"x")
     cg.write_completed(p, [])
     assert cg.read_respawn(p) is None and not cg.respawn_behind("ss_anne_captain@63", p)
+
+
+def test_fit_and_aboard_takes_the_rom_route_to_the_bow_when_the_learned_stairs_are_missing():
+    plan = FakeShipPlan(["UP", "LEFT"])
+    goals = {**FIT, "_ship": {"off": 2}, "_ship_plan": plan}
+    step = plan_step(goals, {}, (0x5F, 20, 6), "UP")
+    assert step and step[0] == "UP" and "goal boarding" in step[1] and plan.asked[0][1] == {(0x61, 14, 0)}, step
+    assert plan_step(goals, {}, (0x63, 13, 6), "UP") is None            # at the bow: the bow's own logic (the sailor, the cabin)
+
+
+def test_fit_in_vermilion_walks_to_the_dock(tmp_path):
+    maps = _vermilion_maps(tmp_path)
+    maps["5"]["warps"]["5,10,DOWN"] = [0x5E, 14, 0]
+    mem = MapMemory(tmp_path / "m3.json")
+    mem.visit(0x5E, 14, 0, 1)
+    maps["94"] = mem.data["maps"]["94"]
+    step = plan_step({**FIT, "to_vermilion": True}, maps, (0x05, 3, 10), "UP")
+    assert step and step[0] == "RIGHT" and "dock" in step[1], step

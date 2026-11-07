@@ -137,8 +137,31 @@ def _rom_step(pos: tuple, tile: tuple, grid_get=None) -> str | None:
     return {(0, -1): "UP", (0, 1): "DOWN", (-1, 0): "LEFT", (1, 0): "RIGHT"}.get((b[0] - a[0], b[1] - a[1]))
 
 
+BOW, CAPTAIN = 0x63, 0x65
+DECK = 0x61   # 3F deck: its warp leads to the bow
+
+
+def board_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
+    """Fit and ready, but not at the bow yet (after a walk-off, or a segment that starts in Vermilion): Vermilion -> dock -> the
+    bow. The learned world has the dock but not the stairs between the ship's floors, so aboard it falls back to the ROM route
+    to the deck's warp to the bow."""
+    if unfit(goals):
+        return None
+    if pos[0] == VERMILION:
+        p = g.path(pos, _on(DOCK))
+        return (p[0], f"goal boarding: {len(p)} steps to the S.S. Anne dock") if p else None
+    if pos[0] not in SHIP_MAPS or pos[0] in (BOW, CAPTAIN):
+        return None
+    p = g.path(pos, _on(BOW))
+    if p:
+        return p[0], f"goal boarding: {len(p)} steps to the bow over the learned world"
+    plan = goals.get("_ship_plan")
+    buttons = plan(pos, plan.warp_tiles(DECK, BOW)) if plan is not None else None
+    return (buttons[0], f"goal boarding: {len(buttons)} steps to the bow by the ROM route") if buttons else None
+
+
 def ship_gate_step(g: WorldGraph, goals: dict, stage: str | None, pos: tuple, grid_get=None) -> tuple[str, str] | None:
     if stage not in SHIP_STAGES:
         return None
     left_ship(goals, pos)
-    return walk_off_step(goals, pos, g.maps) or route_back_step(g, goals, pos, grid_get) or ready_gate(g, goals, pos)
+    return walk_off_step(goals, pos, g.maps) or route_back_step(g, goals, pos, grid_get) or ready_gate(g, goals, pos) or board_step(g, goals, pos)
