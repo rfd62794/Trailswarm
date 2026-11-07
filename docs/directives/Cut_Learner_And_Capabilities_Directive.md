@@ -180,11 +180,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 13:42 · robert-claude-laptop · none → Draft — Claude 2026-11-07: cut_learner goal + RAM/checkpoint capabilities; depends on PR #141
+- 2026-11-07 13:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR 141 merging first; lint_override: dispatch-path-missing/verification-path-missing on new modules/tests and gitignored kb/ evidence paths
 <!-- queue:end -->
