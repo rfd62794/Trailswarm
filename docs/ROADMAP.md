@@ -78,3 +78,4 @@ region; the same four regions become MCP resources so Claude sees exactly what R
 - How many Claude consults per run are acceptable in hybrid mode (cost ceiling)?
 - Keep the explorer's HTTP control API after MCP lands, or MCP only?
 - Starter policy for the campaign: fixed, random per run, or the one that measures best?
+- Starter policy and Cut: Bulbasaur and Charmander lines can learn CUT (kb/hm_compat.json); the Squirtle line cannot, so a Squirtle run must catch a Cut-capable species (the cut_learner goal does this: Oddish on Route 6, ~35% per encounter). Fixing the starter would remove that detour; the choice is Robert's.

@@ -9,6 +9,8 @@ sibling, not a source.
 from __future__ import annotations
 
 from pokeagent import campaign
+from pokeagent.knowledge import kb as _kbmod
+from pokeagent.knowledge.cut_learner import cut_capable, party_names
 from pokeagent.magikarp import gyarados_goal_settled, magikarp_goal_settled
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
@@ -64,6 +66,24 @@ def healed_in_cerulean(emu, st: dict, m: int) -> bool:
     return bool(st.get("healed_cerulean"))
 
 
+def cut_learner_settled(emu, st: dict, kb) -> bool:
+    """cut_learner: a Cut-compatible species is in the party (sticky ``had_cut_learner``), Cut is already known,
+    the step cap was spent, or there is no ROM data to judge by (an empty table never blocks the route)."""
+    if st.get("had_cut_learner") or st.get("cut_learner_skipped"):
+        return True
+    from pokeagent.explorer.catch_list import hm_table  # late import: the explorer package loads after this module
+    hm = hm_table()
+    if not hm:
+        return True  # no kb/hm_compat.json: cannot judge, never block
+    names = party_names(emu, kb)
+    if names is None:
+        return True  # no name_of_internal either
+    if cut_capable(names, hm) or campaign.party_knows_move(emu, 15):
+        st["had_cut_learner"] = True
+        return True
+    return False
+
+
 def check_goals(emu, st: dict) -> dict[str, bool]:
     """Milestones read straight from RAM (bag 0xD31D/E verified; party 0xD163 and battle 0xD057 unverified)."""
     bag_n = emu.read(0xD31D)
@@ -104,6 +124,7 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          "gyarados": gyarados_goal_settled(emu, st, seen), "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
     g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
+    g["cut_learner"] = g["hm01_cut"] and cut_learner_settled(emu, st, _kbmod.ROM_KB)  # only after HM01 is in hand; special goal: hand-coded, skipped by campaign_goals
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:

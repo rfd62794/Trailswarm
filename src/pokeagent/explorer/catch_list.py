@@ -11,6 +11,7 @@ import logging
 
 from pokeagent.campaign import load_campaign
 from pokeagent.knowledge import hm_compat
+from pokeagent.knowledge.cut_learner import LearnerTarget, pick_target
 
 log = logging.getLogger(__name__)
 
@@ -64,3 +65,16 @@ def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned
     if not owned and dex_owned < DEX_TARGET and "dex10" in upcoming:
         return f"new species for the Pokedex ({dex_owned}/{DEX_TARGET} owned, dex10 ahead)"
     return None
+
+
+def _covers(need: str, party, hm: dict) -> bool:
+    """Someone in the party answers ``need`` under the given HM table (can learn it, or already knows the move)."""
+    return need in HM_MOVE and any(name in (hm or {}).get(need, ()) or HM_MOVE[need] in moves
+                                   for name, moves in _members(party))
+
+
+def catch_target_map(goals: dict, party, hm: dict, wild_by_map: dict, here_map: int, known_maps, distance=None) -> LearnerTarget | None:
+    """The map to hunt a CUT learner on (knowledge.cut_learner.pick_target): None unless ``cut`` is the first
+    upcoming need that nobody in the party covers; else the nearest grass map holding a Cut-compatible species."""
+    first = next((n for n in upcoming_needs(goals) if not _covers(n, party, hm)), None)
+    return pick_target(here_map, known_maps, hm, wild_by_map, distance=distance) if first == "cut" else None
