@@ -154,10 +154,11 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-viewer-ux-v1-directive |
 | Base branch | - |
+| Base commit | e150b67f146a3a26495a70386f88563c5c91cbab |
 
 **Status log**
 - 2026-11-07 15:45 · robert-claude-laptop · none → Draft — Claude 2026-11-07: viewer layout persistence, stall/break state, Stadium pane (depends on fix/stadium-opponent)
@@ -165,4 +166,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: reword entry-point mentions (preflight), add provenance rule
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; entry-point mentions reworded; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 16:27 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on gitignored kb/rom_tables.json, runs/anomalies.jsonl and the new tests/test_viewer_stadium_pane.py; known false positives. Entry-point mentions reworded. Dependency fix/stadium-opponent merged as PR #149.
+- 2026-11-07 16:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-ux-v1-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VYJD6XMRJQBXSNCYPZ2EJW
 <!-- queue:end -->
