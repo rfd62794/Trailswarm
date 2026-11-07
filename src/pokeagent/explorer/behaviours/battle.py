@@ -16,6 +16,7 @@ from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, reco
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle_run import cave_run
+from pokeagent.explorer.behaviours.battle_train import train_fight
 from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
@@ -189,7 +190,10 @@ class Battle(BehaviourBase):
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(0xCFE5)))
             flee = kind == 1 and bool(weak or hurry or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
-            if kind == 1:
+            stand = kind == 1 and flee and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
+            if stand:
+                flee = weak = hurry = False
+            if kind == 1 and not stand:
                 flee = wild_flee(ctx, flee)  # bandit decision point: fight or flee (the Explorer's own answer when off)
             if flee and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""

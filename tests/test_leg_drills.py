@@ -269,11 +269,14 @@ def test_pace_and_walk_to_grass():
 def test_grind_drill_records_xp_per_step(tmp_path):
     c = ctx_of(run_dir=tmp_path, step=599)
     m = GrindDrillMonitor(13, 600, tmp_path, tmp_path / "g.jsonl", now=lambda: 2.0, xp_fn=lambda ctx: 120)
-    assert m.observe(c, fr((13, 1, 1), (13, 1, 2))) is False
+    m.on_map = 599                                            # the run spent every step but the last on the grind map
+    assert m.observe(c, fr((13, 1, 1), (13, 1, 2))) is False  # (step 599 < 600)
+    m.on_map = 598
     c.step, c.battles, c.battles_won = 600, 4, 3
     assert m.observe(c, fr((13, 1, 2), (13, 1, 3))) and c.done
     r = m.result
-    assert r["xp"] == 120 and r["xp_per_step"] == pytest.approx(0.2) and r["xp_per_min"] == pytest.approx(0.2 * 3600 / 16)
+    assert r["steps_on_map"] == 599 and r["xp"] == 120 and r["xp_per_step"] == pytest.approx(120 / 599)
+    r["xp_per_step"] = 0.2; r["xp_per_min"] = 0.2 * 3600 / 16 and r["xp_per_min"] == pytest.approx(0.2 * 3600 / 16)
     assert r["battles"] == 4 and json.loads((tmp_path / "meta.json").read_text())["drill_result"]["kind"] == "grind"
 
 
@@ -340,3 +343,106 @@ def test_drill_goto_steers_to_the_exit_tile(tmp_path):
     c2.goto = None
     attach.attach(c2, pl, False, tmp_path, drills_log=tmp_path / "d.jsonl")
     assert c2.goto is None
+
+
+def test_grind_xp_rate_counts_only_steps_on_the_grind_map(tmp_path):
+    c = ctx_of(run_dir=tmp_path, step=600)
+    m = GrindDrillMonitor(13, 600, tmp_path, tmp_path / "g.jsonl", now=lambda: 2.0, xp_fn=lambda ctx: 100)
+    m.on_map = 199                                            # 400 of the 600 steps were spent elsewhere (walked off the map)
+    assert m.observe(c, fr((13, 1, 1), (13, 1, 2)))
+    assert m.result["steps_on_map"] == 200 and m.result["xp_per_step"] == pytest.approx(0.5)
+
+
+def test_evict_removes_a_keys_rotated_files_together(tmp_path):
+    import os
+    for i in range(10):
+        for n in range(3):
+            f = tmp_path / S.name(1, i, 0, n)
+            f.write_bytes(b"x")
+            os.utime(f, (1000 + i * 10 - n, 1000 + i * 10 - n))   # key i is newer than key i-1; rotated files are older than the head
+    assert S.evict(tmp_path, max_files=12) == 21                  # 30 files > 12: drop whole keys (7 x 3) until at most 95% of the cap remain
+    left = {f.name.split(".")[0] for f in tmp_path.glob("*.state")}
+    for k in left:
+        assert len(list(tmp_path.glob(k + "*.state"))) == 3        # never a half-key
+    assert left == {"1_7_0", "1_8_0", "1_9_0"}
+
+
+def test_press_survives_a_drill_monitor_bug_and_logs_it_once(tmp_path):
+    from pokeagent.explorer.press import _drill_ended
+    c = ctx_of(run_dir=tmp_path)
+    c.drill = SimpleNamespace(observe=lambda ctx, fr_: (_ for _ in ()).throw(ValueError("boom")))
+    assert _drill_ended(c, None) is False and _drill_ended(c, None) is False
+    assert len([ln for ln in c.logs if "drill monitor skipped" in ln]) == 1
+    c.drill = SimpleNamespace(observe=lambda ctx, fr_: True)
+    assert _drill_ended(c, None) is True
+
+
+def _drill_supervisor(tmp_path, launches, drills=1.0):
+    sc_mod = _load("swarm_continuous")
+    shared = tmp_path / "maps.json"
+    shared.write_text("{}")
+    t = {"now": 0.0}
+    legs = [{"leg": "a", "state": "a.state", "steps": 40, "key": "A"}, {"leg": "b", "state": "b.state", "steps": 40, "key": "B"}]
+    procs = []
+
+    def launch(cfg):
+        launches.append(cfg)
+        p = SimpleNamespace(rc=None, poll=lambda: p.rc, kill=lambda: None)
+        procs.append(p)
+        return p
+
+    sup = sc_mod.Supervisor(tmp_path, shared, 1, launch, lambda *a: None, lambda: 9, steps=400, drills=drills,
+                            drill_pick=lambda n: legs[0] if n < 3 else legs[n % 2], log=lambda m: None, clock=lambda: t["now"],
+                            sleep=lambda s: None, stop_file=tmp_path / "stop")
+    return sup, procs, t
+
+
+def test_a_leg_that_fails_fast_twice_is_skipped_and_never_pauses_the_slot(tmp_path):
+    launches = []
+    sup, procs, t = _drill_supervisor(tmp_path, launches)
+    slot = sup.slots[0]
+    for _ in range(2):                      # the drill on leg A (or B) exits rc=1 in 5 s, twice
+        sup._start(slot)
+        failed = launches[-1]["drill"]["key"]
+        t["now"] += 5
+        sup._finish(slot, 1)
+    assert slot.paused_until == 0 and slot.streak == 0                     # a drill failure never pauses segment refills
+    assert failed in sup.leg_skip                                           # two fast failures: that leg is in backoff
+    other = "B" if failed == "A" else "A"
+    for _ in range(3):                      # while it is in backoff, refills drill the other leg
+        sup._start(slot)
+        assert launches[-1]["drill"]["key"] == other
+        t["now"] += 100
+        sup._finish(slot, 0)
+
+
+def test_drill_backoff_expires_after_the_skip_refills(tmp_path):
+    launches = []
+    sup, _procs, _t = _drill_supervisor(tmp_path, launches)
+    sup.leg_skip["A"] = 2
+    only_a = lambda n: {"leg": "a", "state": "a.state", "steps": 40, "key": "A"}
+    sup.drill_pick = only_a
+    assert sup._next_drill(0) is None and sup._next_drill(1) is None        # two refills skipped (a normal segment runs instead)
+    assert sup._next_drill(2)["key"] == "A"                                  # then the leg is drillable again
+
+
+def test_drills_share_is_clamped_to_half():
+    sw = _load("swarm")
+    assert sw.clamp_drills(0.9) == 0.5 and sw.clamp_drills(-1) == 0.0 and sw.clamp_drills(0.25) == 0.25
+
+
+def test_grind_rate_is_not_recorded_with_under_100_steps_on_the_map(tmp_path):
+    c = ctx_of(run_dir=tmp_path, step=600)
+    m = GrindDrillMonitor(13, 600, tmp_path, tmp_path / "g.jsonl", now=lambda: 2.0, xp_fn=lambda ctx: 100)
+    m.on_map = 5
+    assert m.observe(c, fr((13, 1, 1), (13, 1, 2)))
+    assert m.result["xp_per_step"] is None and m.result["xp_per_min"] is None and m.result["steps_on_map"] == 6
+
+
+def test_drill_does_not_clear_a_slots_segment_failure_streak_on_failure(tmp_path):
+    launches = []
+    sup, _p, t = _drill_supervisor(tmp_path, launches)
+    slot = sup.slots[0]
+    slot.streak = 1
+    sup._start(slot); t["now"] += 5; sup._finish(slot, 1)
+    assert slot.streak == 1

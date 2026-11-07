@@ -56,6 +56,11 @@ def job_args(job: dict) -> list[str]:
     return ["--state", job["start"], *job["stop"], "--tag", job["tag"]]
 
 
+def clamp_drills(f: float) -> float:
+    """--drills is a share of refills: [0, 0.5], so segment runs always keep at least half."""
+    return min(0.5, max(0.0, float(f)))
+
+
 def drill_args(drill: dict) -> list[str]:
     """A leg drill (legs.schedule.pick): re-run one leg from its saved entry state."""
     return ["--drill-leg", drill["leg"], "--state", drill["state"]]
@@ -187,7 +192,7 @@ def run_continuous(a) -> int:
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
                              segment_ok=lambda g: bool(segment_args(g)), plan=plan,
-                             drills=a.drills, drill_pick=lambda k: legs_schedule.pick(ROOT, k), on_drill=lambda _d: drill_fold.fold_file(ROOT / "runs" / "legs.json", ROOT / "runs" / "legs" / "drills.jsonl")))
+                             drills=clamp_drills(a.drills), drill_pick=lambda k: legs_schedule.pick(ROOT, k), on_drill=lambda _d: drill_fold.fold_file(ROOT / "runs" / "legs.json", ROOT / "runs" / "legs" / "drills.jsonl")))
     if adopted is not None:
         sup[0].adopt(adopted)
         swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)

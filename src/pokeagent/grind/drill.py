@@ -14,6 +14,7 @@ from pokeagent.legs.drill import append_log, write_meta
 
 GRIND_LOG = Path("runs/legs/grind_drills.jsonl")
 DEFAULT_STEPS = 600
+MIN_ON_MAP = 100  # fewer steps on the grind map than this: no XP rate is recorded
 class GrindDrillMonitor:
     """Ends the run after ``steps`` and records XP gained per step (party_log's exp total) as drill_result."""
 
@@ -31,9 +32,9 @@ class GrindDrillMonitor:
             return False
         from pokeagent.grind.atlas import STEPS_PER_MIN
         xp = float(self.xp_fn(ctx))
-        per = xp / max(1, ctx.step)
+        per = xp / self.on_map if self.on_map >= MIN_ON_MAP else None  # time actually on the grind map; too little of it gives no rate
         self.result = {"source": "drill", "kind": "grind", "map": self.map, "steps": ctx.step, "steps_on_map": self.on_map, "xp": xp,
-                       "xp_per_step": per, "xp_per_min": per * STEPS_PER_MIN, "battles": ctx.battles, "wins": ctx.battles_won,
+                       "xp_per_step": per, "xp_per_min": None if per is None else per * STEPS_PER_MIN, "battles": ctx.battles, "wins": ctx.battles_won,
                        "lead_level": _level(ctx), "starter": ctx.opts.starter, "run": self.run_dir.name, "t": self.now()}
         try:
             write_meta(self.run_dir, {"drill_result": self.result})
@@ -41,7 +42,7 @@ class GrindDrillMonitor:
         except OSError as e:
             ctx.log(f"[grind drill result not written: {e!r}]", "res")
         ctx.done = True
-        ctx.log(f"grind drill map {self.map}: {xp:.0f} XP in {ctx.step} steps ({per:.3f}/step), {ctx.battles} battles", "hdr")
+        ctx.log(f"grind drill map {self.map}: {xp:.0f} XP in {ctx.step} steps ({"n/a" if per is None else format(per, ".3f")}/step), {ctx.battles} battles", "hdr")
         return True
 
 
