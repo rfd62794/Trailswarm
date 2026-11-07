@@ -159,7 +159,7 @@ Test tail, line counts, a sample `transitions.jsonl` line, the 13x13 map from a 
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Superseded |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -167,4 +167,5 @@ Test tail, line counts, a sample `transitions.jsonl` line, the 13x13 map from a 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — map memory + transitions log; Agent_Loop merged; text box directive optional
 - 2026-11-06 21:10 · robert-claude-laptop · Draft → Queued — closing as superseded
+- 2026-11-06 21:10 · robert-claude-laptop · Queued → Superseded — superseded: work already merged at main - note: delivered in a different shape on main; triage AgentFlow/docs/notes/2026-11-06-pokeagent-brain-tools-merged-drafts-triage.md
 <!-- queue:end -->
