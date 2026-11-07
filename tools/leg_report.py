@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from pokeagent.atlas.rom_maps import map_name  # noqa: E402
 from pokeagent.legs import grid as G  # noqa: E402
+from pokeagent.legs.drill import DRILLS_LOG  # noqa: E402
+from pokeagent.legs.drill_fold import load_drills, merge_drills  # noqa: E402
 from pokeagent.legs.par import par  # noqa: E402
 from pokeagent.legs.split import efficiency, load_rows, median, split_legs  # noqa: E402
 
@@ -64,7 +66,8 @@ def collect(runs_dir: Path, prefix: str, n: int, get, keep_fights: bool = False)
     return names, groups, skipped
 
 
-def score(get, groups) -> list[dict]:
+def score(get, groups, drills=()) -> list[dict]:
+    """One record per leg. ``drills`` (legs.drill results) join as samples marked source="drill" (see legs.drill_fold)."""
     out = []
     for key, legs in groups.items():
         first = legs[0]
@@ -78,7 +81,7 @@ def score(get, groups) -> list[dict]:
                     "best_frames": min(fr), "median_frames": median(fr), "efficiency": efficiency(pf, fr),
                     "best_presses": best.presses, "best_moved": best.moved, "best_run": best.run, "best_step0": best.step0,
                     "best_buttons": best.buttons, "par_path": None if res is None else [list(p) for p in res[1]]})
-    return out
+    return [merge_drills(r, list(drills)) for r in out]
 
 
 def main(argv=None) -> int:
@@ -92,6 +95,7 @@ def main(argv=None) -> int:
     ap.add_argument("--sort", choices=("eff", "waste"), default="eff", help="eff: worst par/best first; waste: most total frames over par")
     ap.add_argument("--json", help="also write the printed rows here")
     ap.add_argument("--out", help="per-leg record table (default: <runs-dir>/legs.json)")
+    ap.add_argument("--drills", help="leg drill results to fold in as source=drill samples (default runs/legs/drills.jsonl beside the runs dir)")
     ap.add_argument("--no-write", action="store_true")
     ap.add_argument("--keep-fights", action="store_true", help="count legs with battle presses too (default: excluded, so efficiency is travel only)")
     a = ap.parse_args(argv)
@@ -100,7 +104,8 @@ def main(argv=None) -> int:
         print("ROM not found (roms/Pokemon Red.gb): cannot compute par", file=sys.stderr)
         return 2
     names, groups, skipped = collect(Path(a.runs_dir), a.prefix, a.runs, get, a.keep_fights)
-    rows = score(get, groups)
+    drills = load_drills(a.drills or Path(a.runs_dir) / "legs" / DRILLS_LOG.name)
+    rows = score(get, groups, drills)
     keep = [r for r in rows if r["efficiency"] is not None and r["samples"] >= a.min_samples and r["par_frames"] >= a.min_par]
     scored = sorted(keep, key=(lambda r: (r["efficiency"], -(r["best_frames"] - r["par_frames"]))) if a.sort == "eff"
                     else (lambda r: -r["samples"] * (r["median_frames"] - r["par_frames"])))

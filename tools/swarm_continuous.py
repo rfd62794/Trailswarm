@@ -51,7 +51,8 @@ class Supervisor:
                  deadline: float | None = None, stop_now: bool = False, firsts: Callable[[], dict] | None = None,
                  heartbeat: Callable[[], None] | None = None, segment_ok: Callable[[str], bool] | None = None, plan: Any = None,
                  watch: Callable[[dict], Any] | None = None, watch_s: float = 15.0,
-                 on_stall: Callable[..., None] | None = None,
+                 on_stall: Callable[..., None] | None = None, drills: float = 0.0,
+                 drill_pick: Callable[[int], dict | None] | None = None, on_drill: Callable[[dict], None] | None = None,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = lambda m: print(m, flush=True), fast_s: float = FAST_S, pause_s: float = PAUSE_S):
         self.root, self.shared, self.launch, self.merge, self.limit = Path(root), Path(shared), launch, merge, limit
@@ -61,6 +62,8 @@ class Supervisor:
         self.fast_s, self.pause_s, self.plan = fast_s, pause_s, plan  # plan: seg_sched.Curriculum
         self.heartbeat, self.segment_ok, self.watch_factory, self.watch_s = heartbeat, segment_ok, watch, watch_s
         self.on_stall = on_stall
+        self.drills, self.drill_pick, self.on_drill = drills, drill_pick, on_drill  # --drills F: that share of refills drill one leg
+        self._drill_acc = 0.0
         self.watchers: dict[int, Any] = {}
         self.next_watch = 0.0
         self.solved: dict[str, float] = {}
@@ -107,9 +110,33 @@ class Supervisor:
         return None
 
     # --- launching ---------------------------------------------------------------------------------------
+    def _next_drill(self, n: int) -> dict | None:
+        """A leg drill for this refill when the drill share is due (an accumulator, so --drills 0.25 is every fourth refill); None
+        otherwise or when nothing is drillable (the refill then runs a normal segment and the share stays due)."""
+        if self.drills <= 0 or self.drill_pick is None:
+            return None
+        self._drill_acc += self.drills
+        if self._drill_acc < 1.0:
+            return None
+        try:
+            d = self.drill_pick(n)
+        except Exception as e:  # noqa: BLE001  picking is an add-on: a bad table means a normal segment run
+            self.log(f"drill pick failed ({e!r}); running a segment")
+            d = None
+        if d:
+            self._drill_acc -= 1.0
+        else:
+            self._drill_acc = 1.0   # still due, do not bank more
+        return d
+
     def _config(self, slot: Slot) -> dict:
         n = self.seq
         self.seq += 1
+        drill = self._next_drill(n)
+        if drill:  # a drill replaces the segment: no curriculum job is consumed
+            return {"slot": slot.idx, "seed": 1000 + n, "seq": n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
+                    "starter": self.starter or STARTERS[n % 3], "steps": drill["steps"] + 2, "segment": None, "drill": drill,
+                    "own": self.swarm_dir / f"agent{slot.idx}-{n}.json"}
         cfg = {"slot": slot.idx, "seq": n, "seed": 1000 + n, "role": slot.role, "box_pace": BOX_PACES[n % 3],
                 "starter": self.starter or STARTERS[n % 3], "steps": self.steps,
                 "segment": self._pick_segment(n),
@@ -195,6 +222,11 @@ class Supervisor:
             self._refresh_economy()
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
         self.plan and self.plan.on_finish(cfg, rc)
+        if cfg.get("drill") and self.on_drill:
+            try:
+                self.on_drill(cfg["drill"])  # fold the finished drill into runs/legs.json
+            except Exception as e:  # noqa: BLE001
+                self.log(f"drill not folded ({e!r})")
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
         too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
         if too_fast and not self.stopping:

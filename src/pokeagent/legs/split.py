@@ -30,6 +30,7 @@ class Leg:
     moved: int = 0
     frames: float = 0.0
     complete: bool = False
+    source: str = "run"          # "run" (a natural leg from transitions.jsonl) or "drill" (tools/drills.py, legs.drill)
 
     @property
     def presses(self) -> int:
@@ -91,3 +92,14 @@ def efficiency(par_frames: float | None, actual: list[float]) -> float | None:
 
 def median(actual: list[float]) -> float:
     return statistics.median(actual)
+
+
+def drill_leg(d: dict) -> Leg:
+    """A drill result (legs.drill.DrillMonitor.result) as a Leg marked source="drill". Frames = its cost: the model frames when
+    solved, else at least the 3 x par budget, so a failed drill never looks faster than par."""
+    from pokeagent.legs.drill import fail_cost
+    e, x = tuple(d["entry"]), tuple(d["exit"])
+    leg = Leg(d.get("run", ""), int(d["map"]), e, x, d.get("button", ""), None, 0, int(d.get("steps", 0)), [], 0,
+              fail_cost(d), bool(d.get("solved")), "drill")
+    leg.buttons = [d.get("button", "")] * int(d.get("presses", 0))
+    return leg

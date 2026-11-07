@@ -41,6 +41,7 @@ from pokeagent.explorer.seeding import idle_frames
 from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
 from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
+from pokeagent.legs import attach as legs_attach  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
 from pokeagent.segment_names import state_goal  # noqa: E402
 from pokeagent.statemeta import _git_sha  # noqa: E402
@@ -94,7 +95,12 @@ def main(argv=None) -> int:
     ap.add_argument("--novelty", action="store_true", help="count global novelty and log discoveries (runs/novelty.json, runs/discoveries.jsonl)")
     ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start")
     ap.add_argument("--novelty-delta", default="", help="where this run writes its novelty delta (default <run dir>/novelty_delta.json)")
+    legs_attach.add_args(ap)
     a = ap.parse_args(argv)
+    drill_plan = legs_attach.plan(a.drill_leg, a.drill_grind, a.drill_steps, a.leg_states_dir, a.rom,
+                                  a.state if a.state != "baselines/bedroom.state" else None)
+    if drill_plan:  # a drill starts from its saved entry state and runs its own step budget
+        a.state, a.steps = str(drill_plan.state), drill_plan.steps + 2
     if a.seed is not None:
         random.seed(a.seed)
     if a.headless:
@@ -142,6 +148,7 @@ def main(argv=None) -> int:
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
                              bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
                              role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
+    legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log, goto=a.drill_goto)
     if a.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, a.bandit_path, a.bandit_delta or None, a.seed)
