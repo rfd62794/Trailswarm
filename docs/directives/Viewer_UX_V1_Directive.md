@@ -154,7 +154,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -163,4 +163,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:45 · robert-claude-laptop · none → Draft — Claude 2026-11-07: viewer layout persistence, stall/break state, Stadium pane (depends on fix/stadium-opponent)
 - 2026-11-07 15:46 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on fix/stadium-opponent; lint_override: dispatch-path-missing on greenfield test file and gitignored runs/kb paths
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: reword entry-point mentions (preflight), add provenance rule
+- 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; entry-point mentions reworded; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 <!-- queue:end -->
