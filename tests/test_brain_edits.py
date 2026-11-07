@@ -160,9 +160,11 @@ def test_swarm_merge_blackout_tax_is_max_per_goal(tmp_path):
         "Z": {"steps": 0},        # zero: dropped
         "M": {"steps": "x"},      # malformed value: ignored
         "N": 5,                   # malformed entry: ignored
+        "I": {"steps": float("inf")},  # json.loads accepts Infinity: dropped, no OverflowError
     }}
     swarm.merge_memory(dst, src)
     assert dst["blackout_tax"] == {"A": {"steps": 3}, "B": {"steps": 1}}
+    assert "I" not in dst["blackout_tax"]
     # the other direction: the agent's higher count replaces the shared one
     dst2 = {"maps": {}, "blackout_tax": {"A": {"steps": 1}}}
     swarm.merge_memory(dst2, {"maps": {}, "blackout_tax": {"A": {"steps": 4}}})

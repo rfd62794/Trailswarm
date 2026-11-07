@@ -35,7 +35,7 @@ def _table(data: dict, create: bool = False) -> dict:
 def _int(value) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # json.loads accepts Infinity; int(inf) raises OverflowError
         return 0
 
 
