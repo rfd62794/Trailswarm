@@ -195,13 +195,15 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-state-ledger-select-directive |
 | Base branch | - |
+| Base commit | f89cce1990cccd0db71c274a10dc5a3b58825009 |
 
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: ledger part 2 from the merged spec
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new test file and gitignored runs/ evidence path (greenfield)
 - 2026-11-07 12:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (tests/test_statelog.py) and gitignored evidence paths (runs/checkpoints/*.fp.json); known false positive
+- 2026-11-07 12:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-ledger-select-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGEY0J9T6GMN03W7TCWA4T
 <!-- queue:end -->
