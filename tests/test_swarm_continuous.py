@@ -415,3 +415,35 @@ def test_grind_atlas_refresh_exception_is_logged_and_swallowed(tmp_path, monkeyp
         w.sup.tick()  # must not raise
     assert w.sup.finished == 5 and len(w.procs) == 6
     assert any("grind atlas not refreshed" in line and "atlas corrupt" in line for line in w.logs)
+
+
+def test_economy_refresh_only_on_every_fifth_finish(tmp_path, monkeypatch):
+    import pokeagent.explorer.economy.atlas as ea
+    calls = []
+    monkeypatch.setattr(ea, "refresh", lambda runs_dir, *a, **k: calls.append(runs_dir) or {"battles": 1, "runs": 2, "offset": 3})
+    w = World(tmp_path, n=1)
+    w.sup.tick()
+    for _ in range(4):
+        w.end(w.procs[-1])
+        w.sup.tick()
+    assert w.sup.finished == 4 and calls == []
+    w.end(w.procs[-1])
+    w.sup.tick()
+    assert w.sup.finished == 5 and calls == [str(tmp_path)]
+    assert any("economy ledger refreshed" in line for line in w.logs)
+
+
+def test_economy_refresh_exception_is_logged_and_swallowed(tmp_path, monkeypatch):
+    import pokeagent.explorer.economy.atlas as ea
+
+    def boom(runs_dir, *a, **k):
+        raise RuntimeError("ledger corrupt")
+
+    monkeypatch.setattr(ea, "refresh", boom)
+    w = World(tmp_path, n=1)
+    w.sup.tick()
+    for _ in range(5):
+        w.end(w.procs[-1])
+        w.sup.tick()  # must not raise
+    assert w.sup.finished == 5 and len(w.procs) == 6
+    assert any("economy ledger not refreshed" in line and "ledger corrupt" in line for line in w.logs)
