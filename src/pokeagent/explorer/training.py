@@ -10,7 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import trainers
-from pokeagent.knowledge.readiness import MARGIN, Readiness, assess
+from pokeagent.knowledge.readiness import MARGIN, Readiness, TeamReadiness, assess, team_readiness
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
 # (Robert, 2026-11-05: two blackouts in Mt Moon at level 8; Misty's Staryu/Starmie are L18/L21.)
@@ -62,6 +62,20 @@ def readiness_for(goals: dict, party: list | None) -> Readiness | None:
         boss = trainers.boss_party(goal, starter_names=[c.name for c in party]) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
         _cache.clear() if len(_cache) > 64 else None
         _cache[key] = assess(party, boss, BOSS_LABEL[goal], margin=margin) if boss else None
+    return _cache[key]
+
+
+def team_for(goals: dict, party: list | None) -> TeamReadiness | None:
+    """The WHOLE party (Magikarp included) vs the stage boss: the hurt-lead team verdict; None without data.
+    Same boss lookup, label and cache as readiness_for - the team sim keeps the plain MARGIN (no blackout tax)."""
+    goal = stage_goal(goals)
+    if goal is None or not party:
+        return None
+    key = ("team", goal, tuple(party))
+    if key not in _cache:
+        boss = trainers.boss_party(goal, starter_names=[c.name for c in party]) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
+        _cache.clear() if len(_cache) > 64 else None
+        _cache[key] = team_readiness(party, boss, BOSS_LABEL[goal]) if boss else None
     return _cache[key]
 
 

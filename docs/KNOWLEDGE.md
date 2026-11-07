@@ -112,7 +112,8 @@ blacks out in Mt Moon B1F/B2F trainers and respawns in the Pewter Pokecenter.
   `switch_train_run`); a trainer fight cannot be left and carries on. Headless runs from to_route3.state (seeds 7/11/23, 4,000 steps): Magikarp
   reached L6-L7 and shared 4-9 battles; level 20 needs a few hundred shared fights (about 30 EXP each at these levels), so it is far off.
 - Engine notes: the buy_magikarp goal is settled (so the ladder never blocks) when a MAGIKARP/GYARADOS is owned, money < 500, the party is full, or
-  Mt Moon 1F has been entered. `gyarados` is in `SIDE_GOALS` (reported by check_goals and tools/status.py, never the planner's next goal).
+  Mt Moon 1F has been entered. `gyarados` is a LADDER goal since 2026-11-07 (right after `nugget_bridge`): it settles
+  without blocking when a GYARADOS is owned, when no Magikarp was ever owned, or once the stage's step cap is spent.
   With a Magikarp in the party, `party_hp`, the training level and the BattleView read the fighter (the battle's active mon, else the strongest
   non-Magikarp), not party slot 0.
 

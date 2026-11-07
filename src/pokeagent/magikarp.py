@@ -15,6 +15,7 @@ MT_MOON_CENTER = 0x44
 SWITCH_MIN_HP = 0.25                 # never send in a member below this HP fraction (directive section 2.3)
 EVOLVE_LEVEL = 20
 BUY_STEP_CAP = 600                   # steps in/around the center without buying before the goal is dropped for the run
+GYARADOS_STEP_CAP = 6000             # steps on the stage without evolving before the goal is settled for this run (named; tune from runs)
 MAX_RUNS = 5                         # RUN attempts per battle when nobody healthy can replace the trainee
 IN_BATTLE = 0xD057
 
@@ -28,6 +29,21 @@ def trainee_slot(emu) -> int | None:
     """Party index of the Magikarp being switch-trained, else None (Gyarados is a normal team member)."""
     sp = party_species(emu)
     return sp.index(MAGIKARP) if MAGIKARP in sp else None
+
+
+def trainee_slot_for(emu, named: int | None) -> int | None:
+    """The switch-training slot: the Magikarp's when one is in the party; else `named` (the slot ctx.train_member
+    names) when it is a non-lead member at least TEAM_GAP below the lead's level."""
+    t = trainee_slot(emu)
+    if t is not None:
+        return t
+    if named is None:
+        return None
+    party = read_party(emu)
+    if not party or named <= 0 or named >= len(party):
+        return None
+    from pokeagent.knowledge.readiness import TEAM_GAP  # deferred: readiness imports this module for EVOLVE_LEVEL
+    return named if party[named].level <= party[0].level - TEAM_GAP else None
 
 
 def can_buy(emu) -> bool:
@@ -44,17 +60,27 @@ def magikarp_goal_settled(emu, st: dict, seen: set) -> bool:
 
 
 def gyarados_goal(emu, st: dict) -> bool:
-    """Side goal: a GYARADOS in the party (sticky)."""
+    """A GYARADOS in the party (sticky)."""
     if GYARADOS in party_species(emu):
         st["had_gyarados"] = True
     return bool(st.get("had_gyarados"))
 
 
-def switch_candidate(emu) -> int | None:
-    """Party index of the strongest healthy non-trainee (HP >= SWITCH_MIN_HP of max), else None."""
+def gyarados_goal_settled(emu, st: dict, seen: set) -> bool:
+    """Ladder goal: a GYARADOS in the party (sticky), OR no Magikarp was ever owned, OR the stage ran out of steps
+    (st["gyarados_skipped"]). It must NEVER block the route."""
+    return (gyarados_goal(emu, st)
+            or (not st.get("had_magikarp") and MAGIKARP not in party_species(emu))
+            or bool(st.get("gyarados_skipped")))
+
+
+def switch_candidate(emu, trainee: int | None = None) -> int | None:
+    """Party index of the strongest healthy non-trainee (HP >= SWITCH_MIN_HP of max), else None.
+    `trainee` = the slot being switch-trained (trainee_slot_for); without one every MAGIKARP stays out, as before."""
     best = None
     for i, p in enumerate(read_party(emu)):
-        if p.species == MAGIKARP or p.max_hp == 0 or p.hp <= 0 or p.hp / p.max_hp < SWITCH_MIN_HP:
+        is_trainee = i == trainee if trainee is not None else p.species == MAGIKARP
+        if is_trainee or p.max_hp == 0 or p.hp <= 0 or p.hp / p.max_hp < SWITCH_MIN_HP:
             continue
         if best is None or (p.level, p.hp) > (best[1], best[2]):
             best = (i, p.level, p.hp)

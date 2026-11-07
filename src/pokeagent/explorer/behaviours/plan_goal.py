@@ -9,13 +9,14 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
-from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, under_level_note
+from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.goals import GOALS
 from pokeagent.knowledge import blackout_tax
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
-from pokeagent.magikarp import BUY_STEP_CAP, MT_MOON_CENTER
+from pokeagent.magikarp import BUY_STEP_CAP, GYARADOS_STEP_CAP, MAGIKARP, MT_MOON_CENTER, party_species
 
 
 class PlanGoal(BehaviourBase):
@@ -36,6 +37,13 @@ class PlanGoal(BehaviourBase):
                 ctx.buy_skipped = True; ctx.center_intent = None
                 ctx.log(f"[buy_magikarp: {BUY_STEP_CAP} steps in/around the Mt Moon Pokemon Center without buying - settled for this run]", "res")
                 goals_now_all = ctx.goals()
+        if (next((g for g in GOALS if not goals_now_all.get(g)), None) == "gyarados"
+                and MAGIKARP in party_species(ctx.emu)):
+            ctx.gyarados_steps += 1  # raising the trainee is the stage's work while it is the next goal
+            if ctx.gyarados_steps > GYARADOS_STEP_CAP:
+                ctx.gyarados_skipped = True
+                ctx.log(f"[gyarados: {GYARADOS_STEP_CAP} steps with the goal open and a Magikarp in the party - settled for this run]", "res")
+                goals_now_all = ctx.goals()
         if m == MT_MOON_CENTER and not goals_now_all["buy_magikarp"]:
             ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with
         elif ctx.center_intent == "buy_magikarp" and goals_now_all["buy_magikarp"]:
@@ -45,14 +53,19 @@ class PlanGoal(BehaviourBase):
         set_blackout_tax(extras)  # every readiness_for caller sees the learned margins this step
         parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in ctx.mem.data.get("items", [])
                        if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
-        party = our_party(ctx.emu) if not ctx.view.battling else []   # real stats and moves; skipped mid-battle
-        party = [c for c in party if c.name != "MAGIKARP"]  # the trainee never fights a boss: readiness judges the real team
+        party_all = our_party(ctx.emu) if not ctx.view.battling else []   # real stats and moves; skipped mid-battle
+        party = [c for c in party_all if c.name != "MAGIKARP"]  # the trainee never fights a boss: readiness judges the real team
         verdict = readiness_for(goals_now_all, party)
         if verdict and verdict.text != ctx.readiness_note:
             ctx.readiness_note = verdict.text
             extra = extras.get(ctx.stage_goal, 0.0)
             ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})"
                     f"{f' (+{extra:.2f} blackout margin)' if extra > 0 else ''}", "res")
+        team = team_for(goals_now_all, party_all)  # the hurt-lead verdict: is a second member useful for the boss?
+        if team and team.text != ctx.team_note:
+            ctx.team_note = team.text
+            ctx.log(f"[readiness] {team.text}", "res")
+        ctx.train_member = team.weakest.slot if team and team.weakest else None
         need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
         if clamp != ctx.clamp_note:
             ctx.clamp_note = clamp

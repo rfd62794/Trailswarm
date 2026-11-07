@@ -18,7 +18,7 @@ PREFIX = ["potion", "left_house", "first_pokemon", "won_battle",
           "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
           "to_route2", "to_pewter", "to_gym", "beat_brock",
           "to_route3", "to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
-          "heal_cerulean", "beat_misty", "nugget_bridge", "to_bill", "ss_ticket"]
+          "heal_cerulean", "beat_misty", "nugget_bridge", "gyarados", "to_bill", "ss_ticket"]
 SPECS = list(campaign.load_campaign())
 
 
@@ -29,11 +29,11 @@ def _ids(det):
     return inner.get("map", [])
 
 
-def test_ladder_is_long_and_starts_with_todays_25():
+def test_ladder_is_long_and_starts_with_todays_26():
     assert len(SPECS) >= 100
-    assert goals.GOALS[:25] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
+    assert goals.GOALS[:26] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
     assert len(set(goals.GOALS)) == len(goals.GOALS)
-    assert all(g.get("special") for g in SPECS[:25]) and not any(g.get("special") for g in SPECS[25:])
+    assert all(g.get("special") for g in SPECS[:26]) and not any(g.get("special") for g in SPECS[26:])
 
 
 def test_order_is_a_chain():
@@ -185,5 +185,5 @@ def test_snapshot_goals_come_in_ladder_order():
     from pokeagent.adapters import explorer_snapshot as es
     key = lambda k: (goals.GOALS.index(k) if k in goals.GOALS else len(goals.GOALS), k)
     names = ["to_route5", "potion", "gyarados", "beat_champion", "to_bill"]
-    assert sorted(names, key=key) == ["potion", "to_bill", "to_route5", "beat_champion", "gyarados"]
+    assert sorted(names, key=key) == ["potion", "gyarados", "to_bill", "to_route5", "beat_champion"]
     assert es.GOALS is goals.GOALS
