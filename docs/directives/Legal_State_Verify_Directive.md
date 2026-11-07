@@ -81,7 +81,7 @@ def world(respawn=5, hp=79, mx=79, level=29, potions=2):
 1. Pure read-only checker `src/pokeagent/legality.py` (+ small sibling modules if it would pass 300 lines: e.g. `legality_party.py`, `legality_bag.py`, `legality_world.py`).
 2. `src/pokeagent/envelope.py` (organic envelope from fingerprints).
 3. Lineage and edit class in `statefp.py` + a new `src/pokeagent/lineage.py` (classification, promotion rule); the seg_ingest / seg_store gate generalised to lineage.
-4. CLI: `pokeagent states check --legal [--envelope]`, `pokeagent states promote`, and `tools/state_edit.py` runs the checker and fixes `set_level` experience.
+4. CLI (the `states` subcommands, implemented in `statescmd.py`): `check --legal [--envelope]` and `promote`, and `tools/state_edit.py` runs the checker and fixes `set_level` experience.
 5. Tests: `tests/test_legality.py`, `tests/test_envelope.py`, `tests/test_lineage.py`; update `tests/test_surgery.py` for the exp rewrite.
 
 ## 4. The work
@@ -132,14 +132,14 @@ Fingerprint keys (additive, `v` stays 1): `lineage` (`organic` | `synthetic` | `
 - `lineage.edit_class(edited: dict, edit_context: dict, catalog: dict | None, envelope_info) -> str` from the `edited` dict `state_edit` stores (keys of `surgery.WHITELIST`). `organic_equivalent` only if EVERY edit is: `heal` (always); `respawn` to a town that an organic state at or before this stage has as its respawn (`envelope` can answer: a set of respawn ids seen); `give` where every item has `price > 0` in the catalog AND `money_before - new_money >= sum(price * qty)` (the cost was actually deducted); `take` (tossing/selling); `set_hp` to a value <= the current HP (damage).
   `shortcut` for: `set_level`, a `money` increase or any `money` edit not paired with a purchase, free `give`, `set_hp` above current, `position`. Empty/unknown -> `shortcut`.
 - `tools/state_edit.py` stamps `lineage: "synthetic"`, `edit_class`, `edit_context` (money before, parent lineage) and `legal` (section 4.4) in addition to what it writes now. An edit applied to a state that is itself not organic keeps `lineage: "synthetic"` and its edit_class is `shortcut` unless the parent's edit_class was organic_equivalent too.
-- **Inheritance (no laundering).** A run's own checkpoints and end state are stamped by `press_goals.record_goals` / `press_stop.save_end_state` through `statefp.stamp`, which writes a fresh fingerprint with no lineage (reads as organic). Add the run's start state path to the explorer options next to `state_stem` (`ExplorerOptions.state_path: str = ""`, set where `--state` is parsed: find the setters with `git grep -n "state_stem" -- src tools`) and give `statefp.stamp(..., inherit: Path | None = None)`: when `inherit` is given and that state's lineage is not organic, the new fingerprint gets the same `lineage` (`synthetic` stays `synthetic`, `promoted` stays `promoted`) and `parent` = its name; both `press_goals` stamp calls and `save_end_state` pass `inherit=ctx.opts.state_path or None`.
+- **Inheritance (no laundering).** A run's own checkpoints and end state are stamped by `press_goals.record_goals` / `press_stop.save_end_state` through `statefp.stamp`, which writes a fresh fingerprint with no lineage (reads as organic). Add the run's start state path to the explorer options next to `state_stem` (`ExplorerOptions.state_path: str = ""`, set where `--state` is parsed: find every place that sets `state_stem` by reading `tools/explore_headless.py`, `tools/explore_demo.py` and `src/pokeagent/explorer/context.py`) and give `statefp.stamp(..., inherit: Path | None = None)`: when `inherit` is given and that state's lineage is not organic, the new fingerprint gets the same `lineage` (`synthetic` stays `synthetic`, `promoted` stays `promoted`) and `parent` = its name; both `press_goals` stamp calls and `save_end_state` pass `inherit=ctx.opts.state_path or None`.
 - **Promotion** `lineage.promote(end_state, start_state, emu, kb, ...) -> tuple[bool, list[str]]`: allowed only if (1) the start's lineage is `synthetic` AND its `edit_class` is `organic_equivalent`; (2) `legality.check(emu loaded with end_state)` is ok; (3) `within_envelope` holds for the end state's fingerprint and stage. On success the END state's sidecar gets `lineage: "promoted"`, `legal`, `parent` (the start's name) and `promoted_from`; on failure nothing is written and the reasons are returned. A `shortcut` lineage is never promoted ("stays synthetic forever").
 - **The gate (what a promoted state may and may not do).** A promoted state MAY seed drills, A/B runs and segment starts (`seg_store.ckpt`/`ckpt_valid` keep refusing only `is_synthetic`). It may NEVER yield a chain best or confirmation: change `seg_ingest._synthetic_start`/`record_attempt`/`record_confirm` and `seg_store.replayable` to refuse when the start is NOT organic (`not statefp.is_organic`), i.e. synthetic and promoted. The refusal behaviour is the existing one (no attempt, no checkpoint copy, no best; a candidate best is rejected). `tools/stamp_states.py` keeps skipping non-organic states without `--force`.
 
 ### 4.4 CLI
 
-- `pokeagent states check --legal [--envelope] [--rom ROM] [--dir D ...]` (in `statescmd.py`; keep the existing `check` behaviour when the flags are absent): loads each state into ONE headless emulator (build it through a module function `make_emulator(rom)` as `tools/state_edit.py` does, so tests replace it), runs `legality.check` and prints per state `ok` or each violation / warning line; `--envelope` also prints `within_envelope` reasons (JSON only, no emulator). Exit 1 on any violation (warnings never fail). `kb` is loaded from `kb/rom_tables.json` (and `kb/items.json`, `kb/hm_compat.json`) when present, else `check` prints the no-kb warning and the table invariants are skipped.
-- `pokeagent states promote END.state --from START.state [--rom ROM]`: runs `lineage.promote` and prints the result.
+- `states check --legal [--envelope] [--rom ROM] [--dir D ...]` (handler `cmd_check` in `statescmd.py`; keep the existing `check` behaviour when the flags are absent): loads each state into ONE headless emulator (build it through a module function `make_emulator(rom)` as `tools/state_edit.py` does, so tests replace it), runs `legality.check` and prints per state `ok` or each violation / warning line; `--envelope` also prints `within_envelope` reasons (JSON only, no emulator). Exit 1 on any violation (warnings never fail). `kb` is loaded from `kb/rom_tables.json` (and `kb/items.json`, `kb/hm_compat.json`) when present, else `check` prints the no-kb warning and the table invariants are skipped.
+- The `promote` subcommand (positional END state, a `--from` option for the START state, optional `--rom`; new handler `cmd_promote`) runs `lineage.promote` and prints the result.
 - `tools/state_edit.py`: after `surgery.apply` and before saving, run `legality.check` on the edited emulator; compute the violations the INPUT state already had (check it before applying) and refuse to save when the result has violations that the input did not have (exit 2, message names them) unless `--allow-illegal` (then stamp `legal.ok: false` and the violations). `--dry-run` prints the legality result too.
 - **`set_level` exp rewrite** (`surgery._set_level`): also write experience = `exp_for_level(growth, level)` (3 bytes, big-endian, at +14..+16) for the raised mon, so the result satisfies `party_exp`. `surgery.apply` gets a `growth` callable parameter next to `max_pp`/`base_stats` (`growth(species) -> str | None`); `set_level` raises `SurgeryError("set_level needs the growth rate (kb/rom_tables.json)")` without it; `tools/state_edit.py` builds it from `species_by_dex[..]["growth"]`. A level raise to the SAME level is a no-op on exp.
 
@@ -148,7 +148,7 @@ Fingerprint keys (additive, `v` stays 1): `lineage` (`organic` | `synthetic` | `
 - No event-flag writes; no new RAM addresses without evidence (every address used above is in the facts); `legality` and `envelope` never write a state or a sidecar (only `lineage.promote`, `tools/state_edit.py` and the CLI write sidecars).
 - No changes to `ship_gate.py`, `planner.py`, `planner_east.py`, `planner_checkpoint.py`. No deletion of states or sidecars (this PR has no delete path).
 - Do not derive or hard-code the map-view-pointer relation (it is unverified); do not turn any unverified check (gym flags, TM moves, S.S. Ticket flag, view pointer, evolution-pending) into a violation.
-- No ROM, no emulator runs by Devin, no `uv run pokeagent ...`; tests use `FakeEmulator` and small fixture tables. No new dependencies; each module under 300 lines; do not bump `statefp.VERSION`.
+- No ROM, no emulator runs by Devin, and the only commands you run are `uv run pytest -q ...`; tests use `FakeEmulator` and small fixture tables. No new dependencies; each module under 300 lines; do not bump `statefp.VERSION`.
 
 ## 6. Verification
 
@@ -163,9 +163,9 @@ Fingerprint keys (additive, `v` stays 1): `lineage` (`organic` | `synthetic` | `
   7. Promotion: organic_equivalent start + legal + in-envelope end -> `promoted` sidecar written; each failing condition (shortcut start, an illegal end, out of envelope) writes nothing and returns reasons.
   8. The gate: with a `promoted` start (sidecar written via `statefp.write`) `seg_ingest.record_attempt` leaves the doc unchanged and `seg_store.replayable` is False, while `seg_store.ckpt_valid` still accepts it as a start (it is not `is_synthetic`); with a `synthetic` start the existing refusals hold; organic is unchanged. Inheritance: `statefp.stamp(emu, path, inherit=<synthetic state>)` writes `lineage: synthetic`; `inherit=<organic state>` writes no lineage.
   9. `set_level`: the exp bytes at +14..+16 equal `exp_for_level(growth, level)` big-endian for the fixture (e.g. SLOW growth L20 -> 10000 = `00 27 10`); without `growth` it raises; the result passes `party_exp`. `tools/state_edit.py` `main([...])` with `make_emulator` replaced: an edit that produces an illegal result (e.g. `--give` of item id 0xFE... invalid id, or a respawn the checker rejects) exits 2 without `--allow-illegal` and saves with `legal.ok false` with it; an input that was already illegal does not block an unrelated legal edit.
-  10. `states check --legal` on a `tmp_path` dir with one legal and one illegal fixture state (via an injected `make_emulator`): exit 1, the violation printed; `states promote` happy path and refusal.
+  10. the `statescmd` handlers (`cmd_check` with legal=True, called as functions with parsed args, never as a process) on a `tmp_path` dir with one legal and one illegal fixture state (via an injected `make_emulator`): exit 1, the violation printed; `cmd_promote` happy path and refusal.
 - Update, do not delete, existing assertions whose meaning changes (`is_synthetic` for promoted states; the `set_level` bytes in `tests/test_surgery.py` now include the exp rewrite). `uv run pytest -q` green; paste the before/after tails.
-- **ROM validation is the controller's job (you have no ROM or `kb/`):** run `pokeagent states check --legal` over all live checkpoints (82 at the time of writing) and `runs/legs/states`; expect 0 violations on organic states. A violation on an organic state means the INVARIANT is wrong, not the state; the report must list which invariant so it can be fixed or downgraded. The controller also derives the view-pointer relation from a dozen organic states.
+- **Controller validation (not run by Devin; ROM validation is the controller's job, you have no ROM or `kb/`):** run the legality check (the `states` check handler with legal on) over all live checkpoints (82 at the time of writing) and `runs/legs/states`; expect 0 violations on organic states. A violation on an organic state means the INVARIANT is wrong, not the state; the report must list which invariant so it can be fixed or downgraded. The controller also derives the view-pointer relation from a dozen organic states.
 
 ## 7. Rules for this run
 
@@ -185,7 +185,7 @@ Fingerprint keys (additive, `v` stays 1): `lineage` (`organic` | `synthetic` | `
 - [ ] `legality.check` with the invariants named in 4.1 (each its own small function), warnings for every unverified check, never raises, never writes
 - [ ] `envelope.build` / `within_envelope`; lineage keys, `statefp.lineage` / `is_organic`, `edit_class`, `inherit` on `statefp.stamp` and its callers, `lineage.promote`
 - [ ] seg_ingest / seg_store gate refuses non-organic starts for bests and confirmations, still allows promoted starts for segment starts and drills
-- [ ] `states check --legal [--envelope]`, `states promote`, `tools/state_edit.py` legality gate + `--allow-illegal`, `set_level` exp rewrite with `growth`
+- [ ] `check --legal [--envelope]` and `promote` handlers in `statescmd.py`, `tools/state_edit.py` legality gate + `--allow-illegal`, `set_level` exp rewrite with `growth`
 - [ ] The four test files pass; `uv run pytest -q` green (paste the tail); `git diff --stat main` pasted; no forbidden file changed
 - [ ] Status row moved to Review with the branch name
 
@@ -199,7 +199,7 @@ the `edit_class` rules as implemented, and everything you could not verify witho
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -207,4 +207,5 @@ the `edit_class` rules as implemented, and everything you could not verify witho
 **Status log**
 - 2026-11-07 14:26 · robert-claude-laptop · none → Draft — Claude 2026-11-07: legality checker, envelope, lineage/promotion
 - 2026-11-07 14:27 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on new modules/tests and gitignored kb/ + runs/ evidence paths only
+- 2026-11-07 14:30 · robert-claude-laptop · Queued → Draft — Claude 2026-11-07: reword for Devin allow list (pytest only); requeueing
 <!-- queue:end -->
