@@ -147,11 +147,12 @@ differed from section 3 (say exactly what you used).
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — one-window viewer + human steering; Robert asked 2026-11-02; needs Agent_Loop_And_CLI merged
+- 2026-11-06 20:35 · robert-claude-laptop · Draft → Queued — closing as superseded
 <!-- queue:end -->
