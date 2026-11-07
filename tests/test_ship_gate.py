@@ -25,13 +25,14 @@ class FakeShipPlan:
     """The multi-floor ROM planner's interface: a fixed button list from anywhere aboard, the dock's exit warp as the goal."""
 
     def __init__(self, buttons):
-        self.buttons, self.asked = buttons, []
+        self.buttons, self.asked, self.tiles_asked = buttons, [], []
 
     def __call__(self, start, goals):
         self.asked.append((start, set(goals)))
         return list(self.buttons)
 
     def warp_tiles(self, m, dest=None):
+        self.tiles_asked.append((m, dest))
         return {(m, 14, 0)}
 
     def follow(self, start, buttons):
@@ -187,12 +188,23 @@ def test_unknown_respawn_is_not_behind(tmp_path):
     assert cg.read_respawn(p) is None and not cg.respawn_behind("ss_anne_captain@63", p)
 
 
-def test_fit_and_aboard_takes_the_rom_route_to_the_bow_when_the_learned_stairs_are_missing():
+def test_fit_and_aboard_takes_the_rom_route_to_the_captains_door_not_the_bow():
+    """ROM: the bow (0x63) has only warps back to the deck; the captain's room (0x65) is entered from 2F (0x60). Stage targets
+    pointing at the bow left 336 curriculum attempts parked there (frontier UP/DOWN beside the bow sailor)."""
     plan = FakeShipPlan(["UP", "LEFT"])
     goals = {**FIT, "_ship": {"off": 2}, "_ship_plan": plan}
     step = plan_step(goals, {}, (0x5F, 20, 6), "UP")
-    assert step and step[0] == "UP" and "goal boarding" in step[1] and plan.asked[0][1] == {(0x61, 14, 0)}, step
-    assert plan_step(goals, {}, (0x63, 13, 6), "UP") is None            # at the bow: the bow's own logic (the sailor, the cabin)
+    assert step and step[0] == "UP" and "goal boarding" in step[1] and plan.tiles_asked[-1] == (0x60, 0x65), step
+    assert plan.asked[-1][1] == {(0x60, 14, 0)}
+    step = plan_step(goals, {}, (0x63, 11, 8), "UP")                     # parked at the bow: it is a dead end, route off it
+    assert step and step[0] == "UP" and plan.tiles_asked[-1] == (0x60, 0x65), step
+    assert plan_step(goals, {}, (0x65, 5, 2), "UP") is None              # inside the captain's room: its own dialog logic
+
+
+def test_the_ship_stage_targets_the_captains_room_not_the_bow():
+    from pokeagent.explorer import planner_east as pe
+    for stage in ("rival_ss_anne", "ss_anne_captain"):
+        assert pe.TARGETS[stage]((0x65, 5, 2)) and not pe.TARGETS[stage]((0x63, 11, 8)), stage
 
 
 def test_fit_in_vermilion_walks_to_the_dock(tmp_path):
