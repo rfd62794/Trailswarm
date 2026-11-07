@@ -180,13 +180,15 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-cut-learner-and-capabilities-directive |
 | Base branch | - |
+| Base commit | 45b74bf7374d6d45b4a3c440907db823540d9843 |
 
 **Status log**
 - 2026-11-07 13:42 · robert-claude-laptop · none → Draft — Claude 2026-11-07: cut_learner goal + RAM/checkpoint capabilities; depends on PR #141
 - 2026-11-07 13:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR 141 merging first; lint_override: dispatch-path-missing/verification-path-missing on new modules/tests and gitignored kb/ evidence paths
 - 2026-11-07 13:43 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield files (unlocks.py, cut_learner.py, learner_hunt.py, tests) and gitignored evidence (kb/hm_compat.json, kb/rom_tables.json); known false positives. Dependency PR #141 merged as 10a3aa5.
+- 2026-11-07 13:43 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-cut-learner-and-capabilities-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VN5KPHQKJM3BAFX4QR816S
 <!-- queue:end -->
