@@ -337,3 +337,30 @@ def test_fight_floor_shield_below_25_percent(tmp_path, monkeypatch):
     assert hk.wild_flee(ctx, False) is True and ctx.bandit.open == []
     ctx.emu.set(0xD16D, 9)  # 30%: the bandit may choose again
     assert hk.wild_flee(ctx, False) is False
+
+
+def test_kill_after_n_closed_episodes_leaves_n_on_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "flee")
+    ctx = make_ctx(tmp_path)
+    delta = tmp_path / "agent0-1.bandit.json"
+    d = attach(ctx, tmp_path / "none.json", delta, seed=0)
+    for i in range(7):  # 7 episodes close, an 8th is still open when the process is killed (no save(), no exit hook)
+        d.decide("wild_battle", i, lambda: "k", "fight")
+        d.after_press(ctx, {"outcome": "goal", "rule": "r", "map": 1}, tossed=False)
+    d.decide("wild_battle", 99, lambda: "k", "fight")
+    on_disk = json.loads(delta.read_text())
+    assert on_disk["run_id"] == d.run_id and on_disk["cells"]["k"]["flee"][0] == 7
+
+
+def test_reflushed_delta_replaces_the_runs_earlier_share(tmp_path):
+    shared, delta = tmp_path / "bandit.json", tmp_path / "d.json"
+    c: dict = {}; fill(c, "k", "flee", [-1.0, -1.0])
+    write_delta(delta, "run-x", c)
+    assert merge_delta(shared, delta, remove=False)
+    assert not merge_delta(shared, delta, remove=False)  # unchanged: nothing to do
+    fill(c, "k", "flee", [-2.0])  # the run kept going and flushed again
+    write_delta(delta, "run-x", c)
+    assert merge_delta(shared, delta)
+    other: dict = {}; fill(other, "k", "flee", [0.5])
+    write_delta(delta, "run-y", other); merge_delta(shared, delta)
+    assert load_cells(shared)["k"]["flee"] == [4, -3.5, 6.25]  # run-x counted once (3 episodes) + run-y

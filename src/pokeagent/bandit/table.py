@@ -25,11 +25,11 @@ def add_cell(cells: Cells, key: str, arm: str, n: float, s: float, ss: float) ->
     c[0] += n; c[1] += s; c[2] += ss
 
 
-def absorb(cells: Cells, other: Cells) -> None:
-    """Add every cell of ``other`` into ``cells`` (deltas are additive; never call twice for one delta)."""
+def absorb(cells: Cells, other: Cells, sign: int = 1) -> None:
+    """Add every cell of ``other`` into ``cells`` (sign=-1 takes a contribution back out)."""
     for key, arms in other.items():
         for arm, (n, s, ss) in arms.items():
-            add_cell(cells, key, arm, n, s, ss)
+            add_cell(cells, key, arm, sign * n, sign * s, sign * ss)
 
 
 def record(cells: Cells, key: str, arm: str, reward: float) -> None:
