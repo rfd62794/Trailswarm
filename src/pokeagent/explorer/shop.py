@@ -121,6 +121,28 @@ def _fail(res: BuyResult, pad: _Pad, reason: str) -> BuyResult:
     return res
 
 
+def menu_choice(emu: Emulator) -> str | None:
+    """Which of BUY / SELL / QUIT the clerk menu cursor (the '>' glyph) is on, else None."""
+    for line in rows(emu):
+        m = re.search(r">\s*(BUY|SELL|QUIT)", line)
+        if m:
+            return m.group(1)
+    return None
+
+
+def cursor_on_buy(emu: Emulator, pad: "_Pad") -> bool:
+    """Guard: never press A on the BUY/SELL/QUIT menu unless the cursor is on BUY (UP moves it back; SELL/QUIT are never confirmed)."""
+    pad.wait_for(lambda: menu_choice(emu) is not None)  # the cursor is drawn a few frames after the menu opens (seen headless)
+    for _ in range(3):
+        choice = menu_choice(emu)
+        if choice == "BUY":
+            return True
+        if choice is None:
+            return False
+        pad.press(Button.UP)
+    return menu_choice(emu) == "BUY"
+
+
 def open_menu(emu: Emulator, pad: _Pad) -> bool:
     """Talk to the clerk (the player already faces the counter): A until the BUY/SELL/QUIT menu is up."""
     for _ in range(12):
@@ -138,6 +160,8 @@ def buy(emu: Emulator, item_id: int, qty: int) -> BuyResult:
         return _fail(res, pad, "bad_quantity")
     if not open_menu(emu, pad):
         return _fail(res, pad, "no_buy_menu")  # e.g. the clerk only repeats the parcel line before delivery
+    if not cursor_on_buy(emu, pad):
+        return _fail(res, pad, "menu_cursor_not_on_buy")  # SELL (or anything else) is never selected
     if not pad.press(Button.A, pad.box(TB_LIST)):
         return _fail(res, pad, "list_not_shown")
     pad.wait_for(lambda: any(r.startswith(">") for r in rows(emu)))  # the list is drawn and takes input
