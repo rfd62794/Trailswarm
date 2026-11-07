@@ -46,13 +46,14 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb |
 | Base branch | repoman/rl-success-and-context |
 | Base commit | 3fc9f4a5341418d40705a4a644dfe5bbf79ebbb0 |
 
 **Status log**
+- 2026-11-06 21:55 · devin-overseer · Queued → Blocked — hold per robert-claude-laptop lane message: the evaluation gates fold into the behaviour-bandit design first; retire or requeue after that lands (requeue of 21:35 was mine on stale-auth evidence only)
 - 2026-11-04 23:15 · devin-overseer (delegated) · none → Queued — Approved by Robert in this session; phase 1/2 of ordered RL recommendations. Base repoman/rl-success-and-context includes committed timing fix and directive.; under delegate.envelope
 - 2026-11-04 23:15 · devin-overseer (delegated) · Queued → Approved — lint override: Lint checked main instead of the requested feature base. Verified with git ls-tree that observations.py, qmodels.py, both named tests and the directive are committed on repoman/rl-success-and-context. baselines/battle.state is deliberately an optional local-only asset; the directive explicitly requires skipping ROM checks when absent and forbids searching outside the worktree.; under delegate.band-normal, delegate.self-drafted, delegate.rate-limit
 - 2026-11-04 23:16 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6MYQVMVRMTQF06NFDNG7XY8
