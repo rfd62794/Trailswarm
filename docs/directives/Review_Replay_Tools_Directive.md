@@ -162,7 +162,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -172,4 +172,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests/fixtures and gitignored runs/kb paths
 - 2026-11-07 15:43 · robert-claude-laptop · Queued → Draft — Claude: lint rewording (command-looking mentions, secret false positive)
 - 2026-11-07 15:43 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests/fixtures and gitignored runs/kb paths
+- 2026-11-07 15:56 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield modules, tests and fixtures under tests/fixtures/review/ and gitignored runs/ and kb/ evidence paths; known false positives.
 <!-- queue:end -->
