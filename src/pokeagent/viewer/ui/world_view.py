@@ -166,6 +166,13 @@ class WorldView:
                 if loc:
                     self.side.show_tile(*loc)
 
+    def follow_agent(self, agent_id: str) -> None:
+        """Start following (from a card or a mode switch): centre at once when its position is known."""
+        self.follow.start(agent_id, time.monotonic())
+        p = self._points.get(agent_id)
+        if p is not None:
+            self.vp.center_on(*p)
+
     def _double(self) -> None:
         m = self._mouse()
         aid = pick(self._points, self.vp, *m) if m else None

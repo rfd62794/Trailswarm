@@ -13,11 +13,21 @@ class WorldHost:
     def __init__(self, win, model: WorldModel | None = None) -> None:
         self.win, self.model = win, model or WorldModel()
         self.view: WorldView | None = None
+        self.pending_follow: str | None = None   # a follow requested before the view was built
 
     def build(self) -> None:
         w = self.win
         self.view = WorldView(w._win, self.model, w.toggle_focus, w._on_select, load_for_view, WorldSide)
         self.view.side.bind(w.model, w.toggle_focus)
+        if self.pending_follow is not None:
+            self.follow(self.pending_follow)
+
+    def follow(self, agent_id: str) -> None:
+        if self.view is None:
+            self.pending_follow = agent_id
+        else:
+            self.pending_follow = None
+            self.view.follow_agent(agent_id)
 
     def fit(self, vw: int, avail: int) -> None:
         if self.view is not None:

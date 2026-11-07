@@ -139,7 +139,7 @@ def _cmd_view(args: argparse.Namespace) -> int:
     # Lazy import: the viewer pulls dearpygui/PIL only when actually opened.
     from pokeagent.viewer.app import run
 
-    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port)
+    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode)
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
@@ -203,6 +203,8 @@ def _build_parser() -> argparse.ArgumentParser:
                       help="web view port (default 8899)")
     view.add_argument("--fps", type=int, default=30, metavar="N",
                       help="poll/UI rate (default 30)")
+    view.add_argument("--mode", choices=("tiles", "world"), default="world",
+                      help="start view: world (default) or tiles (the agent card grid); Tab swaps")
     view.set_defaults(func=_cmd_view)
 
     from pokeagent.world.app import add_parser as _add_world
