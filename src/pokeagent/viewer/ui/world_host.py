@@ -19,6 +19,7 @@ class WorldHost:
         w = self.win
         self.view = WorldView(w._win, self.model, w.toggle_focus, w._on_select, load_for_view, WorldSide)
         self.view.side.bind(w.model, w.toggle_focus)
+        self.view.side.bind_health(w.health, w.entries)
         if self.pending_follow is not None:
             self.follow(self.pending_follow)
 

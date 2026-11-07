@@ -15,6 +15,7 @@ import numpy as np
 
 from pokeagent.atlas import sprites
 from pokeagent.viewer import ui_scale
+from pokeagent.viewer.ui import tags
 from pokeagent.viewer.ui.world_agents import draw_agents, draw_hover
 from pokeagent.viewer.ui.world_interiors import InteriorLayer
 from pokeagent.world import draw
@@ -58,7 +59,7 @@ class WorldView:
         self._follow_t: float | None = None
         if not dpg.does_item_exist(TEX):
             dpg.add_texture_registry(tag=TEX, show=False)
-        self.area = dpg.add_child_window(parent=parent, width=10, height=10, border=False, no_scrollbar=True, tag="world_area",
+        self.area = dpg.add_child_window(parent=parent, width=10, height=10, border=False, no_scrollbar=True, tag=tags.WORLD_AREA,
                                          show=False)
         with dpg.group(horizontal=True, parent=self.area):
             self.canvas = dpg.add_drawlist(width=800, height=600, tag="world_canvas")

@@ -14,17 +14,19 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands, modes, steering, ui_scale
+from pokeagent.viewer import commands, layout_file, modes, steering, ui_scale
+from pokeagent.viewer.health import ANOMALY, HealthStore
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.panels import BG
 from pokeagent.viewer.screen_fit import open_viewport
-from pokeagent.viewer.ui import keys, theme
+from pokeagent.viewer.ui import keys, menu, tags, theme
 from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
+from pokeagent.viewer.ui.stadium_pane import StadiumPane
 from pokeagent.viewer.ui.world_host import WorldHost
 from pokeagent.world.model import WorldModel
 
@@ -38,13 +40,18 @@ class ViewerWindow:
 
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
-                 root: Path | None = None, world: WorldModel | None = None) -> None:
+                 root: Path | None = None, world: WorldModel | None = None,
+                 health: HealthStore | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
         self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
         self.world = WorldHost(self, world)
+        self.health = health or HealthStore()
+        self.entries: dict = {}                # agent_id -> registry entry; app.run() assigns before run()
+        self._stadium_pref: bool | None = None  # user toggle; None = follow the mode
+        self._layout_path: Path | None = None
         self.selected: str | None = None
         self.scope = "all"
         self._speed = 1
@@ -55,7 +62,8 @@ class ViewerWindow:
         self._grid: GridView | None = None
         self._focus_view: FocusView | None = None
         self._bar: ControlBar | None = None
-        self._win = "viewer_main"
+        self._stadium: StadiumPane | None = None
+        self._win = tags.MAIN_WINDOW
         self._last_size: tuple[int, int] = (0, 0)
         self._outbox: queue.Queue = queue.Queue()  # sends run on a worker so the UI never waits on HTTP
         threading.Thread(target=self._send_loop, daemon=True, name="viewer-send").start()
@@ -176,6 +184,41 @@ class ViewerWindow:
     def _on_select(self, agent_id: str) -> None:
         """The one selection, shared by Tiles (highlight + page pin) and World (follow)."""
         self.selected = agent_id
+        h = self._health_for(agent_id)
+        if h.state == ANOMALY and h.anomaly is not None:
+            self.open_anomaly(h.anomaly)   # clicking an anomaly card's header opens it in the side panel
+
+    # -- health / stadium pane / layout ------------------------------------------------
+    def _health_for(self, agent_id: str):
+        """HealthStore lookup: the agent's run join key is its registry ``started`` epoch."""
+        entry = self.entries.get(agent_id) or {}
+        try:
+            started = float(entry.get("started")) if entry.get("started") is not None else None
+        except (TypeError, ValueError):
+            started = None
+        return self.health.health(agent_id, started)
+
+    def open_anomaly(self, ref) -> None:
+        side = getattr(getattr(self.world, "view", None), "side", None)
+        if side is not None:
+            side.show_anomaly(ref)
+
+    def stadium_visible(self) -> bool:
+        """Default follows the mode (shown in World, hidden in Tiles); the menu choice wins for the run."""
+        return self._stadium_pref if self._stadium_pref is not None else self.focus.view == "world"
+
+    def set_stadium_pref(self, on) -> None:
+        self._stadium_pref = bool(on)
+
+    def save_layout(self) -> None:
+        if self._layout_path is not None:
+            dpg.save_init_file(str(self._layout_path))
+            log.info("layout saved to %s", self._layout_path)
+
+    def reset_layout(self) -> None:
+        if self._layout_path is not None:
+            layout_file.reset_layout(layout_file.DEFAULT, self._layout_path)
+            log.info("layout reset to the committed default; applies on next start")
 
     # -- Tiles | World ----------------------------------------------------------
     def set_view_mode(self, mode: str) -> None:
@@ -222,22 +265,28 @@ class ViewerWindow:
     # -- build --------------------------------------------------------------------
     def _card_factory(self, parent, agent_id, w, h, on_focus, on_select, big=False):
         return CardView(parent, agent_id, w, h, on_focus, on_select, big=big,
-                        on_follow=None if big else self.follow_agent)
+                        on_follow=None if big else self.follow_agent,
+                        health_for=self._health_for)
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
-        open_viewport(self._bg())  # DPI awareness, then a viewport sized in physical px
+        if self.root is not None:  # layout persistence: seed runs/viewer/layout.ini from the default once
+            self._layout_path = layout_file.ensure_layout(
+                layout_file.DEFAULT, Path(self.root) / "runs" / "viewer" / "layout.ini")
+        open_viewport(self._bg(), init_file=self._layout_path)  # DPI awareness, then a viewport sized in physical px
 
     def _populate(self) -> None:
         """All widgets. Needs setup_dearpygui first: groups/fonts resolve at setup time."""
         dpg.add_window(tag=self._win, no_collapse=True, no_move=True, no_resize=True,
                        no_title_bar=True, no_scrollbar=True, width=10, height=10)
-        dpg.add_texture_registry(tag="viewer_tex", show=False)
+        dpg.add_texture_registry(tag=tags.VIEWER_TEX, show=False)
         self._grid = GridView(self._win, self.model, self._card_factory,
                               self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
         self.world.build()
+        self._stadium = StadiumPane(self.toggle_focus)
+        menu.build(self)
         self._bar = ControlBar(self._win, self)
         keys.install(self)
         self._fit()
@@ -262,7 +311,7 @@ class ViewerWindow:
                 view.area = dpg.add_child_window(parent=self._win, before=BAR_TAG, width=vw - 8,
                                                  height=avail, border=False, no_scrollbar=True,
                                                  show=self.area_visible(is_grid),
-                                                 tag="grid_area" if is_grid else "focus_area")
+                                                 tag=tags.GRID_AREA if is_grid else tags.FOCUS_AREA)
                 view.cards = {}
                 view.card = None
                 view._sig = None
@@ -287,6 +336,13 @@ class ViewerWindow:
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
         self.world.tick()
+        if self._stadium is not None:
+            vis = self.stadium_visible()
+            self._stadium.set_visible(vis)
+            if dpg.does_item_exist(menu.MENU_STADIUM):
+                dpg.set_value(menu.MENU_STADIUM, vis)
+            if vis:
+                self._stadium.update(self.world.model, self.model)
         if self._grid is not None:
             dpg.configure_item(self._grid.area, show=self.focus.view == "grid")
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):

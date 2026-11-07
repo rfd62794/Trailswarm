@@ -16,6 +16,7 @@ import numpy as np
 
 from pokeagent.agent_registry import list_agents
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
+from pokeagent.viewer import health as health_mod
 from pokeagent.viewer import modes
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.world.events import BattleEnd, BattleStart, EventBus, Move
@@ -157,6 +158,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     model = ViewerModel()
     world = WorldModel()
     holder = {"sources": {aid: _Throttle(s) for aid, s in sources.items()}, "entries": entries}
+    health = health_mod.HealthStore()
     stop = threading.Event()
 
     def poller() -> None:
@@ -175,6 +177,13 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
                         warned = True
             model.poll(list(holder["sources"].values()))
             world.poll(list(holder["sources"].values()))
+            if health_mod.poll_due(ticks, fps):   # <= 1 Hz: stalls/anomalies; invariants on a one-shot worker
+                now = time.time()
+                if fake:
+                    health.fake_refresh(sorted(holder["sources"]), now)
+                else:
+                    health.refresh(root, now)
+                health.request_invariants(root, now)
             time.sleep(1.0 / fps)
 
     threading.Thread(target=poller, daemon=True).start()
@@ -186,7 +195,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     from pokeagent.viewer.ui.window import ViewerWindow
     from pokeagent.supervisor import Supervisor
     win = ViewerWindow(model, holder["sources"], fps=fps, supervisor=Supervisor(root),
-                       root=root, world=world)
+                       root=root, world=world, health=health)
     win.entries = entries
     win.focus.set_mode(modes.internal("world" if world_mode else mode))
     try:
