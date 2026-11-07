@@ -136,7 +136,7 @@ class MemberValue:
 def form_at(species: str, level: int) -> str            # the form a mon has at `level`, following EVOLUTIONS
 def fights_to_reach(species: str, from_level: int, to_level: int, xp_per_fight: float | None, kb=None, trainee: bool = False) -> int
 def pokedex_value(species: str, owned_count: int, owned_species: frozenset[str], gates=DEX_GATES) -> float
-def catcher_value(party: list, lead_level: int) -> float
+def catcher_value(party: list, lead_level: int, wild=None, kb=None) -> float   # wild = [(level, species)] of the planned map; no wild data -> 0.0 (cannot prove a safe hit)
 def member_value(candidate, party, bosses, xp_per_fight=None, owned_species=(), owned_count=0, kb=None) -> MemberValue
 def candidates_for(party, wild_by_map, maps, magikarp_level: int | None, kb=None) -> list[Candidate]
 ```
@@ -151,8 +151,8 @@ def candidates_for(party, wild_by_map, maps, magikarp_level: int | None, kb=None
 - **Pokedex is a standing objective, not a flat bonus (Robert).** `pokedex_value(S, owned_count, owned_species)` is 0 when `S` (its base form) is already owned; otherwise `DEX_FLOOR_VALUE` plus, when a gate `G` in `DEX_GATES` with
   `G > owned_count` exists, `DEX_GATE_VALUE / (G - owned_count)` (progress toward the NEXT gate: each missing species is worth a share of the gate's item, so the last species before a gate is worth the most). Past the last gate only the floor
   remains. It is a function of the owned COUNT (`catch_list.dex_owned_count`), so it needs no table beyond `DEX_GATES`. `member_value.dex` is that number. Because it enters `value`, a species with no boss contribution can still have `value > 0`.
-- **`catcher` role (Robert's "lower level last option for wild exploit").** `catcher_value(party, lead_level)` = a small positive value (`CATCHER_VALUE = 0.15`, named, untuned) when NO member of the party is within `CATCHER_BAND` levels BELOW the lead
-  (nobody can fight a wild mon without wiping it: the overpower gate), else 0. A candidate whose caught level is `<= lead_level - CATCHER_BAND` and whose species has a damaging or status move at that level gets `source="catcher"` and `member_value.catcher = catcher_value(...)`.
+- **`catcher` role (Robert's "lower level last option for wild exploit").** `catcher_value(party, lead_level, wild=None, kb=None)` = a small positive value (`CATCHER_VALUE = 0.15`, named, untuned) when NO member of the party is within `CATCHER_BAND` levels BELOW the lead
+  (nobody can fight a wild mon without wiping it: the overpower gate), else 0. **HARD RULE (Robert, 2026-11-07): "a cheap low-level member only has value as the catcher if they can cause damage. Magikarp does not apply without an attack to cause damage."** A member counts as a catcher ONLY if it has a DAMAGING move (`power > 1`) whose expected damage against the route's wild species is `> 0` and `< that wild mon's HP` (`knowledge/damage.expected_damage`, evaluated on the species of the planned map at their lowest slot level; use the minimum roll, i.e. `expected_damage` scaled by `MIN_ROLL = 217/255 / AVG_ROLL`, a named constant, so a hit that can KO at min roll is not 'safe'). A Splash-only Magikarp (below L15, where it learns Tackle) is NOT a catcher; a status-only move set is NOT a catcher either (status moves are a bonus for the catch methods, never the qualification). `catcher_value` returns 0 for a non-qualifying member, and a candidate qualifies for `source="catcher"` only under this rule. A candidate whose caught level is `<= lead_level - CATCHER_BAND` and that qualifies gets `source="catcher"` and `member_value.catcher = catcher_value(...)`.
   So the plan prefers catching one low-level mon as the party's wild-capture slot when the party has none. This directive only SCORES the role; choosing it in battle belongs to `Catch_Methods_Directive.md`. Do not add battle code for it.
 - `candidates_for`: (a) every wild species in grass tables of the maps in `maps` (the reachable set the caller passes), each at the lowest level its table gives, with `form_at` applied at the level the sim will test it;
   (b) the evolutions of current party members (so training the lead's own line is scored like the others: `source="party-evolution"`); (c) ONE Magikarp candidate (`source="magikarp"`, species MAGIKARP, judged as its GYARADOS
@@ -243,7 +243,7 @@ Exact edits (name each in your report):
 3. Training cost reduces value: the same candidate with a lower caught level (more fights) has a strictly lower `value`; `fights_to_reach` against a hand-computed `ceil(xp_needed(...)/xp)`; the trainee share doubles the fights.
 4. `form_at`: SQUIRTLE at 15 -> SQUIRTLE, 16 -> WARTORTLE, 36 -> BLASTOISE; MAGIKARP 19 -> MAGIKARP, 20 -> GYARADOS; a species not in the table is itself.
 5. `pokedex_value`: owned -> 0; owned_count 9 (gate 10) is worth more than owned_count 4; owned_count past the last gate gives only `DEX_FLOOR_VALUE`; monotone in progress toward the gate.
-6. `catcher_value`: a party whose weakest member is within `CATCHER_BAND` of the lead -> 0; a lone L20 lead -> `CATCHER_VALUE`; a low-level candidate gets `source="catcher"` only when nobody already fills the band.
+6. `catcher_value`: MAGIKARP L10 (moves SPLASH only) is REJECTED as a catcher; MAGIKARP L15 (TACKLE) qualifies against a PIDGEY L3 fixture when the min-roll TACKLE does not KO it (and is rejected if it would); a status-only mon (e.g. a fixture with only SING/STUN-type moves) is rejected; a party whose weakest member is within `CATCHER_BAND` of the lead -> 0; a lone L20 lead -> `CATCHER_VALUE`; a low-level candidate gets `source="catcher"` only when nobody already fills the band.
 7. `candidates_for`: contains exactly one Magikarp candidate; contains each wild species of the passed maps once; the three starters are symmetric (`@pytest.mark.parametrize` over the Squirtle / Bulbasaur / Charmander parties: same wild tables, candidate lists differ only by that line's party-evolution entries).
 8. Empty party / empty bosses / empty tables return empty or zero without raising.
 
@@ -311,7 +311,7 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -320,4 +320,5 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 - 2026-11-07 15:16 · robert-claude-laptop · none → Draft — Claude 2026-11-07: value-ranked catch plan, Pokedex objective, team_ready gate (supersedes Team_Builder_Directive draft)
 - 2026-11-07 15:17 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on greenfield modules/tests and gitignored kb/ evidence paths
 - 2026-11-07 15:17 · robert-claude-laptop · Queued → Draft — Claude: lint path fix (hp_stats full path)
+- 2026-11-07 15:18 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: catcher requires a damaging move (Robert); lint path fix; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ paths
 <!-- queue:end -->
