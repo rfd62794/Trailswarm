@@ -324,4 +324,5 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 - 2026-11-07 15:18 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: catcher requires a damaging move (Robert); lint path fix; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ paths
 - 2026-11-07 15:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield modules (team_value.py, catch_plan.py, dex_value.py, tests) and gitignored kb/*.json evidence; known false positives.
 - 2026-11-07 15:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-builder-v2-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VTS7Y1KSVFM8YCHATZQNZ6
+- 2026-11-07 15:26 · dispatcher · launched pid=18156; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-builder-v2-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
