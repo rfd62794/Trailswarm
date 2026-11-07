@@ -7,6 +7,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 from __future__ import annotations
 
 from pokeagent.explorer.cave_route import ladder_step, rom_route_step
+from pokeagent.explorer.planner_checkpoint import checkpoint_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
 from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -14,6 +15,7 @@ from pokeagent.goals import GOALS
 PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24 = 0x02, 0x0E, 0x0F, 0x03, 0x23
 ROUTE25 = 0x24
 CERULEAN_GYM = 0x41
+SS_ANNE_BOW = 0x63  # 2F stairs (2,11) -> 3F deck (0x61) -> LEFT -> bow; the captain's cabin is reached from there
 OUTDOORS = (PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24, 0x24)
 CAVE = tuple(sorted(DUNGEON_MAPS))
 EXIT_X = 24  # Route 4 tile x of the cave-exit warp; the west part (Pokecenter 11, entrance 18) is left of it
@@ -30,7 +32,10 @@ def _on(m: int):
 TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on(0x44), "to_mt_moon": _on(0x3B), "mt_moon_b1f": _on(0x3C),
            "mt_moon_b2f": _on(0x3D), "through_mt_moon": lambda n: n[0] == ROUTE4 and n[1] >= EXIT_X,
            "to_cerulean": _on(CERULEAN), "heal_cerulean": _on(0x40), "beat_misty": _on(CERULEAN_GYM),
-           "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None}
+           "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None,
+           # S.S. Anne (2026-11-06): the rival fight at the east end of 2F is not on the way and a lone starter loses it;
+           # walk the learned warps 2F -> 3F -> bow instead of letting the frontier run east into him
+           "rival_ss_anne": _on(SS_ANNE_BOW), "ss_anne_captain": _on(SS_ANNE_BOW)}
 
 
 def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:
@@ -74,6 +79,9 @@ def _misty_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | Non
 
 def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: str = "UP") -> tuple[str, str] | None:
     stage = next((s for s in LADDER if not goals.get(s)), None)
+    ckpt = checkpoint_step(g, goals, pos, facing)  # new town: move the respawn point forward before pushing on
+    if ckpt:
+        return ckpt
     target = TARGETS.get(stage)
     if stage is None or target is None:
         return None
