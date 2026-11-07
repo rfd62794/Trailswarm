@@ -21,7 +21,7 @@ This directive adds ONE mechanism: a per-step progress signal, an in-run ledger 
 
 - `uv run python --version` prints `Python 3.12.12`. Always `uv run`; never bare `python`. Full suite: `uv run pytest -q` (about 100-210 s; 1557 passed, 1 skipped on the live checkout today, plus one environment-dependent failure `tests/test_resources.py::test_lock_takeover_is_exclusive`, unrelated: ignore it and say so if it fails for you).
 - `runs/`, `roms/`, `baselines/`, `kb/rom_tables.json` are gitignored: no run data in your worktree. Tests use `FakeEmulator` (`from pokeagent.emulator import FakeEmulator`: `FakeEmulator({addr: byte})`, `.memory`, `.read`, `.read_range`, `.set`), `tmp_path`, and fixture data you write in the test. Engine/behaviour test patterns: `tests/test_explorer_behaviours.py`, `tests/test_bandit.py`, `tests/test_exploration_momentum.py`, `tests/test_novelty.py`, `tests/test_already_out.py`.
-- **The engine step today** (`explorer/engine.py::Engine.step`): `decision = self.selector.choose(ctx)`; `party_log.of(ctx).tick(ctx)`; if there is no button, return; `why_veto = veto(ctx, decision)` (retalk: replaces the decision with `Decision("B", "retalk_veto", ...)`); `toss_veto(...)` the same way; then `before = (m, x, y)`, `ctx.deciding_rule = decision.rule` (PR #150), `self.presser.press(...)`, `after = ctx.pos()`, `classify_outcome(...)`, `make_record(...)` -> `decisions.jsonl`, `self._note_novelty()` (calls `ctx.novelty.observe(ctx.emu, ctx.step)` when novelty is on). The new veto belongs beside `veto`/`toss_veto`; the progress observation beside `_note_novelty`.
+- **The engine step today** (`src/pokeagent/explorer/engine.py`, `Engine.step`): `decision = self.selector.choose(ctx)`; `party_log.of(ctx).tick(ctx)`; if there is no button, return; `why_veto = veto(ctx, decision)` (retalk: replaces the decision with `Decision("B", "retalk_veto", ...)`); `toss_veto(...)` the same way; then `before = (m, x, y)`, `ctx.deciding_rule = decision.rule` (PR #150), `self.presser.press(...)`, `after = ctx.pos()`, `classify_outcome(...)`, `make_record(...)` -> `decisions.jsonl`, `self._note_novelty()` (calls `ctx.novelty.observe(ctx.emu, ctx.step)` when novelty is on). The new veto belongs beside `veto`/`toss_veto`; the progress observation beside `_note_novelty`.
 - `Selector.choose(ctx)` walks `default_behaviours()` in order and returns the first behaviour's non-None decision (it sets `decision.behaviour = behaviour.name`). It has NO way to skip a behaviour: add one optional argument `skip: frozenset[str] = frozenset()` that makes the loop pass over behaviours whose `name` is in it (default behaviour unchanged; the existing tests stay green).
 - Decision records (`decisions.jsonl`): `{"step", "behaviour", "rule", "button", "map", "x", "y", "goal_stage", "box", "battle", "outcome", "reversal"}`; `outcome` from `classify_outcome` is one of moved / blocked / none / goal ... (read the function; do not assume).
 - Per-step state available WITHOUT pixels: `ctx.view` (`m, x, y, tm, box, lines, battling`), `ctx.facing`, `ctx.pos()`, `ctx.goal_steps` (goal -> step), `ctx.step`, `ctx.mem.data["maps"][str(map)]["visited"]` (tile -> count; a tile is NEW when it is absent before the press), `ctx.emu.read(0xD057)` (battle flag), `ctx.battles_won`, `ctx.battle_log`. `novelty.features.read_snapshot(emu)` returns a `Snapshot(map, x, y, flags: bytes (0xD747, 320 bytes, wEventFlags), bag, pc, money, party ((species, level, exp, moves, ident),...), in_battle, enemy)`; `features.flag_bits(cur_flags, prev_flags)` returns newly set flag bit indexes; `training_progress.marks(party_rows)` / `gained(before, after)` need `[species, level, exp, ...]` rows (the Snapshot party tuples have that shape in positions 0-2).
@@ -150,11 +150,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 15:55 · robert-claude-laptop · none → Draft — Claude 2026-11-07: progress signal + loop memory (veto, cross-run promotion with decay); depends on PR #150
+- 2026-11-07 15:55 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR #150 merging; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ path
 <!-- queue:end -->
