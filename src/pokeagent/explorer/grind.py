@@ -5,6 +5,8 @@ the lead at or above the training route's top wild level + 6 (XP per fight is ne
 """
 from __future__ import annotations
 
+from pokeagent.knowledge import blackout_tax
+
 GRIND_BATTLES = 25
 GRIND_STEPS = 2500
 GRIND_BLACKOUTS = 2
@@ -35,12 +37,21 @@ def outcome_of(*, trainer: bool, won: bool, moved_away: bool, party_count: int) 
     return "lost" if trainer else "fled"
 
 
-def record_battle_result(ctx, *, won: bool, moved_away: bool) -> None:
-    """Blackouts in a row: a lost battle that warped us away counts, a win resets, a flee (same spot) changes nothing."""
+def record_battle_result(ctx, *, won: bool, moved_away: bool, trainer: bool = False) -> None:
+    """Blackouts in a row: a lost battle that warped us away counts, a win resets, a flee (same spot) changes nothing.
+    The same outcome also feeds the stage's blackout tax in the shared learned data when ctx.stage_goal is set:
+    ANY blackout counts against the stage, but only a won TRAINER battle decays it - wild wins are cheap and
+    would erase the tax within a few steps (a flee changes nothing, as today)."""
     if won:
         ctx.blackouts_row = 0
     elif moved_away:
         ctx.blackouts_row = ctx.blackouts_row + 1
+    goal = getattr(ctx, "stage_goal", None)
+    if goal:
+        if moved_away and not won:
+            blackout_tax.on_blackout(ctx.mem.data, goal)
+        elif won and trainer:
+            blackout_tax.on_win(ctx.mem.data, goal)
 
 
 class GrindBudget:

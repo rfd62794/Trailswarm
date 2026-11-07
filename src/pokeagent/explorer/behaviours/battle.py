@@ -253,7 +253,7 @@ class Battle(BehaviourBase):
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
-            record_battle_result(ctx, won=won, moved_away=moved_away)
+            record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from pokeagent.atlas.rom_maps import MapHeader
 from pokeagent.atlas.world import Place, WorldLayout
@@ -29,3 +30,12 @@ def world():
 
 def walkgrid(w=20, h=20):
     return np.ones((h, w), bool)
+
+
+@pytest.fixture(autouse=True)
+def _clear_blackout_tax():
+    """training._tax is module-global; no test may leak a learned blackout margin into another."""
+    from pokeagent.explorer import training
+    training.set_blackout_tax({})
+    yield
+    training.set_blackout_tax({})

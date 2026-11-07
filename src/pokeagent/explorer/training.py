@@ -10,7 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import trainers
-from pokeagent.knowledge.readiness import Readiness, assess
+from pokeagent.knowledge.readiness import MARGIN, Readiness, assess
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
 # (Robert, 2026-11-05: two blackouts in Mt Moon at level 8; Misty's Staryu/Starmie are L18/L21.)
@@ -29,6 +29,14 @@ BOSS_LABEL = {"beat_brock": "BROCK", "to_mt_moon": "MT MOON", "beat_misty": "MIS
               "beat_bruno": "BRUNO", "beat_agatha": "AGATHA", "beat_lance": "LANCE", "beat_champion": "CHAMPION"}
 CAP_ABOVE_TABLE = 5
 _cache: dict = {}
+_tax: dict[str, float] = {}   # stage goal -> extra readiness margin learned from blackouts (knowledge.blackout_tax)
+
+
+def set_blackout_tax(extras: dict[str, float]) -> None:
+    """Replace the per-goal blackout-margin table ({} clears it). plan_goal feeds it from mem.data each step so
+    every readiness_for caller - including ship_gate.under_level - sees the tax with no signature change."""
+    global _tax
+    _tax = dict(extras)
 
 
 MT_MOON_FLOOR_GOALS = frozenset({"mt_moon_b1f", "mt_moon_b2f", "through_mt_moon"})  # still the Mt Moon stage, not Misty's
@@ -48,11 +56,12 @@ def readiness_for(goals: dict, party: list | None) -> Readiness | None:
     goal = stage_goal(goals)
     if goal is None or not party:
         return None
-    key = (goal, tuple(party))
+    margin = MARGIN + _tax.get(goal, 0.0)
+    key = (goal, margin, tuple(party))
     if key not in _cache:
         boss = trainers.boss_party(goal, starter_names=[c.name for c in party]) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
         _cache.clear() if len(_cache) > 64 else None
-        _cache[key] = assess(party, boss, BOSS_LABEL[goal]) if boss else None
+        _cache[key] = assess(party, boss, BOSS_LABEL[goal], margin=margin) if boss else None
     return _cache[key]
 
 

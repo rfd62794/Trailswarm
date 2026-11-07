@@ -100,6 +100,7 @@ class ExplorerContext:
     catch_attempt: dict | None = None
     catch_mode: bool = False
     readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
+    stage_goal: str | None = None  # current stage goal (training.stage_goal), published by plan_goal each step
     clamp_note: str = ""      # last readiness clamp logged
     under_level_note: str = ""  # last under-level line logged (plan_goal)
     blackouts_row: int = 0    # lost battles that warped us away since the last win (grind budget)
