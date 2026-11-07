@@ -140,3 +140,13 @@ def test_training_is_not_an_eligible_trip(tmp_path):
     assert pf.eligible_trip(ctx, "HP 3/20: to the Pokecenter to heal (30 steps)") == "heal"   # a heal trip is still a trip
     ctx.train_need = 0   # budget spent / bandit skipped the grind
     assert pf.eligible_trip(ctx, "goal road north: 14 steps to map 0x0C") == "goal"
+
+
+def test_a_relearned_phantom_warp_is_forgotten_again_and_then_tombstoned(tmp_path):
+    mem = MapMemory(tmp_path / "maps.json")
+    key = "9,11,UP"
+    for cycle in range(2):
+        mem.m(0)["warps"][key] = [40, 5, 11]          # (re)learned, e.g. merged back from another agent's memory
+        mem._note_warp_disproof(0, key); mem._note_warp_disproof(0, key)
+        assert key not in mem.m(0)["warps"]
+    assert "0:" + key in mem.data["bad_warps"]

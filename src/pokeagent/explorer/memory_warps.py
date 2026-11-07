@@ -13,6 +13,7 @@ class WarpsMixin:
         d["warps"].pop(key, None)
         d.get("warp_cand", {}).pop(key, None)
         d.get("warp_taken", {}).pop(key, None)
+        d.get("warp_disproof", {}).pop(key, None)  # a new cycle: without this the count stays past 2 and a re-learned phantom is immortal
         if tombstone:
             bad = self.data.setdefault("bad_warps", [])
             if f"{map_id}:{key}" not in bad:
