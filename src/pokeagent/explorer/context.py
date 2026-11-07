@@ -137,6 +137,8 @@ class ExplorerContext:
     btw_hash: int = 0  # battle_text_wait: hash of the page on screen
     btw_since: int = 0  # ctx.frame when that page last changed
     btw_waits: int = 0
+    restock: dict = field(default_factory=dict)  # Poke Ball restock state (explorer/restock.py): intent, tries, steps, failed Marts
+    catch_want: tuple = (None, None)  # ((battle no., species), reason from catch_list.catch_wanted or None) for the current fight
     heal_trips: int = 0  # Pokecenter entries this run (area_grind bounds the 90% top-off trips)
     last_plan_map: int = -1
     area_grind: dict = field(default_factory=dict)  # steps / battles spent grinding in place on Route 2 / the Forest, and whether it was lifted

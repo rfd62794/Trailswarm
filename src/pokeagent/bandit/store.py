@@ -11,6 +11,7 @@ from pokeagent.bandit.table import Cells, absorb
 from pokeagent.qmodels import atomic_json
 
 MAX_MERGED_IDS = 5000
+MAX_RECENT = 200  # runs whose cells are kept so a re-flushed delta can replace its earlier share
 
 
 def load_cells(path: Path | str) -> Cells:
@@ -69,7 +70,11 @@ def _lock(shared: Path, wait_s: float = 30.0):
 
 
 def merge_delta(shared: Path | str, delta: Path | str, remove: bool = True) -> bool:
-    """Add one run's delta into the shared table under a lock. False when it was already merged or unreadable."""
+    """Fold one run's cumulative delta into the shared table under a lock.
+
+    A delta is the run's running total, so it may be flushed (and merged) more than once. The shared file keeps the
+    last MAX_RECENT runs' contributions: a repeat replaces that run's earlier share (subtract old, add new), never
+    adds it twice. A run older than the window is only recognised by id and skipped. True when the table changed."""
     shared, delta = Path(shared), Path(delta)
     try:
         d = json.loads(delta.read_text(encoding="utf-8"))
@@ -81,12 +86,23 @@ def merge_delta(shared: Path | str, delta: Path | str, remove: bool = True) -> b
             cur = json.loads(shared.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             cur = {}
-        merged = cur.get("merged", [])
-        done = run_id in merged
-        if not done:
-            table = cur.get("cells", {})
+        merged, recent = cur.get("merged", []), cur.get("recent", {})
+        table = cur.get("cells", {})
+        changed = False
+        if run_id in recent:
+            if recent[run_id] != cells:
+                absorb(table, recent[run_id], sign=-1)
+                absorb(table, cells)
+                changed = True
+        elif run_id not in merged:
             absorb(table, cells)
-            atomic_json(shared, {"cells": table, "merged": (merged + [run_id])[-MAX_MERGED_IDS:]})
+            changed = True
+        if changed:
+            recent[run_id] = cells
+            for old in list(recent)[:-MAX_RECENT]:
+                del recent[old]
+            ids = merged if run_id in merged else merged + [run_id]
+            atomic_json(shared, {"cells": table, "merged": ids[-MAX_MERGED_IDS:], "recent": recent})
     if remove:
         delta.unlink(missing_ok=True)
-    return not done
+    return changed

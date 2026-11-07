@@ -150,3 +150,13 @@ def test_a_relearned_phantom_warp_is_forgotten_again_and_then_tombstoned(tmp_pat
         mem._note_warp_disproof(0, key); mem._note_warp_disproof(0, key)
         assert key not in mem.m(0)["warps"]
     assert "0:" + key in mem.data["bad_warps"]
+
+
+def test_a_huge_existing_disproof_count_still_forgets_and_tombstones(tmp_path):
+    mem = MapMemory(tmp_path / "maps.json")
+    key = "9,11,UP"
+    mem.m(0)["warps"][key] = [40, 5, 11]
+    mem.m(0)["warp_disproof"] = {key: 31383}
+    mem.m(0)["warp_disproof_total"] = {key: 31383}   # as in the live maps.json (swarm merge keeps the max)
+    mem._note_warp_disproof(0, key)
+    assert key not in mem.m(0)["warps"] and "0:" + key in mem.data["bad_warps"]

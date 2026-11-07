@@ -28,5 +28,5 @@ class WarpsMixin:
         totals = d.setdefault("warp_disproof_total", {})  # lifetime: never reset, so a re-learned warp is remembered
         counts[key] = counts.get(key, 0) + 1
         totals[key] = totals.get(key, 0) + 1
-        if counts[key] == 2:
+        if counts[key] >= 2:  # >=, not ==: a merged-in count already far past 2 must still fire
             self.forget_warp(m0, key, tombstone=totals[key] >= 4)

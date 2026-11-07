@@ -9,3 +9,4 @@ runs/
 kb/rom_tables.json
 
 .superpowers/
+kb/hm_compat.json
