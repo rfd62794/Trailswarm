@@ -77,8 +77,10 @@ def test_buy_magikarp_detector():
     st: dict = {}
     assert check_goals(emu, st)["buy_magikarp"]
     emu.memory.update(party_mem([(STARTER, 14, 30, 30), (GYARADOS, 20, 60, 60)]))
+    assert not check_goals(emu, st)["team_ready"]  # open until the hurt-lead sim says ready
+    st["team_ready_ok"] = True
     g = check_goals(emu, st)
-    assert g["buy_magikarp"] and "team_ready" in g  # evolved: still bought; team_ready is now the ladder goal
+    assert g["buy_magikarp"] and g["team_ready"]  # evolved: still bought; team_ready is now the ladder goal
     assert check_goals(FakeEmulator({**rich, MAP: 0x3B}), {})["buy_magikarp"]  # Mt Moon 1F entered: the chance is gone
 
 

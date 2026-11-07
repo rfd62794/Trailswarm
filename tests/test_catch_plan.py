@@ -149,10 +149,22 @@ def test_magikarp_is_one_candidate():
     assert len(karp) <= 1  # one candidate, and with L20 far off it can lose (absent or low-ranked)
     owned_all = {"PIDGEY", "RATTATA", "NIDORAN(M)", "NIDORAN(F)", "SPEAROW", "WEEDLE", "KAKUNA", "METAPOD",
                  "CATERPIE", "PIKACHU", "ZUBAT", "GEODUDE", "PARAS", "CLEFAIRY", "ODDISH", "ABRA", "MANKEY"}
-    win = _plan(party=[_mon("PIDGEY", 20)], bosses=[("HARD", [(22, "ONIX")])], magikarp_level=15,
+    win = _plan(party=[_mon("PIDGEY", 20), _mon("MAGIKARP", 15)], bosses=[("HARD", [(22, "ONIX")])], magikarp_level=15,
                 owned_species=owned_all, xp_for_map=lambda m: 130)
     top = win[0]
-    assert top.member.candidate.source == "magikarp" and top.member.gain >= 1
+    assert top.member.candidate.source in ("magikarp", "party-evolution") and top.species == "MAGIKARP" and top.member.gain >= 1
+
+
+def test_unowned_magikarp_is_never_planned_and_empty_inputs_give_nothing():
+    plan = _plan(party=[_mon("PIDGEY", 20)], bosses=[("HARD", [(22, "ONIX")])], magikarp_level=15,
+                 owned_species={"PIDGEY"}, xp_for_map=lambda m: 130)
+    assert all(a.member.candidate.source != "magikarp" and a.steps >= 1 for a in plan)
+    assert plan_catches([], 1, {}, 0, 0, 0, [], {}, [], 10) == []
+
+
+def test_hurt_margin_with_only_magikarps_does_not_raise():
+    from pokeagent.knowledge.team_value import _hurt_margin
+    assert _hurt_margin([_mon("MAGIKARP", 5)], [], {}, {}, SYN) == 0.0
 
 
 # 7. catch odds helpers

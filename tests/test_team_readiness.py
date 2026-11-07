@@ -155,7 +155,7 @@ def _gy_ctx(level_pair=((MAGIKARP, 13, 17, 17), (179, 30, 82, 82))):
 
 def _magikarp_action():
     from types import SimpleNamespace
-    return SimpleNamespace(member=SimpleNamespace(candidate=SimpleNamespace(source="magikarp")))
+    return SimpleNamespace(blocked="", member=SimpleNamespace(candidate=SimpleNamespace(source="magikarp")))
 
 
 def test_team_ready_stage_asks_for_the_team_target_and_its_own_battle_budget():

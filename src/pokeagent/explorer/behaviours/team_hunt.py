@@ -57,7 +57,6 @@ class TeamHunt(BehaviourBase):
             if not (learner_live and ctx.hunt_grass):
                 ctx.hunt_grass = False
             self._armed = False
-        ctx.team_hunt_steps += 1
         ok = (ctx.team_hunt_steps <= TEAM_HUNT_STEP_CAP and not ctx.view.battling and not ctx.view.box
               and ctx.proc is None and ctx.center_intent is None
               and not (next((g for g in GOALS if not goals.get(g)), "") or "").startswith(("beat_", "rival_"))
@@ -69,6 +68,7 @@ class TeamHunt(BehaviourBase):
                   and bag.get(POKE_BALL, 0) >= 1 and read_party_count(ctx.emu) < TEAM_SIZE)
         if not ok:
             ctx.team_wants = {}
+            ctx.team_plan = []
             return False
         self._refresh(ctx, goals, bag)
         return bool(ctx.team_plan)
@@ -120,6 +120,7 @@ class TeamHunt(BehaviourBase):
             magikarp_level=(magikarp_stats(ctx.emu) or {}).get("level"),
             xp_for_map=lambda m: map_prior_xp(wild.get(m) or wild.get(str(m)) or {}, base_exp),
             owned_species=self._owned_species(ctx), kb=None)
+        ctx.team_plan = [a for a in ctx.team_plan if a.detour < FAR]
         self._publish_wants(ctx, owned_count)
 
     def _route_maps(self, ctx: ExplorerContext, target: int) -> set:
@@ -159,7 +160,8 @@ class TeamHunt(BehaviourBase):
         top = next((a for a in ctx.team_plan if not a.blocked), None)
         if top is None:
             return None
-        if top.map and top.map != self._announced:
+        ctx.team_hunt_steps += 1  # counted only when a plan is live and the gates passed
+        if top.map and (top.map, top.species) != self._announced:
             self._announced = (top.map, top.species)
             ctx.log(f"[team_hunt: {top.species} on {top.name} (0x{top.map:02X}), L{top.levels[0]}-{top.levels[1]}, "
                     f"{top.chance * 100:.0f}%/encounter, value {top.value:.1f}, cost {top.steps:.0f} steps]", "res")

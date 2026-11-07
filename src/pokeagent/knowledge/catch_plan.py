@@ -86,8 +86,11 @@ def plan_catches(party, here_map, goals, money, balls, owned_count, bosses, wild
     spend = budget.spendable(goals or {}, money or 0)
     price = restock.ball_price()
     owned = set(owned_species or ())
+    has_magikarp = any(c.name == "MAGIKARP" for c in party or ())
     out: list[CatchAction] = []
     for cand in candidates_for(party, wild_by_map, maps, magikarp_level, kb2):
+        if cand.source == "magikarp" and not has_magikarp:
+            continue  # a Magikarp we do not own is not a plan action (buying one is Restock's job)
         if cand.species in owned and cand.source.startswith("wild:"):
             continue  # an owned species is not a catch target
         m = int(cand.source.split(":", 1)[1]) if cand.source.startswith("wild:") else 0
@@ -108,7 +111,7 @@ def plan_catches(party, here_map, goals, money, balls, owned_count, bosses, wild
         planned_balls = min(expected_balls(catch_rate), balls + can_buy) if m else 0
         detour = dist(here_map, m) if m else 0.0
         steps = (detour + 256 / max(row.get("grass_rate") or 1, 1) / max(chance, 1e-6) + planned_balls * STEPS_PER_BALL
-                 if m else member.fights * FIGHT_STEPS)
+                 if m else max(member.fights, 1) * FIGHT_STEPS)
         score = member.value / max(steps, 1.0) * 1000
         out.append(CatchAction(cand.species, m, map_name(m) if m else "", levels, round(chance, 3),
                                int(row.get("grass_rate") or 0), member.value, round(steps, 1), round(score, 2),

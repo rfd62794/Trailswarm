@@ -155,7 +155,9 @@ def _hurt_margin(party: list, theirs: list, chart: dict, moves: dict, kb) -> flo
     """The hurt-lead fight team_readiness scores: lead at LEAD_HURT, the others as they fight today
     (an evolved MAGIKARP as its GYARADOS)."""
     from pokeagent.magikarp import EVOLVE_LEVEL  # deferred: keep this pure module free of the emulator import
-    lead_i = next(i for i, c in enumerate(party) if c.name != "MAGIKARP")
+    lead_i = next((i for i, c in enumerate(party) if c.name != "MAGIKARP"), None)
+    if lead_i is None:
+        return 0.0
     hurt = replace(party[lead_i], hp=int(party[lead_i].hp * LEAD_HURT))
     others = [(trainer_mon("GYARADOS", c.level, kb) or c) if c.name == "MAGIKARP" and c.level >= EVOLVE_LEVEL else c
               for i, c in enumerate(party) if i != lead_i]

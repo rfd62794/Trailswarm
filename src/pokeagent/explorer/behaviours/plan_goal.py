@@ -131,9 +131,10 @@ class PlanGoal(BehaviourBase):
         team work and the stage's training level is whatever required_level gives."""
         if next((g for g in GOALS if not goals.get(g)), None) != "team_ready":
             return need
-        top = (getattr(ctx, "team_plan", None) or [None])[0]
-        plan_pick = getattr(getattr(getattr(top, "member", None), "candidate", None), "source", "") == "magikarp"
+        top = next((a for a in (getattr(ctx, "team_plan", None) or []) if not a.blocked), None)
         species, slot = party_species(ctx.emu), getattr(ctx, "train_member", None)
+        plan_pick = (getattr(getattr(getattr(top, "member", None), "candidate", None), "source", "") == "magikarp"
+                     and MAGIKARP in species)
         named = slot is not None and 0 <= slot < len(species) and species[slot] == MAGIKARP
         return max(need, EVOLVE_LEVEL + TEAM_GAP) if plan_pick or named else need
 

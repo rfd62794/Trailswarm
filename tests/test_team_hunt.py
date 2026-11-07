@@ -55,11 +55,15 @@ def test_stage_step_cap_settles_and_magikarp_only_gate():
     # below the cap the counter ticks and stays open; past it the goal settles
     ctx.team_ready_steps += 1
     assert ctx.team_ready_steps == GYARADOS_STEP_CAP and not ctx.team_ready_skipped
-    top = SimpleNamespace(member=SimpleNamespace(candidate=SimpleNamespace(source="wild:33")))
+    top = SimpleNamespace(blocked="", member=SimpleNamespace(candidate=SimpleNamespace(source="wild:33")))
     ctx.team_plan = [top]
     assert PlanGoal._team_need(ctx, goals, 19) == 19             # a wild plan pick: no forced gate
     top.member.candidate = SimpleNamespace(source="magikarp")
+    assert PlanGoal._team_need(ctx, goals, 19) == 19             # a Magikarp pick with no MAGIKARP in the party: no gate
+    ctx.emu = FakeEmulator(party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 17, 17)]))
     assert PlanGoal._team_need(ctx, goals, 19) >= EVOLVE_LEVEL + TEAM_GAP
+    top.blocked = "no balls"                                     # the first NON-blocked action decides
+    assert PlanGoal._team_need(ctx, goals, 19) == 19
 
 
 # 3. catch_wanted's wants seam and catch.py's admit condition
@@ -106,6 +110,27 @@ def test_applies_gates():
     c.cut_learner_skipped, c.hunt_grass = False, True
     h2 = TeamHunt(); h2.applies(c)
     assert c.hunt_grass
+
+
+def test_gated_out_applies_do_not_advance_the_step_counter_and_clear_the_plan():
+    h = TeamHunt()
+    c = _ok_ctx(); c.emu.set(0xD31F, 0)                                          # no balls: gated out
+    c.team_plan = ["stale"]
+    for _ in range(50):
+        assert not h.applies(c)
+    assert c.team_hunt_steps == 0 and c.team_plan == []
+
+
+def test_announce_once_per_target():
+    from pokeagent.knowledge.catch_plan import CatchAction
+    logs = []
+    act = CatchAction("NIDORAN(M)", 0x21, "Route 22", (2, 4), 0.395, 25, 1.3, 310, 60, 3, "", 20,
+                      SimpleNamespace(candidate=SimpleNamespace(source="wild:33"), contributes=("MISTY",)))
+    h = TeamHunt(); ctx = _ok_ctx(); ctx.team_plan = [act]; ctx.view.m = 0x21
+    ctx.log = lambda *a, **k: logs.append(a)
+    for _ in range(5):
+        h.step(ctx)
+    assert len(logs) == 1 and ctx.team_hunt_steps == 5
 
 
 # 5. the walk
