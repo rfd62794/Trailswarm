@@ -2,7 +2,7 @@
 
     uv run python tools/state_edit.py IN.state --out OUT.state [--rom ROM] [--heal] [--money N] [--respawn M]
         [--give ID:QTY ...] [--take ID:QTY ...] [--set-hp SLOT:HP ...] [--set-level SLOT:LEVEL ...]
-        [--pos MAP:X:Y --warp-safe] [--dry-run] [--force]
+        [--pos MAP:X:Y --unsafe-pos] [--dry-run] [--force]
 
 Numbers accept decimal or 0x hex (`--give 0x13:1`, `--respawn 0x05`). The output fingerprint gets
 `synthetic: true` plus `edited` (the edits applied) and `parent` (the input state) - a synthetic state is for
@@ -72,7 +72,7 @@ def _edits(a) -> dict:
     if a.take:
         edits["take"] = [list(p) for p in a.take]
     if a.pos is not None:
-        edits["position"] = {"map": a.pos[0], "x": a.pos[1], "y": a.pos[2], "warp_safe": a.warp_safe}
+        edits["position"] = {"map": a.pos[0], "x": a.pos[1], "y": a.pos[2], "unsafe_pos": a.unsafe_pos}
     return edits
 
 
@@ -115,7 +115,9 @@ def main(argv=None) -> int:
     ap.add_argument("--set-hp", type=_num_pair, nargs="+", action="append", default=[], metavar="SLOT:HP")
     ap.add_argument("--set-level", type=_num_pair, nargs="+", action="append", default=[], metavar="SLOT:LEVEL")
     ap.add_argument("--pos", type=_pos, default=None, metavar="MAP:X:Y", help="move within the current map")
-    ap.add_argument("--warp-safe", action="store_true", help="required for --pos: confirms the move cannot trap the run")
+    ap.add_argument("--unsafe-pos", action="store_true",
+                    help="required for --pos. UNSAFE: desyncs the view (the map view pointer 0xD35F and scroll are not "
+                         "shifted); A/B drills must not use it")
     ap.add_argument("--dry-run", action="store_true", help="apply in memory and print the writes; save nothing")
     ap.add_argument("--force", action="store_true", help="overwrite an existing OUT")
     a = ap.parse_args(argv)

@@ -19,6 +19,8 @@ not re-create it.
 | 0xD53B.. | wBoxItems | pairs (item id, qty), 0xFF terminator | probe_pc: D53B 14->FF |
 | 0xD019 / 0xD01A | wBattleMonType1 / wBattleMonType2 | OUR battler's types in a fight (the STAB source; party slot 1's 0xD170/0xD171 is not the Pokemon in play) | from pokered wBattleMon layout, consistent with the moves at 0xD01C and PP at 0xD02D already in use; controller verifies on the ROM |
 
+- **Position RAM is not safe to edit alone (ROM-observed 2026-11-07):** writing only wYCoord/wXCoord (0xD361/0xD362) leaves the map-view pointer (0xD35F..0xD360) and scroll unshifted, so the rendered map is one tile off from the coordinates; collision and warps use the new coordinates while the screen does not move (a RIGHT from the edited x did nothing where the original walked onto the next map). Any position edit must shift the view pointer too; `surgery.py` refuses position edits unless `unsafe_pos` is set.
+
 Item id 0x14 = POTION (the one item in the PC at a new game). Still UNVERIFIED: 0xD163 party count
 (the START menu showed POKéMON while it read 0), 0xD356 badges, 0xD057 in-battle.
 

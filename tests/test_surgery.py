@@ -169,15 +169,18 @@ def test_take_more_than_held_raises_and_writes_nothing():
 
 
 # --- 7. position -----------------------------------------------------------------------------------------------
-def test_position_needs_warp_safe_and_the_current_map():
+def test_position_is_refused_by_default_and_needs_the_current_map_with_the_key():
     emu = world()
     snap = dict(emu.memory)
+    # v1 position edits desync the view (0xD35F pointer not shifted): refused without the explicit key
+    with pytest.raises(surgery.SurgeryError, match="unsafe in v1"):
+        surgery.apply(emu, {"position": {"map": 0x61, "x": 1, "y": 2}})
+    with pytest.raises(surgery.SurgeryError, match="unsafe in v1"):
+        surgery.apply(emu, {"position": {"map": 0x61, "x": 1, "y": 2, "warp_safe": True}})   # old key no longer works
     with pytest.raises(surgery.SurgeryError):
-        surgery.apply(emu, {"position": {"map": 0x61, "x": 1, "y": 2}})            # no warp_safe
-    with pytest.raises(surgery.SurgeryError):
-        surgery.apply(emu, {"position": {"map": 0x62, "x": 1, "y": 2, "warp_safe": True}})   # a map change
+        surgery.apply(emu, {"position": {"map": 0x62, "x": 1, "y": 2, "unsafe_pos": True}})   # a map change
     assert emu.memory == snap
-    writes = surgery.apply(emu, {"position": {"map": 0x61, "x": 1, "y": 2, "warp_safe": True}})
+    writes = surgery.apply(emu, {"position": {"map": 0x61, "x": 1, "y": 2, "unsafe_pos": True}})
     assert writes == [(0xD361, 6, 2), (0xD362, 13, 1)]                             # y then x, nothing else
     assert emu.memory[0xD35E] == 0x61
 

@@ -2,8 +2,10 @@
 
 ``apply`` validates EVERY edit before the first write, so it is all-or-nothing from the caller's view. An edited
 state is SYNTHETIC - usable for drills and A/B runs, never a chain checkpoint or a personal best - and
-``tools/state_edit.py`` stamps it that way. ``position`` moves only the map-tile bytes: the player sprite position
-is NOT rewritten, and whether the result is playable is the controller's job to validate on the ROM.
+``tools/state_edit.py`` stamps it that way. ``position`` is UNSAFE in v1 and refused unless the edit dict carries
+``"unsafe_pos": True``: it writes only the player tile bytes (0xD361/0xD362), so the map-view pointer (0xD35F..0xD360)
+and scroll are not shifted and the screen desyncs from the coordinates (observed on the ROM: one tile off, and a RIGHT
+from the edited x did nothing). Drills and A/B runs must not use it.
 """
 from __future__ import annotations
 
@@ -184,9 +186,10 @@ def _bag_writes(bag: list[list[int]]) -> list[tuple[int, int]]:
 
 def _position(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
     if not isinstance(spec, dict):
-        raise SurgeryError("position: expected {'map': m, 'x': x, 'y': y, 'warp_safe': True}")
-    if spec.get("warp_safe") is not True:
-        raise SurgeryError("position refused without warp_safe=True")
+        raise SurgeryError("position: expected {'map': m, 'x': x, 'y': y, 'unsafe_pos': True}")
+    if spec.get("unsafe_pos") is not True:
+        raise SurgeryError("position edits are unsafe in v1: the map view pointer (0xD35F) and scroll are not updated, "
+                           "so the screen desyncs from the coordinates; not supported")
     if spec.get("map") != emu.read(MAP):
         raise SurgeryError("position: v1 cannot change maps (a map id write without a warp breaks the loaded tile data)")
     x, y = spec.get("x"), spec.get("y")
