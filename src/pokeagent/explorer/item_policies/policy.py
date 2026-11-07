@@ -104,11 +104,18 @@ def choose(ctx) -> Pick | None:
     boss = next_boss(goals, combatants)
     boss_types, info, chart = [c.types for c in boss], default_info, default_chart()
     needs = catch_list.upcoming_needs(goals)
+    if goals.get("hm01_cut") and not goals.get("cut_taught") and "cut" not in needs:
+        needs.append("cut")  # HM01 acquired and CUT not known yet: teach it even when no later goal lists the capability
     needed_hm = {ids.HM_MOVE[t] for t in needs if t in ids.HM_MOVE}
 
     plan = hm_teach.plan_hm(bag=bag, party=party, needs=needs, learners=catch_list.hm_table(), boss_types=boss_types, info=info, chart=chart)
     if plan:
         return Pick(plan.item, "hm", plan.learner, plan.reason, "teach", plan)
+    for tag in hm_teach.stranded_hms(bag=bag, party=party, needs=needs, learners=catch_list.hm_table()):
+        if tag not in ctx.item_notes:
+            ctx.item_notes.add(tag)
+            ctx.log(f"[use_items: {ids.name_of(ids.HM_BY_TAG[tag])} ({tag.upper()}) is in the bag but no party member can learn it; "
+                    f"the catch list now wants a {tag.upper()}-capable species]", "res")
     plan = hm_teach.plan_tm(enabled=ctx.opts.item_tms, bag=bag, party=party, can_learn=tm_can_learn, needed_hm_moves=needed_hm,
                             boss_types=boss_types, info=info, chart=chart)
     if plan:

@@ -27,9 +27,12 @@ def toss_screen(lines: list[str]) -> str | None:
     if any("to toss" in ln.lower() for ln in lines):
         return CONFIRM
     has_toss = any(_bare(ln).endswith("TOSS") or _bare(ln).startswith("TOSS") for ln in lines)
-    if has_toss and any(re.search(r"\bx\d{2}\b", ln) for ln in lines):  # the quantity box "x01" (the item list's rows read "x 1")
+    has_use = any(_bare(ln) == "USE" for ln in lines)
+    # the quantity box "x01" (the item list's rows read "x 1", but a stack of ten or more reads "x10": with the USE row up, the
+    # screen is the USE/TOSS box over such a list, not the quantity box - 2026-11-07 it vetoed every A of the HM01 teach flow)
+    if has_toss and not has_use and any(re.search(r"\bx\d{2}\b", ln) for ln in lines):
         return QUANTITY
-    if has_toss and any(_bare(ln) == "USE" for ln in lines):
+    if has_toss and has_use:
         return USE_TOSS
     return None
 

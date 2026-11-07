@@ -227,6 +227,8 @@ class ExplorerContext:
     item_seq: dict | None = None  # behaviours/use_items.py: the item-use sequence in progress (item, kind, presses, before snapshot ...)
     item_next_check: int = 0  # step before which use_items does not re-evaluate its policies
     item_cooldown: dict = field(default_factory=dict)  # item id -> step before which use_items does not try it again
+    goal_talk_tries: dict = field(default_factory=dict)  # goal id -> A presses made by behaviours/goal_talk.py at the goal's person
+    item_notes: set = field(default_factory=set)  # one-time use_items log notes already printed (e.g. an HM with no learner in the party)
     xitem: dict | None = None  # item_policies.xitems_battle: this battle's X-item decision {battle, item, count0}
     par: Any = None  # explorer.par_follow.ParState, created on first use when opts.par_follow is on
 
