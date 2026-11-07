@@ -383,3 +383,35 @@ def test_trivially_solved_segment_not_repicked_for_ten_minutes(tmp_path):
     w.end(w.procs[2], rc=0, after=100)
     w.sup.tick()
     assert w.procs[3].cfg["segment"] in ("a", "b")
+
+
+def test_grind_atlas_refresh_only_on_every_fifth_finish(tmp_path, monkeypatch):
+    import pokeagent.grind.refresh as gr
+    calls = []
+    monkeypatch.setattr(gr, "refresh", lambda runs_dir, *a, **k: calls.append(runs_dir) or {"folded": 2})
+    w = World(tmp_path, n=1)
+    w.sup.tick()
+    for _ in range(4):
+        w.end(w.procs[-1])
+        w.sup.tick()
+    assert w.sup.finished == 4 and calls == []
+    w.end(w.procs[-1])
+    w.sup.tick()
+    assert w.sup.finished == 5 and calls == [str(tmp_path)]
+    assert any("grind atlas refreshed: 2 battles folded" in line for line in w.logs)
+
+
+def test_grind_atlas_refresh_exception_is_logged_and_swallowed(tmp_path, monkeypatch):
+    import pokeagent.grind.refresh as gr
+
+    def boom(runs_dir, *a, **k):
+        raise RuntimeError("atlas corrupt")
+
+    monkeypatch.setattr(gr, "refresh", boom)
+    w = World(tmp_path, n=1)
+    w.sup.tick()
+    for _ in range(5):
+        w.end(w.procs[-1])
+        w.sup.tick()  # must not raise
+    assert w.sup.finished == 5 and len(w.procs) == 6
+    assert any("grind atlas not refreshed" in line and "atlas corrupt" in line for line in w.logs)
