@@ -313,6 +313,20 @@ def test_empty_interaction_capture_does_not_exclude_a_ball_spot():
     assert plan_step(goals, texted, (40, 6, 4), "UP")[0] == "RIGHT"  # (5,4) has text: skipped
 
 
+def test_will_trainer_change_pokemon_is_answered_no(tmp_path):
+    """YES opens the party list on the active mon and the game answers '<name> is already out!' forever."""
+    from pokeagent.explorer.dialog import yesno_answer
+    assert yesno_answer("Will BCN change POKéMON?")[0] == "NO"
+    assert yesno_answer("BUG CATCHER is about to use KAKUNA! Will BCN change POKeMON?")[0] == "NO"
+    assert yesno_answer("Do you want to continue?")[0] == "YES"  # other boxes keep the default
+    ctx = make_ctx(tmp_path)
+    put_box(ctx, text_rows=("Will BCN", "change POKeMON?", " YES", " NO"))
+    ctx.emu.set(TM + 20 * 13 + 1, 0xED)  # the cursor starts on YES
+    ctx.refresh()
+    d = Menu().step(ctx)
+    assert (d.button, d.rule) == ("DOWN", "yesno_cursor")
+
+
 def test_no_to_unwanted_starter_records_the_ball_and_readiness_does_not_reopen_it(tmp_path):
     ctx = make_ctx(tmp_path, memory={PX: 6, PY: 4})
     ctx.opts.starter = "bulbasaur"
