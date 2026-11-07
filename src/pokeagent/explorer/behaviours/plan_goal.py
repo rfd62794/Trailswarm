@@ -9,7 +9,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
-from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal
+from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal, under_level_note
 from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge.encounters import level_ceiling
@@ -52,6 +52,11 @@ class PlanGoal(BehaviourBase):
             ctx.clamp_note = clamp
             if clamp:
                 ctx.log(f"[readiness] {clamp}", "res")
+        ul = under_level_note(goals_now_all, party, ctx.opts.train_level)
+        if ul != ctx.under_level_note:
+            ctx.under_level_note = ul
+            if ul:
+                ctx.log(f"[readiness] {ul}", "res")
         need = self._budgeted(ctx, goals_now_all, need, verdict)
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
         area_grind.note_map(ctx, m)
