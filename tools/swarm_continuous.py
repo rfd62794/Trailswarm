@@ -41,6 +41,8 @@ POLL_S = 1.0
 SOLVED_FAST_S = 20.0   # a segment run this quick was already trivially solved
 SOLVED_HOLD_S = 600.0  # ...so --segment auto must not pick it again for 10 minutes
 MIN_S_PER_STEP = 0.05  # a clean exit faster than this per step cannot have used its step budget
+DRILL_FAILS = 2        # fast failures of one leg's drill before it is skipped
+DRILL_SKIP_REFILLS = 6  # ...for this many refills
 GRIND_REFRESH_EVERY = 5  # fold finished battles into runs/grind_atlas.json every 5th finished run
 
 
@@ -64,6 +66,8 @@ class Supervisor:
         self.on_stall = on_stall
         self.drills, self.drill_pick, self.on_drill = drills, drill_pick, on_drill  # --drills F: that share of refills drill one leg
         self._drill_acc = 0.0
+        self.leg_fails: dict[str, int] = {}   # drill leg key -> consecutive fast failures
+        self.leg_skip: dict[str, int] = {}    # drill leg key -> refills left to skip it
         self.watchers: dict[int, Any] = {}
         self.next_watch = 0.0
         self.solved: dict[str, float] = {}
@@ -118,8 +122,14 @@ class Supervisor:
         self._drill_acc += self.drills
         if self._drill_acc < 1.0:
             return None
+        skipping, d = set(self.leg_skip), None
+        self.leg_skip = {k: v - 1 for k, v in self.leg_skip.items() if v > 1}  # one drill refill served
         try:
-            d = self.drill_pick(n)
+            for k in range(5):  # the picker rotates on n: step past legs in failure backoff
+                d = self.drill_pick(n + k)
+                if not d or d.get("key") not in skipping:
+                    break
+                d = None
         except Exception as e:  # noqa: BLE001  picking is an add-on: a bad table means a normal segment run
             self.log(f"drill pick failed ({e!r}); running a segment")
             d = None
@@ -229,10 +239,26 @@ class Supervisor:
                 self.log(f"drill not folded ({e!r})")
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
         too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
-        if too_fast and not self.stopping:
+        if cfg.get("drill"):  # a drill's failure is the leg's problem: back that leg off, never pause the slot's segment refills
+            self._note_drill(cfg["drill"], rc != 0 and too_fast and not self.stopping)
+            slot.streak = 0
+        elif too_fast and not self.stopping:
             self._note_failure(slot, f"rc={rc}, {ran:.0f}s, budget {cfg['steps']} steps")
         else:
             slot.streak = 0
+
+    def _note_drill(self, drill: dict, failed: bool) -> None:
+        key = drill.get("key")
+        if key is None:
+            return
+        if not failed:
+            self.leg_fails.pop(key, None)
+            return
+        self.leg_fails[key] = self.leg_fails.get(key, 0) + 1
+        if self.leg_fails[key] >= DRILL_FAILS:
+            self.leg_fails.pop(key)
+            self.leg_skip[key] = DRILL_SKIP_REFILLS
+            self.log(f"drill {key}: {DRILL_FAILS} fast failures, skipping that leg for {DRILL_SKIP_REFILLS} refills")
 
     def _merge_bandit(self, own: Path) -> None:
         """A bandit agent leaves its delta beside its memory file: add it into runs/bandit.json (idempotent by run id)."""

@@ -31,7 +31,7 @@ class GrindDrillMonitor:
             return False
         from pokeagent.grind.atlas import STEPS_PER_MIN
         xp = float(self.xp_fn(ctx))
-        per = xp / max(1, ctx.step)
+        per = xp / max(1, self.on_map)  # time actually on the grind map, not the whole run
         self.result = {"source": "drill", "kind": "grind", "map": self.map, "steps": ctx.step, "steps_on_map": self.on_map, "xp": xp,
                        "xp_per_step": per, "xp_per_min": per * STEPS_PER_MIN, "battles": ctx.battles, "wins": ctx.battles_won,
                        "lead_level": _level(ctx), "starter": ctx.opts.starter, "run": self.run_dir.name, "t": self.now()}

@@ -189,6 +189,17 @@ class Presser:
             ctx.leg_saver.observe(ctx, fr)  # never raises
         if record_goals(ctx, fr):
             return
-        if ctx.drill is not None and ctx.drill.observe(ctx, fr):
+        if ctx.drill is not None and _drill_ended(ctx, fr):
             return  # the drill ended (drill_result is in meta.json); ctx.done is set
         log_press(ctx, fr)
+
+
+def _drill_ended(ctx, fr) -> bool:
+    """Ask the drill monitor whether the drill is over. A monitor bug must not crash a run: log it once, keep running."""
+    try:
+        return bool(ctx.drill.observe(ctx, fr))
+    except Exception as e:  # noqa: BLE001
+        if not getattr(ctx, "_drill_error_logged", False):
+            ctx._drill_error_logged = True
+            ctx.log(f"[drill monitor skipped: {e!r}]", "res")
+        return False

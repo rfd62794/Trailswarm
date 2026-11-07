@@ -82,14 +82,28 @@ def save_entry(emu, d: str | Path, m: int, x: int, y: int, keep: int = KEEP) -> 
 
 def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
     """Delete the oldest state files until about 95% of ``max_files`` remain (slack, so it does not run every save)."""
-    files = list(Path(d).glob("*.state"))
-    if len(files) <= max_files:
+    groups: dict[str, list[Path]] = {}
+    for f in Path(d).glob("*.state"):
+        groups.setdefault(f.name.split(".")[0], []).append(f)  # <map>_<x>_<y> -> .state, .1.state, .2.state
+    total = sum(len(g) for g in groups.values())
+    if total <= max_files:
         return 0
-    files.sort(key=lambda f: f.stat().st_mtime)
-    drop = files[:len(files) - int(max_files * 0.95)]
-    for f in drop:
-        f.unlink(missing_ok=True)
-    return len(drop)
+    stamp = {k: max(_mtime(f) for f in g) for k, g in groups.items()}
+    dropped, target = 0, total - int(max_files * 0.95)
+    for k in sorted(groups, key=stamp.get):  # oldest key first, all its rotated files together: no half-key is left
+        if dropped >= target:
+            break
+        for f in groups[k]:
+            f.unlink(missing_ok=True)
+        dropped += len(groups[k])
+    return dropped
+
+
+def _mtime(f: Path) -> float:
+    try:
+        return f.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 class LegStateSaver:
