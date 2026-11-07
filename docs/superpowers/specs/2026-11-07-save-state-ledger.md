@@ -45,9 +45,9 @@ from them: the defect is inherited, run after run.
   the frontier falls back to the segment that remakes it (to_vermilion -> to_ss_anne heals in Vermilion first). The scheduler logs
   each refusal once. `tools/stamp_states.py runs/checkpoints` stamps legacy states from RAM (one headless emulator).
 
-## Proposed: the ledger (two small modules)
+## Shipped: the ledger (select + CLI)
 
-`statefp.py` stays the only thing that reads RAM. New `statelog.py` (the ledger) only reads/writes JSON and never touches an emulator:
+`statefp.py` stays the only thing that reads RAM. `src/pokeagent/statelog.py` (the ledger) only reads/writes JSON and never touches an emulator; `src/pokeagent/statescmd.py` adds the `pokeagent states` CLI:
 
 * `entries(dir) -> list[Entry]`: state path + fingerprint + age, read from the `.fp.json` files (no central file to corrupt, no lock).
 * `select(entries, want) -> Entry | None`: `want` is a small dataclass per consumer: map (or goal), respawn must be >= a map rank,
