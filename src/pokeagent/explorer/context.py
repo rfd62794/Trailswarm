@@ -207,6 +207,7 @@ class ExplorerContext:
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
+    party_log: Any = None  # explorer.party_log.PartyLog, made on first use (XP/level logging)
     bandit: Any = None  # pokeagent.bandit.driver.BanditDriver (None = bandit off: every hook answers as the Explorer would)
     par: Any = None  # explorer.par_follow.ParState, created on first use when opts.par_follow is on
 

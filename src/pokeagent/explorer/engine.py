@@ -4,6 +4,7 @@ This is the old ``agent_step()`` closure's job, minus the window and the HTTP AP
 """
 from __future__ import annotations
 
+from pokeagent.explorer import party_log
 from pokeagent.explorer.behaviours import default_behaviours
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -38,6 +39,7 @@ class Engine:
         if ctx.bandit is not None:
             ctx.bandit.begin_step()
         decision = self.selector.choose(ctx)
+        party_log.of(ctx).tick(ctx)  # level timeline: out-of-battle level/exp changes, grind/travel step counts
         self.last_decision = decision
         if decision is None or not decision.button:
             return decision  # nothing to do, or a wait: the step is used without a press
