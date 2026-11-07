@@ -7,7 +7,10 @@ Each goal is {id, name, after, detector, needs, note}. ``detector`` is one of
   {"flag": {"addr", "bit"}}       an event-flag byte bit
   {"party": {"min_count": n}}     party size
   {"map_and_badge": {"map": [ids], "badge": bit}}
-  "unverified"                    no verified RAM detector; check_goals infers it from later goals (never a segment target)
+  {"map_now_with_item": {"map": [ids], "item": id}}   standing on one of these maps NOW, holding (or once holding, this run) the item
+  {"map_past_x": {"map": [ids], "x": n}}              standing on one of these maps NOW at wXCoord >= n (past a blocker)
+  "unverified"                    no verified RAM detector; check_goals infers it from later goals, but only once its ``after``
+                                  predecessor is reached too (never a segment target, never recorded)
 The first 25 goals carry ``"special": true``: pokeagent.goals keeps their hand-coded detectors, byte for byte.
 ``needs`` are capability tags (cut, surf, strength, flash, poke_flute, silph_scope, bike, puzzle, safari, dex10) the
 current agent behaviours may lack; see ``reachable`` / ``selectable``.
@@ -99,6 +102,15 @@ def evaluate(det, emu, st: dict, seen: set, bag: dict) -> bool | None:
     if "map_and_badge" in det:
         mb = det["map_and_badge"]
         return any(m in seen for m in mb["map"]) and bool(emu.read(BADGES) >> int(mb["badge"]) & 1)
+    if "map_now_with_item" in det:
+        mi = det["map_now_with_item"]
+        had = st.setdefault("had_items", set())
+        if mi["item"] in bag:
+            had.add(mi["item"])
+        return emu.read(0xD35E) in mi["map"] and mi["item"] in had
+    if "map_past_x" in det:
+        mx = det["map_past_x"]
+        return emu.read(0xD35E) in mx["map"] and emu.read(0xD362) >= int(mx["x"])
     return None
 
 
@@ -114,13 +126,18 @@ def campaign_goals(emu, st: dict, seen: set, bag: dict) -> dict[str, bool]:
 
 
 def infer_unverified(g: dict[str, bool]) -> None:
-    """An unverified goal counts as reached once any later goal has: the ladder is a chain, so it cannot stall."""
+    """An unverified goal counts as reached once a later goal has AND its ``after`` predecessor has: the ladder is a chain,
+    so it cannot stall, but a goal reached out of order (the Cerulean bike shop) must not drag earlier ones with it."""
+    later_true: dict[str, bool] = {}
     later = False
     for spec in reversed(load_campaign()):
+        later_true[spec["id"]] = later
+        later = later or bool(g.get(spec["id"]))
+    for spec in load_campaign():  # forward, so a chain of unverified goals needs each predecessor in turn
         k = spec["id"]
         if spec["detector"] == UNVERIFIED:
-            g[k] = later
-        later = later or bool(g.get(k))
+            pred = spec.get("after")
+            g[k] = later_true[k] and (pred is None or bool(g.get(pred)))
 
 
 def brief(goals: dict, order: list[str], ahead: int = 6) -> str:
