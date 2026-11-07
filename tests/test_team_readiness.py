@@ -197,3 +197,26 @@ def test_gyarados_goal_settles_after_idle_closed_gate_steps_not_while_training()
     for _ in range(GYARADOS_IDLE_CAP):
         PlanGoal._gyarados_idle(ctx, False)
     assert ctx.gyarados_skipped
+
+
+def test_gyarados_budget_does_not_leak_into_the_next_boss_stage():
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    _, ctx = _gy_ctx()
+    gy = {g: True for g in GOALS[:GOALS.index("gyarados")]}
+    assert PlanGoal._budgeted(ctx, gy, 26, None) == 26
+    ctx.step, ctx.battles = 300, 30                                  # 30 flat battles at the gyarados stage
+    assert PlanGoal._budgeted(ctx, gy, 26, None) == 26
+    nxt = {g: True for g in GOALS[:GOALS.index("gyarados") + 1]}
+    ctx.step, ctx.battles = 301, 31
+    assert PlanGoal._budgeted(ctx, nxt, 26, None) == 26             # first step of the next stage: not pre-lifted
+    assert not ctx.grind.lifted("rival_ss_anne") and not ctx.grind.lifted("gyarados")
+
+
+def test_gyarados_idle_resets_on_a_level_gain():
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    _, ctx = _gy_ctx()
+    for _ in range(10):
+        PlanGoal._gyarados_idle(ctx, False, 19)
+    assert ctx.gyarados_idle == 9
+    PlanGoal._gyarados_idle(ctx, False, 20)
+    assert ctx.gyarados_idle == 0

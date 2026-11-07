@@ -86,7 +86,9 @@ class PlanGoal(BehaviourBase):
         need = train_need(ctx, goals_now_all, need)  # bandit decision point: grind or skip (unchanged when off)
         ctx.train_need = need  # frontier reads it to seek grass while below the target
         if gyarados_stage:
-            self._gyarados_idle(ctx, 0 < lead_level(ctx.emu) < need)
+            self._gyarados_idle(ctx, 0 < lead_level(ctx.emu) < need, lead_level(ctx.emu))
+        else:
+            ctx.gyarados_idle = 0  # left the stage: "consecutive" restarts on re-entry
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need, "_heal_trips": ctx.heal_trips,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
@@ -113,9 +115,12 @@ class PlanGoal(BehaviourBase):
         return need
 
     @staticmethod
-    def _gyarados_idle(ctx: ExplorerContext, training_live: bool) -> None:
+    def _gyarados_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
         """Settle the gyarados goal early when the gate is closed or lifted so the stage has nothing to do."""
-        ctx.gyarados_idle = 0 if training_live else ctx.gyarados_idle + 1
+        gained = level is not None and level > getattr(ctx, "gyarados_idle_level", 0)
+        if level is not None:
+            ctx.gyarados_idle_level = level
+        ctx.gyarados_idle = 0 if training_live or gained else ctx.gyarados_idle + 1  # a level gain is progress too
         if ctx.gyarados_idle >= GYARADOS_IDLE_CAP and not ctx.gyarados_skipped:
             ctx.gyarados_skipped = True
             ctx.log(f"[gyarados: training gate closed or lifted for {GYARADOS_IDLE_CAP} plan steps - settled for this run]", "res")
@@ -123,13 +128,15 @@ class PlanGoal(BehaviourBase):
     @staticmethod
     def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
         """The training level, or 0 (gate lifted) once the grind budget for this goal is spent."""
-        goal, level = stage_goal(goals), lead_level(ctx.emu)
-        if goal is None:
+        stage, level = stage_goal(goals), lead_level(ctx.emu)
+        if stage is None:
             return need
+        gy = next((g for g in GOALS if not goals.get(g)), None) == "gyarados"
+        goal = "gyarados" if gy else stage  # the gyarados stage has its own budget key: it must not accrue on the next boss's
         ctx.grind = ctx.grind or GrindBudget()
         why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
-                               training=0 < level < need, ceiling=level_ceiling(goal),
-                               max_battles=GRIND_BATTLES_GYARADOS if next((g for g in GOALS if not goals.get(g)), None) == "gyarados" else GRIND_BATTLES)
+                               training=0 < level < need, ceiling=level_ceiling(stage),
+                               max_battles=GRIND_BATTLES_GYARADOS if gy else GRIND_BATTLES)
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
         return 0 if ctx.grind.lifted(goal) else need
