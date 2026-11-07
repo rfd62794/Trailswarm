@@ -32,13 +32,30 @@ def legit_exit(g, leg) -> bool:
     return leg.exit in g.solid or (nx, ny) in g.solid or not g.inside(nx, ny)
 
 
-def collect(runs_dir: Path, prefix: str, n: int, get):
+def fight_steps(path: Path) -> set:
+    """Steps whose decision was made in a battle: grinding / wild fights, not travel."""
+    steps = set()
+    if path.exists():
+        for r in load_rows(path):
+            if r.get("battle"):
+                steps.add(int(r.get("step", -1)))
+    return steps
+
+
+def fought(fights: set, leg) -> bool:
+    return any(s in fights for s in range(leg.step0, leg.step1 + 1))
+
+
+def collect(runs_dir: Path, prefix: str, n: int, get, keep_fights: bool = False):
     names = sorted(p.name for p in runs_dir.glob(prefix + "*") if (p / "transitions.jsonl").exists())[-n:]
     groups, skipped = defaultdict(list), defaultdict(int)
     for name in names:
+        fights = set() if keep_fights else fight_steps(runs_dir / name / "decisions.jsonl")
         for leg in split_legs(load_rows(runs_dir / name / "transitions.jsonl"), name):
             g = get(leg.map)
-            if not leg.complete:
+            if fights and fought(fights, leg):
+                skipped["fought (grinding/battle: not travel)"] += 1
+            elif not leg.complete:
                 skipped["incomplete"] += 1
             elif g is None or not legit_exit(g, leg):
                 skipped["irregular exit"] += 1
@@ -76,12 +93,13 @@ def main(argv=None) -> int:
     ap.add_argument("--json", help="also write the printed rows here")
     ap.add_argument("--out", help="per-leg record table (default: <runs-dir>/legs.json)")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--keep-fights", action="store_true", help="count legs with battle presses too (default: excluded, so efficiency is travel only)")
     a = ap.parse_args(argv)
     get = G.rom_grids()
     if get is None:
         print("ROM not found (roms/Pokemon Red.gb): cannot compute par", file=sys.stderr)
         return 2
-    names, groups, skipped = collect(Path(a.runs_dir), a.prefix, a.runs, get)
+    names, groups, skipped = collect(Path(a.runs_dir), a.prefix, a.runs, get, a.keep_fights)
     rows = score(get, groups)
     keep = [r for r in rows if r["efficiency"] is not None and r["samples"] >= a.min_samples and r["par_frames"] >= a.min_par]
     scored = sorted(keep, key=(lambda r: (r["efficiency"], -(r["best_frames"] - r["par_frames"]))) if a.sort == "eff"

@@ -71,8 +71,9 @@ class Launcher:
     """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
 
     def __init__(self, share_frames: bool, roles_mode: bool = False, ram_diff_slots: int = 0, port_base: int | None = None,
-                 bandit_slots: int = 0):
+                 bandit_slots: int = 0, par_from: int | None = None):
         self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
+        self.par_from = par_from  # slots >= par_from run --par-follow (the top slots, so a bandit A/B on the bottom slots stays separate)
         self.bandit_slots = bandit_slots  # slots 0..N-1 run the behaviour bandit; the rest are the control group
         self.ram_diff_slots = ram_diff_slots  # slots 0..N-1 record event RAM diffs (tools/ram_discover.py); default none
         self.port_base = PORT_BASE if port_base is None else port_base
@@ -82,6 +83,9 @@ class Launcher:
             return []
         from pokeagent.bandit.store import delta_path_for
         return ["--bandit", "--bandit-delta", str(delta_path_for(cfg["own"]))]
+
+    def _par_args(self, cfg: dict) -> list[str]:
+        return ["--par-follow"] if self.par_from is not None and cfg["slot"] >= self.par_from else []
 
     def _port(self) -> int:
         used = {e.get("port") for e in list_agents(ROOT)} | {h.port for h in self.handles if h.poll() is None}
@@ -99,7 +103,7 @@ class Launcher:
         port = self._port()
         cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
-               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + self._bandit_args(cfg) + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + self._bandit_args(cfg) + self._par_args(cfg) + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
@@ -113,6 +117,11 @@ def make_watch(cfg: dict):
 def touch_lock() -> None:
     with contextlib.suppress(OSError):
         os.utime(ROOT / "runs" / "spawn.lock")
+
+
+def par_from(a, n: int) -> int | None:
+    """First slot index that runs --par-follow (--continuous only): the top --par-share of the n slots, the rest are controls."""
+    return n - round(n * a.par_share) if a.par_follow else None
 
 
 def bandit_slots(a, n: int) -> int:
@@ -159,7 +168,7 @@ def run_continuous(a) -> int:
         room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
         return sup[0].running() + room
 
-    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base, bandit_slots(a, n)), merge_file_into, limit, steps=a.steps,
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base, bandit_slots(a, n), par_from(a, n)), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
@@ -179,6 +188,8 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--merge-only", action="store_true")
     ap.add_argument("--bandit", action="store_true", help="--continuous: run the behaviour bandit in a share of the slots (the rest are controls)")
+    ap.add_argument("--par-follow", action="store_true", help="--continuous: walk purposeful trips along the ROM par path in a share of the slots (the rest are controls)")
+    ap.add_argument("--par-share", type=float, default=0.5, help="share of slots that run with --par-follow (default 0.5; the top slots)")
     ap.add_argument("--bandit-share", type=float, default=0.5, help="share of slots that run with --bandit (default 0.5)")
     ap.add_argument("--maps", default="runs/maps.json")
     ap.add_argument("--port-base", type=int, default=PORT_BASE,

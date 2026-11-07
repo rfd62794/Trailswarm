@@ -64,6 +64,8 @@ class Engine:
                           stage, box, battle, outcome, reversal)
         if ctx.bandit is not None:
             rec = ctx.bandit.tag(rec)  # driver/arm: only runs with the bandit on carry them
+        if decision.driver:
+            rec = {**rec, "driver": decision.driver}  # par_follow drove this press
         if self.decision_log is not None:
             self.decision_log.write(rec)
         if ctx.anomalies is not None:
