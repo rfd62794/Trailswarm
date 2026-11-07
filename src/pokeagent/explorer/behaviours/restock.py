@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import restock as rs
 from pokeagent.explorer import shop
-from pokeagent.explorer.economy import budget, ledger, plan
+from pokeagent.explorer.economy import budget, floor, ledger, plan
 from pokeagent.explorer.economy.prices import price, stocked
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
@@ -35,13 +35,14 @@ class Restock(BehaviourBase):
             trip = plan.trip_plan(ctx)
             if trip is None:
                 return None
-            marts = rs.candidate_marts(ctx.goals(), st.setdefault("failed", set()))
+            st["want"] = tuple(i for i, _ in trip.items)  # only a Mart that sells one of these is worth the walk
+            marts = self._marts(ctx, st, st.setdefault("failed", set()))
             if m not in marts and not self._path_to(ctx, lambda n: n[0] in marts):
                 return None
             st.update(intent=True, steps=0)
             ctx.shop_intent = ("mart", None)  # par_follow: this is a Mart trip
             ctx.log(f"[restock: {self._describe(trip)} - going to a Mart]", "res")
-        marts = rs.candidate_marts(ctx.goals(), st.get("failed", ()))
+        marts = self._marts(ctx, st, st.get("failed", ()))
         st["steps"] = st.get("steps", 0) + 1
         if st["steps"] > rs.MAX_TRIP_STEPS:
             return self._end(ctx, f"gave up after {st['steps']} steps", failed=True)
@@ -53,6 +54,12 @@ class Restock(BehaviourBase):
                 return Decision(path[0], "restock_walk", f"{len(path)} steps to a Mart")
             return self._end(ctx, "no route to a Mart", failed=True)
         return self._in_mart(ctx, m, x, y)
+
+    @staticmethod
+    def _marts(ctx, st, failed) -> frozenset:
+        """Candidate Marts that sell what the trip wants (the Vermilion Mart has Balls and Super Potions but no Potion)."""
+        marts = rs.candidate_marts(ctx.goals(), failed)
+        return floor.marts_selling([(i, 1) for i in st.get("want", ())], marts) if st.get("want") else marts
 
     @staticmethod
     def _describe(trip) -> str:

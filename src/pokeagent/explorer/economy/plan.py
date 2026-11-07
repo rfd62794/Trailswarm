@@ -57,7 +57,7 @@ def trip_plan(ctx) -> TripPlan | None:
     bag, money = bag_contents(ctx.emu), read_money(ctx.emu)
     sells = tuple(i for i in SELL_WHITELIST for _ in range(min(bag.get(i, 0), 3)))
     items = make_list(ctx, bag, money + sum(sell_price(i) for i in sells))
-    if sells or shopping.trip_worth(items):
+    if sells or shopping.trip_worth(items, bag):
         return TripPlan(sells, tuple(items))
     return None
 
