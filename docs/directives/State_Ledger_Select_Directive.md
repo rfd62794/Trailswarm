@@ -195,7 +195,7 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-state-ledger-select-directive |
 | Base branch | - |
@@ -210,4 +210,5 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 - 2026-11-07 12:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-ledger-select-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGEY0J9T6GMN03W7TCWA4T
 - 2026-11-07 12:29 · dispatcher · launched pid=1268; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-state-ledger-select-directive; provisioned: uv sync --frozen
 - 2026-11-07 13:04 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 0 min est. n/a
+- 2026-11-07 13:31 · robert-claude-laptop · Review → Done — note: PR #139 merged (merge commit); Sonnet review CHANGES-NEEDED -> Haiku fixes f81f399/f480377 -> Haiku re-review; verify at f480377 1422 passed 36 skipped
 <!-- queue:end -->
