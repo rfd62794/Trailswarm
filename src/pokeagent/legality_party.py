@@ -25,10 +25,14 @@ def _party(c) -> list:
 
 def party_structure(c) -> None:
     n = c.emu.read(PARTY_COUNT)
-    if not 1 <= n <= MAX_PARTY:
-        c.violations.append(f"party_structure: count 0x{PARTY_COUNT:04X} = {n} (want 1..{MAX_PARTY})")
+    if n > MAX_PARTY:
+        c.violations.append(f"party_structure: count 0x{PARTY_COUNT:04X} = {n} (want 0..{MAX_PARTY})")
         return
     listed = c.emu.read_range(PARTY_SPECIES, n + 1)
+    if n == 0:   # the bedroom start is organic with an empty party: only the (empty) species list must be sane
+        if listed[0] not in (0x00, 0xFF):
+            c.violations.append(f"party_structure: empty party but species list 0x{PARTY_SPECIES:04X} = {listed[0]:#04x} (want 0xFF or 0)")
+        return
     raw = c.emu.read_range(PARTY_MON1, PARTY_MON_SIZE * n)
     if listed[n] != 0xFF:
         c.violations.append(f"party_structure: species list terminator 0x{PARTY_SPECIES + n:04X} = {listed[n]:#04x} (want 0xFF)")

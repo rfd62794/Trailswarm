@@ -131,7 +131,7 @@ def _set_level(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
         for i, k in enumerate(("attack", "defense", "speed", "special")):
             hi, lo = _u16(vals[k])
             writes += [(base + 36 + 2 * i, hi), (base + 37 + 2 * i, lo)]
-        if level > mon.level:                                            # a raise to the same level is a no-op on exp
+        if level != mon.level:                                           # an unchanged level leaves exp alone
             exp = exp_for_level(growth, level)                           # the old exp on a new level is illegal (party_exp)
             writes += [(base + 14, exp >> 16 & 0xFF), (base + 15, exp >> 8 & 0xFF), (base + 16, exp & 0xFF)]
     return writes

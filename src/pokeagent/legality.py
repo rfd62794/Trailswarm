@@ -182,11 +182,11 @@ def check(emu, kb: dict | None, *, catalog: dict | None = None, hm: dict | None 
           rom: bytes | None = None) -> Legality:
     """Read-only legality verdict for the state ``emu`` is standing in (never writes, never raises)."""
     c = _C(emu, kb, catalog, hm, rom)
-    if kb is None:
+    if not kb:
         c.warnings.append("no kb: party tables skipped")
     checked = []
     for name, fn in _INVARIANTS.items():
-        if kb is None and name in PARTY_TABLE_INVARIANTS:
+        if not kb and name in PARTY_TABLE_INVARIANTS:
             continue
         checked.append(c._finish(name, fn))
     return Legality(not c.violations, c.violations, c.warnings, checked)

@@ -67,17 +67,17 @@ def test_edit_class():
     assert lineage.edit_class({}, ctx, CAT, seen) == "shortcut"
 
 
-def _promote_world(tmp_path):
+def _promote_world(tmp_path, start):
     end = tmp_path / "end.state"
     legal_world().save_state(end)
-    statefp.stamp(legal_world(), end)
+    statefp.stamp(legal_world(), end, inherit=start)   # a legitimate one-hop synthetic descendant of START
     return end
 
 
 def test_promote_happy_path_and_refusals(tmp_path, monkeypatch):
     start = _state(tmp_path, "start.state", {"lineage": "synthetic", "edit_class": "organic_equivalent",
                                              "synthetic": True})
-    end = _promote_world(tmp_path)
+    end = _promote_world(tmp_path, start)
     env = envelope.build([tmp_path])
     ok, reasons = lineage.promote(end, start, legal_world(), KB, catalog=CATALOG, hm=HM, env=env)
     assert ok and reasons == []
@@ -85,20 +85,20 @@ def test_promote_happy_path_and_refusals(tmp_path, monkeypatch):
     assert fp["lineage"] == "promoted" and fp["parent"] == "start.state" and fp["promoted_from"] == "start.state"
     assert fp["legal"]["ok"] and "synthetic" not in fp
     # shortcut start: nothing written
-    end2 = _promote_world(tmp_path)
     bad_start = _state(tmp_path, "bad.state", {"lineage": "synthetic", "edit_class": "shortcut", "synthetic": True})
+    end2 = _promote_world(tmp_path, bad_start)
     ok, reasons = lineage.promote(end2, bad_start, legal_world(), KB, env=env)
     assert not ok and any("organic_equivalent" in r for r in reasons)
     assert "promoted" not in (statefp.read(end2) or {})
     # illegal end: nothing written
-    end3 = _promote_world(tmp_path)
+    end3 = _promote_world(tmp_path, start)
     emu = legal_world()
     emu.memory[0xD347] = 0xAA                                                           # money not BCD
     ok, reasons = lineage.promote(end3, start, emu, KB, catalog=CATALOG, hm=HM, env=env)
     assert not ok and any("money:" in r for r in reasons)
     assert "promoted" not in (statefp.read(end3) or {})
     # out of envelope: nothing written
-    end4 = _promote_world(tmp_path)
+    end4 = _promote_world(tmp_path, start)
     tight = {"badges:2": {"lead": 1, "party": 1, "money": 1, "badges": 0, "bag_slots": 0, "heal_items": 0,
                           "respawns": []}}
     ok, reasons = lineage.promote(end4, start, legal_world(), KB, env=tight)

@@ -61,15 +61,37 @@ def edit_class(edited: dict, edit_context: dict, catalog: dict | None, envelope_
     return "organic_equivalent"
 
 
+MAX_DEPTH = 8
+
+
+def _descends_from(end_state: Path, start_name: str) -> bool:
+    """Walk END's ``parent`` sidecar chain (same directory) up to MAX_DEPTH hops looking for ``start_name``."""
+    cur = end_state
+    for _ in range(MAX_DEPTH):
+        parent = (statefp.read(cur) or {}).get("parent")
+        if not isinstance(parent, str) or not parent:
+            return False
+        if parent == start_name:
+            return True
+        cur = end_state.parent / parent
+    return False
+
+
 def promote(end_state, start_state, emu, kb, *, catalog: dict | None = None, hm: dict | None = None,
             rom: bytes | None = None, env: dict | None = None, slack_levels: int = 3,
             slack_money: float = 0.20) -> tuple[bool, list[str]]:
     """Upgrade END state's lineage to ``promoted``: START must be a synthetic state whose edit_class is
     ``organic_equivalent``, END must pass ``legality.check`` on ``emu`` (already loaded with it) and sit inside the
-    organic envelope for its stage. On success the END sidecar gets ``lineage: promoted``, the ``legal`` record,
+    organic envelope for its stage.
+    END must also be ``synthetic`` and descend from START via the ``parent`` sidecar chain (<= MAX_DEPTH hops, same dir). On success the END sidecar gets ``lineage: promoted``, the ``legal`` record,
     ``parent`` and ``promoted_from``; on failure nothing is written and the reasons are returned."""
     start_state, end_state = Path(start_state), Path(end_state)
     reasons = []
+    if statefp.lineage(end_state) != SYNTHETIC:
+        reasons.append(f"promote: end {end_state.name} is {statefp.lineage(end_state)} (needs synthetic)")
+    elif not _descends_from(end_state, start_state.name):
+        reasons.append(f"promote: end {end_state.name} does not descend from {start_state.name} "
+                       f"(parent chain must reach it within {MAX_DEPTH} hops)")
     sfp = statefp.read(start_state) or {}
     if statefp.lineage(start_state) != SYNTHETIC or sfp.get("edit_class") != "organic_equivalent":
         reasons.append(f"promote: start {start_state.name} is {statefp.lineage(start_state)}/"

@@ -226,3 +226,17 @@ def test_no_kb_and_a_bare_emulator_never_raise():
 
     r = legality.check(Bare(), None)
     assert not r.ok and any(v.startswith("read:") for v in r.violations)
+
+
+def test_empty_party_is_legal_and_overfull_is_not():
+    """The bedroom start state is organic with an empty party: count 0 passes party_structure."""
+    emu = FakeEmulator({0xD35E: 0x26, 0xD163: 0, 0xD164: 0xFF})
+    assert "party_structure" not in " ".join(check(emu).violations)
+    emu.memory[0xD164] = 0x33                                  # species list not terminated
+    assert any(v.startswith("party_structure") for v in check(emu).violations)
+    emu.memory.update({0xD163: 7, 0xD164: 0xFF})
+    assert any(v.startswith("party_structure") for v in check(emu).violations)
+
+
+def test_empty_kb_dict_warns_like_none():
+    assert any("no kb" in w for w in legality.check(world(), {}).warnings)
