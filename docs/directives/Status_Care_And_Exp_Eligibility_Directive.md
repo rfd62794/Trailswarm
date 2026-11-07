@@ -61,7 +61,7 @@ Urgency tag in `why`: `blackout risk` when every living member is poisoned, `mem
 ### 4.2 Carrying it out (`explorer/behaviours/status_care.py`)
 
 Registered after `Heal()` and `Restock()` and before `UseItems()` in `default_behaviours()` (read the order first; do not reorder anything else). `applies`: not battling, no text box, `ctx.proc is None`, `ctx.center_intent is None`, at least one party member has `poison` in `status_kinds(PartyMon.status)`, re-evaluated every `RECHECK_EVERY = 10` steps and immediately when a poison appears (the status changed). It builds `MonStatus` rows from `read_party`, `steps_to_heal` from `outside_use.walk_to_center(ctx)`, calls `decide`, logs ONE line per change (`[status_care] slot 1 poisoned HP 12/40: 45 steps to faint, 80 to the nurse -> Antidote]`) and then:
-- `antidote` / `potion`: use the item on that party slot through the SAME machinery the field Potion uses (`item_step` / `UseItems` target selection; read `use_items.py` to see how the party slot is chosen). If the existing machinery cannot target a specific slot, do NOT write new menu code: fall back to `walk_to_center` (when a heal is known) and say so in the Status row. A used Antidote must verify its effect: the status byte no longer has `poison` within `VERIFY_STEPS = 20` presses; a failed use is logged and not retried more than `MAX_TRIES = 2`.
+- `antidote` / `potion`: use the item on that party slot through the SAME machinery the field Potion uses (`item_step` / `UseItems` target selection; read `use_items.py` to see how the party slot is chosen). If the existing machinery cannot target a specific slot, do NOT write new menu code: fall back to `walk_to_center` (when a heal is known) and say so in the Status row. Rows written to `status_care.jsonl` carry `provenance` (see the standing rule in section 7), and every constant marked `# unverified` (status bits, poison rate, EXP rule) stays a hypothesis until an ORGANIC run or save confirms it: the controller validation uses an organic save, not a synthetic one. A used Antidote must verify its effect: the status byte no longer has `poison` within `VERIFY_STEPS = 20` presses; a failed use is logged and not retried more than `MAX_TRIES = 2`.
 - `walk_to_center`: sets `ctx.center_intent` (the same field `Heal` honours). Nothing else.
 - Never inside a battle (battle poison is handled by the existing battle behaviours, untouched) and never while a boss segment is in its fight step.
 
@@ -113,6 +113,7 @@ def trainee_eligible(party: list[MonStatus], slot: int | None, revive_carried: b
 - Create no scratch or debug files (deleting is denied and ends the run). If one is truly needed it goes under `.devin-scratch/` and stays.
 - If a tool call is genuinely blocked, stop and write why in the Status row; do not try another way around it.
 - SOLID/SRP/KISS is a hard rule here: small new modules (under 300 lines), no new dependencies.
+- **Standing rule (Robert, 2026-11-07, verbatim): "We can use synthetic data and states and saves throughout, with a standing rule that a synthetic result must be verified by organic data and states and saves, as a proof system."** Every learned record this work writes carries `"provenance": "organic" | "synthetic" | "unknown"`, taken from the start state's lineage (`statefp` lineage, PR #147: if it is not merged or a state has no lineage record the value is `"unknown"`, never guessed, and `unknown` is treated like organic for display and like synthetic for promotion: it can never be promoted by itself). Synthetic-born records are HYPOTHESES: usable for drills, A/B and planning, NEVER a chain best, a confirmed segment, a shared-memory veto or a KNOWLEDGE fact until an organic run reproduces them, at which point they are promoted (same semantics as state promotion). Tests use fixture lineage values only.
 
 ## 8. Completion criteria
 
@@ -131,7 +132,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -139,4 +140,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 **Status log**
 - 2026-11-07 16:20 · robert-claude-laptop · none → Draft — Claude 2026-11-07: poison care/Antidote, shopping floor, EXP eligibility gate
 - 2026-11-07 16:20 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing greenfield/gitignored
+- 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: add provenance standing rule
 <!-- queue:end -->
