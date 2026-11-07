@@ -21,6 +21,7 @@ from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
 
 _PAD = 5
 _HEADER_H = 15
+_FOLLOW_H = 22  # the per-card Follow button strip (tiles only)
 _FRAME_MIN_S = 1 / 20  # a card re-uploads a changed frame at most 20 times a second
 
 
@@ -91,8 +92,10 @@ class CardView:
     re-uploads pixels when the snapshot/frame content actually changed."""
 
     def __init__(self, parent, agent_id: str, card_w: int, card_h: int, on_focus: Callable[[str], None],
-                 on_select: Callable[[str], None], big: bool = False) -> None:
+                 on_select: Callable[[str], None], big: bool = False,
+                 on_follow: Callable[[str], None] | None = None) -> None:
         self.agent_id = agent_id
+        self._on_follow = on_follow
         self.big = big
         self._on_focus, self._on_select = on_focus, on_select
         self.card_w, self.card_h = card_w, card_h
@@ -136,7 +139,7 @@ class CardView:
         pw = (iw - _PAD) // 2 if not self.big else iw * 2 // 5
         # two 10:9 frames wide -> frame height follows panel width
         fh = int(pw * 9 / 10)
-        avail = h - 2 * _PAD - _HEADER_H
+        avail = h - 2 * _PAD - _HEADER_H - (_FOLLOW_H if self._on_follow else 0)
         top = min(fh, max(24, int(avail * 0.62)))
         text = max(16, avail - top - _PAD)
         g = {
@@ -179,6 +182,9 @@ class CardView:
         self._img["progress"] = self._place("progress", g["progress"])
         if self.big:
             self._img["focus"] = self._place("focus", g["focus"])
+        if self._on_follow is not None:
+            self._img["follow"] = dpg.add_button(label="Follow", parent=self._parent, width=60, height=_FOLLOW_H - 4,
+                                                 callback=lambda s, a, u: self._on_follow(self.agent_id))
 
     def _place(self, name: str, size: tuple[int, int]):
         tex = self._tex.setdefault(name, _Tex(*size))

@@ -34,7 +34,7 @@ def main(args: argparse.Namespace) -> int:
     if args.png:
         return png(args)
     from pokeagent.viewer.app import run
-    return run(args.root, fake=args.fake, world_mode=True)
+    return run(args.root, fake=args.fake, mode=args.mode)
 
 
 def add_parser(sub) -> None:
@@ -48,4 +48,5 @@ def add_parser(sub) -> None:
     p.add_argument("--scale", type=float, default=1.0, help="output scale for --png")
     p.add_argument("--interiors", choices=list(MODE_ALIAS), default="inset",
                    help="--png: interiors inset (grid), inplace (fit to building), inplace-full, auto, or stretch (stretch the outdoor world so rooms fit full size)")
+    p.add_argument("--mode", choices=("tiles", "world"), default="world", help="start view (default world; same window as `view`)")
     p.set_defaults(func=main)
