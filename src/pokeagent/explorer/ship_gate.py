@@ -137,26 +137,22 @@ def _rom_step(pos: tuple, tile: tuple, grid_get=None) -> str | None:
     return {(0, -1): "UP", (0, 1): "DOWN", (-1, 0): "LEFT", (1, 0): "RIGHT"}.get((b[0] - a[0], b[1] - a[1]))
 
 
-BOW, CAPTAIN = 0x63, 0x65
-DECK = 0x61   # 3F deck: its warp leads to the bow
+DECK_2F, CAPTAIN = 0x60, 0x65   # the captain's room is entered from 2F; the bow (0x63) is a dead end with warps only back to the deck
 
 
 def board_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
-    """Fit and ready, but not at the bow yet (after a walk-off, or a segment that starts in Vermilion): Vermilion -> dock -> the
-    bow. The learned world has the dock but not the stairs between the ship's floors, so aboard it falls back to the ROM route
-    to the deck's warp to the bow."""
+    """Fit and ready: Vermilion -> dock, then aboard the ROM route to 2F's door into the captain's room. The learned world has the
+    dock but not the stairs between the ship's floors, and the bow it did learn leads nowhere, so aboard it is always the ROM route."""
     if unfit(goals):
         return None
     if pos[0] == VERMILION:
         p = g.path(pos, _on(DOCK))
         return (p[0], f"goal boarding: {len(p)} steps to the S.S. Anne dock") if p else None
-    if pos[0] not in SHIP_MAPS or pos[0] in (BOW, CAPTAIN):
+    if pos[0] not in SHIP_MAPS or pos[0] == CAPTAIN:
         return None
-    if g.path(pos, _on(BOW)):
-        return None  # the learned world reaches the bow: east_road_step's own target walk takes it
     plan = goals.get("_ship_plan")
-    buttons = plan(pos, plan.warp_tiles(DECK, BOW)) if plan is not None else None
-    return (buttons[0], f"goal boarding: {len(buttons)} steps to the bow by the ROM route") if buttons else None
+    buttons = plan(pos, plan.warp_tiles(DECK_2F, CAPTAIN)) if plan is not None else None
+    return (buttons[0], f"goal boarding: {len(buttons)} steps to the captain's door on 2F by the ROM route") if buttons else None
 
 
 def ship_gate_step(g: WorldGraph, goals: dict, stage: str | None, pos: tuple, grid_get=None) -> tuple[str, str] | None:

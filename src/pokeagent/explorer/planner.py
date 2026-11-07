@@ -239,6 +239,6 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
                 return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
     if goals.get("beat_brock") and not goals.get("ss_ticket"):
         return east_road_step(g, maps, goals, pos, facing)
-    if goals.get("to_vermilion") and not goals.get("ss_anne_captain"):  # Vermilion checkpoint, then aboard: the bow, never east into the rival
+    if goals.get("to_vermilion") and not goals.get("ss_anne_captain"):  # Vermilion checkpoint, then aboard: the ROM route to the captain's door on 2F
         return east_road_step(g, maps, goals, pos, facing)
     return None
