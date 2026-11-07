@@ -78,8 +78,14 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         dx, dy = DIRS.get(name, (0, 0))
         npc_ahead = name in DIRS and after == before and (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
         result = ctx.mem.learn(before, name, after, confirmed=confirmed, npc_ahead=npc_ahead)
-        if npc_ahead and before[0] in DUNGEON_MAPS:  # only in a dungeon: elsewhere the person may be the target (nurse, Mom, clerk); route around / wait for the person; the tile decays (anomalies.expire) and is never learned as a wall
-            ctx.mem.temp_blocked[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
+        exploring = fr.why.startswith("frontier")  # exploration never needs a person's tile: route around the person (Route 25 trainers, 2026-11-06)
+        if npc_ahead and (before[0] in DUNGEON_MAPS or exploring):  # elsewhere the person may be the target (nurse, Mom, clerk); the tile decays and is never learned as a wall
+            tb = ctx.mem.temp_blocked
+            for k in [k for k, until in tb.items() if until <= ctx.frame]:
+                del tb[k]  # prune here too: headless/demo runs have no anomaly monitor to expire them
+            tb[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
+            if exploring:
+                ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = [], None, None  # replan around the person
         if "ahead_tiles" in extra and after[0] == before[0]:
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
                 ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False, stand=extra.get("stand_tile"))  # a real wall, not a person
