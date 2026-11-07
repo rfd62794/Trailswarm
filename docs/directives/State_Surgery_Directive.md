@@ -50,9 +50,7 @@ An edited state is a SYNTHETIC state: never a chain checkpoint, never a personal
 | 0xD356 | badges bitmask | read only here (no badge edits in v1) |
 
   Item ids in this repo: 0x14 POTION, 0x13 SUPER POTION, 0x12 HYPER POTION, 0x11 MAX POTION (`explorer/behaviours/cave_escape.py`, `item_use.py`).
-- `tools/make_state.py` (usage docstring): "Build reusable emulator checkpoints from an existing savestate. Examples:
-  `uv run python tools/make_state.py --src runs/checkpoints/deliver_parcel.state --out runs/checkpoints/deliver_parcel_closed.state --clear-dialog`;
-  `... --src runs/checkpoints/deliver_parcel_closed.state --out runs/checkpoints/viridian_old_man.state --goto 1:18:11 --press UP`."
+- `tools/make_state.py` (usage docstring): "Build reusable emulator checkpoints from an existing savestate", with flags `--src SRC --out OUT --clear-dialog` and `--goto MAP:X:Y --press BUTTON`.
   It walks and presses buttons; it does not write RAM. `tools/state_info.py <glob>` prints the `statemeta` sidecars (not `.fp.json`).
   `tools/ab.py --state S --goal G --seeds 1-4 --steps N --a "" --b "--flag"` runs two explorer variants headless from state `S`.
 - **Where a personal best is recorded (read from `tools/`):** `tools/seg_ingest.py::record_attempt` (updates attempt stats, may copy the run's `end.state`
@@ -226,11 +224,12 @@ function, what you could not do without a ROM, and anything that did not fit.
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 12:56 · robert-claude-laptop · none → Draft — Claude 2026-11-07: save-state editing v1 (surgery.py + state_edit CLI + synthetic gate)
+- 2026-11-07 12:57 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new surgery.py/test_surgery.py and gitignored kb/ + runs/ evidence paths (greenfield); statelog.py cited conditionally
 <!-- queue:end -->
