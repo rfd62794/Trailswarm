@@ -131,11 +131,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 16:20 · robert-claude-laptop · none → Draft — Claude 2026-11-07: poison care/Antidote, shopping floor, EXP eligibility gate
+- 2026-11-07 16:20 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing greenfield/gitignored
 <!-- queue:end -->
