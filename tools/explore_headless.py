@@ -54,13 +54,19 @@ def run(args) -> dict:
                           explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), stop_at_goal=args.stop_at_goal, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
-                                                                   bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow))
-    from pokeagent.atlas.walkgrid import rom_cave_planner
+                                                                   bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow,
+                                                                   role=args.role, novelty=args.novelty, novelty_path=args.novelty_path))
     from pokeagent.explorer.world import SHIP_MAPS
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, args.bandit_path, work / "bandit_delta.json", args.seed)
+    if args.novelty:
+        from pokeagent.novelty.tracker import attach as attach_novelty
+        ctx.opts.novelty_delta = str(work / "novelty_delta.json")
+        attach_novelty(ctx, runs_dir=work)  # discoveries and the delta stay in the temp work dir: a check never writes runs/
+        ctx.log = lambda t, tag=None: print(t) if "novelty" in t or args.verbose else None
+        ctx.novelty.log = ctx.log
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=DecisionLog(work / "decisions.jsonl"))
     m = {"box_presses": 0, "box_frames": 0, "pages": 0, "early_presses": 0}
@@ -139,6 +145,9 @@ def main(argv=None) -> int:
     ap.add_argument("--bandit", action="store_true", help="behaviour bandit on (reads --bandit-path, writes <work>/bandit_delta.json)")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
+    ap.add_argument("--role", default="", help="swarm role; with --novelty only explorer is steered and paid by novelty")
+    ap.add_argument("--novelty", action="store_true", help="novelty tracking on (reads --novelty-path; delta and discoveries stay in the work dir)")
+    ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start (read-only here)")
     ap.add_argument("--verbose", action="store_true")
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
     return 0

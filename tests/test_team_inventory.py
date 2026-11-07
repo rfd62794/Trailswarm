@@ -34,10 +34,12 @@ def world() -> dict:
             "67": {"visited": inside, "blocked": [], "warps": {"3,7,DOWN": [3, 23, 19]}}}
 
 
-def make_ctx(tmp_path, balls: int, money: int, m: int = 3, x: int = 23, y: int = 19, party_hp=(30, 30)) -> ExplorerContext:
+def make_ctx(tmp_path, balls: int, money: int, m: int = 3, x: int = 23, y: int = 19, party_hp=(30, 30), potions: int = 0) -> ExplorerContext:
     mem = {MAP: m, PX: x, PY: y, **bcd(money), 0xD16C: 0, 0xD16D: party_hp[0], 0xD18D: 0, 0xD18E: party_hp[1]}
-    if balls:
-        mem.update({BAG_N: 1, 0xD31E: 0x04, 0xD31F: balls})
+    bag = [(0x04, balls)] * bool(balls) + [(0x14, potions)] * bool(potions)
+    mem[BAG_N] = len(bag)
+    for i, (item, qty) in enumerate(bag):
+        mem.update({0xD31E + 2 * i: item, 0xD31F + 2 * i: qty})
     ctx = ExplorerContext(emu=FakeEmulator(mem), mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10)
     ctx.mem.data["maps"] = world()
     ctx.facing = "UP"
@@ -61,8 +63,8 @@ def test_restock_sets_intent_and_walks_to_the_mart(tmp_path):
 
 
 def test_restock_stays_quiet_with_balls_or_without_money(tmp_path):
-    for balls, money in ((9, 4000), (1, 500)):
-        ctx = make_ctx(tmp_path, balls, money)
+    for balls, money in ((9, 4000), (1, 500)):  # economy: the potion floor is stocked too, so quiet means balls AND potions are fine
+        ctx = make_ctx(tmp_path, balls, money, potions=3)
         assert Restock().step(ctx) is None and not ctx.restock.get("intent")
 
 
@@ -102,7 +104,8 @@ def test_in_mart_walks_to_the_counter_then_buys_balls_once(tmp_path, monkeypatch
     assert Restock().step(ctx).button == "LEFT"  # turn to face the clerk first
     ctx.facing = "LEFT"
     d = Restock().step(ctx)
-    assert calls == [(0x04, rs.BALL_BUY)] and d.button == "" and not ctx.restock["intent"] and ctx.restock["bought"] == 10
+    assert calls == [(0x04, rs.BALL_BUY), (0x14, 2)]  # balls first, then potions with what the reserve leaves
+    assert d.button == "" and not ctx.restock["intent"] and ctx.restock["bought"] == 20
 
 
 def test_failed_purchase_marks_the_mart_and_never_loops(tmp_path, monkeypatch):

@@ -21,6 +21,7 @@ from pokeagent.explorer.behaviours.item_use import (
     POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import party_log
+from pokeagent.explorer.economy import ledger as economy_ledger
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
@@ -176,7 +177,8 @@ class Battle(BehaviourBase):
                     return dec
             if ctx.potion_hp_before is not None and hp > ctx.potion_hp_before:
                 ctx.mem.data.setdefault("item_heal", {}).setdefault("20", []).append(hp - ctx.potion_hp_before)
-                ctx.log(f"[POTION healed {hp - ctx.potion_hp_before} HP: learned]", "res"); ctx.potion_hp_before = None
+                ctx.log(f"[POTION healed {hp - ctx.potion_hp_before} HP: learned]", "res")
+                economy_ledger.of(ctx).use(ctx, 0x14, "battle potion timing", "battle", ctx.potion_hp_before, hp, True); ctx.potion_hp_before = None
             # On the road to Pewter after the parcel, wild fights cost 25+ presses each and a to_pewter run only has 1800
             # (2026-11-03: 30-50% of the Forest presses were battle text): run unless a ball could catch it.
             gn = check_goals(ctx.emu, ctx)
