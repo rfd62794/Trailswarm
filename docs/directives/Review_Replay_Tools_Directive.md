@@ -162,11 +162,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 15:41 · robert-claude-laptop · none → Draft — Claude 2026-11-07: review run/swarm/replay/diff operator CLI tools
+- 2026-11-07 15:42 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests/fixtures and gitignored runs/kb paths
 <!-- queue:end -->
