@@ -27,6 +27,7 @@ from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.seeding import idle_frames  # noqa: E402
 from pokeagent.explorer.text_pace import prompt_waiting  # noqa: E402
 from pokeagent.goals import check_goals  # noqa: E402
+from pokeagent.segment_names import state_goal  # noqa: E402
 
 
 FRAMES_PER_STEP, BOX_PACE = 4, 6  # explore_demo --headless: decisions every 4 frames, every 6 while a box is open
@@ -50,7 +51,7 @@ def run(args) -> dict:
     emu.press = lambda b, hold=8, settle=16: (count.__setitem__("frames", count["frames"] + hold), press(b, hold, settle))[1]
     trans = (work / "transitions.jsonl").open("a", encoding="utf-8")
     ctx = ExplorerContext(emu=emu, mem=mem, log=lambda t, tag=None: print(t) if args.verbose else None, run_dir=work, trans=trans,
-                          explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, frames_per_step=4,
+                          explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), stop_at_goal=args.stop_at_goal, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text))
     presser = Presser(ctx)
@@ -123,6 +124,7 @@ def main(argv=None) -> int:
     ap.add_argument("--fast-text", action="store_true", help="run the set_text_speed_fast procedure first")
     ap.add_argument("--maps-copy", default=None, help="start from a copy of this maps.json (default: fresh)")
     ap.add_argument("--hurt", type=int, default=0, help="set the lead mon's HP to this value after loading (heal check)")
+    ap.add_argument("--stop-at-goal", default=None, help="end the run when this goal lands (a segment run, as the swarm launches it)")
     ap.add_argument("--starter", default="bulbasaur")
     ap.add_argument("--verbose", action="store_true")
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
