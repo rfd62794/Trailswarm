@@ -150,7 +150,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -158,4 +158,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 **Status log**
 - 2026-11-07 15:55 · robert-claude-laptop · none → Draft — Claude 2026-11-07: progress signal + loop memory (veto, cross-run promotion with decay); depends on PR #150
 - 2026-11-07 15:55 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR #150 merging; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ path
+- 2026-11-07 16:11 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield modules/tests and gitignored kb/rom_tables.json; known false positives. Dependency PR #150 (blocked_cap, ctx.deciding_rule) merged.
 <!-- queue:end -->
