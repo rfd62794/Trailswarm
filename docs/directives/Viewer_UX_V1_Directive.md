@@ -154,7 +154,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -164,4 +164,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:46 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on fix/stadium-opponent; lint_override: dispatch-path-missing on greenfield test file and gitignored runs/kb paths
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: reword entry-point mentions (preflight), add provenance rule
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; entry-point mentions reworded; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
+- 2026-11-07 16:27 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on gitignored kb/rom_tables.json, runs/anomalies.jsonl and the new tests/test_viewer_stadium_pane.py; known false positives. Entry-point mentions reworded. Dependency fix/stadium-opponent merged as PR #149.
 <!-- queue:end -->
