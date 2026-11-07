@@ -163,11 +163,13 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-blackout-adjusted-readiness-directive |
 | Base branch | - |
 | Base commit | c3e79c03f087d2052665496c8c3d8df7ccc7c380 |
+| Head commit | c520435941eeb78f89c8532f9f2ab08c37770e46 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: blackout tax on readiness margin
@@ -175,4 +177,5 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 - 2026-11-07 12:49 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files knowledge/blackout_tax.py and tests/test_blackout_tax.py; known false positive. Held until Battle_Log_Fidelity merged (shared battle.py edits); it merged as #136.
 - 2026-11-07 12:49 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJ2YZ0BDDN8RQ9F2871WRF
 - 2026-11-07 12:56 · dispatcher · launched pid=3808; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; provisioned: uv sync --frozen
+- 2026-11-07 13:00 · devin · In progress → Review — [origin] spent: devin 4 min est. n/a
 <!-- queue:end -->
