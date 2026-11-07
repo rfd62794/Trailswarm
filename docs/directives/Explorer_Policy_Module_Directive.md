@@ -217,11 +217,12 @@ returned `None`, how hybrid's `Unknown` triggers were detected, and anything in 
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — build step 11 (explorer policy module), spike approved by Robert 2026-11-02; queue after Map_Memory, Text_Box_Awareness, Viewer and Mcp_Server merge
+- 2026-11-06 21:11 · robert-claude-laptop · Draft → Queued — closing as superseded
 <!-- queue:end -->
