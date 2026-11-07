@@ -75,6 +75,19 @@ def plan_hm(*, bag: dict[int, int], party: list[Mon], needs: list[str], learners
     return None
 
 
+def stranded_hms(*, bag: dict[int, int], party: list[Mon], needs: list[str], learners: dict[str, frozenset]) -> list[str]:
+    """HM tags the bag holds and the campaign needs, that nobody knows and no party species can learn: the option exists but only a
+    caught Cut/Surf/Strength-capable mon unlocks it (catch_list.catch_wanted asks for one)."""
+    out = []
+    for tag in needs:
+        item = ids.HM_BY_TAG.get(tag)
+        if item is None or bag.get(item, 0) <= 0 or any(ids.HM_MOVE[tag] in m.moves for m in party):
+            continue
+        if not any(m.species != MAGIKARP and m.species in learners.get(tag, ()) for m in party):
+            out.append(tag)
+    return out
+
+
 def _fighter(party: list[Mon]) -> int | None:
     from pokeagent.explorer.item_policies.view import fighter_slot_of
     return fighter_slot_of(party)

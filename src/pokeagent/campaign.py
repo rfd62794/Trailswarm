@@ -6,6 +6,7 @@ Each goal is {id, name, after, detector, needs, note}. ``detector`` is one of
   {"item": id | [ids]}            the item is (or once was, this run) in the bag
   {"flag": {"addr", "bit"}}       an event-flag byte bit
   {"party": {"min_count": n}}     party size
+  {"party_move": move_id}         any party member knows this move (pokered move id; 15 = CUT)
   {"map_and_badge": {"map": [ids], "badge": bit}}
   {"map_now_with_item": {"map": [ids], "item": id}}   standing on one of these maps NOW, holding (or once holding, this run) the item
   {"map_past_x": {"map": [ids], "x": n}}              standing on one of these maps NOW at wXCoord >= n (past a blocker)
@@ -82,6 +83,15 @@ def _flag(emu, flag: dict) -> bool:
     return bool(emu.read(addr) >> int(flag["bit"]) & 1)
 
 
+PARTY_COUNT, PARTY_MON1_MOVES, PARTY_MON_SIZE = 0xD163, 0xD173, 0x2C  # wPartyCount; wPartyMon1Moves (4 bytes); struct stride
+
+
+def party_knows_move(emu, move_id: int) -> bool:
+    """Any of the (up to 6) party members has ``move_id`` in one of its four move slots."""
+    n = min(emu.read(PARTY_COUNT), 6)
+    return any(emu.read(PARTY_MON1_MOVES + PARTY_MON_SIZE * i + s) == move_id for i in range(n) for s in range(4))
+
+
 def evaluate(det, emu, st: dict, seen: set, bag: dict) -> bool | None:
     """One generic detector against the emulator and run state; None for a detector this module does not evaluate."""
     if not isinstance(det, dict):
@@ -99,6 +109,8 @@ def evaluate(det, emu, st: dict, seen: set, bag: dict) -> bool | None:
         return _flag(emu, det["flag"])
     if "party" in det:
         return emu.read(0xD163) >= int(det["party"].get("min_count", 1))
+    if "party_move" in det:
+        return party_knows_move(emu, int(det["party_move"]))
     if "map_and_badge" in det:
         mb = det["map_and_badge"]
         return any(m in seen for m in mb["map"]) and bool(emu.read(BADGES) >> int(mb["badge"]) & 1)

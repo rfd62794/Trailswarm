@@ -12,6 +12,7 @@ from pokeagent.explorer.behaviours.catch import Catch
 from pokeagent.explorer.behaviours.cave_escape import CaveEscape
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp
 from pokeagent.explorer.behaviours.frontier import ExploreBurst, Frontier
+from pokeagent.explorer.behaviours.goal_talk import GoalTalk
 from pokeagent.explorer.behaviours.goto import Goto
 from pokeagent.explorer.behaviours.grind_drill import GrindDrill
 from pokeagent.explorer.behaviours.guards import LoopGuard, StallGuard
@@ -29,7 +30,7 @@ from pokeagent.explorer.behaviours.use_items import UseItems
 
 __all__ = [
     "AdvanceDialog", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
-    "ExploreBurst", "Frontier", "Goto", "GrindDrill", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
+    "ExploreBurst", "Frontier", "GoalTalk", "Goto", "GrindDrill", "Heal", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "Restock", "SettleWait", "StallGuard", "SwitchOut",
     "UseItems", "default_behaviours", "no_press",
 ]
@@ -47,6 +48,6 @@ def default_behaviours() -> list[Behaviour]:
         SettleWait(), LoopGuard(), PartyOrder(), PostTalkSettle(), Readiness(), AnomalyWait(), ReplayInterrupt(),
         BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
         NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
-        Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), UseItems(), GrindDrill(),
+        Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), UseItems(), GoalTalk(), GrindDrill(),
         ExploreBurst(), Pickup(), PlanGoal(), Frontier(),
     ]
