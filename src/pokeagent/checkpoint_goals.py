@@ -68,6 +68,12 @@ def read_completed(state: Path) -> set[str] | None:
         return None
 
 
+def stamp_fingerprint(emu, state: Path, source_run: str | None = None) -> None:
+    """A fresh RAM fingerprint (statefp) beside a just-written checkpoint state; the caller's try keeps it best effort."""
+    from pokeagent import statefp
+    statefp.stamp(emu, state, source_run)
+
+
 def copy_sidecar(src: Path, dst: Path) -> None:
     import shutil
     from pokeagent import statefp

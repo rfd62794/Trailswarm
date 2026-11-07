@@ -13,6 +13,7 @@ not re-create it.
 | 0xD31E.. | wBagItems | pairs (item id, qty), 0xFF terminator | probe_pc: D31E FF->14 (POTION), D31F 00->01, D320 00->FF |
 | 0xD347 (3 bytes) | wPlayerMoney | BCD, 3000 at a new game | make_baseline |
 | 0xD35E | wCurMap | 0x26 = REDS_HOUSE_2F, 0x25 = REDS_HOUSE_1F, 0x00 = PALLET_TOWN | make_baseline + explore_demo warps |
+| 0xD719 | wLastBlackoutMap | map id of the town a blackout returns to (the last Pokecenter healed at); 5 = Vermilion | 2026-11-07: 2026-11-07: read from 229 save states with one headless emulator: all 49 leg states on Vermilion and ship maps read 5 (Vermilion) after the Pokecenter heal; ship checkpoints saved before the heal read 3 (Cerulean); values seen 0,1,2,3,5,15. Spec docs/superpowers/specs/2026-11-07-save-state-ledger.md. |
 | 0xD361 / 0xD362 | wYCoord / wXCoord | player tile position | make_baseline (RIGHT changed X 4->5) |
 | 0xD53A | wNumBoxItems | items stored in the PC | probe_pc: 1->0 |
 | 0xD53B.. | wBoxItems | pairs (item id, qty), 0xFF terminator | probe_pc: D53B 14->FF |
@@ -187,6 +188,16 @@ Gen 1 evolves a mon after the battle returns to the overworld, so an evolution u
 Atlas consumers: key on `map`, `kind`, `enemy` (species, level) and sum `exp_gained`; `sum(exp_gained)` is the exp for that fight
 (lead only unless Exp. All or the fight was shared). Records written before this change have none of these fields; treat them as
 missing, or use `runs/xp_estimates.jsonl`.
+
+2026-11-07: the record also carries `outcome` (`"won" | "lost" | "fled" | "blackout"`), `battle_map` (the map the fight started
+on), `end_map` (where the run stands after the battle: the respawn town for a blackout), `stage` (the training stage goal, e.g.
+`"rival_ss_anne"`), `trainer` (`{"map","x","y","pic"}` of the pinned trainer NPC, or `null`), and `party_error` (only when the
+party snapshot failed; `party_before`/`party_after` are now on every record). From this date `map` = `battle_map` and `fled`
+means a real wild flee: records before it have `fled: true` on blackouts and the respawn town in `map`; readers that need
+history should prefer `outcome` when present. `party_after` is read after the warp, so for a blackout it shows the healed
+party (the HP at the moment of loss is the last `turns[-1].hp_you`). A ship fight won is the record
+`{"outcome": "won", "stage": "rival_ss_anne", "trainer": {...}}`: that is the battle-won flag until a ROM-verified event flag
+exists (`rival_ss_anne` stays `unverified`).
 
 **`runs/explore-*/levels.jsonl`** (per run): `{step, frame, map, cause, party, [level_ups, evolved, moves_learned]}`, with `cause`
 `start` (baseline), `battle_end` (every battle), or `out_of_battle` (any level/exp/species change outside a fight: rare candy, daycare,
