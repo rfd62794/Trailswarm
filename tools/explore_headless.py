@@ -53,7 +53,11 @@ def run(args) -> dict:
     ctx = ExplorerContext(emu=emu, mem=mem, log=lambda t, tag=None: print(t) if args.verbose else None, run_dir=work, trans=trans,
                           explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), stop_at_goal=args.stop_at_goal, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
-                                                                   adaptive_pace=args.adaptive, fast_text=args.fast_text))
+                                                                   adaptive_pace=args.adaptive, fast_text=args.fast_text,
+                                                                   bandit=args.bandit, bandit_path=args.bandit_path))
+    if args.bandit:
+        from pokeagent.bandit.driver import attach
+        attach(ctx, args.bandit_path, work / "bandit_delta.json", args.seed)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=DecisionLog(work / "decisions.jsonl"))
     m = {"box_presses": 0, "box_frames": 0, "pages": 0, "early_presses": 0}
@@ -92,6 +96,9 @@ def run(args) -> dict:
                 m["step_errors"] = m.get("step_errors", 0) + 1
                 ctx.log(f"[agent step error: {e!r}]", "res")
     mem.save(); trans.close()
+    if ctx.bandit is not None:
+        ctx.bandit.save()
+        m["bandit"] = {"closed_episodes": ctx.bandit.closed, "open_episodes": len(ctx.bandit.open), "delta": str(ctx.bandit.delta_path)}
     if args.adaptive:  # the fast path waits for the prompt itself, so it counts its own pages
         tp = mem.data.get("text_press_stats", {"presses": 0, "pages": 0})
         m["box_presses"], m["pages"], m["early_presses"] = tp["presses"], tp["pages"], tp["presses"] - tp["pages"]
@@ -126,6 +133,8 @@ def main(argv=None) -> int:
     ap.add_argument("--hurt", type=int, default=0, help="set the lead mon's HP to this value after loading (heal check)")
     ap.add_argument("--stop-at-goal", default=None, help="end the run when this goal lands (a segment run, as the swarm launches it)")
     ap.add_argument("--starter", default="bulbasaur")
+    ap.add_argument("--bandit", action="store_true", help="behaviour bandit on (reads --bandit-path, writes <work>/bandit_delta.json)")
+    ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--verbose", action="store_true")
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
     return 0

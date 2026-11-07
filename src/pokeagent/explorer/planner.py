@@ -38,7 +38,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # straight back out, and ping-ponged through the door for 220 presses - 07:14 round)
     top_off = goals.get("_heal_trips", 0) < MAX_TOPOFF_TRIPS  # area_grind: the 90% heal trip is bounded (Route 2 <-> Viridian yo-yo)
     heal_below = 0.9 if top_off and pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
-    if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed")
+    if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed") and not goals.get("_push_on")
             and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33, 0x02, 0x36, 0x03, 0x0F, 0x23) or pos[0] in POKECENTER_MAPS)):
         # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
         # every Pokecenter has the same shape: door (3,7), a clear column x=3 up to the counter, nurse at (3,1).

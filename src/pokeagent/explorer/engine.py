@@ -35,6 +35,8 @@ class Engine:
 
     def step(self) -> Decision | None:
         ctx = self.ctx
+        if ctx.bandit is not None:
+            ctx.bandit.begin_step()
         decision = self.selector.choose(ctx)
         self.last_decision = decision
         if decision is None or not decision.button:
@@ -60,10 +62,16 @@ class Engine:
             self._prev_from = before
         rec = make_record(ctx.step, decision.behaviour, decision.rule, decision.button, before,
                           stage, box, battle, outcome, reversal)
+        if ctx.bandit is not None:
+            rec = ctx.bandit.tag(rec)  # driver/arm: only runs with the bandit on carry them
         if self.decision_log is not None:
             self.decision_log.write(rec)
         if ctx.anomalies is not None:
             ctx.anomalies.note_decision(rec)
+        if ctx.bandit is not None:
+            for ev in ctx.bandit.after_press(ctx, rec, _tossed(ctx) > tossed_before):
+                if self.decision_log is not None:
+                    self.decision_log.write(ev)
         if self.decision_log is not None and _tossed(ctx) > tossed_before:  # an item was thrown away: the bandit reward counts this line
             self.decision_log.write({**rec, "event": "item_tossed", "outcome": "item_tossed"})
         self._pending_outcomes.append(rec)

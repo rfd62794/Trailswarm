@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import random
 
+from pokeagent.bandit.hook import heal_push_on, train_need
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
@@ -55,8 +56,9 @@ class PlanGoal(BehaviourBase):
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
         area_grind.note_map(ctx, m)
         need = area_grind.capped_need(ctx, m, need, lead_level(ctx.emu), bool(goals_now_all.get("to_route2")))
+        need = train_need(ctx, goals_now_all, need)  # bandit decision point: grind or skip (unchanged when off)
         ctx.train_need = need  # frontier reads it to seek grass while below the target
-        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_parcel_spot": parcel,
+        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need, "_heal_trips": ctx.heal_trips,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
