@@ -159,7 +159,8 @@ class LegStateSaver:
             fresh = not (self.dir / name(*a, self.keep - 1)).exists()
             p = save_entry(ctx.emu, self.dir, *a, keep=self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)   # respawn, party, money, bag beside the state
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)   # lineage carries from the run's start
             except Exception as e:  # noqa: BLE001  an unstamped state is still a state
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             self.saved += 1
@@ -188,7 +189,8 @@ class LegStateSaver:
                 return None
             p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name)
+                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)
             except Exception as e:  # noqa: BLE001
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")

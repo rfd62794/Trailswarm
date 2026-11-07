@@ -22,6 +22,7 @@ class ExplorerOptions:
 
     starter: str = "any"
     state_stem: str = ""  # Path(--state).stem, "" when no state
+    state_path: str = ""  # Path(--state) itself: state stamps inherit a non-organic start's lineage from it
     steps: int = 300
     stop_at_goal: str | None = None
     stop_at_map: int | None = None  # sub-segment runs end on first entry into this map id

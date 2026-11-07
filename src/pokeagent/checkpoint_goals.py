@@ -68,10 +68,11 @@ def read_completed(state: Path) -> set[str] | None:
         return None
 
 
-def stamp_fingerprint(emu, state: Path, source_run: str | None = None) -> None:
-    """A fresh RAM fingerprint (statefp) beside a just-written checkpoint state; the caller's try keeps it best effort."""
+def stamp_fingerprint(emu, state: Path, source_run: str | None = None, *, inherit=None) -> None:
+    """A fresh RAM fingerprint (statefp) beside a just-written checkpoint state; the caller's try keeps it best effort.
+    ``inherit`` is the run's start state: a non-organic start's lineage is carried into the new fingerprint."""
     from pokeagent import statefp
-    statefp.stamp(emu, state, source_run)
+    statefp.stamp(emu, state, source_run, inherit=inherit)
 
 
 def copy_sidecar(src: Path, dst: Path) -> None:

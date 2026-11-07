@@ -286,6 +286,6 @@ def replayable(b: dict | None) -> bool:
     both kept under runs/segments/inputs/) are all still there and unchanged."""
     if not b or not b.get("input") or not b.get("start") or not Path(b["input"]).exists() or not Path(b["start"]).exists():
         return False
-    if statefp.is_synthetic(Path(b["start"])):
-        return False                                    # a solve from an edited state can never be confirmed
+    if not statefp.is_organic(Path(b["start"])):
+        return False                                    # a solve from an edited or promoted state can never be confirmed
     return all(b.get(k) is not None for k in REPLAY_KEYS) and sha256(b["start"]) == b.get("start_sha")
