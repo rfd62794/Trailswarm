@@ -11,6 +11,7 @@ from pokeagent.explorer.behaviours.battle import BattleView
 from pokeagent.explorer import catch_list
 from pokeagent.explorer.catch_list import catch_wanted, upcoming_needs
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+from pokeagent.explorer.economy import hp_stats, plan
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.knowledge import hm_compat
 from pokeagent.explorer.memory import MapMemory
@@ -19,6 +20,13 @@ from pokeagent.screentext import CHARMAP
 MAP, PX, PY, BAG_N, MONEY = 0xD35E, 0xD362, 0xD361, 0xD31D, 0xD347
 REV = {v: k for k, v in CHARMAP.items() if len(v) == 1 and v.strip()}
 needs_rom = pytest.mark.skipif(ROM_KB is None, reason="kb/rom_tables.json not present")
+
+
+@pytest.fixture(autouse=True)
+def no_run_data(monkeypatch):
+    """The expected-loss stats come from runs/economy.json or runs/battles.jsonl (the live checkout's run data). Pin them to the
+    empty case so the Mart tests never depend on what the repo's runs/ holds (empty stats: default loss, potion floor 3, reserve clamps to 2)."""
+    monkeypatch.setattr(plan, "load_stats", lambda path=None: hp_stats.HpStats())
 
 
 def bcd(n: int) -> dict:
