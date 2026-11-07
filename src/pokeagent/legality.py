@@ -9,7 +9,7 @@ the table-dependent invariants do not run - a ``no kb`` warning, never a violati
 Invariants: party_structure, party_stats, party_exp, party_moves, party_pp, party_evolution (party, in
 legality_party); bag, money, badges, key_items, world, pokedex (here). Unverified checks are always WARNINGS:
 gym-beaten flags, TM moves (there is no TM compatibility table in the repo), the S.S. Ticket flag, the map-view
-pointer, evolution pending.
+pointer (a mismatch is a warning: transitional saves differ), evolution pending.
 """
 from __future__ import annotations
 
@@ -25,7 +25,13 @@ from pokeagent.ramworld import POKEDEX_BYTES, POKEDEX_OWNED, POKEDEX_SEEN
 
 MAP, Y, X, BADGES, MONEY, RESPAWN = statefp.MAP, statefp.Y, statefp.X, statefp.BADGES, statefp.MONEY, statefp.RESPAWN
 EVENT_HM01 = 0xD803          # bit 0 = got HM01 (verified, campaign.json 'hm01_cut'); bit 1 = captain's back rubbed
-VIEW_PTR = 0xD35F            # wCurrentTileBlockMapViewPointer (unverified in ram_map.json)
+VIEW_PTR = 0xD35F            # wCurrentTileBlockMapViewPointer, little-endian (unverified in ram_map.json)
+VIEW_BASE, VIEW_STRIDE_PAD = 0xC6E8, 6   # view pointer = VIEW_BASE + (y//2 + 1) * (w + 6) + x//2 + 1 (see below)
+# Respawn (wLastBlackoutMap) values an organic state can hold: the towns 0..10, plus route-Pokecenter maps.
+# 15 = Route 4 (the Mt Moon Pokecenter's blackout map): 10 validated Mt Moon-area states carry it.
+# 21 = Route 10 (Rock Tunnel center): expected, UNVERIFIED. Accepted anyway: we would rather under-flag respawn
+# than false-flag a legal state.
+RESPAWN_MAPS = frozenset(range(11)) | {15, 21}
 HM01_ITEM, SS_TICKET = 0xC4, 0x3F
 CATALOG_MAX, HM_LO, TM_HI = 83, 0xC4, 0xFA
 MONEY_MAX = 999999
@@ -41,10 +47,12 @@ class Legality:
     checked: list[str]             # invariant names that actually ran
 
 
-def expected_view_pointer(map_w: int, x: int, y: int) -> int | None:
-    """The (map, x, y) -> wCurrentTileBlockMapViewPointer (0xD35F) relation. NOT derived anywhere in the repo, so it
-    returns None: the controller derives it from organic states afterwards and fills this hook in."""
-    return None
+def expected_view_pointer(map_id: int, x: int, y: int, width_blocks: int) -> int:
+    """The view pointer wCurrentTileBlockMapViewPointer (0xD35F) should hold for the player at tile (x, y) on a map
+    ``width_blocks`` blocks wide. Fitted on organic states: it matches 100 of 114 (the 14 misses are transitional
+    saves, e.g. Pallet saved right after leaving the house, or a mid-step row off by one). ``map_id`` is not part of
+    the formula; it is kept so callers pass the full (map, x, y) they checked."""
+    return VIEW_BASE + (y // 2 + 1) * (width_blocks + VIEW_STRIDE_PAD) + x // 2 + 1
 
 
 class _C:
@@ -135,8 +143,9 @@ def _world(c: _C) -> None:
     m, x, y, respawn = c.emu.read(MAP), c.emu.read(X), c.emu.read(Y), c.emu.read(RESPAWN)
     if odd_map(m):
         c.violations.append(f"world: glitch map 0x{MAP:04X} = {m:#04x}")
-    if not 0 <= respawn <= 10:
-        c.violations.append(f"world: respawn 0x{RESPAWN:04X} = {respawn} not a town id (0..10)")
+    if respawn not in RESPAWN_MAPS:
+        c.violations.append(f"world: respawn 0x{RESPAWN:04X} = {respawn} not a town id (0..10) or a route Pokecenter "
+                            f"({', '.join(str(r) for r in sorted(RESPAWN_MAPS - set(range(11))))})")
     hd = None
     if c.rom is None:
         c.warnings.append("world: walk check skipped: no rom")
@@ -151,8 +160,12 @@ def _world(c: _C) -> None:
             c.violations.append(f"world: (x,y) = ({x},{y}) outside map {m:#04x} ({hd.w * 2}x{hd.h * 2})")
         elif not walk_grid(c.rom, hd)[y][x]:
             c.violations.append(f"world: ({x},{y}) not walkable on map {m:#04x}")
-    if expected_view_pointer(hd.w if hd else 0, x, y) is None:
+    if hd is None:
         c.warnings.append("world: view pointer relation unverified")
+    else:
+        ptr, want = c.emu.read(VIEW_PTR) | c.emu.read(VIEW_PTR + 1) << 8, expected_view_pointer(m, x, y, hd.w)
+        if ptr != want:
+            c.warnings.append(f"world: view pointer 0x{ptr:04X} != expected 0x{want:04X} (transitional saves differ)")
 
 
 def _pokedex(c: _C) -> None:

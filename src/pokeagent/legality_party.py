@@ -24,6 +24,10 @@ def _party(c) -> list:
 
 
 def party_structure(c) -> None:
+    """Count, species list and per-mon structure. Box level (struct offset +3) is deliberately NOT checked: the ROM
+    validation (114 organic states, 161 party mons) found it 0 for every party mon, starters and fresh catches
+    included. In Gen 1 that byte only means something for boxed mons, so comparing it to the level false-flagged 94
+    legal states. A transient save (species list written, struct still empty) is a violation: not a resume point."""
     n = c.emu.read(PARTY_COUNT)
     if n > MAX_PARTY:
         c.violations.append(f"party_structure: count 0x{PARTY_COUNT:04X} = {n} (want 0..{MAX_PARTY})")
@@ -39,16 +43,16 @@ def party_structure(c) -> None:
     for i in range(n):
         mon = decode_party_mon(raw[i * PARTY_MON_SIZE:(i + 1) * PARTY_MON_SIZE])
         base = PARTY_MON1 + i * PARTY_MON_SIZE
-        if listed[i] != mon.species:
+        if listed[i] != mon.species and mon.species == 0:
+            c.violations.append(f"party_structure: slot {i} transient save (struct empty): not a usable resume point "
+                                f"(species list 0x{PARTY_SPECIES + i:04X} = {listed[i]:#04x}, struct 0x{base:04X} = 0)")
+        elif listed[i] != mon.species:
             c.violations.append(f"party_structure: slot {i} species list 0x{PARTY_SPECIES + i:04X} = {listed[i]:#04x} "
                                 f"but struct 0x{base:04X} = {mon.species:#04x}")
         if c.kb and str(mon.species) not in c.kb.get("name_of_internal", {}):
             c.violations.append(f"party_structure: slot {i} species {mon.species:#04x} not a valid internal id")
         if not 1 <= mon.level <= 100:
             c.violations.append(f"party_structure: slot {i} level 0x{base + 33:04X} = {mon.level} (want 1..100)")
-        if mon.box_level != mon.level:
-            c.violations.append(f"party_structure: slot {i} box level 0x{base + 3:04X} = {mon.box_level} "
-                                f"!= level 0x{base + 33:04X} = {mon.level}")
         if mon.max_hp < 1:
             c.violations.append(f"party_structure: slot {i} max HP 0x{base + 34:04X}..{base + 35:04X} = {mon.max_hp} (want >= 1)")
         elif mon.hp > mon.max_hp:

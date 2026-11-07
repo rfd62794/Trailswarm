@@ -126,10 +126,28 @@ def test_party_structure_terminator_and_species_list_mismatch():
     assert any(v.startswith("party_structure: slot 1 species list") for v in r.violations)
 
 
-def test_box_level_mismatch_and_hp_over_max():
+def test_box_level_is_not_checked_so_zero_is_legal():
+    """Box level (struct +3) is 0 for every organic party mon: it must never be a violation, not even a warning."""
     emu = world()
-    emu.memory[LEAD + 3] = 5
-    assert any("box level" in v for v in check(emu).violations)
+    assert emu.memory[LEAD + SIZE + 3] == 29 and emu.memory[LEAD + SIZE + 33] == 29
+    emu.memory[LEAD + SIZE + 3] = 0                                         # WARTORTLE L29 with box level 0
+    r = check(emu)
+    assert r.ok and not any("box level" in w for w in r.warnings)
+    emu.memory[LEAD + 3] = 5                                                # any other box-level value: still legal
+    assert check(emu).ok
+
+
+def test_transient_save_with_empty_struct_is_a_violation_with_its_own_message():
+    emu = world()
+    emu.memory[0xD164 + 1] = WARTORTLE                                      # species list written, struct zero
+    for a in range(LEAD + SIZE, LEAD + 2 * SIZE):                          # slot 1 struct zeroed
+        emu.memory[a] = 0
+    r = check(emu)
+    assert not r.ok
+    assert any("transient save (struct empty): not a usable resume point" in v for v in r.violations)
+
+
+def test_hp_over_max():
     emu = world()
     emu.memory[LEAD + 34], emu.memory[LEAD + 35] = 0, 1                    # max HP 1 under current HP
     r = check(emu)
@@ -183,6 +201,65 @@ def test_key_items_hm01_needs_its_flag_and_ss_ticket_warns():
     emu.memory.update({0xD31D: 1, 0xD31E: 0x3F, 0xD31F: 1, 0xD320: 0xFF})   # S.S. Ticket: flag unknown -> warning
     r = check(emu)
     assert r.ok and any("S.S. Ticket" in w for w in r.warnings)
+
+
+def test_respawn_maps_accept_town_and_route_pokecenters_reject_others():
+    for respawn in (0, 5, 10, 15, 21):
+        emu = world()
+        emu.memory[0xD719] = respawn
+        assert not any(v.startswith("world: respawn") for v in check(emu).violations), respawn
+    emu = world()
+    emu.memory[0xD719] = 99
+    assert any(v.startswith("world: respawn") and "99" in v for v in check(emu).violations)
+
+
+VIEW_ROWS = [  # (map, width_blocks, x, y, expected pointer): validated on organic states
+    (90, 4, 2, 1, 0xC6F4),     # bike_voucher
+    (40, 5, 6, 4, 0xC70D),     # first_pokemon
+    (61, 20, 15, 27, 0xC85C),  # mt_moon_b2f
+    (38, 4, 0, 2, 0xC6FD),     # rl_potion
+    (90, 4, 2, 7, 0xC712),     # ss_anne_2f@5a
+    (99, 10, 13, 6, 0xC72F),   # ss_anne_captain@63
+    (36, 30, 0, 8, 0xC79D),    # to_bill@24.best
+    (2, 20, 19, 35, 0xC8C6),   # to_pewter
+    (16, 10, 17, 0, 0xC701),   # to_route5
+    (1, 20, 21, 35, 0xC8C7),   # to_viridian.best
+]
+
+
+@pytest.mark.parametrize("map_id,w,x,y,want", VIEW_ROWS)
+def test_expected_view_pointer_matches_validated_states(map_id, w, x, y, want):
+    assert legality.expected_view_pointer(map_id, x, y, w) == want
+
+
+def _walkable_rom(monkeypatch, w):
+    hd = SimpleNamespace(map_id=0, tileset=0, h=40, w=w, blocks_ptr=0, border=0,
+                         connections=[], warps=[], signs=[], objects=[])
+    monkeypatch.setattr(legality.rom_maps, "is_sane", lambda rom, m: True)
+    monkeypatch.setattr(legality.rom_maps, "header", lambda rom, m: hd)
+    monkeypatch.setattr(legality, "walk_grid", lambda rom, h: [[True] * (h.w * 2) for _ in range(h.h * 2)])
+
+
+@pytest.mark.parametrize("map_id,w,x,y,want", VIEW_ROWS)
+def test_view_pointer_matching_is_silent(monkeypatch, map_id, w, x, y, want):
+    _walkable_rom(monkeypatch, w)
+    emu = world()
+    emu.memory.update({0xD35E: map_id, 0xD362: x, 0xD361: y, 0xD35F: want & 255, 0xD360: want >> 8})
+    r = check(emu, rom=b"rom")
+    assert r.ok and not any("view pointer" in w_ for w_ in r.warnings)
+
+
+def test_view_pointer_mismatch_is_a_warning_not_a_violation(monkeypatch):
+    _walkable_rom(monkeypatch, 10)
+    emu = world()
+    emu.memory.update({0xD35E: 0, 0xD362: 2, 0xD361: 7, 0xD35F: 0x12, 0xD360: 0xC7})   # pointer 0xC712
+    r = check(emu, rom=b"rom")
+    assert r.ok and "world: view pointer 0xC712 != expected 0xC72A (transitional saves differ)" in r.warnings
+
+
+def test_view_pointer_without_header_keeps_the_unverified_warning():
+    r = check(world())
+    assert "world: view pointer relation unverified" in r.warnings
 
 
 def test_world_glitch_map_and_bad_respawn():
