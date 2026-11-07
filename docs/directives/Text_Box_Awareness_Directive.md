@@ -150,11 +150,12 @@ place `CHARMAP` disagreed with the bytes in section 3.
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — text-box awareness; needs Hex_Map_Discovery merged (screentext.py)
+- 2026-11-06 21:10 · robert-claude-laptop · Draft → Queued — closing as superseded
 <!-- queue:end -->
