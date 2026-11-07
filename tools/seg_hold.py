@@ -27,37 +27,47 @@ class Hold:
 
 
 def parse_until(text) -> datetime | None:
+    """An aware datetime, or None if the text is not a usable timestamp (including out-of-range years, which
+    astimezone() rejects on Windows)."""
     if not isinstance(text, str):
         return None
     try:
         t = datetime.fromisoformat(text)
-    except ValueError:
+        return t if t.tzinfo else t.astimezone()
+    except (ValueError, OverflowError, OSError):
         return None
-    return t if t.tzinfo else t.astimezone()
 
 
 def path(root: Path) -> Path:
     return Path(root) / FILE
 
 
-def read_file(p: Path) -> list[Hold]:
-    """Every valid hold in the file; [] if the file is missing or malformed."""
+def parse(text: str) -> list[Hold]:
+    """Every valid hold in the JSON text; [] if it is malformed. A bad entry is skipped on its own."""
     try:
-        rows = json.loads(Path(p).read_text(encoding="utf-8"))["holds"]
-    except (OSError, ValueError, KeyError, TypeError):
+        rows = json.loads(text)["holds"]
+    except (ValueError, KeyError, TypeError):
         return []
     if not isinstance(rows, list):
         return []
     out: list[Hold] = []
     for r in rows:
         try:
-            seg, text = r["segment"], r["until"]
-        except (KeyError, TypeError):
+            seg, text_until = r["segment"], r["until"]
+            until = parse_until(text_until)
+            if isinstance(seg, str) and seg and until is not None:
+                out.append(Hold(seg, text_until, until, str(r.get("reason", ""))))
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
             continue
-        until = parse_until(text)
-        if isinstance(seg, str) and seg and until is not None:
-            out.append(Hold(seg, text, until, str(r.get("reason", ""))))
     return out
+
+
+def read_file(p: Path) -> list[Hold]:
+    """Every valid hold in the file; [] if the file is missing, unreadable or malformed."""
+    try:
+        return parse(Path(p).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
 
 
 def write_file(p: Path, holds: list[Hold]) -> None:
@@ -81,10 +91,18 @@ class HoldFile:
     def current(self) -> list[Hold]:
         try:
             st = self.path.stat()
-            sig = (st.st_mtime_ns, st.st_size)
+        except FileNotFoundError:
+            self._sig, self._holds = None, []
+            return self._holds
         except OSError:
-            sig = None
+            return self._holds           # transient (e.g. a writer holds the file): keep the last good holds
+        sig = (st.st_mtime_ns, st.st_size)
         if sig != self._sig:
-            self._sig = sig
-            self._holds = read_file(self.path) if sig else []
+            try:
+                text = self.path.read_text(encoding="utf-8")
+            except OSError:
+                return self._holds       # not cached: the next call retries the read
+            except ValueError:
+                text = ""                # undecodable content counts as malformed
+            self._sig, self._holds = sig, parse(text)
         return self._holds

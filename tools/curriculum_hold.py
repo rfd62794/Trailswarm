@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -33,9 +34,12 @@ def main(argv: list[str] | None = None) -> int:
     p = seg_hold.path(args.root)
     holds = seg_hold.read_file(p)
     if args.cmd == "add":
-        if args.hours <= 0:
-            ap.error("--hours must be greater than 0")
-        until = datetime.now().astimezone() + timedelta(hours=args.hours)
+        if not math.isfinite(args.hours) or args.hours <= 0:
+            ap.error("--hours must be a finite number greater than 0")
+        try:
+            until = datetime.now().astimezone() + timedelta(hours=args.hours)
+        except OverflowError:
+            ap.error("--hours is too large")
         text = until.isoformat(timespec="seconds")
         holds = [h for h in holds if h.segment != args.segment]
         holds.append(seg_hold.Hold(args.segment, text, until, args.reason))

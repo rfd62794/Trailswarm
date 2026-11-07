@@ -158,3 +158,40 @@ def test_cli_add_list_clear_on_tmp_root(tmp_path, capsys):
 def test_cli_rejects_non_positive_hours(tmp_path):
     with pytest.raises(SystemExit):
         curriculum_hold.main(["--root", str(tmp_path), "add", "gyarados", "--hours", "0", "--reason", "x"])
+
+
+def test_out_of_range_entries_are_skipped_alone(tmp_path):
+    root = mkroot(tmp_path, ("bedroom", "potion"))
+    write_holds(root, [{"segment": "won_battle", "until": "9999-12-31T23:59:59", "reason": "far"},
+                       {"segment": "won_battle", "until": "0001-01-01T00:00:00", "reason": "past"},
+                       {"segment": "left_house", "until": "9999-12-31T23:59:59+00:00", "reason": "aware"},
+                       {"segment": "won_battle", "until": until(2), "reason": "ok"}])
+    c = sched(root, [], Clock(T0.timestamp()))
+    assert {k for k, _ in [c.choose() for _ in range(6)]} == {"unsolved"}   # the valid won_battle hold still applies
+    assert {h.segment for h in seg_hold.read_file(root / "runs" / "curriculum_hold.json")} == {"won_battle", "left_house"}
+
+
+def test_unreadable_read_keeps_last_good_holds(tmp_path, monkeypatch):
+    root = mkroot(tmp_path, ("bedroom", "potion"))
+    write_holds(root, [{"segment": "won_battle", "until": until(2), "reason": "r"}])
+    hf = seg_hold.HoldFile(root)
+    assert [h.segment for h in hf.current()] == ["won_battle"]
+    write_holds(root, [])                            # a new write changes the signature...
+    real = Path.read_text
+
+    def flaky(self, *a, **k):
+        if self == hf.path:
+            raise PermissionError("locked by a writer")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    assert [h.segment for h in hf.current()] == ["won_battle"]   # ...but a failed read keeps the last good holds
+    monkeypatch.setattr(Path, "read_text", real)
+    assert hf.current() == []                        # not cached as failed: the next call reads the file
+
+
+def test_cli_rejects_nan_inf_and_huge_hours(tmp_path):
+    for bad in ("nan", "inf", "-inf", "1e300"):
+        with pytest.raises(SystemExit):
+            curriculum_hold.main(["--root", str(tmp_path), "add", "gyarados", "--hours", bad, "--reason", "x"])
+    assert not (tmp_path / "runs" / "curriculum_hold.json").exists()
