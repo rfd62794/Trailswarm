@@ -43,3 +43,20 @@ def test_learned_east_connection_is_walked_to(tmp_path):
 def test_route_25_is_left_to_exploration(tmp_path):
     maps = _bridge(tmp_path, east_warp=True)
     assert plan_step({**GOALS_NOW, "_sprites": []}, maps, (0x24, 5, 8), "RIGHT") is None
+
+
+def test_frontier_press_into_a_person_blocks_that_tile_and_replans(tmp_path):
+    """Route 25 (2026-11-06): a beaten trainer stands on a frontier route; pressing into him must route around, not repeat."""
+    from pokeagent.explorer.press_frame import PressFrame
+    from pokeagent.explorer.press_interact import record_interaction
+    from test_item_balls import MAP, PX, PY, ball_sprite, make_ctx
+    ctx = make_ctx(tmp_path, memory={MAP: 36, PX: 13, PY: 6})
+    ball_sprite(ctx.emu, 9, 13, 7, pic=14)  # the hiker, one tile below
+    ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = ["DOWN"], (36, 13, 9), (36, 13, 6)
+    record_interaction(ctx, PressFrame("DOWN", "agent", "frontier: 3 steps to (13,9)", before=(36, 13, 6), after=(36, 13, 6)))
+    assert (36, 13, 7) in ctx.mem.temp_blocked and ctx.frontier_route == [] and ctx.frontier_target is None
+    assert "13,6,DOWN" not in ctx.mem.m(36)["blocked"]  # a person is never a wall
+    # a non-exploring press (walking to a nurse) leaves routing alone
+    ctx.mem.temp_blocked.clear()
+    record_interaction(ctx, PressFrame("DOWN", "agent", "plan_goal: to the nurse", before=(36, 13, 6), after=(36, 13, 6)))
+    assert not ctx.mem.temp_blocked
