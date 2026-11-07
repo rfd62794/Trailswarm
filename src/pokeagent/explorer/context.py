@@ -91,6 +91,7 @@ class ExplorerContext:
     catch_mode: bool = False
     readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
     clamp_note: str = ""      # last readiness clamp logged
+    under_level_note: str = ""  # last under-level line logged (plan_goal)
     blackouts_row: int = 0    # lost battles that warped us away since the last win (grind budget)
     grind: Any = None         # explorer.grind.GrindBudget, made on first use
     dialog: list = field(default_factory=list)
