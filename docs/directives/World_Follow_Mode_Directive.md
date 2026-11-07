@@ -198,4 +198,5 @@ clicking empty map stops it).
 - 2026-11-06 21:14 · robert-claude-laptop · none → Queued
 - 2026-11-06 21:15 · robert-claude-laptop · Queued → Approved — lint override: follow.py and tests/test_world_follow.py are new files this directive creates (greenfield false positive)
 - 2026-11-06 21:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6SWMY1ANRG5X42PVQJN0YQZ
+- 2026-11-06 21:25 · dispatcher · launched pid=6980; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
