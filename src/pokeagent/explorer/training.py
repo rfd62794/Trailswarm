@@ -14,8 +14,19 @@ from pokeagent.knowledge.readiness import Readiness, assess
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
 # (Robert, 2026-11-05: two blackouts in Mt Moon at level 8; Misty's Staryu/Starmie are L18/L21.)
-TRAIN_LEVEL_BY_GOAL = {"beat_brock": 12, "to_mt_moon": 14, "beat_misty": 20}
-BOSS_LABEL = {"beat_brock": "BROCK", "to_mt_moon": "MT MOON", "beat_misty": "MISTY"}
+TRAIN_LEVEL_BY_GOAL = {
+    "beat_brock": 12, "to_mt_moon": 14, "beat_misty": 20,
+    # FALLBACKS (2026-11-06): used only when the ROM trainer data or our party is missing; about the boss's top level, from
+    # the ROM parties (S.S. Anne rival 20, Surge 24, Erika 29, tower rival 25, Koga 43, Silph rival 40, Sabrina 43,
+    # Blaine 47, Giovanni 50, Route 22 rival 53, Lorelei 56, Bruno 58, Agatha 60, Lance 62, champion 65).
+    "rival_ss_anne": 20, "beat_surge": 25, "beat_erika": 30, "rival_pokemon_tower": 26, "beat_koga": 42,
+    "rival_silph": 38, "beat_sabrina": 42, "beat_blaine": 46, "beat_giovanni": 49, "rival_route22": 50,
+    "beat_lorelei": 54, "beat_bruno": 56, "beat_agatha": 58, "beat_lance": 60, "beat_champion": 62}
+BOSS_LABEL = {"beat_brock": "BROCK", "to_mt_moon": "MT MOON", "beat_misty": "MISTY", "rival_ss_anne": "RIVAL (S.S. ANNE)",
+              "beat_surge": "LT.SURGE", "beat_erika": "ERIKA", "rival_pokemon_tower": "RIVAL (POKEMON TOWER)",
+              "beat_koga": "KOGA", "rival_silph": "RIVAL (SILPH CO)", "beat_sabrina": "SABRINA", "beat_blaine": "BLAINE",
+              "beat_giovanni": "GIOVANNI", "rival_route22": "RIVAL (ROUTE 22)", "beat_lorelei": "LORELEI",
+              "beat_bruno": "BRUNO", "beat_agatha": "AGATHA", "beat_lance": "LANCE", "beat_champion": "CHAMPION"}
 CAP_ABOVE_TABLE = 5
 _cache: dict = {}
 
@@ -39,10 +50,25 @@ def readiness_for(goals: dict, party: list | None) -> Readiness | None:
         return None
     key = (goal, tuple(party))
     if key not in _cache:
-        boss = trainers.boss_party(goal) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
+        boss = trainers.boss_party(goal, starter_names=[c.name for c in party]) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
         _cache.clear() if len(_cache) > 64 else None
         _cache[key] = assess(party, boss, BOSS_LABEL[goal]) if boss else None
     return _cache[key]
+
+
+def under_level(goals: dict, party: list | None, floor: int = 0) -> tuple[int, int, int] | None:
+    """(needed level, current lead level, gap) when our lead is below the next stage's required level, else None.
+    One source for the planner log, the bandit's train point and the grind atlas: all three read required_level."""
+    if not party:
+        return None
+    needed, current = required_level(goals, floor, party)[0], party[0].level
+    return (needed, current, needed - current) if current < needed else None
+
+
+def under_level_note(goals: dict, party: list | None, floor: int = 0) -> str:
+    """'under-level for beat_surge: need L25, have L21' (empty when ready), the planner's once-per-change log line."""
+    gap = under_level(goals, party, floor)
+    return f"under-level for {stage_goal(goals)}: need L{gap[0]}, have L{gap[1]}" if gap else ""
 
 
 def before_route2(goals: dict) -> bool:

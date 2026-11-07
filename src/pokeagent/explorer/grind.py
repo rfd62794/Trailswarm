@@ -11,6 +11,18 @@ GRIND_BLACKOUTS = 2
 CEILING_MARGIN = 6   # lead this far above the route's top wild level: a fight there gives negligible XP
 
 
+def battle_outcome(*, trainer: bool, start: tuple, end: tuple, party_count: int) -> tuple[bool, bool]:
+    """(won, moved_away) from where the battle began and where it ended.
+    A trainer battle cannot be fled, and a loss warps you to another MAP (a Pokecenter): so a trainer fight is won when we
+    are still on the battle's map, even if the trainer walked us a tile or a door away (2026-11-06: five S.S. Anne wins were
+    recorded as lost 'with HP left', and counted as blackouts). A wild fight keeps the exact-tile test: staying put is a win
+    or a flee (not told apart here), moving off the tile is a blackout."""
+    if trainer:
+        gone = end[0] != start[0]
+        return party_count > 0 and not gone, party_count > 0 and gone
+    return party_count > 0 and end == start, party_count > 0 and end != start
+
+
 def record_battle_result(ctx, *, won: bool, moved_away: bool) -> None:
     """Blackouts in a row: a lost battle that warped us away counts, a win resets, a flee (same spot) changes nothing."""
     if won:
