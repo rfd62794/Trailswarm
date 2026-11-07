@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.interaction_record import close_interaction
+from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.world import DUNGEON_MAPS
+
+NPC_BLOCK_FRAMES = 240  # how long a person in the way keeps their tile out of routing
 
 
 def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
@@ -30,10 +35,16 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
                     inter["menus"].append(menu)
         if not box_after and inter:
             ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
+            if inter.get("ball") is not None:  # the dialog is complete: record the fullest text + parsed item
+                bx, by = inter["ball"]
+                full = inter["entry"].get("text") or " / ".join(ctx.dialog)
+                ctx.mem.note_item_ball(before[0], bx, by, text=full, seen=False)
+                ctx.ball_result = (before[0], bx, by, parse_item_text(full))  # THIS press's own outcome
             extra["ram_diff"], fx = effects(inter["snap"], ctx.emu.read_range(*EFFECT_WINDOW))
             inter["entry"].setdefault("effects", [])
             if fx not in inter["entry"]["effects"]:
                 inter["entry"]["effects"].append(fx)
+            close_interaction(ctx, inter, after)
             result = (f"interaction closed after {inter['presses']} presses; menus seen: {len(inter['menus'])}, "
                       f"choices: {inter['choices'] or 'none'}; effects: {fx}")
             ctx.inter = None
@@ -43,6 +54,9 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         # Record the A press either way, so a silent wall is tested once and never again.
         fdx, fdy = DIRS[ctx.facing]
         npc_in_front = ctx.mem.npc_at(before[0], before[1] + fdx, before[2] + fdy)
+        ball = (before[1] + fdx, before[2] + fdy) if is_item_ball(npc_in_front) else None
+        if ball is not None:
+            ctx.mem.note_item_ball(before[0], ball[0], ball[1], text=text)
         if npc_in_front is not None:  # people move: their results belong to the NPC record, not to the tile
             npc_in_front["talked"] = npc_in_front.get("talked", 0) + 1
             if len(text) > len(npc_in_front.get("text", "")):
@@ -54,28 +68,30 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.mem.recent_talk.add(f"{before[1]},{before[2]},{ctx.facing}")
         if box_after:
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
-                           "choices": [], "snap": snap_pre}
+                           "choices": [], "snap": snap_pre, "ball": ball, "pos": before, "solid": npc_in_front is None}
             extra["sprites"] = sprite_snapshot(ctx.emu)
         result = (f"INTERACTION at ({before[1]},{before[2]}) facing {ctx.facing}: \"{text[:60]}\""
                   if box_after else f"nothing to interact with facing {ctx.facing} (remembered)")
     else:
         fail_key = (before, name)
         confirmed = ctx.last_fail == fail_key
-        result = ctx.mem.learn(before, name, after, confirmed=confirmed)
+        dx, dy = DIRS.get(name, (0, 0))
+        npc_ahead = name in DIRS and after == before and (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
+        result = ctx.mem.learn(before, name, after, confirmed=confirmed, npc_ahead=npc_ahead)
+        if npc_ahead and before[0] in DUNGEON_MAPS:  # only in a dungeon: elsewhere the person may be the target (nurse, Mom, clerk); route around / wait for the person; the tile decays (anomalies.expire) and is never learned as a wall
+            ctx.mem.temp_blocked[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
         if "ahead_tiles" in extra and after[0] == before[0]:
-            dx, dy = DIRS[name]
-            npc_ahead = (before[1] + dx, before[2] + dy) in npc_positions(ctx.emu)
             if result.startswith("blocked (confirmed)") and not npc_ahead and not box_after:
-                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False)  # a real wall, not a person
+                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=False, stand=extra.get("stand_tile"))  # a real wall, not a person
             elif result.startswith("moved"):
-                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=True)
+                ctx.mem.learn_tiles(ctx.emu.read(0xD367), extra["ahead_tiles"], walkable=True, stand=extra.get("stand_tile"))
         ctx.last_fail = fail_key if (name in DIRS and after == before) else None
         if after[0] != before[0]:
             ctx.settle = 30  # fade already waited out; a short pause so the watcher sees the arrival
-        if box_after and not ctx.inter:  # walked into an NPC, or a scripted event fired (Oak!)
+        if box_after and not ctx.inter and ctx.proc is None:  # (a procedure's own menu is not an interaction) walked into an NPC, or a scripted event fired (Oak!)
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text)
             ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
-                           "choices": [], "snap": snap_pre}
+                           "choices": [], "snap": snap_pre, "pos": before}
             extra["sprites"] = sprite_snapshot(ctx.emu)
             extra["trigger"] = True  # a box with no A press is a contact/scripted event, not an interaction
             result += f'; event on contact: "{text[:50]}"'

@@ -193,6 +193,8 @@ def build_server(
         tools.brain_diff, tools.brain_lessons, tools.brain_edit, tools.brain_undo,
     ):
         server.tool()(fn)
+    from pokeagent.intervene.mcp_tools import register as register_agent_tools  # live-agent digest + nudge tools
+    register_agent_tools(server)
 
     @server.resource("pokeagent://state", mime_type="application/json")
     def current_state() -> dict[str, Any]:

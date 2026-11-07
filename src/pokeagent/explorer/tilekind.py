@@ -9,6 +9,8 @@ what memory itself recorded: blocked-edge targets for walls, interaction targets
 """
 from __future__ import annotations
 
+from pokeagent.explorer.items import is_item_ball
+
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 
 
@@ -102,11 +104,19 @@ def trainer_tiles(memory_map: dict) -> dict:
             if e.get("trainer") and e.get("last")}
 
 
+def item_tiles(memory_map: dict) -> dict:
+    """``{(x, y): npc entry}`` for NPCs that are item balls (pic 61, never seen moving)."""
+    return {tuple(e["last"]): e for e in (memory_map or {}).get("npcs", {}).values()
+            if is_item_ball(e) and e.get("last")}
+
+
 def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
-             x: int, y: int, block, npcs_here, trainers, strict: bool = True) -> str:
-    """The legend kind for tile (x,y), by precedence: override > trainer > npc > warp > ledge >
+             x: int, y: int, block, npcs_here, trainers, items=None, strict: bool = True) -> str:
+    """The legend kind for tile (x,y), by precedence: override > trainer > item > npc > warp > ledge >
     object > wall > encounter > grass > interaction > walkable > unknown. A ``tile_kind`` journal
-    edit lands in ``memory_map["tile_overrides"]["x,y"]`` and wins over everything."""
+    edit lands in ``memory_map["tile_overrides"]["x,y"]`` and wins over everything. ``items`` is a
+    set/dict of item-ball tiles (``item_tiles`` for Remembers, live sprite positions for Sees);
+    None means none are known."""
     d = memory_map or {}
     override = (d.get("tile_overrides") or {}).get(f"{x},{y}")
     if override:
@@ -115,6 +125,8 @@ def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
     trainer = trainers.get(p) if hasattr(trainers, "get") else None
     if trainer is not None:
         return "trainer_beaten" if trainer.get("beaten") else "trainer"
+    if items and p in items:
+        return "item"
     if p in (npcs_here or ()):
         return "npc"
     if _prefix_hit(d.get("warps", {}), x, y):

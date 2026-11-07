@@ -7,16 +7,42 @@ name without touching the emulator. No new dependencies (stdlib only).
 """
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 from multiprocessing import shared_memory
 from typing import Optional
 
 FRAME_W, FRAME_H = 160, 144
-HEADER = 16  # u64 seq | u16 w | u16 h | pad — seqlock: odd seq = write in progress
+HEADER = 16  # u64 seq | u16 w | u16 h | u32 owner pid (seqlock: odd seq = write in progress)
+SLOT_PREFIX = "pokeagent_frames_"
 
 
-def slot_name(agent_id: int | str) -> str:
-    return f"pokeagent_frames_{agent_id}"
+def slot_name(agent_id: int | str, pid: int | None = None) -> str:
+    """Unique per process (shared-memory names are machine-global): pokeagent_frames_<id>_<pid>."""
+    return f"{SLOT_PREFIX}{agent_id}_{os.getpid() if pid is None else pid}"
+
+
+def slot_owner(buf) -> int:
+    return int.from_bytes(buf[12:16], "little")
+
+
+def _stale_slot_removed(name: str) -> bool:
+    """True if an existing slot's recorded owner is dead and the slot was unlinked (or vanished)."""
+    from pokeagent.registry import process_alive
+    try:
+        old = shared_memory.SharedMemory(name=name)
+    except Exception:
+        return True  # vanished meanwhile (Windows frees a dead owner's slot)
+    try:
+        if process_alive(slot_owner(old.buf)):
+            return False
+        old.unlink()
+    except Exception:
+        return False
+    finally:
+        old.close()
+    return True
 
 
 class FramePublisher:
@@ -29,11 +55,18 @@ class FramePublisher:
         self.emu = emu
         self.half_res = half_res
         self.seq = 0
+        self.name = slot_name(agent_id)
+        size = HEADER + FRAME_W * FRAME_H * 3
         try:
-            self.shm = shared_memory.SharedMemory(name=slot_name(agent_id), create=True,
-                                                  size=HEADER + FRAME_W * FRAME_H * 3)
-        except FileExistsError:  # a killed publisher left a zombie slot: reclaim it
-            self.shm = shared_memory.SharedMemory(name=slot_name(agent_id))
+            self.shm = shared_memory.SharedMemory(name=self.name, create=True, size=size)
+        except FileExistsError:  # never attach to a live slot: two writers make a viewer card flip games
+            if not _stale_slot_removed(self.name):
+                raise FileExistsError(f"frame slot {self.name} is owned by a live publisher") from None
+            try:
+                self.shm = shared_memory.SharedMemory(name=self.name, create=True, size=size)
+            except FileExistsError:  # dead owner but handles still open (Windows): cannot reclaim
+                raise FileExistsError(f"frame slot {self.name} is held by a dead publisher's open handles") from None
+        self.shm.buf[12:16] = os.getpid().to_bytes(4, "little")
         w, h = self.dims()
         self.shm.buf[8:10] = w.to_bytes(2, "little")
         self.shm.buf[10:12] = h.to_bytes(2, "little")
@@ -67,13 +100,29 @@ class FramePublisher:
 
 
 class FrameSubscriber:
-    """Reader side: attach to one agent's slot; returns latest RGB frame bytes or None."""
+    """Reader side: attach to one agent's slot; returns latest RGB frame bytes or None.
 
-    def __init__(self, agent_id: int | str) -> None:
+    ``agent_id`` is a full slot name (pokeagent_frames_<id>_<pid>) or, for tools that scan ports, a bare
+    port: the slot is then looked up in the agent registry under ``root`` (prefix pokeagent_frames_<port>_)."""
+
+    def __init__(self, agent_id: int | str, root: Path | str = ".") -> None:
         self.agent_id = agent_id
+        self.root = Path(root)
+        self.owner_pid = 0
         self.shm: Optional[shared_memory.SharedMemory] = None
         self._tried = 0.0
         self.seq = 0
+
+    def _slot(self) -> Optional[str]:
+        sid = str(self.agent_id)
+        if sid.startswith(SLOT_PREFIX):
+            return sid
+        from pokeagent.agent_registry import list_agents
+        for e in list_agents(self.root):
+            slot = str(e.get("frame_slot") or "")
+            if slot.startswith(f"{SLOT_PREFIX}{sid}_"):
+                return slot
+        return None
 
     def read(self) -> Optional[bytes]:
         if self.shm is None:
@@ -82,7 +131,8 @@ class FrameSubscriber:
                 return None
             self._tried = now
             try:
-                self.shm = shared_memory.SharedMemory(name=slot_name(self.agent_id))
+                name = self._slot()
+                self.shm = shared_memory.SharedMemory(name=name) if name else None
             except Exception:
                 self.shm = None
             if self.shm is None:
@@ -98,6 +148,7 @@ class FrameSubscriber:
             if int.from_bytes(b[0:8], "little") != s1:
                 return None  # torn read; next tick gets a clean frame
             self.seq = s1
+            self.owner_pid = slot_owner(b)
             return (data, w, h)
         except Exception:
             self.close()

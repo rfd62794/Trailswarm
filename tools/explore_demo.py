@@ -13,8 +13,6 @@ use arrows / a (A) / s (B) / Enter (START) / Shift (SELECT); p pauses the agent.
 """
 from __future__ import annotations
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -39,22 +37,18 @@ from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/pro
     DIRS, TILEMAP, TILEMAP_LEN, ascii_vision, battle_view, box_open, box_text, frame_lines, is_menu, npc_positions,
     party_hp,
 )
+from pokeagent.explorer.seeding import idle_frames
 from pokeagent.explorer.press import Presser  # noqa: E402
-from pokeagent.goals import GOALS, check_goals  # noqa: E402
+from pokeagent.explorer.ram_diff import add_cli_flag as add_ram_diff_flag, start_ram_diff  # noqa: E402
+from pokeagent.goals import GOALS, check_goals, goals_brief  # noqa: E402
 from pokeagent.ram import read_state  # noqa: E402
+from pokeagent.segment_names import state_goal  # noqa: E402
+from pokeagent.statemeta import _git_sha  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from explore_plan import ControlServer, png_bytes  # noqa: E402
 
 __all__ = ["DIRS", "box_open", "box_text", "frame_lines", "is_menu", "main"]  # probe_pc.py's imports
-
-
-def _git_sha() -> str:
-    try:
-        import subprocess
-        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip()
-    except Exception:
-        return ""
 
 
 KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", "s": "B",
@@ -72,13 +66,21 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="any", choices=["any", "random", "bulbasaur", "charmander", "squirtle"],
                     help="which ball to take on Oak's table (random picks one per run, for the starter sweep)")
     ap.add_argument("--headless", action="store_true", help="no window: run as fast as the emulator allows (swarm learners)")
+    add_ram_diff_flag(ap)
     ap.add_argument("--frame-share", action="store_true",
-                    help="publish rendered frames to shared memory pokeagent_frames_<control-port> for tools/watch.py")
+                    help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
                     help="render+publish every Nth tick when frame-sharing (render cost only, no extra game frames)")
     ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
+    ap.add_argument("--stop-at-map", type=lambda v: int(v, 0), default=None,
+                    help="end the run on first entry into this map id (a split sub-segment; see tools/segments.py)")
+    ap.add_argument("--tag", default=None, help="opaque label stored in meta.json (the curriculum links a run to its job)")
     ap.add_argument("--box-pace", type=int, default=6,
                     help="frames between presses while a text box is open (A skips text faster); swarm agents vary it")
+    ap.add_argument("--adaptive-pace", action=argparse.BooleanOptionalAction, default=True,
+                    help="A through text boxes the moment the prompt shows, at the learned minimum settle (text_press); overrides --box-pace")
+    ap.add_argument("--fast-text", action=argparse.BooleanOptionalAction, default=True,
+                    help="set TEXT SPEED to FAST once at the start (START > OPTION), verified on the option byte")
     ap.add_argument("--seed", type=int, default=None, help="random seed (swarm learners get different ones)")
     ap.add_argument("--train-level", type=int, default=8,
                     help="planner trains on Route 1 until the lead reaches this level (Brock sweep: 8/10/12/14)")
@@ -96,13 +98,14 @@ def main(argv=None) -> int:
     run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
     run_dir.mkdir(parents=True, exist_ok=True)
     trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
-    (run_dir / "meta.json").write_text(json.dumps({"start": Path(a.state).stem if a.state else "baseline",
-                                                    "stop_at_goal": a.stop_at_goal, "starter": a.starter, "seed": a.seed,
+    (run_dir / "meta.json").write_text(json.dumps({"start": state_goal(Path(a.state).stem) if a.state else "baseline",
+                                                    "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag, "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace, "starter": a.starter, "seed": a.seed,
                                                     "frame_share": a.frame_share, "train_level": a.train_level,
-                                                    "window": not a.headless, "git_sha": _git_sha()}))
+                                                    "window": not a.headless, "git_sha": _git_sha() or ""}))
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
+    emu.tick(idle_frames(a.seed))  # --seed shifts the game's RNG (seed 0/None: unchanged)
 
     root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
     root.configure(bg="#111")
@@ -125,11 +128,44 @@ def main(argv=None) -> int:
     decisions = DecisionLog(run_dir / "decisions.jsonl")
     ctx = ExplorerContext(
         emu=emu, mem=mem, log=log, run_dir=run_dir, trans=trans, explore_run=explore_run,
-        opts=ExplorerOptions(starter=a.starter, state_stem=Path(a.state).stem if a.state else "", steps=a.steps,
-                             stop_at_goal=a.stop_at_goal, headless=a.headless, box_pace=a.box_pace,
-                             frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps))
+        opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", steps=a.steps,
+                             stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
+                             frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
+                             adaptive_pace=a.adaptive_pace, fast_text=a.fast_text))
+    from pokeagent.explorer.anomalies import AnomalyMonitor
+    from pokeagent.atlas.rom_maps import valid_map_ids
+    ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
+    a.ram_diff and start_ram_diff(ctx, emu, run_dir, a.state, a.rom)  # fail-soft: runs unrecorded on any error
+    from pokeagent.atlas.ladders import rom_ladders
+    ctx.ladders = rom_ladders(a.rom)
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    ctx.cave_plan = rom_cave_planner(a.rom)
+    from pokeagent.atlas.collision import rom_walkable_ids
+    mem.rom_walkable = rom_walkable_ids(a.rom)
+    from pokeagent.atlas.collision import rom_tile_pairs
+    mem.rom_pairs = rom_tile_pairs(a.rom)
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
+    frame_pub = None
+    if a.frame_share:
+        try:
+            from pokeagent.telemetry import FramePublisher
+            frame_pub = FramePublisher(a.control_port, emu)
+            log(f"[frame slot: {frame_pub.name}]", "res")
+        except Exception as e:
+            log(f"[frame share unavailable: {e}]", "res")
+
+    agent_view = None
+    try:  # viewer agent: snapshot+commands on pokeagent.control_server, frames via --frame-share/telemetry
+        import atexit
+        from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
+        agent_view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id=f"explore-{os.getpid()}",
+                                       frame_slot=frame_pub.name if frame_pub else "")
+        agent_view.serve(port=0)
+        atexit.register(agent_view.close)
+        log(f"[viewer agent registered: {agent_view.agent_id}]", "res")
+    except Exception as e:
+        log(f"[viewer agent unavailable: {e!r}]", "res")
     pos = ctx.pos
 
     def close_logs() -> None:
@@ -144,6 +180,7 @@ def main(argv=None) -> int:
             log(f"[turbo {ctx.speed}x]", "res"); return
         name = KEYS.get(ev.keysym)
         if name:
+            if agent_view is not None: agent_view.hold.touch()  # tk steering holds the agent like viewer steering
             presser.press(name, "human", f"you pressed {name}")
 
     # --- remote control (Claude via curl now, MCP later): handlers run on this thread between frames ---
@@ -194,7 +231,7 @@ def main(argv=None) -> int:
 
     @ctl.route("GET", "/vision")
     def _vision(**_):
-        return {"rows": battle_view(emu) if emu.read(0xD057) else ascii_vision(emu, mem, emu.read(0xD367))}
+        return {"rows": battle_view(emu, ctx.move_tag) if emu.read(0xD057) else ascii_vision(emu, mem, emu.read(0xD367))}
 
     @ctl.route("GET", "/peek")
     def _peek(addr="0xD35E", length="1", **_):
@@ -223,20 +260,12 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
-    frame_pub = None
-    if a.frame_share:
-        try:
-            from pokeagent.telemetry import FramePublisher
-            frame_pub = FramePublisher(a.control_port, emu)
-            log(f"[frame slot: pokeagent_frames_{a.control_port}]", "res")
-        except Exception as e:
-            log(f"[frame share unavailable: {e}]", "res")
-
     def close_frame_shm() -> None:
         if frame_pub is not None:
             frame_pub.close()
 
     def frame():
+        agent_view and agent_view.tick()  # viewer commands + cached snapshot, on this (emulator) thread
         while not jobs.empty():  # remote-control jobs run here, on the emulator's thread
             fn, fut = jobs.get()
             try:
@@ -265,12 +294,14 @@ def main(argv=None) -> int:
                 emu.tick(ctx.speed - 1)  # turbo: frameskip - run extra frames unrendered, draw one
             img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
             ctx.photo = ImageTk.PhotoImage(img); screen.configure(image=ctx.photo)
+            if frame_pub is not None:
+                frame_pub.publish(advance=False)  # reuse the frame screenshot() just rendered
         ctx.frame += 1
         if ctx.frame % 15 == 0 and not a.headless:
             try:
                 m_, x_, y_ = pos(); npcs = npc_positions(emu)
                 if emu.read(0xD057):
-                    vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu)))
+                    vis.configure(text="SEES (battle)\n" + "\n".join(battle_view(emu, ctx.move_tag)))
                 else:
                     sees = ascii_vision(emu, mem, emu.read(0xD367)); rem = mem.render_memory(m_, x_, y_, npcs)
                     vis.configure(text="SEES (10x9 tiles)\n" + "\n".join(sees) + "\n" + sees.legend
@@ -279,7 +310,7 @@ def main(argv=None) -> int:
                 lines_d = frame_lines(tm_d) if box_open(tm_d) else []
                 g = check_goals(emu, ctx)
                 dlg.configure(text=("DIALOG: " + " | ".join(lines_d)[:150] if lines_d else "DIALOG: (none)")
-                              + f"\nGOALS:  " + "  ".join(f"{k}{'+' if v else '-'}" for k, v in g.items())
+                              + f"\nGOALS:  " + goals_brief(g)
                               + f"\nBATTLE: {'yes (0x%02X)' % emu.read(0xD057) if emu.read(0xD057) else 'no'}"
                               f"   party={emu.read(0xD163)} bag={emu.read(0xD31D)} money={read_state(emu).money}")
             except Exception as e:
@@ -290,11 +321,12 @@ def main(argv=None) -> int:
         ctx.stable_frames = ctx.stable_frames + 1 if h == ctx.last_hash else 0
         ctx.last_hash = h
         try:
-            pace = a.box_pace if (a.box_pace and ctx.box_open_now) else a.frames_per_step
+            pace = (a.frames_per_step if a.adaptive_pace else a.box_pace) if (a.box_pace and ctx.box_open_now) else a.frames_per_step
             if ctx.slow_until > ctx.step:
                 pace = max(pace, 40)  # some tasks need a slower hand (Mom's heal, fades): per-task speed
-            if not ctx.paused and ctx.frame % pace == 0:
-                engine.step()
+            hold = agent_view.held() if agent_view is not None else False
+            if not ctx.paused and not hold and ctx.frame % pace == 0:
+                engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
         finally:

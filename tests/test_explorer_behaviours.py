@@ -8,9 +8,10 @@ import pytest
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.behaviours import (
     AdvanceDialog, Battle, BattleMoves, Catch, ExploreBurst, Frontier, Goto, Heal, LoopGuard, Menu, NamingKeyboard,
-    PlanGoal, Procedures, Readiness, ReplayBeat, ReplayInterrupt, SettleWait, StallGuard, default_behaviours,
+    Pickup, PlanGoal, Procedures, Readiness, ReplayBeat, ReplayInterrupt, SettleWait, StallGuard, default_behaviours,
 )
 from pokeagent.explorer.behaviours.base import Decision, no_press
+from pokeagent.explorer.mash_skill import BOUND_FRAMES, WAIT, MashSkill, signature
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
 from pokeagent.explorer.decisions import FIELDS, DecisionLog, classify_outcome, goal_stage, make_record
 from pokeagent.explorer.engine import Engine
@@ -55,9 +56,9 @@ def test_settle_and_readiness_start_conditions(tmp_path):
     ctx.settle = 0
     assert not applies(Readiness(), ctx)  # the screen has been still for 10 frames
     ctx.stable_frames = 0
-    assert applies(Readiness(), ctx)  # screen moving on its own: mash A
+    assert applies(Readiness(), ctx)  # screen moving on its own: wait
     decision = Readiness().step(ctx)
-    assert (decision.button, decision.rule) == ("A", "mash") and ctx.mash == 1
+    assert decision.button == "" and decision.rule.startswith("busy_wait") and ctx.mash == 1
     ctx.stable_frames = 10
     ctx.emu.set(0xCD6B, 1)  # the game says it ignores the joypad
     assert applies(Readiness(), ctx)
@@ -194,9 +195,9 @@ def test_selector_picks_the_first_applicable_in_order(tmp_path):
 
 def test_default_order_is_the_old_agent_step_order():
     names = [b.name for b in default_behaviours()]
-    assert names == ["settle", "guards", "readiness", "replay_interrupt", "battle", "catch", "battle_moves",
-                     "naming_keyboard", "beat_start", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
-                     "stall_guard", "heal", "explore_burst", "plan_goal", "frontier"]
+    assert names == ["settle", "guards", "party_order", "post_talk_settle", "readiness", "anomaly_wait", "replay_interrupt", "battle_text_wait", "battle", "switch_out", "catch", "battle_moves", "cave_escape", "cave_topup",
+                     "naming_keyboard", "beat_start", "box_settle", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
+                     "stall_guard", "heal", "explore_burst", "pickup", "plan_goal", "frontier"]
     assert no_press("x").button == ""
 
 
@@ -259,7 +260,7 @@ def test_explorer_package_layering_and_size():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
-    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer"}
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals"}
     for f in root.rglob("*.py"):
         assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
@@ -323,15 +324,86 @@ def test_no_to_unwanted_starter_records_the_ball_and_readiness_does_not_reopen_i
     assert ctx.declined_balls == {(40, 6, 4, "UP"): "CHARMANDER"}
     ctx = make_ctx(tmp_path, memory={PX: 6, PY: 4}, declined_balls={(40, 6, 4, "UP"): "CHARMANDER"})
     ctx.facing, ctx.stable_frames = "UP", 0  # the box just closed; the screen is still settling
+    force(ctx, "A/4")
     ctx.refresh()
     assert Readiness().step(ctx).button == "B"
     ctx.refresh()
     ctx.emu.set(0xD163, 1)  # a starter is in the party now: the old decline no longer matters
+    ctx.frame += 10
     assert Readiness().step(ctx).button == "A" and not ctx.declined_balls
 
 
 def test_readiness_still_presses_a_at_a_non_declined_spot(tmp_path):
     ctx = make_ctx(tmp_path, memory={PX: 7, PY: 4}, declined_balls={(40, 6, 4, "UP"): "CHARMANDER"})
     ctx.facing, ctx.stable_frames = "UP", 0
+    force(ctx, "A/4")
     ctx.refresh()
     assert Readiness().step(ctx).button == "A"
+
+
+def force(ctx, strategy):
+    class Fixed(MashSkill):
+        def choose(self, sig):
+            return strategy
+    ctx.skill = Fixed(ctx.mem.data)
+
+
+def run_busy(ctx, ticks):
+    out = []
+    for _ in range(ticks):
+        out.append(Readiness().step(ctx).button)
+        ctx.frame += ctx.opts.frames_per_step
+    return out
+
+
+def test_readiness_wait_strategy_presses_once_per_bound(tmp_path):
+    ctx = make_ctx(tmp_path)
+    ctx.stable_frames = 0
+    ctx.refresh()
+    force(ctx, WAIT)
+    n = BOUND_FRAMES // ctx.opts.frames_per_step
+    assert run_busy(ctx, n * 2 + 2) == [""] * n + ["A"] + [""] * (n - 1) + ["A"] + [""]  # nothing between nudges
+
+
+def test_readiness_a_strategy_presses_at_its_pace_and_learns_the_episode(tmp_path):
+    ctx = make_ctx(tmp_path)
+    ctx.stable_frames = 0
+    ctx.refresh()
+    force(ctx, "A/32")
+    assert run_busy(ctx, 8) == ["A", "", "", "", "A", "", "", ""]  # 32 frames at 10f per decision
+    ctx.stable_frames = 10  # resolved
+    ctx.refresh()
+    assert Readiness().step(ctx) is None and ctx.mash == 0
+    e = ctx.mem.data["mash_skill"][signature(0x28, False, False)]["A/32"]
+    assert e["n"] == 1 and e["mean_frames"] == 80 and e["mean_presses"] == 2
+
+
+def test_mash_skill_prefers_the_faster_strategy_and_starts_unknowns_from_the_global_best(tmp_path):
+    data: dict = {}
+    sk = MashSkill(data)
+    for s_ in ("WAIT", "A/4", "A/8", "A/16", "A/32"):
+        sk.record("1|overworld|j0|", s_, 40 if s_ == "WAIT" else 90, 0 if s_ == "WAIT" else 8)
+    sk.rng.random = lambda: 0.5  # no exploration
+    assert sk.choose("1|overworld|j0|") == WAIT
+    assert sk.choose("9|overworld|j0|") == WAIT  # unknown signature: the global best
+
+
+def test_mash_skill_is_optimistic_about_untried_strategies():
+    sk = MashSkill({})
+    sk.rng.random = lambda: 0.5
+    sk.record("s", WAIT, 50, 1)
+    assert sk.choose("s") == "A/4"  # untried and nowhere measured: tried before settling
+
+
+def test_readiness_waits_while_the_joypad_is_ignored(tmp_path):
+    ctx = make_ctx(tmp_path, memory={0xCD6B: 1})
+    ctx.refresh()
+    assert Readiness().step(ctx).button == ""
+
+
+def test_readiness_leaves_a_waiting_text_box_to_the_dialog_behaviour(tmp_path):
+    ctx = make_ctx(tmp_path)
+    ctx.stable_frames = 0
+    put_box(ctx)
+    ctx.refresh()
+    assert not Readiness().applies(ctx)  # a box is waiting: advance_dialog presses, readiness does not

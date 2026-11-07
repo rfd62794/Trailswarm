@@ -1,8 +1,9 @@
 """Pure readers of the screen and RAM: what the explorer sees (moved unchanged from tools/explore_demo.py)."""
 from __future__ import annotations
 
-from pokeagent.explorer import legend, tilekind
+from pokeagent.explorer import items, legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
+from pokeagent.magikarp import fighter, trainee_slot
 from pokeagent.names import load_registry
 from pokeagent.screentext import CHARMAP
 
@@ -19,13 +20,26 @@ REGISTRY = load_registry()
 def party_hp(emu) -> tuple[int, int]:
     """Lead pokemon HP and max HP. VERIFIED 2026-11-03: wPartyMon1HP 0xD16C/6D, wPartyMon1MaxHP 0xD18D/8E
     (read 11/20 for a level-5 Bulbasaur; wPartyMon1Level 0xD18C read 5; species at 0xD16B read 0x99)."""
+    if trainee_slot(emu) is not None:  # a Magikarp in training lives in the party: the fighter is not the lead
+        _, _, hp, mx = fighter(emu)
+        return hp, mx
     hp = (emu.read(0xD16C) << 8) | emu.read(0xD16D)
     mx = (emu.read(0xD18D) << 8) | emu.read(0xD18E)
     return hp, mx
 
 
+def lead_level(emu) -> int:
+    """Level of the fighter (the party lead, or the strongest non-Magikarp while a Magikarp is in training)."""
+    return fighter(emu)[1] if trainee_slot(emu) is not None else emu.read(0xD18C)
+
+
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:
     return [tilemap[r * 20 + c] for r, c in AHEAD[direction]]
+
+
+def stand_tile(tilemap: bytes) -> int:
+    """The tile id under the player: bottom-left of the 2x2 at screen rows 8-9, columns 8-9 (the game's wTilePlayerStandingOn)."""
+    return tilemap[9 * 20 + 8]
 
 
 def sprite_snapshot(emu) -> list[list[int]]:
@@ -51,6 +65,7 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
     d = mem.m(m)
     npcs = {(emu.read(0xC205 + 16 * i) - 4, emu.read(0xC204 + 16 * i) - 4) for i in range(1, 16) if emu.read(0xC100 + 16 * i)}
     trainers = tilekind.trainer_tiles(d)
+    item_pos = {(x, y) for _slot, x, y in items.item_balls(emu)}  # live: a picked-up ball is gone, not '*'
     tile_types = mem.data.get("tile_types", {})
     grass_ids = mem.data.get("grass_ids", {})
     kinds = set()
@@ -61,26 +76,39 @@ def ascii_vision(emu, mem, tileset: int) -> legend.Rendered:
             mx, my = px + (c - 4), py + (r - 4)
             block = [tm[(2 * r) * 20 + 2 * c], tm[(2 * r) * 20 + 2 * c + 1], tm[(2 * r + 1) * 20 + 2 * c], tm[(2 * r + 1) * 20 + 2 * c + 1]]
             kind = "you" if (c, r) == (4, 4) else tilekind.classify(
-                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, strict=False)
+                d, tile_types, grass_ids, tileset, mx, my, block, npcs, trainers, items=item_pos, strict=False)
             kinds.add(kind)
             line += legend.glyph(kind, tilekind.ledge_dir(d, mx, my) if kind == "ledge" else None)
         rows.append(line)
     return legend.Rendered(rows, legend.line(kinds))
 
 
-def battle_view(emu) -> list[str]:
+def wrap_move(move: str, width: int = 22, prefix: str = "move  ") -> list[str]:
+    """The move rule wrapped at spaces to fit ``width`` columns (continuations indented); never cuts a word."""
+    if not move:
+        return []
+    import textwrap
+    parts = textwrap.wrap(move, width, initial_indent=prefix, subsequent_indent="  ",
+                          break_long_words=False, break_on_hyphens=False)
+    return parts or [prefix + move]
+
+
+def battle_view(emu, move: str = "") -> list[str]:
     """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
     we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
-    wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu."""
+    wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu.
+    `move` adds the chosen move's rule string ('EMBER x2 FIRE>GRASS/POISON STAB') when supplied."""
     def u16(a): return (emu.read(a) << 8) | emu.read(a + 1)
     tm = emu.read_range(TILEMAP, TILEMAP_LEN)
     lines = frame_lines(tm)
     rows = [f"BATTLE kind=0x{emu.read(0xD057):02X}",
             f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
-            "(hp addrs unverified)", ""]
+            "(hp addrs unverified)"]
+    rows += wrap_move(move)
+    rows += ["", "MENU/TEXT:"]
     menu = [ln for ln in lines if ">" in ln or ln.isupper()]
-    rows += ["MENU/TEXT:"] + [ln[:20] for ln in (menu or lines)[:6]]
+    rows += [ln[:20] for ln in (menu or lines)[:6]]
     return rows
 
 

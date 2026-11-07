@@ -7,13 +7,14 @@ from pokeagent.emulator import Button
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import close_episode, record_intervention, shutdown
 from pokeagent.explorer.perceive import (
-    DIRS, EFFECT_WINDOW, TILEMAP, TILEMAP_LEN, ahead_tiles, box_open, box_text, frame_lines, is_menu,
+    DIRS, EFFECT_WINDOW, TILEMAP, TILEMAP_LEN, ahead_tiles, stand_tile, box_open, box_text, frame_lines, is_menu,
 )
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_goals import record_goals
 from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
-from pokeagent.goals import GOALS, bag_contents, check_goals
+from pokeagent.explorer.text_press import fast_a_press
+from pokeagent.goals import GOALS, bag_contents, check_goals, goals_brief
 
 
 def settle_position(ctx: ExplorerContext, before, max_frames=600):
@@ -65,6 +66,7 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
         extra["battle_turn"] = len(bl["turns"])
     if name in DIRS and not box_before:
         extra["ahead_tiles"] = ahead_tiles(tm, name)  # lets the KB learn which tile ids are walls
+        extra["stand_tile"] = stand_tile(tm)  # ... and which tile PAIRS (cave elevation steps) block
     if name not in DIRS or box_before:
         ctx.last_fail = None  # a wall is only 'confirmed' by two consecutive identical move presses
     snap_pre = ctx.emu.read_range(*EFFECT_WINDOW) if not box_before else None
@@ -81,8 +83,20 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
 def press_and_read(ctx: ExplorerContext, fr: PressFrame) -> None:
     """Press the button, wait for the position to settle, read the screen, track the dialog."""
     name, before, box_before = fr.name, fr.before, fr.box_before
-    ctx.emu.press(Button[name])
-    after = settle_position(ctx, before)
+    fast = fast_a_press(ctx) if (box_before and name == "A" and ctx.opts.adaptive_pace) else None
+    if fast is not None:  # a mid-text page: A at the learned pace, then the screen is calm
+        after = ctx.pos() if box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN)) else settle_position(ctx, before)
+        ctx.stable_frames = max(ctx.stable_frames, 4)  # we already waited for the screen to calm (the demo loop counts it
+        ctx.last_hash = hash(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))  # per frame): Readiness must not call it "busy"
+    else:
+        ctx.emu.press(Button[name])
+        after = settle_position(ctx, before)
+        if after[0] == before[0] and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN)):
+            # settle_position already waited for the screen to calm. The demo loop counts stillness per frame from the press, so
+            # the next decision (4 frames later) read "still moving" after EVERY step and Readiness spent an A on it:
+            # 24% of the Viridian Forest steps and 111 on Route 2 in the seed-11 run were those no-op A presses.
+            ctx.stable_frames = max(ctx.stable_frames, 4)
+            ctx.last_hash = hash(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
     tm2 = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
     box_after = box_open(tm2)
     text = box_text(tm2) if box_after else ""
@@ -116,7 +130,7 @@ def log_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     """Console log of the press, periodic map save, and the step cap."""
     name, source, why, after, result, goals = fr.name, fr.source, fr.why, fr.after, fr.result, fr.goals
     mm = ctx.mem.m(after[0])
-    gtxt = " ".join(f"{g}{'+' if goals[g] else '-'}" for g in GOALS)
+    gtxt = goals_brief(goals)
     ctx.log(f"--- step {ctx.step}/{ctx.opts.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {ctx.facing}  "
         f"party={ctx.emu.read(0xD163)} bag={ctx.emu.read(0xD31D)}  goals: {gtxt}\n"
         f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
@@ -139,10 +153,37 @@ class Presser:
     def press(self, name: str, source: str, why: str) -> None:
         ctx = self.ctx
         fr = PressFrame(name, source, why)
+        rd = ctx.ram_diff
+        if rd is None:
+            self._press(fr)
+            return
+        try:  # recording must never end a run
+            rd.begin(ctx)
+        except Exception as e:
+            ctx.ram_diff = None
+            ctx.log(f"[ram diff off: {e!r}]", "res")
+            self._press(fr)
+            return
+        try:
+            self._press(fr)
+        finally:
+            try:
+                rd.end(ctx, fr)
+            except Exception as e:
+                ctx.ram_diff = None
+                ctx.log(f"[ram diff off: {e!r}]", "res")
+
+    def _press(self, fr: PressFrame) -> None:
+        ctx = self.ctx
         begin_press(ctx, fr)
         press_and_read(ctx, fr)
         record_interaction(ctx, fr)
         track_progress(ctx, fr)
+        if ctx.anomalies is not None:
+            try:  # watching must never end a run
+                ctx.anomalies.observe(ctx, fr)
+            except Exception as e:
+                ctx.log(f"[anomaly monitor failed: {e!r}]", "res")
         write_transition(ctx, fr)
         if record_goals(ctx, fr):
             return

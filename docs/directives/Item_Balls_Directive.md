@@ -90,7 +90,7 @@ Test tail, line counts, where `pickup` sits in the selector order and why, anyth
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-item-balls-directive |
 | Base branch | - |
@@ -105,4 +105,5 @@ Test tail, line counts, where `pickup` sits in the selector order and why, anyth
 - 2026-11-05 19:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-item-balls-directive; lane=explicit; model=swe-2-flash-max; persona=steady-builder; agent_id=01M6Q4T3ZVNEZWZ51V3PT4GSNA
 - 2026-11-05 19:42 · dispatcher · launched pid=21428; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-item-balls-directive; provisioned: uv sync --frozen
 - 2026-11-05 19:56 · devin · In progress → Review — [origin] spent: devin 14 min est. n/a
+- 2026-11-05 21:13 · robert-claude-laptop · Review → Done — note: merged via PR #48 (6cfc975) with ROM-verified fixes; Route 2 checkpoint: 59 pickup decisions, POTION + ANTIDOTE collected, no ball pressed twice; follow-ups: cache approach BFS, ball_result overwrite test
 <!-- queue:end -->

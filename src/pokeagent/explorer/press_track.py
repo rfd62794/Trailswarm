@@ -8,6 +8,7 @@ from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
+from pokeagent.explorer.stat_records import note_stat_exp
 from pokeagent.goals import GOALS, bag_contents, check_goals
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
@@ -71,6 +72,12 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     if ctx.exp_prev is not None:
         ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})["steps"] += 1
     ctx.exp_prev = exp_now
+    try:  # record-only stat-exp yield: never let it end a run
+        sx_now = sum(int.from_bytes(ctx.emu.read_range(0xD17C + 2 * i, 2), "big") for i in range(5))  # wPartyMon1 stat exp
+        note_stat_exp(ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}}), sx_now, ctx.stat_exp_prev)
+        ctx.stat_exp_prev = sx_now
+    except Exception:
+        ctx.stat_exp_prev = None
     bag_post = bag_contents(ctx.emu)
     if bag_post != bag_pre:  # an item was received, used, bought or sold: remember where and from what
         for item in set(bag_pre) | set(bag_post):
@@ -110,7 +117,10 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
             progressed = (any(goals_now[g] and not bt["goals"].get(g) for g in GOALS) or bool(extra.get("ram_diff"))) \
                 and not bt.get("choice")
             src = "human" if "human" in bt["sources"] else "claude" if "claude" in bt["sources"] else "agent"
-            ctx.mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
+            if bt["sig"] is None:
+                progressed = False  # a one-line box (the START menu) never got a signature: nothing to key a beat on
+            else:
+                ctx.mem.learn_beat(bt["sig"], bt["buttons"], progressed, src)
             if progressed:
                 ctx.log(f"[beat learned for \"{bt['sig'][:40]}\": {len(bt['buttons'])} presses ({src})]", "res")
     fr.result = result

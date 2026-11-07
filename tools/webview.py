@@ -29,7 +29,7 @@ body{background:#111;color:#ddd;font:13px monospace}img{width:320px;image-render
 
 def sub(p):
     if p not in subs:
-        subs[p] = FrameSubscriber(p)
+        subs[p] = FrameSubscriber(p, root=Path(__file__).resolve().parents[1])
     return subs[p]
 
 

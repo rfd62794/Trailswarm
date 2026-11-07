@@ -24,11 +24,14 @@ class ExplorerOptions:
     state_stem: str = ""  # Path(--state).stem, "" when no state
     steps: int = 300
     stop_at_goal: str | None = None
+    stop_at_map: int | None = None  # sub-segment runs end on first entry into this map id
     headless: bool = False
     box_pace: int = 6
     frames_per_step: int = 10
     train_level: int = 8
     maps_path: str = "runs/maps.json"
+    adaptive_pace: bool = False  # A through text boxes at the learned pace (text_press) instead of the fixed settle
+    fast_text: bool = False  # run the set_text_speed_fast procedure once at the start
 
 
 @dataclass
@@ -51,6 +54,8 @@ class ExplorerContext:
     opts: ExplorerOptions = field(default_factory=ExplorerOptions)
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
+    anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
+    ram_diff: Any = None  # explorer.ram_diff.RamDiffer (None = event RAM diffs off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
     step: int = 0
@@ -81,11 +86,16 @@ class ExplorerContext:
     burst_maps: set = field(default_factory=set)
     catch_attempt: dict | None = None
     catch_mode: bool = False
+    readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
+    clamp_note: str = ""      # last readiness clamp logged
+    blackouts_row: int = 0    # lost battles that warped us away since the last win (grind budget)
+    grind: Any = None         # explorer.grind.GrindBudget, made on first use
     dialog: list = field(default_factory=list)
     declined_balls: dict = field(default_factory=dict)  # (map, x, y, facing) of a ball whose starter offer we said NO to -> species
     episode: dict | None = None
     events_prev: bytes | None = None
     exp_prev: int | None = None
+    stat_exp_prev: int | None = None
     explore_burst: int = 0
     forget_move: str | None = None
     frontier_at: tuple | None = None  # position the committed route's next button was chosen at
@@ -105,16 +115,65 @@ class ExplorerContext:
     last_press: str | None = None
     last_sig: tuple | None = None
     last_text: str = ""
-    mash: int = 0
+    mash: int = 0  # decisions spent in the current busy stretch (Readiness)
+    busy_presses: int = 0  # A/B nudges in the current busy stretch
+    busy_start: int = 0  # ctx.frame when the stretch began
+    busy_sig: str = ""  # the situation signature of the stretch
+    busy_strategy: str = ""  # the mash_skill strategy chosen for it
+    busy_last_press: int = 0  # ctx.frame of the last nudge
+    skill: object = None  # MashSkill, built lazily over mem.data
     mom_failed_until: int = 0
+    talk_closed_frame: int = -1  # ctx.frame when the last interaction's box closed (post_talk_settle)
+    post_talk_waits: int = 0
+    setup_steps: int = 0  # presses spent on one-time setup (the text speed procedure), not counted in ctx.step
+    box_empty_since: int = -1  # ctx.frame when the current empty-box stretch began
+    box_empty_waits: int = 0  # consecutive no-press turns spent on an empty text box (box_settle)
+    pace: object = None  # text_pace.PaceLearner, built lazily over mem.data
+    text_frames: int = 0  # emulator frames spent pressing through text boxes (fast path only)
+    btw_hash: int = 0  # battle_text_wait: hash of the page on screen
+    btw_since: int = 0  # ctx.frame when that page last changed
+    btw_waits: int = 0
+    heal_trips: int = 0  # Pokecenter entries this run (area_grind bounds the 90% top-off trips)
+    last_plan_map: int = -1
+    area_grind: dict = field(default_factory=dict)  # steps / battles spent grinding in place on Route 2 / the Forest, and whether it was lifted
+    train_need: int = 8  # the training level plan_goal last computed for this map (0 inside a dungeon)
+    buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
+    buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
+    switch_runs: tuple = (-1, 0)  # (ctx.battles, RUN attempts) of switch_train_run
+    party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
+    order_retry_at: int = 0  # step before which a failed reorder_party is not retried
+    switch_train: dict | None = None  # switch_out_lead in progress for this battle
+    switch_gave_up: int = -1  # ctx.battles value of the battle whose switch was abandoned
+    magikarp_shared: int = 0  # battles in which the trainee was sent out and swapped on turn one
+    center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None
     move_nav: int = 0
     move_reason: str = ""
     no_pp: set = field(default_factory=set)
     pending_move: dict | None = None
+    pending_effect: dict | None = None  # our landed attack still awaiting its result message (battle text)
+    fx_src: list | None = None  # battle-text scan cursor: the dialog list object last scanned ...
+    fx_seen: list = field(default_factory=list)  # ... and a snapshot of its entries already parsed
+    fx_last: dict | None = None  # last 'used' event seen {'side': 'ours'|'enemy', 'move': name}
+    fx_last_fx: dict | None = None  # last result message attributed to our move {'move', 'effect', 'step'}
+    move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
+    cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo
+    ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
+    cave_catch_balls: dict = field(default_factory=dict)  # species -> balls thrown this run (battle_run caps it inside dungeons)
+    topup_presses: int = 0  # presses in the current cave_topup potion sequence (0 = not started)
+    topup_potions0: int = 0
+    topup_cooldown_until: int = 0
+    cave_runs: int = 0  # RUN presses chosen only because we are in a dungeon, this battle (battle_run caps it)
+    dir_fail: int = 0  # consecutive direction presses that left the position unchanged (LoopGuard)
+    dir_fail_pos: tuple | None = None
+    rope_presses: int = 0  # presses spent in the current escape-rope sequence (cave_escape); 0 = not started
+    rope_cooldown_until: int = 0  # step before which a failed rope try is not repeated
+    item_attempts: int = 0  # item-list confirmations this battle (item_use.MAX_ITEM_ATTEMPTS caps it)
+    item_blocked: set = field(default_factory=set)  # item ids that cannot help this battle ("won't have any effect")
     proc: dict | None = None
     proc_done: set = field(default_factory=set)
     proc_due: list = field(default_factory=list)
@@ -130,6 +189,14 @@ class ExplorerContext:
     stall: int = 0
     stalls: int = 0
     yesno: dict | None = None
+    pickup_await: tuple | None = None  # (map,x,y) ball whose A press is awaiting its item result
+    pickup_ball: tuple | None = None  # committed item-ball target (map,x,y)
+    ball_result: tuple | None = None  # (map,x,y,item|None): the last item-ball dialog to close, from press_interact
+    pickup_gone: set = field(default_factory=set)  # (map,x,y) balls seen hidden or collected this run
+    pickup_approach: dict = field(default_factory=dict)  # (map,x,y) -> presses spent walking through unexplored ground toward it
+    pickup_last: tuple | None = None  # (map,x,y, ball) where the last pickup walking press was made
+    pickup_stuck: int = 0  # consecutive pickup walking presses that left the player where they were
+    pickup_tries: dict = field(default_factory=dict)  # (map,x,y) -> presses that gave no item text this run
     trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)

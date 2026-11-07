@@ -135,6 +135,13 @@ def _cmd_state(args: argparse.Namespace) -> int:
         emu.close()
 
 
+def _cmd_view(args: argparse.Namespace) -> int:
+    # Lazy import: the viewer pulls dearpygui/PIL only when actually opened.
+    from pokeagent.viewer.app import run
+
+    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port)
+
+
 def _cmd_mcp(args: argparse.Namespace) -> int:
     # Imported lazily so cli.py (and its tests) never pay for the mcp import.
     from pokeagent.mcp_server import serve
@@ -184,6 +191,22 @@ def _build_parser() -> argparse.ArgumentParser:
     mcp.add_argument("--idle-fps", type=int, default=60, metavar="N",
                      help="idle tick rate between tool calls (0 = no idle ticking)")
     mcp.set_defaults(func=_cmd_mcp)
+
+    view = sub.add_parser("view", help="Dear PyGui viewer for registered agents")
+    view.add_argument("--root", default=".", metavar="DIR",
+                      help="agent registry root (default: cwd)")
+    view.add_argument("--fake", type=int, default=0, metavar="N",
+                      help="show N animated fake agents instead of real ones")
+    view.add_argument("--web", action="store_true",
+                      help="also serve the read-only web view")
+    view.add_argument("--port", type=int, default=8899, metavar="N",
+                      help="web view port (default 8899)")
+    view.add_argument("--fps", type=int, default=30, metavar="N",
+                      help="poll/UI rate (default 30)")
+    view.set_defaults(func=_cmd_view)
+
+    from pokeagent.world.app import add_parser as _add_world
+    _add_world(sub)
 
     cli_hex.register(sub)
     cli_brain.register(sub)

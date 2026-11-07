@@ -5,12 +5,20 @@ first battle (FIGHT), then the road to Pewter.
 """
 from __future__ import annotations
 
+from pokeagent.explorer.planner_east import east_road_step
 from pokeagent.explorer.world import POKECENTER_MAPS, STARTERS, WorldGraph, interaction_spots
+
+# No-grind list for everything east of Pewter (Route 3/4, Mt Moon 1F/B1F/B2F, Cerulean + Pokecenter + Gym, Routes 24/25, Bill's house):
+# never turn back to Route 1 to train from here.
+MAX_TOPOFF_TRIPS = 2
+GRIND_IN_PLACE = (0x0D, 0x33)  # Route 2 and Viridian Forest: past Viridian, training happens here, never back south
+EAST_MAPS = (0x0E, 0x0F, 0x3B, 0x3C, 0x3D, 0x03, 0x40, 0x41, 0x23, 0x24, 0x58, 0x44)
 
 
 def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, str] | None:
     """Next button toward the first unmet goal that the learned world already knows how to reach, else None."""
     g = WorldGraph(maps)
+    g.blocked_now = frozenset(goals.get("_blocked_now", ()))  # a wanderer NPC's tile, temporarily
     hp, mx = goals.get("_hp", (0, 0))
     if goals.get("first_pokemon") and mx and hp / mx < 0.4 and pos[0] in (0x00, 0x25, 0x26, 0x0C) and not goals.get("_mom_failed"):
         # Weak and near home: Mom heals the party when talked to. She is the one static sprite downstairs
@@ -28,15 +36,16 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     # stays 50% (a trek back is long).
     # (the Pokecenter itself must use the same 90%: with 50% inside, an agent at 70% HP walked in at Viridian, walked
     # straight back out, and ping-ponged through the door for 220 presses - 07:14 round)
-    heal_below = 0.9 if pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
+    top_off = goals.get("_heal_trips", 0) < MAX_TOPOFF_TRIPS  # area_grind: the 90% heal trip is bounded (Route 2 <-> Viridian yo-yo)
+    heal_below = 0.9 if top_off and pos[0] in (0x01, 0x0D, 0x02, 0x36) + POKECENTER_MAPS else 0.5
     if (goals.get("deliver_parcel") and mx and hp / mx < heal_below and not goals.get("_mom_failed")
-            and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33, 0x02, 0x36) or pos[0] in POKECENTER_MAPS)):
+            and (pos[0] in (0x01, 0x0D, 0x0C, 0x32, 0x33, 0x02, 0x36, 0x03, 0x0F, 0x23) or pos[0] in POKECENTER_MAPS)):
         # Weak on the road north: the Viridian Pokecenter (map 41, door at Viridian (23,26)) heals for free. Inside,
         # every Pokecenter has the same shape: door (3,7), a clear column x=3 up to the counter, nurse at (3,1).
         if pos[0] in POKECENTER_MAPS:
             if pos[1] != 3:
                 return ("RIGHT" if pos[1] < 3 else "LEFT"), f"HP {hp}/{mx}: crossing the Pokecenter to the counter"
-            if pos[2] > 2:
+            if pos[2] > 3:  # y=3 is the counter row: the nurse (3,1) answers across it (Viridian: 483 heals from (3,3) facing UP)
                 return "UP", f"HP {hp}/{mx}: walking up to the nurse"
             return ("A" if facing == "UP" else "UP"), f"HP {hp}/{mx}: at the nurse, {'talking' if facing == 'UP' else 'facing her'} to heal"
         p = g.path(pos, lambda n: n[0] in POKECENTER_MAPS)
@@ -127,17 +136,12 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     carrying_parcel = goals.get("oaks_parcel") and not goals.get("deliver_parcel")
     # Past Viridian (Route 2, its gates, the Forest, Pewter) never turn back to grind: that yo-yo burned 600+ steps of
     # 1800 per run (2026-11-03 05:54 round: 6 of 8 runs ran out of steps in the Forest, 360-560 steps spent in Viridian/Route 1).
-    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36, 0x0E, 0x0F, 0x3B)
-    if (goals.get("won_battle") and goals.get("to_route1") and 0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5
-            and not carrying_parcel and not beyond_viridian):
-        # (never while carrying Oak's parcel: delivering it came last in every deliver_parcel run because this branch
-        #  sent the agent back to Route 1 to train - they spent 600+ presses there and never reached the lab)
-        # Training: wander the Route 1 grass while healthy; wild battles are fought (FIGHT), fled when weak.
-        if pos[0] != 0x0C:
-            p = g.path(pos, lambda n: n[0] == 0x0C)
-            if p:
-                return p[0], f"goal train to L{goals.get('_train_level', 8)} (now L{level}, HP {hp}/{mx}): {len(p)} steps back to Route 1"
-        return None  # on Route 1: let exploration roam (grass encounters happen on their own)
+    beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36) + EAST_MAPS
+    # Training never walks the agent back south. Before Route 2 only the floor level is asked (see training.required_level) and it
+    # is met by the fights on the way to Viridian; from Route 2 on, Brock's target is ground out where the agent stands.
+    if (0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5 and goals.get("to_route2")
+            and pos[0] in GRIND_IN_PLACE):
+        return None  # Route 2 / the Forest: roam the grass here and fight what comes (the grind budget still caps it)
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):
         # Already known from earlier agents: the spot where "got OAK PARCEL" was seen. Go there and talk (known facts first).
         known = [tuple(goals["_parcel_spot"])] if goals.get("_parcel_spot") else []  # (map, x, y, facing) from the item log
@@ -233,51 +237,6 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
             p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
             if p:
                 return p[0], f"goal road north: {len(p)} steps to the northernmost known tile ({tx},{ty})"
-    if goals.get("beat_brock") and not goals.get("to_cerulean"):
-        return _east_road_step(g, maps, goals, pos)
-    return None
-
-
-# After the Boulder Badge, in geographic order (ROM map connections): Pewter E-> Route 3 N-> Route 4 (Mt Moon 1F is a warp
-# on Route 4) E-> Cerulean. Same order as pokeagent.goals.GOALS.
-EAST_ROAD = (("to_route3", 0x0E), ("to_route4", 0x0F), ("to_mt_moon", 0x3B), ("to_cerulean", 0x03))
-PEWTER, ROUTE3 = 0x02, 0x0E
-
-
-def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str) -> tuple[str, str] | None:
-    """Push toward a map edge ('RIGHT' = east, 'UP' = north): the extreme visited tile whose `side` is still unknown."""
-    d = maps.get(str(pos[0]), {})
-    visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
-    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
-    tiles = [tuple(map(int, k.split(","))) for k in visited]
-    tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
-             and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})]
-    order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
-    word = "easternmost" if side == "RIGHT" else "northernmost"
-    for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
-        if (pos[1], pos[2]) == (tx, ty):
-            return side, f"goal {stage}: at the {word} open tile, pushing {side} for the map edge"
-        p = g.path(pos, lambda n, tx=tx, ty=ty: n == (pos[0], tx, ty))
-        if p:
-            return p[0], f"goal {stage}: {len(p)} steps to the {word} known tile ({tx},{ty})"
-    return None
-
-
-def _east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple) -> tuple[str, str] | None:
-    """Walk toward the next unmet map of EAST_ROAD over the learned world; if it is not mapped yet, push east out of
-    Pewter (Route 3) and north along Route 3 (Route 4). Mt Moon and the road to Cerulean are left to exploration."""
-    stage, target = next((s, t) for s, t in EAST_ROAD if not goals.get(s))
-    p = g.path(pos, lambda n: n[0] == target)
-    if p:
-        return p[0], f"goal {stage}: {len(p)} steps to map 0x{target:02X}"
-    if stage == "to_route3":
-        if pos[0] != PEWTER:
-            p = g.path(pos, lambda n: n[0] == PEWTER)
-            return (p[0], f"goal {stage}: {len(p)} steps back to Pewter City") if p else None
-        return _edge_frontier(g, maps, pos, stage, "RIGHT")
-    if stage == "to_route4":
-        if pos[0] != ROUTE3:
-            p = g.path(pos, lambda n: n[0] == ROUTE3)
-            return (p[0], f"goal {stage}: {len(p)} steps back to Route 3") if p else None
-        return _edge_frontier(g, maps, pos, stage, "UP")
+    if goals.get("beat_brock") and not goals.get("ss_ticket"):
+        return east_road_step(g, maps, goals, pos, facing)
     return None

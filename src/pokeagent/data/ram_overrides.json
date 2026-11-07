@@ -1,0 +1,90 @@
+{
+ "wPartyMon1": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon1": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wPartyMon2": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon2": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wPartyMon3": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon3": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wPartyMon4": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon4": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wPartyMon5": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon5": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wPartyMon6": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "party_struct (44 bytes); decode with pokeagent.ramstructs.decode_party_mon"
+ },
+ "wEnemyMon6": {
+  "size": 44,
+  "encoding": "bytes",
+  "note": "enemy trainer party_struct (44 bytes)"
+ },
+ "wBattleMon": {
+  "size": 29,
+  "encoding": "bytes",
+  "note": "battle_struct (29 bytes): decode_battle_mon"
+ },
+ "wEnemyMon": {
+  "size": 29,
+  "encoding": "bytes",
+  "note": "battle_struct (29 bytes): decode_battle_mon"
+ },
+ "wPartyMon1Type": {
+  "size": 2,
+  "encoding": "bytes",
+  "note": "type1, type2"
+ },
+ "wPartyMon1Stats": {
+  "size": 10,
+  "encoding": "bytes",
+  "note": "max HP + attack/defense/speed/special, u16 big-endian each"
+ },
+ "wPartyMon1DVs": {
+  "size": 2,
+  "encoding": "bytes",
+  "note": "Atk<<12|Def<<8|Spd<<4|Spc nibbles; HP DV = low bits of the four"
+ },
+ "wCurOpponent": {
+  "note": "trainer id: 200 + trainer class (201..) in trainer battles, 0 in wild battles; set as the pre-battle text closes, cleared at battle end (ram_discover 2026-11-05)"
+ }
+}

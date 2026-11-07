@@ -2,7 +2,7 @@
 
 Sees (``perceive.ascii_vision``), Remembers (``MapMemory.render_memory``) and the viewer (V2 imports
 ``line``/``glyph`` for its legend line) all draw from this table. ``PRECEDENCE`` is the order
-``tilekind.classify`` checks kinds in (the directive's ``@ T/t N W ledge o # ! ~ i . ?``; ``you`` is
+``tilekind.classify`` checks kinds in (the directive's ``@ T/t * N W ledge o # ! ~ i . ?``; ``you`` is
 the renderer's own overlay and never returned by classify).
 """
 from __future__ import annotations
@@ -13,8 +13,9 @@ KIND_ROWS = [
     ("npc", "N", "an NPC not known to battle"),
     ("trainer", "T", "an NPC that started a trainer battle"),
     ("trainer_beaten", "t", "a beaten trainer"),
+    ("item", "*", "an item ball"),
     ("wall", "#", "terrain the player cannot enter"),
-    ("object", "o", "solid tile with an interaction (sign, PC, item ball)"),
+    ("object", "o", "solid tile with an interaction (sign, PC)"),
     ("grass", "~", "tile whose block id is in grass_ids"),
     ("encounter", "!", "grass tile where a wild battle started"),
     ("ledge", "v^<>", "a recorded one-way ledge jump (glyph = jump direction)"),
@@ -25,7 +26,7 @@ KIND_ROWS = [
 ]
 GLYPHS = {kind: glyph_ for kind, glyph_, _ in KIND_ROWS}
 MEANINGS = {kind: meaning for kind, _, meaning in KIND_ROWS}
-PRECEDENCE = ("you", "trainer", "trainer_beaten", "npc", "warp", "ledge", "object", "wall",
+PRECEDENCE = ("you", "trainer", "trainer_beaten", "item", "npc", "warp", "ledge", "object", "wall",
               "encounter", "grass", "interaction", "walkable", "unknown")
 LEDGE_GLYPH = {"UP": "^", "DOWN": "v", "LEFT": "<", "RIGHT": ">"}
 

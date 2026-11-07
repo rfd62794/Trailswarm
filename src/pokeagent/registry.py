@@ -35,6 +35,35 @@ def process_alive(pid):
         return True
 
 
+def process_state(pid):
+    """'alive', 'gone' (definitely no such process / exited) or 'unknown' (e.g. access denied: do not delete)."""
+    if not isinstance(pid, int) or pid <= 0:
+        return 'gone'
+    if os.name == 'nt':
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        kernel.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return 'gone' if ctypes.get_last_error() == 87 else 'unknown'  # 87 = ERROR_INVALID_PARAMETER: no such pid
+        try:
+            status = ctypes.c_ulong()
+            if not kernel.GetExitCodeProcess(handle, ctypes.byref(status)):
+                return 'unknown'
+            return 'alive' if status.value == 259 else 'gone'
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return 'alive'
+    except ProcessLookupError:
+        return 'gone'
+    except PermissionError:
+        return 'alive'
+
+
 @contextmanager
 def registry_lock(path):
     path = Path(path)

@@ -1,6 +1,8 @@
 """menu: YES/NO answers, move-forgetting, goal-driven menu choices, and exploring the first untried option."""
 from __future__ import annotations
 
+import re
+
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.dialog import goal_menu_choice, learn_decision, offered_starter, yesno_answer
@@ -13,7 +15,7 @@ class Menu(BehaviourBase):
     name = "menu"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        return ctx.view.box and is_menu(ctx.view.tm)
+        return ctx.view.box and is_menu(ctx.view.tm) and ctx.proc is None  # a running procedure drives its own menus
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         tm = ctx.view.tm
@@ -33,7 +35,8 @@ class Menu(BehaviourBase):
                 ans, why, forget = learn_decision(context, cur_moves)
                 ctx.forget_move = forget
             else:
-                ans, why = yesno_answer(context, ctx.opts.starter)
+                ans, why = yesno_answer(context, ctx.opts.starter, buy_magikarp=not check_goals(ctx.emu, ctx)["buy_magikarp"],
+                                      offer_text=" ".join(ctx.dialog[-12:]) + " " + question)  # the price line scrolls past the name
             ctx.yesno = {"question": question[:80], "answer": ans}
             offered = offered_starter(context)
             if ans == "NO" and offered:  # remember THIS ball so we try another one
@@ -65,6 +68,8 @@ class Menu(BehaviourBase):
             # Exits are always a fine choice once nothing here is wanted (seen 2026-11-03: the agent sat on
             # 'CANCEL' pressing DOWN because CANCEL counted as 'already tried').
             return Decision("A", "leave_menu", f"menu: cursor on '{cursor}' - leaving this menu")
+        if re.match(r"POK.DEX", cursor):  # its entry pages are full-screen, not boxes: nothing backs out of them (Mt Moon B2F, 2026-11-05)
+            return Decision("DOWN", "menu_skip_pokedex", "menu open, cursor on POKeDEX - never opening it, moving the cursor down")
         if cursor and cursor not in tried:
             return Decision("A", "menu_new_option", f"menu open, cursor on '{cursor}' (new) - choosing it")
         if any(o not in tried for o in options):

@@ -1,13 +1,30 @@
 """World graph over the learned map memory: BFS across floors and doors (moved from tools/explore_plan.py)."""
 from __future__ import annotations
 
+import json
 from collections import deque
+from pathlib import Path
 from typing import Callable
 
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
-POKECENTER_MAPS = (41, 58)  # Viridian (41) and Pewter (58, "Welcome... JIGGLY") Pokecenters
+
+
+def pokecenter_maps(names_path: Path | None = None) -> tuple[int, ...]:
+    """Every map whose ROM name ends in POKECENTER (11 of them), from atlas/map_names.json, sorted. The list was hand-typed with
+    4 of the 11 before; a missing one meant no nurse planning, no 90% heal threshold and no veto exemption in that town."""
+    path = names_path or Path(__file__).resolve().parents[1] / "atlas" / "map_names.json"
+    try:
+        names = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return (41, 58, 0x44, 0x40)  # the four the explorer was written against
+    return tuple(sorted(int(k) for k, v in names.items() if str(v).endswith("POKECENTER")))
+
+
+POKECENTER_MAPS = pokecenter_maps()  # computed once at import: Viridian 41, Pewter 58, Cerulean 0x40, Mt Moon 0x44, Rock Tunnel, Vermilion, ...
+MT_MOON_MAPS = frozenset({0x3B, 0x3C, 0x3D})  # 1F, B1F, B2F
+DUNGEON_MAPS = MT_MOON_MAPS  # no training gate inside: grind outside (Route 3/4), inside head for the exit
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 
@@ -16,6 +33,8 @@ class WorldGraph:
 
     def __init__(self, maps: dict):
         self.maps = maps
+
+    blocked_now: frozenset = frozenset()  # (map, x, y) tiles an NPC temporarily occupies: skipped, never learned
 
     strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
 
@@ -50,6 +69,8 @@ class WorldGraph:
             if self.strict and key in d.get("blocked", []):
                 continue
             nx, ny = x + dx, y + dy
+            if (m, nx, ny) in self.blocked_now:
+                continue
             if (nx, ny) in self.static_npc_tiles(m):
                 continue  # a person standing there: walking into them only starts a conversation (Forest corridor, 07:34)
             if f"{nx},{ny}" in d.get("visited", {}):

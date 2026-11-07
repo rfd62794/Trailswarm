@@ -25,6 +25,7 @@ class Thinking:
     button: str = ""
     result: str = ""
     confidence: float | None = None
+    brain: str = ""  # e.g. the RL agent's decoded Q-brain line; "" for agents without one
 
 
 @dataclass
@@ -55,6 +56,8 @@ class PartyMon:
     level: int = 0
     hp: int = 0
     max_hp: int = 0
+    dvs: str = ""         # "A5 D12 S5 P7 H11" (Gen 1 DVs, 0-15 each)
+    stat_exp: str = ""    # "hp/atk/def/spd/spc" stat experience
 
 
 @dataclass
@@ -90,6 +93,8 @@ class AgentSnapshot:
     sees: Sees = field(default_factory=Sees)
     screen: Screen = field(default_factory=Screen)
     human_hold: bool = False
+    claude_hold_s: float = 0.0  # seconds left on a Claude lease (0 = none); the agent makes no own decisions while > 0
+    extra: dict = field(default_factory=dict)  # intervention digest inputs (intervene.extra); empty for agents without it
     frame_slot: str = ""
     updated_at: float = 0.0
 

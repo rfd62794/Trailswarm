@@ -4,7 +4,7 @@ Mixed into MapMemory (moved unchanged from tools/explore_demo.py).
 """
 from __future__ import annotations
 
-from pokeagent.explorer.perceive import DIRS, ahead_tiles
+from pokeagent.explorer.perceive import DIRS, ahead_tiles, stand_tile
 from pokeagent.explorer.world import WorldGraph
 
 OPPOSITE = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
@@ -36,7 +36,7 @@ class NavMixin:
         tried = [n for n in DIRS if f"{x},{y},{n}" in d["blocked"]]
         if tilemap is not None:  # tile ids ahead already known solid (bookshelf, wall, desk) count as tried
             for n in DIRS:
-                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n)):
+                if n not in tried and self.known_solid(tileset, ahead_tiles(tilemap, n), stand_tile(tilemap)):
                     tried.append(n)
                     # remember it as a wall edge too: the frontier search only knows 'blocked', so without this it kept
                     # sending agents to a 'frontier' tile whose open side was a known-solid tile (move/A loop at Viridian)
@@ -44,6 +44,9 @@ class NavMixin:
                         d["blocked"].append(f"{x},{y},{n}")
                 if grass == "avoid" and n not in tried and self.is_grass(tileset, ahead_tiles(tilemap, n)):
                     tried.append(n)
+        for n, (tdx, tdy) in DIRS.items():  # a wanderer NPC temporarily stands there: wait or go around, do not learn a wall
+            if (map_id, x + tdx, y + tdy) in self.temp_blocked and n not in tried:
+                tried.append(n)
         for n in list(DIRS):  # do not take a connection/warp back to a map we are deliberately done with
             w = d["warps"].get(f"{x},{y},{n}")
             if w and avoid_maps and w[0] in avoid_maps and n not in tried:
@@ -81,6 +84,7 @@ class NavMixin:
 
     def _frontier_graph(self) -> WorldGraph:
         g = WorldGraph(self.data["maps"]); g.strict = True
+        g.blocked_now = frozenset(self.temp_blocked)
         return g
 
     def _frontier(self, d: dict, visited: dict, blocked: set, n: tuple) -> bool:

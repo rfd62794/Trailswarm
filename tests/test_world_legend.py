@@ -193,7 +193,7 @@ def test_trainer_marked_on_flag2_and_beaten_on_win(tmp_path):
     mem.m(0x28).setdefault("npcs", {})["slot1:pic7"] = {"pic": 7, "slot": 1, "positions": {"6,6": 1},
                                                        "last": [6, 6], "text": "", "talked": 1}
     emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6, BATTLE: 2, PARTY: 1})
-    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path)
+    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10)
     ctx.refresh()
     assert Battle().step(ctx) is None
     npc = mem.m(0x28)["npcs"]["slot1:pic7"]
@@ -218,7 +218,7 @@ def test_record_outcome_aggregates_n_progress_best(tmp_path):
 def test_engine_backfills_goal_keyed_outcomes(tmp_path):
     emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6})
     mem = MapMemory(tmp_path / "maps.json")
-    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path)
+    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10)
     ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
     engine = Engine(ctx, decision_log=DecisionLog(tmp_path / "decisions.jsonl"))
     engine.step()  # a real press: the record lands in the pending segment
@@ -239,7 +239,7 @@ def test_stop_at_goal_final_segment_outcomes_are_saved(tmp_path):
     import json
     emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6})
     mem = MapMemory(tmp_path / "maps.json")
-    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(stop_at_goal="potion"), run_dir=tmp_path)
+    ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(stop_at_goal="potion"), run_dir=tmp_path, stable_frames=10)
     ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
 
     class GoalPresser:
@@ -261,7 +261,7 @@ def test_stop_at_goal_final_segment_outcomes_are_saved(tmp_path):
 
 def test_pending_outcomes_are_capped(tmp_path):
     emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6})
-    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path)
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10)
     ctx.trans = (tmp_path / "t.jsonl").open("a", encoding="utf-8")
     engine = Engine(ctx)
     engine._pending_outcomes = [{"step": i} for i in range(2000)]

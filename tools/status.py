@@ -8,9 +8,10 @@ Prints the done-condition metrics; targets stay with Robert in DIRECTION.md.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-from pokeagent.goals import GOALS
+from pokeagent.goals import GOALS, SIDE_GOALS
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
@@ -91,6 +92,65 @@ def _unbroken_badge_run(ms: dict) -> dict | None:
     return None
 
 
+def _items_picked(d: Path) -> int:
+    """Item-ball pickups in a run: positive bag deltas whose dialog said 'found/obtained <ITEM>!'."""
+    n = 0
+    for line in (d / "transitions.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        it = rec.get("item")
+        if not it or it.get("delta", 0) <= 0:
+            continue
+        text = f"{it.get('text', '')} {rec.get('text', '')}".lower()
+        if "found" in text or "obtained" in text:
+            n += 1
+    return n
+
+
+def interaction_lines(maps: dict) -> list[str]:
+    """Defined-interaction metrics from maps.json: presses per type, re-talks avoided, heal visits, frames per text page."""
+    st = maps.get("interaction_stats") or {}
+    out = []
+    by = st.get("by_type", {})
+    if by:
+        out.append("interactions by type (talks, mean presses): " + ", ".join(
+            f"{k} {v['talks']}x {v['presses'] / max(1, v['talks']):.1f}" for k, v in sorted(by.items())))
+    if st:
+        out.append(f"re-talks avoided: {st.get('retalks_avoided', 0)}; info/sign re-talked: {st.get('retalks', 0)}; "
+                   f"heal visits: {st.get('heal_visits', 0)}")
+    tp = maps.get("text_press_stats")
+    if tp and tp.get("pages"):
+        out.append(f"text pace: {tp['frames'] / tp['pages']:.1f} frames/page, {tp['presses'] / tp['pages']:.2f} presses/page, "
+                   f"{tp.get('dropped', 0)} dropped; speed byte {(maps.get('text_speed') or {}).get('byte', '?')}")
+    return out
+
+
+def _trainee_line(dirs: list[Path]) -> str:
+    """Newest run that recorded Magikarp numbers (meta.json "magikarp") plus the background goals (SIDE_GOALS)."""
+    for d in reversed(dirs):
+        meta = _meta(d)
+        mk = meta.get("magikarp")
+        if mk is None:
+            continue
+        side = ", ".join(f"{g}={'yes' if meta.get('side_goals', {}).get(g) else 'no'}" for g in SIDE_GOALS)
+        lvl = f"L{mk['level']}" if "level" in mk else "not owned"
+        return (f"magikarp ({d.name}): {lvl}, battles shared {mk.get('battles_shared', 0)} of {mk.get('battles', 0)}; "
+                f"background goals: {side}")
+    return "magikarp: no run has bought one yet; background goals: " + ", ".join(f"{g}=no" for g in SIDE_GOALS)
+
+
+def _campaign_line(ms: dict) -> str:
+    """Ladder length, how many goals have a RAM detector, how far the best run got (the full list is too long to print)."""
+    from pokeagent.campaign import load_campaign, selectable
+    specs = load_campaign()
+    unv = sum(1 for g in specs if g["detector"] == "unverified")
+    furthest = max((i for i, g in enumerate(specs) if ms.get(g["id"])), default=-1)
+    at = specs[furthest]["id"] if furthest >= 0 else "none"
+    return (f"campaign: {len(specs)} goals ({len(specs) - unv} detected, {unv} unverified, "
+            f"{sum(1 for g in specs if selectable(g['id']))} selectable); furthest reached: {at}")
+
+
 def main() -> int:
     if not RUNS.exists():
         print("no runs/ data in this checkout (runs/ is gitignored; run the swarm here first)")
@@ -119,12 +179,25 @@ def main() -> int:
     tiles = sum(len(m.get("visited", {})) for m in maps.get("maps", {}).values())
     print(f"world: {len(maps.get('maps', {}))} maps, {tiles} tiles, team_best_level={maps.get('team_best_level', '?')}")
 
+    for line in interaction_lines(maps):
+        print(line)
+
     dirs = _run_dirs()
     if dirs:
         from backtrack_report import backtrack_stats
         s = backtrack_stats(dirs[-1] / "transitions.jsonl")
         print(f"backtrack ({dirs[-1].name}): reversals {s['reversal_pct']:.1f}% ({s['reversals']}/{s['moves']} agent moves), "
               f"back-in-2 {s['back2_pct']:.1f}% ({s['back_in_2']}/{s['moves']})")
+        print(f"items picked up ({dirs[-1].name}): {_items_picked(dirs[-1])}")
+    print(_trainee_line(dirs))
+    print(_campaign_line(ms))
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from segments import summary
+        print("segment curriculum (tools/segments.py):")
+        print("\n".join("  " + ln for ln in summary(ROOT, do_ingest=False)))
+    except Exception as e:  # the report must never break status
+        print(f"segment curriculum: unavailable ({e!r})")
     return 0
 
 
