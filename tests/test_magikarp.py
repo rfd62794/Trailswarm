@@ -57,10 +57,11 @@ def draw_framed(emu: FakeEmulator, rows: list[str]) -> None:
 
 # --- goals -------------------------------------------------------------------------------------------------------
 
-def test_buy_magikarp_sits_before_mt_moon_and_gyarados_is_a_ladder_goal():
+def test_buy_magikarp_sits_before_mt_moon_and_team_ready_is_a_ladder_goal():
     assert GOALS.index("to_route4") < GOALS.index("buy_magikarp") < GOALS.index("to_mt_moon")
-    assert GOALS.index("gyarados") == GOALS.index("nugget_bridge") + 1
-    assert GOALS.index("to_bill") == GOALS.index("gyarados") + 1
+    assert GOALS.index("team_ready") == GOALS.index("nugget_bridge") + 1
+    assert GOALS.index("to_bill") == GOALS.index("team_ready") + 1
+    assert "gyarados" not in GOALS
     assert SIDE_GOALS == []
 
 
@@ -76,16 +77,20 @@ def test_buy_magikarp_detector():
     st: dict = {}
     assert check_goals(emu, st)["buy_magikarp"]
     emu.memory.update(party_mem([(STARTER, 14, 30, 30), (GYARADOS, 20, 60, 60)]))
+    assert not check_goals(emu, st)["team_ready"]  # open until the hurt-lead sim says ready
+    st["team_ready_ok"] = True
     g = check_goals(emu, st)
-    assert g["buy_magikarp"] and g["gyarados"]  # evolved: still bought, the gyarados goal is met
+    assert g["buy_magikarp"] and g["team_ready"]  # evolved: still bought; team_ready is now the ladder goal
     assert check_goals(FakeEmulator({**rich, MAP: 0x3B}), {})["buy_magikarp"]  # Mt Moon 1F entered: the chance is gone
 
 
-def test_gyarados_never_blocks_the_ladder():
-    g = check_goals(FakeEmulator({**party_mem([(STARTER, 14, 30, 30)]), **bcd(3000)}), {})
-    assert g["gyarados"]  # settled without a Magikarp ever being owned: the ladder goal cannot stall
+def test_team_ready_never_blocks_the_ladder():
     karp = FakeEmulator({**party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 17, 17)]), **bcd(3000)})
-    assert not check_goals(karp, {})["gyarados"]  # open only while a Magikarp is actually being raised
+    assert not check_goals(karp, {})["team_ready"]                    # open: the sim has not said ready yet
+    assert check_goals(karp, {"team_ready_ok": True})["team_ready"]   # the hurt-lead sim says the team beats the next boss
+    assert check_goals(karp, {"had_team_ready": True})["team_ready"]  # sticky once ready
+    assert check_goals(karp, {"team_ready_skipped": True})["team_ready"]  # the stage's step cap ran out
+    assert check_goals(karp, {"team_ready_nodata": True})["team_ready"]   # no boss data: never blocks
 
 
 # --- the salesman's YES / the nickname NO ------------------------------------------------------------------------

@@ -11,7 +11,7 @@ from __future__ import annotations
 from pokeagent import campaign
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
-from pokeagent.magikarp import gyarados_goal_settled, magikarp_goal_settled
+from pokeagent.magikarp import magikarp_goal_settled, team_ready_settled
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
 GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 26 ids are the hand-coded ones below
@@ -22,7 +22,7 @@ def goals_brief(goals: dict) -> str:
 
 
 # Background goals: reported by check_goals and tools/status.py, never part of the ladder (they must not block the route).
-# None today (gyarados joined the ladder 2026-11-07); the name stays exported for its consumers.
+# None today (team_ready sits in the ladder since 2026-11-07); the name stays exported for its consumers.
 SIDE_GOALS: list[str] = []
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
@@ -119,9 +119,10 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # 0x58 Bill's house is the only warp on Route 25 (0x24). CASCADEBADGE = wObtainedBadges bit1 (ROM 17:5736).
          "heal_cerulean": healed_in_cerulean(emu, st, m), "beat_misty": bool(emu.read(0xD356) & 2),
          "nugget_bridge": 0x23 in seen,
-         # Robert 2026-11-07: raise the bought Magikarp to Gyarados on Routes 24/25; settled (never blocks) when a
-         # GYARADOS is owned, when no Magikarp was ever owned, or once the stage's step cap is spent (plan_goal).
-         "gyarados": gyarados_goal_settled(emu, st, seen), "to_bill": 0x58 in seen,
+         # Robert 2026-11-07 (team builder v2): "a party that beats the next boss (hurt-lead sim)" replaces the
+         # Gyarados mandate - the Gyarados is now one catch-plan candidate. Settled (never blocks) when the team
+         # verdict is ready (sticky), the stage's step cap is spent, or there is no boss data (plan_goal).
+         "team_ready": team_ready_settled(emu, st, seen), "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
     g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
     g["cut_learner"] = g["hm01_cut"] and cut_learner_settled(emu, st, _kbmod.ROM_KB)  # only after HM01 is in hand; special goal: hand-coded, skipped by campaign_goals

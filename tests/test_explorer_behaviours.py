@@ -197,7 +197,7 @@ def test_default_order_is_the_old_agent_step_order():
     names = [b.name for b in default_behaviours()]
     assert names == ["settle", "guards", "party_order", "post_talk_settle", "readiness", "anomaly_wait", "replay_interrupt", "already_out", "battle_yesno", "battle_text_wait", "battle", "switch_out", "catch", "battle_moves", "cave_escape", "cave_topup", "use_items",
                      "naming_keyboard", "beat_start", "box_settle", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
-                     "stall_guard", "heal", "restock", "use_items", "goal_talk", "grind_drill", "explore_burst", "pickup", "plan_goal", "learner_hunt", "frontier"]
+                     "stall_guard", "heal", "restock", "use_items", "goal_talk", "grind_drill", "explore_burst", "pickup", "plan_goal", "learner_hunt", "team_hunt", "frontier"]
     assert no_press("x").button == ""
 
 

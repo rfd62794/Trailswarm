@@ -34,11 +34,12 @@ class Catch(BehaviourBase):
             sp_name = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), str(species))
             key = (ctx.battles, species)
             if ctx.catch_want[0] != key:  # decided once per fight: the party read is not free
-                why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()), owned=owned)
+                why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()),
+                                   owned=owned, wants=ctx.team_wants)
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
-        if want and balls and dex_no and e_max and (not owned or want.startswith("can learn")):
+        if want and balls and dex_no and e_max and (not owned or want.startswith(("can learn", "planned"))):
             ratio = e_hp / e_max
             if ratio <= 0.35 and (run_line is not None or item_list_open(lines_now)):  # a ball throw never opens a party prompt
                 ctx.catch_attempt = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2), "step": ctx.step, "dex": dex_no}

@@ -75,6 +75,16 @@ def gyarados_goal_settled(emu, st: dict, seen: set) -> bool:
             or bool(st.get("gyarados_skipped")))
 
 
+def team_ready_settled(emu, st: dict, seen: set) -> bool:
+    """team_ready (the ladder goal that replaced gyarados, same slot): True once the hurt-lead sim says the party
+    beats the next boss (plan_goal sets ``team_ready_ok`` each step from team_for().ready and latches
+    ``had_team_ready``), when the stage's step cap is spent (``team_ready_skipped``), or when there is no boss/ROM
+    data to judge by (``team_ready_nodata``). It must NEVER block the route."""
+    if st.get("team_ready_ok") or st.get("team_ready_skipped") or st.get("team_ready_nodata"):
+        st["had_team_ready"] = True  # settled is sticky: a later not-ready step must not reopen the route
+    return bool(st.get("had_team_ready"))
+
+
 def switch_candidate(emu, trainee: int | None = None) -> int | None:
     """Party index of the strongest healthy non-trainee (HP >= SWITCH_MIN_HP of max), else None.
     `trainee` = the slot being switch-trained (trainee_slot_for); without one every MAGIKARP stays out, as before."""

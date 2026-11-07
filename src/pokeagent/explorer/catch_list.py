@@ -57,11 +57,16 @@ def _party_covers(hm: str, party) -> bool:
     return any(name in can or HM_MOVE[hm] in moves for name, moves in _members(party))
 
 
-def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned: bool = False) -> str | None:
-    """Why a ball should go on ``species`` (a reason string), or None. ``owned``: the species is already in the dex."""
+def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned: bool = False,
+                 wants: dict[str, str] | None = None) -> str | None:
+    """Why a ball should go on ``species`` (a reason string), or None. ``owned``: the species is already in the dex.
+    ``wants``: the catch plan's species -> reason map (knowledge.catch_plan via ctx.team_wants); a planned species
+    reports its plan reason after the HM check and before the dex check. None keeps today's behaviour exactly."""
     for hm in HM_MOVE:
         if hm in upcoming and species in hm_table().get(hm, ()) and not _party_covers(hm, party):
             return f"can learn {hm.upper()} (needed ahead, nobody in the party can)"
+    if wants and species in wants:
+        return wants[species]
     if not owned and dex_owned < DEX_TARGET and "dex10" in upcoming:
         return f"new species for the Pokedex ({dex_owned}/{DEX_TARGET} owned, dex10 ahead)"
     return None

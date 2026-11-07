@@ -1,6 +1,6 @@
-"""Where the gyarados stage trains: Route 24's grass, the same ground the Misty stage grinds on.
+"""Where the team_ready stage trains: Route 24's grass, the same ground the Misty stage grinds on.
 
-The planner has no target for the "gyarados" goal (it is a training stage, not a place), so with the gate live the run fell
+The planner has no target for the "team_ready" goal (it is a training stage, not a place), so with the gate live the run fell
 through to frontier, whose grass seeking is local: runs that left Route 24 for Cerulean City wandered 31 tiles for 600+
 presses, found no grass and were stalled (2026-11-07 swarm-day34). This walks back to Route 24 and then returns None, so
 frontier roams its grass.
@@ -31,7 +31,7 @@ def step(maps: dict, pos: tuple, blocked, hp: int, mx: int) -> tuple[str, str] |
     g = WorldGraph(maps)
     g.blocked_now = frozenset(blocked)
     p = g.path(pos, goal)
-    return (p[0], f"goal gyarados: {len(p)} steps {what} to train the trainee") if p else None
+    return (p[0], f"goal team_ready: {len(p)} steps {what} to train the trainee") if p else None
 
 def stay_on_route(map_id: int, training_live: bool) -> set | None:
     """Maps frontier must not walk into while it roams Route 24 for the trainee: with every Route 24 tile already seen, the
