@@ -13,6 +13,12 @@ from pokeagent.explorer.catch_list import upcoming_needs
 from pokeagent.explorer.item_policies.ids import HM_MOVE
 
 
+def yesno_box_up(lines: list[str]) -> bool:
+    """A YES/NO box is on screen (the cursor row ends in YES or NO and both options are listed)."""
+    options = [ln.replace(">", "").strip() for ln in lines if ">" in ln or (ln.isupper() and len(ln.split()) <= 3)]
+    return {"YES", "NO"} <= {o.split()[-1] for o in options if o}
+
+
 class Menu(BehaviourBase):
     name = "menu"
 
