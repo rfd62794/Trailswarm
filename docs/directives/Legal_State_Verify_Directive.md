@@ -199,7 +199,7 @@ the `edit_class` rules as implemented, and everything you could not verify witho
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -208,4 +208,5 @@ the `edit_class` rules as implemented, and everything you could not verify witho
 - 2026-11-07 14:26 · robert-claude-laptop · none → Draft — Claude 2026-11-07: legality checker, envelope, lineage/promotion
 - 2026-11-07 14:27 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on new modules/tests and gitignored kb/ + runs/ evidence paths only
 - 2026-11-07 14:30 · robert-claude-laptop · Queued → Draft — Claude 2026-11-07: reword for Devin allow list (pytest only); requeueing
+- 2026-11-07 14:30 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: pytest-only for Devin; CLI checks are controller validation. lint_override: dispatch-path-missing only
 <!-- queue:end -->
