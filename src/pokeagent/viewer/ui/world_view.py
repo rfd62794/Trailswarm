@@ -18,6 +18,7 @@ from pokeagent.viewer import ui_scale
 from pokeagent.viewer.ui.world_agents import draw_agents, draw_hover
 from pokeagent.viewer.ui.world_interiors import InteriorLayer
 from pokeagent.world import draw
+from pokeagent.world.follow import Follow
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
 
@@ -53,6 +54,8 @@ class WorldView:
         self._building = False
         self._built_at = 0.0
         self._points: dict[str, tuple[float, float]] = {}
+        self.follow = Follow()
+        self._follow_t: float | None = None
         if not dpg.does_item_exist(TEX):
             dpg.add_texture_registry(tag=TEX, show=False)
         self.area = dpg.add_child_window(parent=parent, width=10, height=10, border=False, no_scrollbar=True, tag="world_area",
@@ -155,7 +158,9 @@ class WorldView:
             aid = pick(self._points, self.vp, *m)
             if aid:
                 self._on_select(aid)
+                self.follow.start(aid, time.monotonic())
             elif self.side:
+                self.follow.stop()
                 loc = locate(self.vl or self.world.layout, *self.vp.to_world(*m))
                 self.interiors.selected = loc[0] if loc and self.interiors.plan and loc[0] in self.interiors.plan.anchors else None
                 if loc:
@@ -174,6 +179,8 @@ class WorldView:
                 d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
                 if not self.interiors.edit_drag(*d):
                     self.vp.pan(*d)
+                    if d[0] or d[1]:
+                        self.follow.stop()
             self._last_mouse = m
         else:
             self._last_mouse = None
@@ -220,6 +227,10 @@ class WorldView:
         self.interiors.tick_world()
         self._maybe_rebuild(now)
         self._drag()
+        t = self.follow.target(self._points, now)
+        if t is not None:
+            self.follow.step(self.vp, t, 0.0 if self._follow_t is None else now - self._follow_t)
+        self._follow_t = now
         vp, self._uploads = self.vp, 0
         f, chunks = self.pyr.plan(vp.zoom, vp.visible(), MAX_TEX - 10)
         for cx, cy in chunks:
@@ -236,6 +247,9 @@ class WorldView:
         self.interiors.draw(dl)
         draw_agents(self, now)
         draw_hover(self)
+        if self.follow.active:
+            dpg.draw_text((12, 8), f"Following {self.follow.agent_id[-8:]} - drag the map or click empty space to stop",
+                          size=ui_scale.px(15), parent=dl)
         if self.side:
             self.side.update()
 
