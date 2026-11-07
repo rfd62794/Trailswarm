@@ -13,6 +13,7 @@ from pokeagent.explorer.training import gate_for, readiness_for, required_level,
 from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge import blackout_tax
+from pokeagent.knowledge.cut_learner import LEARNER_STEP_CAP
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
 from pokeagent.magikarp import BUY_STEP_CAP, MT_MOON_CENTER
@@ -35,6 +36,12 @@ class PlanGoal(BehaviourBase):
             if ctx.buy_steps > BUY_STEP_CAP:
                 ctx.buy_skipped = True; ctx.center_intent = None
                 ctx.log(f"[buy_magikarp: {BUY_STEP_CAP} steps in/around the Mt Moon Pokemon Center without buying - settled for this run]", "res")
+                goals_now_all = ctx.goals()
+        if goals_now_all["hm01_cut"] and not goals_now_all["cut_learner"]:
+            ctx.cut_learner_steps += 1
+            if ctx.cut_learner_steps > LEARNER_STEP_CAP:
+                ctx.cut_learner_skipped = True
+                ctx.log(f"[cut_learner: {LEARNER_STEP_CAP} steps without a Cut-capable party member - settled for this run]", "res")
                 goals_now_all = ctx.goals()
         if m == MT_MOON_CENTER and not goals_now_all["buy_magikarp"]:
             ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with

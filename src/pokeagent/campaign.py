@@ -41,9 +41,19 @@ def goal_spec(goal: str) -> dict | None:
     return next((g for g in load_campaign() if g["id"] == goal), None)
 
 
-def agent_capabilities() -> frozenset[str]:
-    """What the current agent behaviours can do: nothing special yet; POKEAGENT_CAPS=cut,surf overrides (comma list)."""
-    return frozenset(c.strip() for c in os.environ.get("POKEAGENT_CAPS", "").split(",") if c.strip())
+def agent_capabilities(emu=None, root: Path | None = None) -> frozenset[str]:
+    """What the current agent behaviours can do: the POKEAGENT_CAPS=cut,surf env override (comma list, unchanged),
+    capabilities read from RAM when an emulator is passed (pokeagent.unlocks), and the curriculum's own evidence:
+    a run that reached ``cut_taught`` left ``runs/checkpoints/cut_taught.state`` (press_goals.record_goals writes it
+    the moment the detector fires), which is what lets the segment picker - it has no emulator - see the capability."""
+    caps = set(c.strip() for c in os.environ.get("POKEAGENT_CAPS", "").split(",") if c.strip())
+    if emu is not None:
+        from pokeagent import unlocks  # late import: unlocks needs this module's party_knows_move
+        caps |= unlocks.capabilities(emu)
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    if (base / "runs" / "checkpoints" / "cut_taught.state").exists():
+        caps.add("cut")
+    return frozenset(caps)
 
 
 def reachable(goal: str, capabilities=None) -> bool:

@@ -33,7 +33,7 @@ def test_ladder_is_long_and_starts_with_todays_25():
     assert len(SPECS) >= 100
     assert goals.GOALS[:25] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
     assert len(set(goals.GOALS)) == len(goals.GOALS)
-    assert all(g.get("special") for g in SPECS[:25]) and not any(g.get("special") for g in SPECS[25:])
+    assert all(g.get("special") for g in SPECS[:25]) and [g["id"] for g in SPECS if g.get("special")] == [*PREFIX, "cut_learner"]
 
 
 def test_order_is_a_chain():
@@ -112,7 +112,7 @@ def test_captain_and_hm01_use_the_mined_event_flags():
     by = {g["id"]: g for g in SPECS}
     assert by["ss_anne_captain"]["detector"] == {"flag": {"addr": "0xD803", "bit": 1}}   # rubbed the captain's back
     assert by["hm01_cut"]["detector"] == {"flag": {"addr": "0xD803", "bit": 0}}          # EVENT_GOT_HM01
-    assert by["cut_taught"]["after"] == "hm01_cut" and by["pokemon_fan_club"]["after"] == "cut_taught"
+    assert by["cut_taught"]["after"] == "cut_learner" and by["cut_learner"]["after"] == "hm01_cut" and by["pokemon_fan_club"]["after"] == "cut_taught"
     g = {s["id"]: False for s in SPECS}
     emu = FakeEmulator({})
     for k in ("ss_anne_captain", "hm01_cut"):

@@ -156,6 +156,10 @@ class ExplorerContext:
     train_need: int = 8  # the training level plan_goal last computed for this map (0 inside a dungeon)
     buy_skipped: bool = False  # the buy_magikarp stage ran out of steps (BUY_STEP_CAP): settled for this run
     buy_steps: int = 0  # steps spent in or around the Mt Moon Pokemon Center with buy_magikarp open
+    cut_learner_steps: int = 0  # steps spent with hm01_cut met and cut_learner still open (plan_goal)
+    cut_learner_skipped: bool = False  # the learner stage ran out of steps (LEARNER_STEP_CAP): settled for this run
+    learner_target: Any = None  # knowledge.cut_learner.LearnerTarget the learner_hunt walk heads for
+    hunt_grass: bool = False  # on the learner target's map: frontier should seek grass for the wild encounter
     switch_runs: tuple = (-1, 0)  # (ctx.battles, RUN attempts) of switch_train_run
     party_order: dict | None = None  # reorder_party in progress: {"src", "presses", "wait"}
     order_retry_at: int = 0  # step before which a failed reorder_party is not retried
