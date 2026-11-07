@@ -311,7 +311,7 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -321,4 +321,5 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 - 2026-11-07 15:17 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on greenfield modules/tests and gitignored kb/ evidence paths
 - 2026-11-07 15:17 · robert-claude-laptop · Queued → Draft — Claude: lint path fix (hp_stats full path)
 - 2026-11-07 15:18 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: catcher requires a damaging move (Robert); lint path fix; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ paths
+- 2026-11-07 15:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield modules (team_value.py, catch_plan.py, dex_value.py, tests) and gitignored kb/*.json evidence; known false positives.
 <!-- queue:end -->
