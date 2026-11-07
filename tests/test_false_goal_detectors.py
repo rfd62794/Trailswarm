@@ -50,11 +50,11 @@ def test_out_of_order_goal_does_not_infer_unverified_predecessors():
         g[k] = True
     g["bike_shop"] = True                                     # reached out of order
     campaign.infer_unverified(g)
-    assert not g["rival_ss_anne"] and not g["hm01_cut"]
+    assert not g["rival_ss_anne"]
     for k in ("ss_anne_2f", "ss_anne_captain", "pokemon_fan_club"):
         g[k] = True                                           # the real chain
     campaign.infer_unverified(g)
-    assert g["rival_ss_anne"] and g["hm01_cut"]
+    assert g["rival_ss_anne"]
 
 
 def test_early_game_ram_fires_none_of_the_four():

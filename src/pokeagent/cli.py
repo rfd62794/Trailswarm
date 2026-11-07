@@ -209,6 +209,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     from pokeagent.world.app import add_parser as _add_world
     _add_world(sub)
+    from pokeagent.statescmd import add_parser as _add_states
+    _add_states(sub)
 
     cli_hex.register(sub)
     cli_brain.register(sub)

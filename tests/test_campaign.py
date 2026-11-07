@@ -46,7 +46,7 @@ def test_every_goal_has_a_known_detector_shape():
     for g in SPECS:
         d = g["detector"]
         assert d == "unverified" or (isinstance(d, dict) and len(d) == 1 and next(iter(d)) in
-                                     {"map", "badge", "item", "flag", "party", "map_and_badge", "map_now_with_item", "map_past_x", "special"}), g["id"]
+                                     {"map", "badge", "item", "flag", "party", "party_move", "map_and_badge", "map_now_with_item", "map_past_x", "special"}), g["id"]
         if isinstance(d, dict) and "badge" in d:
             assert 0 <= d["badge"] <= 7
 
@@ -99,16 +99,39 @@ def test_item_list_and_flag_and_combined_detectors():
     assert ev({"party": {"min_count": 1}}, FakeEmulator({0xD163: 2}), {}, set(), {})
 
 
+def test_party_move_detector_reads_every_member_and_slot():
+    ev = campaign.evaluate
+    cut = {"party_move": 15}
+    assert not ev(cut, FakeEmulator({0xD163: 2}), {}, set(), {})
+    assert ev(cut, FakeEmulator({0xD163: 2, 0xD173 + 0x2C + 3: 15}), {}, set(), {})       # slot 4 of the second member
+    assert not ev(cut, FakeEmulator({0xD163: 1, 0xD173 + 0x2C: 15}), {}, set(), {})       # a bench slot past the party count
+
+
+def test_captain_and_hm01_use_the_mined_event_flags():
+    ev = campaign.evaluate
+    by = {g["id"]: g for g in SPECS}
+    assert by["ss_anne_captain"]["detector"] == {"flag": {"addr": "0xD803", "bit": 1}}   # rubbed the captain's back
+    assert by["hm01_cut"]["detector"] == {"flag": {"addr": "0xD803", "bit": 0}}          # EVENT_GOT_HM01
+    assert by["cut_taught"]["after"] == "hm01_cut" and by["pokemon_fan_club"]["after"] == "cut_taught"
+    g = {s["id"]: False for s in SPECS}
+    emu = FakeEmulator({})
+    for k in ("ss_anne_captain", "hm01_cut"):
+        g[k] = bool(ev(by[k]["detector"], emu, {}, set(), {}))
+    assert not g["ss_anne_captain"] and not g["hm01_cut"]                                 # walking into the cabin is not enough
+    emu.set(0xD803, 0b11)
+    assert ev(by["ss_anne_captain"]["detector"], emu, {}, set(), {}) and ev(by["hm01_cut"]["detector"], emu, {}, set(), {})
+
+
 def test_unverified_goals_follow_later_goals():
     g = {s["id"]: False for s in SPECS}
     campaign.infer_unverified(g)
-    assert not g["hm01_cut"]
+    assert not g["rival_ss_anne"]
     g["to_pokemon_tower"] = True
     campaign.infer_unverified(g)
-    assert not g["hm01_cut"] and not g["rival_ss_anne"]                    # a later goal alone is not enough: predecessors missing
+    assert not g["rival_ss_anne"]                                          # a later goal alone is not enough: predecessors missing
     g["ss_anne_2f"] = g["ss_anne_captain"] = True
     campaign.infer_unverified(g)
-    assert g["hm01_cut"] and g["rival_ss_anne"]                           # earlier than a reached goal
+    assert g["rival_ss_anne"]                                             # earlier than a reached goal
     assert not g["snorlax_route12"]                                        # later than the last reached goal
 
 
@@ -125,7 +148,8 @@ def test_chain_reachability_and_selectable():
     assert campaign.campaign_reachable("ss_anne_captain", set())
     assert not campaign.campaign_reachable("to_route10", set())          # behind the Cut tree on Route 9
     assert campaign.selectable("to_vermilion", set())
-    assert not campaign.selectable("hm01_cut", set())                     # unverified: no detector to land on
+    assert not campaign.selectable("rival_ss_anne", set())                # unverified: no detector to land on
+    assert campaign.selectable("hm01_cut", set()) and campaign.selectable("cut_taught", set())   # real detectors since 2026-11-07
     assert not campaign.selectable("to_cinnabar", {"cut", "puzzle"})      # needs Surf
     everything = {t for g in SPECS for t in g["needs"]}
     assert campaign.selectable("to_cinnabar", everything)
@@ -155,10 +179,10 @@ def test_segment_picker_skips_unreachable_goals(monkeypatch):
     monkeypatch.setattr(overnight, "consistency", lambda: dict(weak))
     monkeypatch.delenv("POKEAGENT_CAPS", raising=False)
     picks = {sw.weakest_segment(n) for n in range(6)}
-    assert picks == {"to_vermilion", "potion"}                           # no Surf, Cut-wall or unverified goals
+    assert picks == {"to_vermilion", "potion", "hm01_cut"}               # no Surf or Cut-wall goals (hm01_cut has a flag detector now)
     monkeypatch.setenv("POKEAGENT_CAPS", "cut,puzzle,surf,flash,poke_flute,silph_scope,safari,bike,dex10,strength")
     picks = {sw.weakest_segment(n) for n in range(8)}
-    assert "to_cinnabar" in picks and "beat_surge" in picks and "hm01_cut" not in picks
+    assert "to_cinnabar" in picks and "beat_surge" in picks
 
 
 def test_brief_truncates_the_long_ladder():

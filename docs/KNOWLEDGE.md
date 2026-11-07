@@ -225,3 +225,13 @@ money-bearing records is a blackout; the halving rule (`budget.blackout_cost`, p
 unverified in our data until `runs/economy.json` `blackouts.yen` fills. Mart stock read live (`stock_seen`): Pewter 56 and Cerulean
 67 sell Potion (0x14); Viridian 42 and Vermilion 91 do not (Vermilion: Poke Ball, Super Potion, Ice Heal, Awakening, Parlyz Heal,
 Repel); the battle and field item policies only ever use Potion, never Super Potion.
+
+**HM01 Cut and the S.S. Anne captain (measured 2026-11-07, headless from `runs/checkpoints/ss_anne_captain.state`).** Item 0xC4 is HM01 on this
+ROM: talking to the captain at (4,2) of map 0x65 from (4,3) facing UP ("Rub-rub...", "feel much better!", "BCN got HM01!") is the only bag change and adds
+`(196, 1)`; the same states in `runs/legs/states` and `runs/checkpoints` that hold 0xC4 (6 of 329, all later than the cabin) all have both flags set, the 323
+without it have neither. Event flags in `wEventFlags` (0xD747+): `0xD803` bit 1 flips when the back-rubbing starts (A press 14 of the dialog), bit 0 flips with
+the item (press 27); the replay from the pre-talk state is deterministic and no other byte of 0xD747-0xD87B changes. They are pokered `EVENT_RUBBED_CAPTAINS_BACK`
+(bit 1) and `EVENT_GOT_HM01` (bit 0). Entering the cabin sets neither, so "map 0x65 entered" was never a talked-to detector. kb/hm_compat.json: the Squirtle line
+cannot learn CUT (Bulbasaur, Charmander and Oddish lines, Paras, Bellsprout, Sandshrew can), so a Wartortle + Magikarp party holds HM01 with nobody to teach.
+Item-list rows read "x10" for a stack of ten, which `toss_guard` used to mistake for the TOSS quantity box (vetoing every A of the HM teach flow).
+

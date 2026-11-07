@@ -73,6 +73,14 @@ def pressed(tmp_path, screen, button):
     return names(ctx)[-1]
 
 
+def test_a_stack_of_ten_in_the_item_list_is_not_the_quantity_box():
+    """Seen 2026-11-07: POKe BALL x10 in the visible rows + the USE/TOSS box read as QUANTITY and every A of the HM01 teach flow became B."""
+    rows = ["TM28", "x 1", "POKé BALL", "x10", "SUPER POTION", "x 1", "HM01"]
+    assert toss_screen(rows + [">USE", "TOSS"]) == USE_TOSS
+    assert toss_veto(rows + [">USE", "TOSS"], Decision("A", "r")) is None
+    assert toss_screen(rows + ["HP UP x01", "TOSS"]) == QUANTITY
+
+
 def test_screens_are_recognised():
     assert toss_screen(SCREENS["use_toss_on_toss"]) == USE_TOSS
     assert toss_screen(SCREENS["quantity"]) == QUANTITY

@@ -163,7 +163,7 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-blackout-adjusted-readiness-directive |
 | Base branch | - |
@@ -178,4 +178,5 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 - 2026-11-07 12:49 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJ2YZ0BDDN8RQ9F2871WRF
 - 2026-11-07 12:56 · dispatcher · launched pid=3808; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-blackout-adjusted-readiness-directive; provisioned: uv sync --frozen
 - 2026-11-07 13:00 · devin · In progress → Review — [origin] spent: devin 4 min est. n/a
+- 2026-11-07 13:17 · robert-claude-laptop · Review → Done — note: PR #138 merged (merge commit); Sonnet review CHANGES-NEEDED -> swarm_merge handler + Infinity guard fixed (c6f6efe, b619036), Haiku re-review; verify at b619036 1436 passed 36 skipped
 <!-- queue:end -->

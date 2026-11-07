@@ -23,6 +23,7 @@ from functools import lru_cache
 
 from pokeagent import checkpoint_goals as cg
 from pokeagent import statefp
+from pokeagent import statelog
 from pokeagent.campaign import agent_capabilities, selectable
 from pokeagent.goals import GOALS
 from pokeagent.segment_names import BEST_SUFFIX
@@ -213,6 +214,12 @@ def ckpt(root: Path, name: str) -> Path | None:
         p = root / "baselines" / "bedroom.state"
         return p if p.exists() else None
     d = root / "runs" / "checkpoints"
+    base = name.split("@", 1)[0]
+    # the ledger first: a fresh stamped state for this goal (a ship checkpoint must respawn at/past Vermilion).
+    # statelog._kept already skips synthetic states; the filter below guards the fallback path only.
+    got = statelog.pick(d, statelog.Want(stem=base, respawn_ahead_of=5 if base in cg.SHIP_GOALS else None))
+    if got is not None:
+        return got
     found = [p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state")
              if p.exists() and not statefp.is_synthetic(p)]   # a tool-edited state is never a segment start
     # a ship-segment state whose blackout lands behind Vermilion loses to one that does not (when both exist)

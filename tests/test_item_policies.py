@@ -484,3 +484,15 @@ def test_learn_decision_never_forgets_a_protected_move(monkeypatch):
     assert learn_decision(q, ["CUT", "TACKLE"])[2] == "CUT"                                      # unshielded: CUT is the weakest
     assert learn_decision(q, ["CUT", "TACKLE"], {"CUT"})[2] == "TACKLE"                          # shielded: the next weakest
     assert learn_decision(q, ["CUT", "SURF"], {"CUT", "SURF"})[:2][0] == "NO"                    # everything needed: decline
+
+
+def test_hm_in_bag_with_no_learner_in_the_party_is_flagged_not_silent():
+    """The 2026-11-07 stall: HM01 in the bag, a Wartortle (cannot learn CUT) and a Magikarp: no plan, but the option is named."""
+    party = [mon(0, "MAGIKARP", 13, ("SPLASH",)), mon(1, "WARTORTLE", 30, ("BITE", "TAIL WHIP", "BUBBLE", "WATER GUN"))]
+    assert plan(party=party, needs=["cut"]) is None
+    assert hm_teach.stranded_hms(bag={ids.HM01: 1}, party=party, needs=["cut"], learners=LEARNERS) == ["cut"]
+    ivy = [*party, mon(2, "IVYSAUR")]
+    assert hm_teach.stranded_hms(bag={ids.HM01: 1}, party=ivy, needs=["cut"], learners=LEARNERS) == []
+    assert hm_teach.stranded_hms(bag={}, party=party, needs=["cut"], learners=LEARNERS) == []
+    known = [mon(1, "WARTORTLE", 30, ("CUT", "BITE"))]
+    assert hm_teach.stranded_hms(bag={ids.HM01: 1}, party=known, needs=["cut"], learners=LEARNERS) == []

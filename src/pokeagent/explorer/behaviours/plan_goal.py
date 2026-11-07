@@ -9,9 +9,10 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
-from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal, under_level_note
+from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, under_level_note
 from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.knowledge import blackout_tax
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
 from pokeagent.magikarp import BUY_STEP_CAP, MT_MOON_CENTER
@@ -39,6 +40,9 @@ class PlanGoal(BehaviourBase):
             ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with
         elif ctx.center_intent == "buy_magikarp" and goals_now_all["buy_magikarp"]:
             ctx.center_intent = None  # bought (or no longer possible): the planner may walk out now
+        ctx.stage_goal = stage_goal(goals_now_all)  # the stage record_battle_result taxes on a blackout
+        extras = blackout_tax.extras(ctx.mem.data)
+        set_blackout_tax(extras)  # every readiness_for caller sees the learned margins this step
         parcel = next(((i["map"], i["at"][0], i["at"][1], i.get("facing", "UP")) for i in ctx.mem.data.get("items", [])
                        if i.get("item") == "OAK'S PARCEL" and i.get("delta", 0) > 0), None)
         party = our_party(ctx.emu) if not ctx.view.battling else []   # real stats and moves; skipped mid-battle
@@ -46,7 +50,9 @@ class PlanGoal(BehaviourBase):
         verdict = readiness_for(goals_now_all, party)
         if verdict and verdict.text != ctx.readiness_note:
             ctx.readiness_note = verdict.text
-            ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})", "res")
+            extra = extras.get(ctx.stage_goal, 0.0)
+            ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})"
+                    f"{f' (+{extra:.2f} blackout margin)' if extra > 0 else ''}", "res")
         need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
         if clamp != ctx.clamp_note:
             ctx.clamp_note = clamp

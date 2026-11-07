@@ -37,7 +37,7 @@ FRAMES_PER_STEP, BOX_PACE = 4, 6  # explore_demo --headless: decisions every 4 f
 def run(args) -> dict:
     random.seed(args.seed)
     drill_plan = legs_attach.plan(args.drill_leg, args.drill_grind, args.drill_steps, args.leg_states_dir, args.rom,
-                                  args.state if args.state != "baselines/bedroom.state" else None)
+                                  args.state if args.state != "baselines/bedroom.state" else None, min_hp=args.drill_min_hp)
     if drill_plan:
         args.state, args.steps = str(drill_plan.state), drill_plan.steps + 2
     work = Path(tempfile.mkdtemp(prefix="headless-"))
