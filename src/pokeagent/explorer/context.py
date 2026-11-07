@@ -22,6 +22,7 @@ class ExplorerOptions:
 
     starter: str = "any"
     state_stem: str = ""  # Path(--state).stem, "" when no state
+    state_path: str = ""  # the --state file itself: its <state>.goals.json sidecar is the source of truth for goals done at the start
     steps: int = 300
     stop_at_goal: str | None = None
     stop_at_map: int | None = None  # sub-segment runs end on first entry into this map id
