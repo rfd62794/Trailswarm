@@ -11,8 +11,10 @@ import json
 from collections import Counter
 from typing import Any
 
+from pokeagent.explorer.economy import ledger
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.ramstructs import read_party
+from pokeagent.ramworld import read_money
 
 Member = tuple  # (species, level, exp, hp, max_hp, moves)
 
@@ -55,6 +57,7 @@ class PartyLog:
     def __init__(self) -> None:
         self.before: list[Member] | None = None
         self.prev: list[Member] | None = None
+        self.money_before: int | None = None
         self.exp_total = 0
         self.levels_by_slot: Counter = Counter()
         self.blackouts = 0
@@ -68,6 +71,10 @@ class PartyLog:
             self.before = snapshot(ctx.emu)
         except Exception:
             self.before = None
+        try:
+            self.money_before = read_money(ctx.emu)
+        except Exception:
+            self.money_before = None
 
     def end_battle(self, ctx, won: bool, fled: bool) -> dict:
         """The new battle-record fields ({} when the party cannot be read); also appends the levels.jsonl line."""
@@ -83,7 +90,17 @@ class PartyLog:
                 self.blackouts += 1
             self.prev = after
             self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
-            return {"party_before": rows(before), "party_after": rows(after), **d}
+            return {"party_before": rows(before), "party_after": rows(after), **d, **self._money(ctx, won, fled)}
+        except Exception:
+            return {}
+
+    def _money(self, ctx, won: bool, fled: bool) -> dict:
+        """money_before / money_after for the battle record; the ledger books the prize or the blackout loss."""
+        try:
+            after = read_money(ctx.emu)
+            before, self.money_before = (after if self.money_before is None else self.money_before), None
+            ledger.of(ctx).battle(before, after, won, fled)
+            return {"money_before": before, "money_after": after}
         except Exception:
             return {}
 
@@ -93,6 +110,7 @@ class PartyLog:
             self._count_steps(ctx)
             if ctx.in_battle or ctx.view.battling:
                 return
+            ledger.of(ctx).tick(ctx)
             now = snapshot(ctx.emu)
             if self.prev is None:
                 self.prev = now

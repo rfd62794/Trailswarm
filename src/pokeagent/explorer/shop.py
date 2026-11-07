@@ -208,3 +208,78 @@ def buy(emu: Emulator, item_id: int, qty: int) -> BuyResult:
     res.ok = res.bought == qty and spent == res.unit_price * qty
     res.reason = "ok" if res.ok else f"verify_failed (bought {res.bought}, spent {spent})"
     return res
+
+
+@dataclass
+class SellResult(BuyResult):
+    sold: int = 0
+    gained: int = 0
+
+
+def cursor_on_sell(emu: Emulator, pad: "_Pad") -> bool:
+    """Guard: the BUY/SELL/QUIT cursor starts on BUY; DOWN once reaches SELL. A is only ever pressed on SELL (never on QUIT)."""
+    pad.wait_for(lambda: menu_choice(emu) is not None)
+    for _ in range(3):
+        choice = menu_choice(emu)
+        if choice == "SELL":
+            return True
+        if choice != "BUY":
+            return False
+        pad.press(Button.DOWN)
+    return menu_choice(emu) == "SELL"
+
+
+def sell_confirm_shown(emu: Emulator, expect_price: int) -> bool:
+    """The 'I can pay you $N for that.' YES/NO prompt for THIS item: the price on screen is the whitelisted item's sell price."""
+    text = " ".join(rows(emu))
+    return ">YES" in text and "pay you" in text and f"${expect_price}" in text.replace("$ ", "$")
+
+
+def sell(emu: Emulator, item_id: int) -> SellResult:
+    """Sell ONE ``item_id`` to the clerk the player faces. Only whitelisted ids (prices.SELL_WHITELIST) are ever sold; YES is
+    confirmed only on that item's 'I can pay you $<half price> for that.' prompt, anything else is backed out of with B."""
+    from pokeagent.explorer.economy import prices
+    from pokeagent.explorer.behaviours.item_use import bag_index
+    res = SellResult(False, "start", item_id, 1, money_before=read_money(emu), bag_before=bag_contents(emu))
+    pad = _Pad(emu, res)
+    if item_id not in prices.SELL_WHITELIST:
+        return _fail(res, pad, "not_whitelisted")  # before any press
+    if not res.bag_before.get(item_id):
+        return _fail(res, pad, "not_in_bag")
+    expect = prices.sell_price(item_id)
+    if expect <= 0:
+        return _fail(res, pad, "no_sell_price")
+    if not open_menu(emu, pad):
+        return _fail(res, pad, "no_sell_menu")
+    if not cursor_on_sell(emu, pad):
+        return _fail(res, pad, "menu_cursor_not_on_sell")
+    pad.press(Button.A)  # SELL
+    if not pad.wait_for(lambda: any(r.startswith(">") for r in rows(emu)) and emu.read(TEXT_BOX_ID) != TB_MENU):
+        return _fail(res, pad, "sell_list_not_shown")
+    row = bag_index(emu, item_id)
+    for _ in range(21):  # cursor to the item's bag row (the sell list is the bag), verified from scroll offset + cursor
+        if row is None or _cursor(emu) == row:
+            break
+        pad.press(Button.DOWN)
+    if row is None or _cursor(emu) != row:
+        return _fail(res, pad, "sell_cursor_mismatch")
+    pad.press(Button.A)
+    if quantity_box(emu) is not None:  # a stack: the box starts at x01, which sells one
+        pad.press(Button.A)
+    if not pad.advance_until(lambda: sell_confirm_shown(emu, expect) or any(">YES" in r for r in rows(emu))):
+        return _fail(res, pad, "no_sell_confirm")
+    if not sell_confirm_shown(emu, expect):
+        return _fail(res, pad, "sell_confirm_mismatch")  # wrong item or price on the prompt: never YES
+    pad.press(Button.A)  # YES
+    pad.wait_for(lambda: read_money(emu) > res.money_before)
+    for _ in range(10):  # back out to closed (B never sells)
+        if _closed(emu):
+            break
+        pad.press(Button.B)
+    res.money_after, res.bag_after = read_money(emu), bag_contents(emu)
+    res.sold = res.bag_before.get(item_id, 0) - res.bag_after.get(item_id, 0)
+    res.gained = res.money_after - res.money_before
+    res.bought = res.sold
+    res.ok = res.sold == 1 and res.gained == expect
+    res.reason = "ok" if res.ok else f"verify_failed (sold {res.sold}, gained {res.gained})"
+    return res
