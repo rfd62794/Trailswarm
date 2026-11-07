@@ -13,6 +13,12 @@ SELL_DIVISOR = 2                      # a Mart pays half the buy price
 SELL_WHITELIST = frozenset({NUGGET})  # the only item the agent may ever sell
 
 
+def sell_allowed(item_id: int) -> bool:
+    """Whitelisted AND not a key item (the whitelist alone is one edit away from selling a BICYCLE; item_policies.key_items is the shield)."""
+    from pokeagent.explorer.item_policies.key_items import is_key_item
+    return item_id in SELL_WHITELIST and not is_key_item(item_id)
+
+
 def price(item_id: int) -> int:
     """Catalog (kb/items.json, built from the ROM) > ROM table > the fallbacks above."""
     cat = items_catalog.load()

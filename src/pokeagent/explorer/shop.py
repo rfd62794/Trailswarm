@@ -242,7 +242,7 @@ def sell(emu: Emulator, item_id: int) -> SellResult:
     from pokeagent.explorer.behaviours.item_use import bag_index
     res = SellResult(False, "start", item_id, 1, money_before=read_money(emu), bag_before=bag_contents(emu))
     pad = _Pad(emu, res)
-    if item_id not in prices.SELL_WHITELIST:
+    if not prices.sell_allowed(item_id):
         return _fail(res, pad, "not_whitelisted")  # before any press
     if not res.bag_before.get(item_id):
         return _fail(res, pad, "not_in_bag")

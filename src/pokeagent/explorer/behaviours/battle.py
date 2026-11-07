@@ -22,6 +22,7 @@ from pokeagent.explorer.behaviours.item_use import (
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import party_log
 from pokeagent.explorer.economy import ledger as economy_ledger
+from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_battle_step
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
@@ -166,6 +167,9 @@ class Battle(BehaviourBase):
             want_potion = (has_potion and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
                            and not item_is_blocked(ctx, POTION))
             cur = next((ln for ln in lines_now if ">" in ln), "")
+            xdec = None if want_potion else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
+            if xdec is not None:
+                return xdec
             if want_potion:
                 ctx.potion_hp_before = hp
                 dec = item_step(ctx, lines_now, cur, POTION, "POTION", f"BATTLE HP {hp}/{mx}, enemy hits up to {expected}")
