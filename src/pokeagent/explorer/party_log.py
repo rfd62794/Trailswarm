@@ -13,6 +13,7 @@ from typing import Any
 
 from pokeagent.explorer.economy import ledger
 from pokeagent.explorer.perceive import lead_level
+from pokeagent.goals import bag_contents
 from pokeagent.ramstructs import read_party
 from pokeagent.ramworld import read_money
 
@@ -58,6 +59,7 @@ class PartyLog:
         self.before: list[Member] | None = None
         self.prev: list[Member] | None = None
         self.money_before: int | None = None
+        self.potions_before: int | None = None
         self.exp_total = 0
         self.levels_by_slot: Counter = Counter()
         self.blackouts = 0
@@ -72,9 +74,9 @@ class PartyLog:
         except Exception:
             self.before = None
         try:
-            self.money_before = read_money(ctx.emu)
+            self.money_before, self.potions_before = read_money(ctx.emu), bag_contents(ctx.emu).get(0x14, 0)
         except Exception:
-            self.money_before = None
+            self.money_before = self.potions_before = None
 
     def end_battle(self, ctx, won: bool, fled: bool) -> dict:
         """The new battle-record fields ({} when the party cannot be read); also appends the levels.jsonl line."""
@@ -100,7 +102,7 @@ class PartyLog:
             after = read_money(ctx.emu)
             before, self.money_before = (after if self.money_before is None else self.money_before), None
             ledger.of(ctx).battle(before, after, won, fled)
-            return {"money_before": before, "money_after": after}
+            return {"money_before": before, "money_after": after, "potions_before": self.potions_before}
         except Exception:
             return {}
 

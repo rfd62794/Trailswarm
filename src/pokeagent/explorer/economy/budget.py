@@ -10,9 +10,11 @@ def blackout_cost(money: int) -> int:
     return max(0, money) // 2
 
 
-def reserve(goals: dict, money: int) -> int:
+def reserve(goals: dict, money: int, ref_money: int = 0) -> int:
+    """``ref_money``: the money at the start of the last Mart visit, so spending in one visit does not shrink the next one's reserve."""
+    money = max(money, ref_money)
     return FLOOR + FLOOR_PER_BOSS * sum(1 for g in BOSS_GOALS if goals.get(g)) + blackout_cost(money) // 2
 
 
-def spendable(goals: dict, money: int) -> int:
-    return max(0, money - reserve(goals, money))
+def spendable(goals: dict, money: int, ref_money: int = 0) -> int:
+    return max(0, money - reserve(goals, money, ref_money))

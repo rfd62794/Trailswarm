@@ -14,8 +14,14 @@ TAIL = 3000              # newest records read
 
 @dataclass
 class HpStats:
-    by_map: dict = field(default_factory=lambda: defaultdict(list))
-    overall: list = field(default_factory=list)
+    """Sufficient statistics: ``[fights, HP lost]`` per map and overall (what economy.json keeps across runs)."""
+    by_map: dict = field(default_factory=lambda: defaultdict(lambda: [0, 0]))
+    overall: list = field(default_factory=lambda: [0, 0])
+
+    def add(self, map_id, lost: int) -> None:
+        for row in (self.by_map[map_id], self.overall):
+            row[0] += 1
+            row[1] += lost
 
 
 def hp_lost(rec: dict) -> int | None:
@@ -42,16 +48,15 @@ def load_hp_loss(path: str | Path = "runs/battles.jsonl", tail: int = TAIL) -> H
         except (ValueError, TypeError, IndexError):
             continue
         if lost is not None:
-            st.overall.append(lost)
-            st.by_map[rec.get("map")].append(lost)
+            st.add(rec.get("map"), lost)
     return st
 
 
 def expected_battle_loss(stats: HpStats | None, map_id: int | None = None) -> float:
     if stats is not None:
-        for sample in (stats.by_map.get(map_id, []), stats.overall):
-            if len(sample) >= MIN_SAMPLES:
-                return sum(sample) / len(sample)
+        for n, total in (stats.by_map.get(map_id, (0, 0)), stats.overall):
+            if n >= MIN_SAMPLES:
+                return total / n
     return float(DEFAULT_LOSS)
 
 
@@ -59,3 +64,13 @@ def segment_loss(stats: HpStats | None, party, map_id: int | None = None) -> int
     """HP the next segment is expected to cost, never more than the party's total max HP (``party`` = battle-record rows)."""
     cap = sum(r[4] for r in party) or 10**9
     return int(min(cap, BATTLES_PER_SEGMENT * expected_battle_loss(stats, map_id)))
+
+
+def from_atlas(doc: dict) -> HpStats:
+    """The cross-run stats in runs/economy.json (``hp`` = {"overall": [n, lost], "by_map": {map: [n, lost]}})."""
+    st = HpStats()
+    hp = doc.get("hp") or {}
+    st.overall = list(hp.get("overall", [0, 0]))
+    for k, row in (hp.get("by_map") or {}).items():
+        st.by_map[int(k)] = list(row)
+    return st

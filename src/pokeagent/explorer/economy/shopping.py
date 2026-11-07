@@ -32,9 +32,9 @@ def potion_target(stats, party, map_id, potion_scale: float = 1.0) -> int:
 
 
 def shopping_list(goals: dict, bag: dict, money: int, party, stats, *, map_id: int | None = None, needs_balls: bool | None = None,
-                  cave: bool | None = None, potion_scale: float = 1.0, extras: bool = True) -> list[tuple[int, int]]:
+                  cave: bool | None = None, potion_scale: float = 1.0, extras: bool = True, ref_money: int = 0) -> list[tuple[int, int]]:
     """``[(item_id, qty)]`` in buy order; ``needs_balls`` / ``cave`` override the campaign lookups (tests, bundles)."""
-    left = budget.spendable(goals, money)
+    left = budget.spendable(goals, money, ref_money)
     balls, potions, rope = bag.get(POKE_BALL, 0), bag.get(POTION, 0), bag.get(ESCAPE_ROPE, 0)
     target = potion_target(stats, party, map_id, potion_scale)
     want_balls = ball_need(goals) if needs_balls is None else needs_balls

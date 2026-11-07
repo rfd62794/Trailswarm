@@ -5,7 +5,7 @@ from __future__ import annotations
 from pokeagent.explorer import restock as rs
 from pokeagent.explorer import shop
 from pokeagent.explorer.economy import budget, ledger, plan
-from pokeagent.explorer.economy.prices import price
+from pokeagent.explorer.economy.prices import price, stocked
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import party_hp
@@ -93,9 +93,10 @@ class Restock(BehaviourBase):
                 break
             led.sale(ctx, item, r.money_before, r.money_after)
         bag, money = bag_contents(ctx.emu), read_money(ctx.emu)
-        floor = budget.reserve(ctx.goals(), money)
+        led.ref_money, led.ref_step = max(money, led.reserve_ref(ctx.step)), ctx.step
+        floor = budget.reserve(ctx.goals(), money, led.ref_money)
         for item, qty in plan.make_list(ctx, bag, money) if ok else ():
-            if item in st.setdefault("unsold", {}).get(m, ()):
+            if item in st.setdefault("unsold", {}).get(m, ()) or not stocked(item, m):
                 continue
             qty = min(qty, max(0, (read_money(ctx.emu) - floor) // max(1, price(item))))  # the reserve is never breached
             if qty < 1:
@@ -103,6 +104,7 @@ class Restock(BehaviourBase):
             res = shop.buy(ctx.emu, item, qty)
             ctx.log(f"[economy: bought {res.bought}/{qty} x item 0x{item:02X} on map 0x{m:02X} for {res.money_before - res.money_after} yen "
                     f"(money {res.money_before} -> {res.money_after}); {res.reason}]", "res")
+            led.stock_seen[m] = shop.stock(ctx.emu) or led.stock_seen.get(m, [])  # best effort: wItemList as the clerk left it
             if res.bought:
                 led.purchase(ctx, item, res.bought, res.money_before, res.money_after)
                 st["bought"] = st.get("bought", 0) + res.bought

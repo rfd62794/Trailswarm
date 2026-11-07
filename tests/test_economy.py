@@ -10,7 +10,7 @@ from pokeagent.emulator import Button, FakeEmulator
 from pokeagent.explorer import party_log, shop
 from pokeagent.explorer.behaviours import Restock
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp, wants_topup
-from pokeagent.explorer.economy import budget, hp_stats, ledger, outside_use, prices, shopping
+from pokeagent.explorer.economy import atlas, budget, hp_stats, ledger, outside_use, prices, shopping
 from pokeagent.explorer.economy.bundles import candidate_bundles
 from pokeagent.explorer.economy.prices import ESCAPE_ROPE, NUGGET, POKE_BALL, POTION
 from pokeagent.legs import grid as G
@@ -40,7 +40,7 @@ def test_priority_balls_then_potion_floor_then_rope_then_more_potions():
 
 
 def test_potions_are_sized_by_the_expected_hp_loss():
-    stats = hp_stats.HpStats(overall=[60] * 10)
+    stats = hp_stats.HpStats(overall=[10, 600])
     big = shopping.shopping_list({}, {POTION: 3}, 20000, [[1, 30, 0, 200, 200]], stats, needs_balls=False, cave=False)
     assert big == [(POTION, 7)]  # 5 fights x 60 HP = 300 HP = 15 potions, capped at 10, minus the 3 carried
     thin = shopping.shopping_list({}, {}, 20000, [[1, 30, 0, 200, 200]], None, needs_balls=False, cave=False)
@@ -238,4 +238,71 @@ def test_hp_stats_from_battle_records(tmp_path):
             {"map": 12, "won": False, "fled": False, "party_before": [[1, 5, 0, 8, 30]], "party_after": [[1, 5, 0, 30, 30]]}, {"map": 1}]
     p.write_text("\n".join(json.dumps(r) for r in recs) + "\nnot json\n")
     st = hp_stats.load_hp_loss(p)
-    assert st.by_map[12] == [10, 8] and hp_stats.expected_battle_loss(st, 12) == hp_stats.DEFAULT_LOSS  # < MIN_SAMPLES: default
+    assert st.by_map[12] == [2, 18] and hp_stats.expected_battle_loss(st, 12) == hp_stats.DEFAULT_LOSS  # < MIN_SAMPLES: default
+
+
+# ---- the ROM catalog (gated: needs kb/rom_tables.json and the ROM) ----
+from pokeagent.knowledge import items_catalog as ic  # noqa: E402
+
+needs_rom = pytest.mark.skipif(ic.load() is None, reason="no ROM / kb/rom_tables.json")
+
+
+@needs_rom
+def test_catalog_known_values_and_categories():
+    cat = ic.load()
+    it = lambda i: ic.item(cat, i)  # noqa: E731
+    assert (it(0x14)["price"], it(0x04)["price"], it(0x31)["sell"]) == (300, 200, 5000)
+    assert ic.category_of(0x14) == "healing" and ic.category_of(0x28) == "rare_candy" and ic.category_of(0x0A) == "stone"
+    assert ic.category_of(0x3F) == "key" and it(0x3F)["key_item"] and ic.category_of(0xC4) == "tm_hm" and ic.category_of(0x1D) == "escape_rope"
+    assert ic.category_of(0x31) == "valuable" and not it(0x31)["key_item"] and it(0x14)["battle"] and it(0x1D)["overworld"]
+    assert ic.category_of(0x23) == "vitamin" and ic.category_of(0x04) == "ball" and ic.category_of(0x0B) == "status_cure"
+
+
+@needs_rom
+def test_catalog_marts_and_prize_money():
+    cat = ic.load()
+    assert ic.stock_for_map(cat, 56)[:2] == [0x04, 0x14] and POTION not in ic.stock_for_map(cat, 42)  # Pewter sells Potions, Viridian does not
+    assert not prices.stocked(POTION, 42) and prices.stocked(POTION, 67) and prices.stocked(POTION, 3)  # 3 is not a Mart: unknown = try
+    assert ic.trainer_prize(cat, "BROCK", 1) == 99 * 14 == 1386 and ic.trainer_prize(cat, "YOUNGSTER", 1) == 15 * 11
+    assert ic.map_income(cat, 54) > 1386 and ic.trainer_prize(cat, "BROCK", 9) is None
+
+
+# ---- item-use log and the cross-run ledger ----
+def test_item_use_is_logged_with_hp_before_and_after(tmp_path):
+    ctx = _field_ctx(tmp_path)
+    ledger.of(ctx).use(ctx, POTION, "battle potion timing", "battle", 8, 28, True)
+    ledger.of(ctx).use(ctx, POTION, "field potion instead of a Pokecenter walk", "cave_topup", 5, 25, False)
+    u = ledger.of(ctx).summary()["uses"]
+    assert [(r["item"], r["hp_before"], r["hp_after"], r["battle"]) for r in u] == [(POTION, 8, 28, True), (POTION, 5, 25, False)]
+
+
+def test_battle_record_carries_potions_before(tmp_path):
+    ctx = xp_ctx(tmp_path, {**party((1, 10, 0, 30, 30)), **bcd(1000), 0xD31D: 1, 0xD31E: POTION, 0xD31F: 2})
+    log = party_log.of(ctx)
+    log.start_battle(ctx)
+    assert log.end_battle(ctx, True, False)["potions_before"] == 2
+
+
+def test_economy_refresh_folds_battles_by_cursor_and_finished_runs(tmp_path):
+    runs = tmp_path
+    rec = lambda **k: json.dumps({"map": 12, "kind": 2, "won": True, "party_before": [[1, 5, 0, 30, 30]],  # noqa: E731
+                                  "party_after": [[1, 5, 0, 20, 30]], "money_before": 1000, "money_after": 1165, **k}) + chr(10)
+    (runs / "battles.jsonl").write_text(rec() + rec(kind=1, money_after=1000) + rec(won=False, fled=False, money_after=500, potions_before=0))
+    run = runs / "explore-x"
+    run.mkdir()
+    econ = {"purchases": [{"item": POTION, "qty": 3, "cost": 900}], "sales": [{"gained": 5000}], "stock_seen": {"67": [4, 20]},
+            "uses": [{"item": POTION, "why": "field potion instead of a Pokecenter walk", "hp_before": 5, "hp_after": 25, "battle": False},
+                     {"item": POTION, "why": "battle potion timing", "hp_before": 8, "hp_after": 28, "battle": True}]}
+    (run / "meta.json").write_text(json.dumps({"econ_summary": econ}))
+    (runs / "explore-unfinished").mkdir()
+    (runs / "explore-unfinished" / "meta.json").write_text("{}")
+    assert atlas.refresh(runs) == {"battles": 3, "runs": 1, "offset": (runs / "battles.jsonl").stat().st_size}
+    d = json.loads((runs / "economy.json").read_text())
+    assert d["income"]["trainer"] == 165 and d["income"]["sales"] == 5000 and d["income"]["by_map"]["12"] == 165
+    assert d["blackouts"] == {"n": 1, "yen": 500, "no_potion": 1, "by_map": {"12": 1}} and d["hp"]["overall"] == [3, 10 + 10 + 30]
+    assert d["spend"][str(POTION)] == {"qty": 3, "yen": 900} and d["uses"][str(POTION)]["hp_restored"] == 40 and d["heal_trips_avoided"] == 1
+    assert atlas.refresh(runs)["battles"] == 0 and atlas.refresh(runs)["runs"] == 0  # nothing is folded twice
+    with (runs / "battles.jsonl").open("a") as fh:
+        fh.write(rec())
+    assert atlas.refresh(runs)["battles"] == 1
+    assert hp_stats.from_atlas(json.loads((runs / "economy.json").read_text())).overall == [4, 60]

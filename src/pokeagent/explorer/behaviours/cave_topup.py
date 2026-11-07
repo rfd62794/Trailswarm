@@ -55,11 +55,15 @@ class CaveTopUp(BehaviourBase):
         have = bag_contents(ctx.emu).get(POTION, 0)
         if ctx.topup_presses == 0:
             ctx.topup_potions0 = have
-            ledger.of(ctx).topup_map = ctx.view.m
+            led = ledger.of(ctx)
+            led.topup_map, led.topup_hp0 = ctx.view.m, party_hp(ctx.emu)[0]
+            led.topup_why = "cave" if ctx.view.m in DUNGEON_MAPS else "field potion instead of a Pokecenter walk"
             ctx.log(f"[cave top-up: start, fighter HP {party_hp(ctx.emu)}, {have} POTION(s)]", "res")
         if ctx.view.m != ledger.of(ctx).topup_map or have < ctx.topup_potions0 or have == 0:
             if ctx.topup_presses and have < ctx.topup_potions0:
                 ctx.log(f"[cave top-up: POTION used, fighter HP now {party_hp(ctx.emu)}]", "res")
+                led = ledger.of(ctx)
+                led.use(ctx, POTION, led.topup_why, "cave_topup", led.topup_hp0, party_hp(ctx.emu)[0], False)
             ctx.topup_presses = 0
             return Decision("B", "topup_close", "top-up done: closing any menu") if ctx.view.lines else None
         if ctx.topup_presses >= TOPUP_MAX_PRESSES:

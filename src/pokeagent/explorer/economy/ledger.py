@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pokeagent.ramworld import read_money
 
 LOG_KEEP = 40
+USE_KEEP = 200
+REF_MEMORY = 1500  # steps a Mart visit's starting money keeps anchoring the reserve
 
 
 @dataclass
@@ -18,9 +20,15 @@ class Ledger:
     last_money: int | None = None
     purchases: list = field(default_factory=list)   # {step, map, item, qty, cost, money_before, money_after}
     sales: list = field(default_factory=list)
+    uses: list = field(default_factory=list)        # {step, map, item, why, behaviour, hp_before, hp_after, battle}
+    stock_seen: dict = field(default_factory=dict)  # map -> stock ids read live from the clerk's list
     visited_centers: set = field(default_factory=set)
     field_check_at: int = 0                          # outside_use: step before which the cached decision stands
     field_decision: bool = False
+    ref_money: int = 0                               # money when the last Mart visit began (the reserve is measured on it)
+    ref_step: int = -10**9
+    topup_hp0: int = 0
+    topup_why: str = "cave"
     topup_map: int | None = None                     # map a started potion sequence began on
 
     def tick(self, ctx) -> None:
@@ -59,10 +67,19 @@ class Ledger:
         del self.sales[:-LOG_KEEP]
         self.last_money = money_after
 
+    def use(self, ctx, item: int, why: str, behaviour: str, hp_before: int, hp_after: int, battle: bool) -> None:
+        """One item use and what it did (HP before/after), so its value per use is measurable across runs."""
+        self.uses.append({"step": ctx.step, "map": ctx.view.m, "item": item, "why": why, "behaviour": behaviour,
+                          "hp_before": hp_before, "hp_after": hp_after, "battle": battle})
+        del self.uses[:-USE_KEEP]
+
+    def reserve_ref(self, step: int) -> int:
+        return self.ref_money if step - self.ref_step < REF_MEMORY else 0
+
     def summary(self) -> dict:
         return {"income": self.income, "spend": self.spend, "other_spend": self.other_spend, "blackout_loss": self.blackout_loss,
                 "net": self.income - self.spend - self.other_spend - self.blackout_loss,
-                "purchases": self.purchases, "sales": self.sales}
+                "purchases": self.purchases, "sales": self.sales, "uses": self.uses, "stock_seen": self.stock_seen}
 
 
 def _centers() -> frozenset:
