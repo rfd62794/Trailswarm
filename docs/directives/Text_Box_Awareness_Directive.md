@@ -150,11 +150,13 @@ place `CHARMAP` disagreed with the bytes in section 3.
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Superseded |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — text-box awareness; needs Hex_Map_Discovery merged (screentext.py)
+- 2026-11-06 21:10 · robert-claude-laptop · Draft → Queued — closing as superseded
+- 2026-11-06 21:10 · robert-claude-laptop · Queued → Superseded — superseded: work already merged at main - note: delivered in a different shape on main; triage AgentFlow/docs/notes/2026-11-06-pokeagent-brain-tools-merged-drafts-triage.md
 <!-- queue:end -->
