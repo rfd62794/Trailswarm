@@ -174,7 +174,7 @@ def test_other_stages_keep_the_25_battle_budget(monkeypatch):
     from pokeagent.explorer.grind import GRIND_BATTLES
     from pokeagent.knowledge import kb as kbmod
     monkeypatch.setattr(kbmod, "ROM_KB", None)
-    goals, ctx = _gy_ctx()
+    _, ctx = _gy_ctx(((179, 8, 30, 30),))
     goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 12
     ctx.step, ctx.battles = 300, GRIND_BATTLES
