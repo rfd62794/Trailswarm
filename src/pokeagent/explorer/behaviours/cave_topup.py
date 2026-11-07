@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.cave_escape import rope_press
-from pokeagent.explorer.economy import ledger, outside_use
+from pokeagent.explorer.behaviours.item_use import HEAL_NAME
+from pokeagent.explorer.economy import heal_items, ledger, outside_use
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.world import DUNGEON_MAPS
@@ -36,7 +37,7 @@ def fighter_slot(emu) -> int:
 
 def wants_topup(ctx: ExplorerContext) -> bool:
     hp, mx = party_hp(ctx.emu)
-    return (mx > 0 and 0 < hp < mx * TOPUP_BELOW and bag_contents(ctx.emu).get(POTION, 0) > 0
+    return (mx > 0 and 0 < hp < mx * TOPUP_BELOW and heal_items.heal_count(bag_contents(ctx.emu)) > 0
             and ctx.topup_cooldown_until <= ctx.step and (ctx.view.m in DUNGEON_MAPS or outside_use.field_wants(ctx)))
 
 
@@ -52,18 +53,22 @@ class CaveTopUp(BehaviourBase):
         return not ctx.view.box and ctx.proc is None and ctx.rope_presses == 0 and wants_topup(ctx)
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        have = bag_contents(ctx.emu).get(POTION, 0)
+        if ctx.topup_presses == 0:
+            hp0, mx0 = party_hp(ctx.emu)
+            ctx.heal_item = heal_items.pick_for_missing(bag_contents(ctx.emu), mx0 - hp0) or POTION  # smallest item that covers the gap
+        item = ctx.heal_item
+        have = bag_contents(ctx.emu).get(item, 0)
         if ctx.topup_presses == 0:
             ctx.topup_potions0 = have
             led = ledger.of(ctx)
             led.topup_map, led.topup_hp0 = ctx.view.m, party_hp(ctx.emu)[0]
             led.topup_why = "cave" if ctx.view.m in DUNGEON_MAPS else "field potion instead of a Pokecenter walk"
-            ctx.log(f"[cave top-up: start, fighter HP {party_hp(ctx.emu)}, {have} POTION(s)]", "res")
+            ctx.log(f"[cave top-up: start, fighter HP {party_hp(ctx.emu)}, {have} {HEAL_NAME[item]}(s)]", "res")
         if ctx.view.m != ledger.of(ctx).topup_map or have < ctx.topup_potions0 or have == 0:
             if ctx.topup_presses and have < ctx.topup_potions0:
-                ctx.log(f"[cave top-up: POTION used, fighter HP now {party_hp(ctx.emu)}]", "res")
+                ctx.log(f"[cave top-up: {HEAL_NAME[item]} used, fighter HP now {party_hp(ctx.emu)}]", "res")
                 led = ledger.of(ctx)
-                led.use(ctx, POTION, led.topup_why, "cave_topup", led.topup_hp0, party_hp(ctx.emu)[0], False)
+                led.use(ctx, item, led.topup_why, "cave_topup", led.topup_hp0, party_hp(ctx.emu)[0], False)
             ctx.topup_presses = 0
             return Decision("B", "topup_close", "top-up done: closing any menu") if ctx.view.lines else None
         if ctx.topup_presses >= TOPUP_MAX_PRESSES:
@@ -72,4 +77,4 @@ class CaveTopUp(BehaviourBase):
             return Decision("B", "topup_give_up", "top-up sequence abandoned")
         ctx.item_attempts = 0
         ctx.topup_presses += 1
-        return rope_press(ctx, ctx.view.lines, POTION, "POTION", "fighter under half HP in the cave", fighter_slot(ctx.emu))
+        return rope_press(ctx, ctx.view.lines, item, HEAL_NAME[item], "fighter under half HP in the cave", fighter_slot(ctx.emu))

@@ -52,3 +52,19 @@ def test_fighter_slot_is_the_lead_without_a_magikarp(tmp_path):
     assert fighter_slot(ctx.emu) == 0                             # slot 1 is level 21, slot 0 level 9: still the lead
     ctx2 = make_ctx(tmp_path, memory={0xD35E: 0x3C, **BAG, **PARTY})
     assert fighter_slot(ctx2.emu) == 1                            # with a Magikarp in the party: the strongest other member
+
+
+def test_cave_topup_accepts_a_super_potion_and_picks_the_smallest_item(tmp_path):
+    only_super = {**BAG, BAG_START: 0x13}
+    ctx = make_ctx(tmp_path, memory={0xD35E: 0x3C, **only_super, **PARTY})
+    ctx.refresh()
+    assert wants_topup(ctx) and CaveTopUp().step(ctx).button == "START" and ctx.heal_item == 0x13
+    both = {**BAG, BAG_COUNT: 3, BAG_START + 4: 0x13, BAG_START + 5: 1}
+    ctx = make_ctx(tmp_path, memory={0xD35E: 0x3C, **both, **PARTY})
+    ctx.refresh()
+    CaveTopUp().step(ctx)
+    assert ctx.heal_item == 0x13   # fighter missing 47 HP: a Potion would leave 27 missing
+    ctx = make_ctx(tmp_path, memory={0xD35E: 0x3C, **both, **PARTY, 0xD16D + 0x2C: 12, 0xD18E + 0x2C: 25})
+    ctx.refresh()
+    CaveTopUp().step(ctx)
+    assert ctx.heal_item == 0x14   # missing 13 HP: the Potion covers it
