@@ -210,4 +210,5 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on gitignored runs/battles.jsonl evidence path
 - 2026-11-07 12:23 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on the gitignored evidence path runs/battles.jsonl; known false positive
 - 2026-11-07 12:23 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-log-fidelity-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGK973P9BJYJZ10VE74T14
+- 2026-11-07 12:29 · dispatcher · launched pid=2856; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-log-fidelity-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
