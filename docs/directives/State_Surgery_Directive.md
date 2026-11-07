@@ -235,4 +235,5 @@ function, what you could not do without a ROM, and anything that did not fit.
 - 2026-11-07 12:57 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new surgery.py/test_surgery.py and gitignored kb/ + runs/ evidence paths (greenfield); statelog.py cited conditionally
 - 2026-11-07 13:03 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (src/pokeagent/surgery.py, tests/test_surgery.py, src/pokeagent/statelog.py from the sibling directive) and gitignored evidence paths (kb/rom_tables.json, runs/checkpoints/*.fp.json); known false positive
 - 2026-11-07 13:03 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJWPNNBEW8JP4PNY8DARJ1
+- 2026-11-07 13:09 · dispatcher · launched pid=24552; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
