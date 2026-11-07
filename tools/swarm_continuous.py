@@ -192,6 +192,7 @@ class Supervisor:
         self._merge_novelty(cfg["own"])
         if self.finished % GRIND_REFRESH_EVERY == 0:
             self._refresh_grind()
+            self._refresh_economy()
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
         self.plan and self.plan.on_finish(cfg, rc)
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
@@ -230,6 +231,15 @@ class Supervisor:
             self.log(f"grind atlas refreshed: {r.get('folded', 0)} battles folded")
         except Exception as e:
             self.log(f"grind atlas not refreshed ({e!r})")
+
+    def _refresh_economy(self) -> None:
+        """Fold newly finished runs into runs/economy.json (continuous learning; never blocks a slot)."""
+        try:
+            from pokeagent.explorer.economy.atlas import refresh
+            r = refresh(str(self.shared.parent))
+            self.log(f"economy ledger refreshed: {r!r:.120}")
+        except Exception as e:
+            self.log(f"economy ledger not refreshed ({e!r})")
 
     def _keep(self, own: Path) -> Path:
         dest = self.swarm_dir / "unmerged"
