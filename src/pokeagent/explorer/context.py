@@ -176,6 +176,7 @@ class ExplorerContext:
     move_tag: str = ""  # rule string of the last/target move ('EMBER x2 FIRE>GRASS/POISON STAB')
     pos_hist: list = field(default_factory=list)
     potion_hp_before: int | None = None
+    heal_item: int = 0x14  # heal item the current battle use / top-up sequence is working on (economy.heal_items)
     rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
     ship_plan: Any = None  # atlas.walkgrid.rom_cave_planner over the dock + S.S. Anne maps (ship_gate walk-off); set by the demo
     cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo

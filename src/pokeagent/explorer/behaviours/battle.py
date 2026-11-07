@@ -19,10 +19,10 @@ from pokeagent.explorer.behaviours.battle_run import cave_run
 from pokeagent.explorer.behaviours.battle_train import train_fight
 from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
-    POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
+    HEAL_NAME, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import party_log
-from pokeagent.explorer.economy import ledger as economy_ledger
+from pokeagent.explorer.economy import heal_items, ledger as economy_ledger
 from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_battle_step
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
@@ -172,19 +172,21 @@ class Battle(BehaviourBase):
             expected = max(ctx.mem.data.get("enemy_damage", {}).get(str(species), [0]) or [0])
             threat = ctx.mem.data.get("threat_by_species", {}).get(str(species), {}).get("score", 0.0)
             # --- potion timing: use one when the next expected hit could take us below ~1 hit of safety and the heal
-            #     is not wasted (POTION restores 20 HP in Gen 1; the observed heal is learned into item_heal) ---
-            heal = max(ctx.mem.data.get("item_heal", {}).get("20", [20]) or [20])
-            has_potion = bag_contents(ctx.emu).get(0x14, 0) > 0
-            note_screen(ctx, lines_now, POTION)
-            want_potion = (has_potion and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
-                           and not item_is_blocked(ctx, POTION))
+            #     is not wasted (POTION restores 20 HP, SUPER POTION 50; the observed heal is learned into item_heal) ---
+            note_screen(ctx, lines_now, ctx.heal_item)  # "won't have any effect" blocks the item we were just trying
+            # the smallest heal item that covers the missing HP (a Super Potion is not spent on 15 missing HP)
+            pick = heal_items.pick_for_missing(bag_contents(ctx.emu), mx - hp, ctx.item_blocked) if mx else None
+            heal_hp = heal_items.HEAL_HP[pick if pick is not None else ctx.heal_item]
+            heal = max(ctx.mem.data.get("item_heal", {}).get(str(heal_hp), [heal_hp]) or [heal_hp])
+            want_potion = (pick is not None and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
+                           and not item_is_blocked(ctx, pick))
             cur = next((ln for ln in lines_now if ">" in ln), "")
             xdec = None if want_potion else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
             if xdec is not None:
                 return xdec
             if want_potion:
-                ctx.potion_hp_before = hp
-                dec = item_step(ctx, lines_now, cur, POTION, "POTION", f"BATTLE HP {hp}/{mx}, enemy hits up to {expected}")
+                ctx.potion_hp_before, ctx.heal_item = hp, pick
+                dec = item_step(ctx, lines_now, cur, pick, HEAL_NAME[pick], f"BATTLE HP {hp}/{mx}, enemy hits up to {expected}")
                 if dec is not None:
                     return dec
             else:
@@ -192,9 +194,9 @@ class Battle(BehaviourBase):
                 if dec is not None:
                     return dec
             if ctx.potion_hp_before is not None and hp > ctx.potion_hp_before:
-                ctx.mem.data.setdefault("item_heal", {}).setdefault("20", []).append(hp - ctx.potion_hp_before)
-                ctx.log(f"[POTION healed {hp - ctx.potion_hp_before} HP: learned]", "res")
-                economy_ledger.of(ctx).use(ctx, 0x14, "battle potion timing", "battle", ctx.potion_hp_before, hp, True); ctx.potion_hp_before = None
+                ctx.mem.data.setdefault("item_heal", {}).setdefault(str(heal_items.HEAL_HP[ctx.heal_item]), []).append(hp - ctx.potion_hp_before)
+                ctx.log(f"[{HEAL_NAME[ctx.heal_item]} healed {hp - ctx.potion_hp_before} HP: learned]", "res")
+                economy_ledger.of(ctx).use(ctx, ctx.heal_item, "battle potion timing", "battle", ctx.potion_hp_before, hp, True); ctx.potion_hp_before = None
             # On the road to Pewter after the parcel, wild fights cost 25+ presses each and a to_pewter run only has 1800
             # (2026-11-03: 30-50% of the Forest presses were battle text): run unless a ball could catch it.
             gn = check_goals(ctx.emu, ctx)

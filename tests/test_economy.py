@@ -10,9 +10,9 @@ from pokeagent.emulator import Button, FakeEmulator
 from pokeagent.explorer import party_log, shop
 from pokeagent.explorer.behaviours import Restock
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp, wants_topup
-from pokeagent.explorer.economy import atlas, budget, floor, hp_stats, ledger, outside_use, prices, shopping
+from pokeagent.explorer.economy import atlas, budget, floor, heal_items, hp_stats, ledger, outside_use, prices, shopping
 from pokeagent.explorer.economy.bundles import candidate_bundles
-from pokeagent.explorer.economy.prices import ESCAPE_ROPE, NUGGET, POKE_BALL, POTION
+from pokeagent.explorer.economy.prices import ESCAPE_ROPE, NUGGET, POKE_BALL, POTION, SUPER_POTION
 from pokeagent.legs import grid as G
 from pokeagent.screentext import CHARMAP
 from test_team_inventory import MONEY, bcd, make_ctx
@@ -66,26 +66,115 @@ def test_a_single_potion_trip_is_worth_it_only_with_an_empty_bag():
     assert not shopping.trip_worth([(POKE_BALL, 1)], {})
 
 
-def test_marts_selling_skips_the_vermilion_mart_for_potions():
+STOCK = {42: [4, 11], 56: [4, 20], 67: [4, 20], 91: [4, 19, 13]}   # Lavender-ish, Pewter, Cerulean, Vermilion (Super Potion only)
+
+
+def sells(i, m):
+    return i in STOCK[m]
+
+
+def test_heal_item_ids_match_the_rom_catalog_and_hp_table():
+    assert (POTION, SUPER_POTION) == (0x14, 0x13) and heal_items.HEAL_ITEMS == (POTION, SUPER_POTION)
+    assert prices.HEAL_HP == {POTION: 20, SUPER_POTION: 50} and prices.price(SUPER_POTION) == 700
+
+
+def test_marts_selling_now_includes_the_vermilion_mart_for_a_heal_trip():
     marts = frozenset({42, 56, 67, 91})
-    stock = {42: [4, 11], 56: [4, 20], 67: [4, 20], 91: [4, 19, 13]}
-    sells = lambda i, m: i in stock[m]  # noqa: E731
-    assert floor.marts_selling([(POTION, 3)], marts, sells) == {56, 67}
+    assert floor.marts_selling([(POTION, 3)], marts, sells) == {56, 67, 91}   # Super Potion stands in for Potion
     assert floor.marts_selling([(POKE_BALL, 10), (POTION, 3)], marts, sells) == marts
-    assert floor.marts_selling([(POTION, 1)], frozenset({91}), sells) == frozenset()
+    assert floor.marts_selling([(POTION, 1)], frozenset({91}), sells) == frozenset({91})
+    assert floor.marts_selling([(POTION, 1)], frozenset({42}), sells) == frozenset()   # a Mart with no heal item still does not count
+    assert floor.marts_selling([(POKE_BALL, 10)], frozenset({42}), sells) == frozenset({42})
 
 
-def test_restock_does_not_walk_into_a_mart_that_lacks_the_potion(tmp_path, monkeypatch):
+def test_battle_and_field_use_pick_the_smallest_item_that_covers_the_missing_hp():
+    both = {POTION: 1, SUPER_POTION: 1}
+    assert heal_items.pick_for_missing(both, 15) == POTION and heal_items.pick_for_missing(both, 20) == POTION
+    assert heal_items.pick_for_missing(both, 35) == SUPER_POTION           # a Potion would leave 15 missing
+    assert heal_items.pick_for_missing({SUPER_POTION: 1}, 15) == SUPER_POTION   # the only item
+    assert heal_items.pick_for_missing({POTION: 2}, 90) == POTION            # nothing covers it: the biggest carried
+    assert heal_items.pick_for_missing({}, 15) is None
+    assert heal_items.pick_for_missing(both, 15, blocked={POTION}) == SUPER_POTION   # "won't have any effect" is per item
+
+
+def test_floor_counts_a_super_potion_as_two_and_a_half_potions():
+    assert heal_items.potion_equivalents({SUPER_POTION: 1}) == 2.5 and heal_items.potion_equivalents({POTION: 1, SUPER_POTION: 1}) == 3.5
+    assert floor.floor_hp(1) == 20 and floor.floor_hp(3) == 60
+    rough = hp_stats.HpStats(overall=[10, 900])   # floor 3 = 60 HP
+    party = [[1, 30, 0, 79, 79]]
+    kw = dict(needs_balls=False, cave=False, mart=67, stock=sells)
+    assert shopping.shopping_list({}, {SUPER_POTION: 1}, 20000, party, rough, **kw) == [(POTION, 1)]   # 50 HP carried: 10 HP short = 1 Potion
+    assert shopping.shopping_list({}, {SUPER_POTION: 2}, 20000, party, rough, **kw) == []              # 100 HP: floor met
+    assert shopping.shopping_list({}, {POTION: 1, SUPER_POTION: 1}, 20000, party, rough, **kw) == []   # 70 HP
+    assert floor.trip_is_floor([(POTION, 1)], {SUPER_POTION: 1}) is False and floor.trip_is_floor([(POTION, 1)], {}) is True
+    assert floor.trip_is_floor([(SUPER_POTION, 1)], {POTION: 1}) is False
+
+
+def test_shopping_at_vermilion_with_an_empty_bag_lists_one_super_potion_and_cerulean_lists_potions():
+    quiet = hp_stats.HpStats(overall=[10, 30])   # floor 1 = 20 HP
+    party = [[1, 30, 0, 200, 200]]
+    kw = dict(needs_balls=False, cave=False, stock=sells)
+    assert shopping.shopping_list({}, {}, 20000, party, quiet, mart=91, **kw) == [(SUPER_POTION, 1)]
+    assert shopping.shopping_list({}, {}, 20000, party, quiet, mart=67, **kw) == [(POTION, 1)]
+    rough = hp_stats.HpStats(overall=[10, 900])  # floor 3 = 60 HP
+    assert shopping.shopping_list({}, {}, 20000, party, rough, mart=91, **kw) == [(SUPER_POTION, 2)]   # 100 HP covers 60
+    assert shopping.shopping_list({}, {}, 20000, party, rough, mart=67, **kw) == [(POTION, 3)]
+    assert shopping.shopping_list({}, {}, 20000, party, quiet, **dict(kw, mart=None)) == [(POTION, 1)]   # planning: Potions
+    assert shopping.shopping_list({}, {}, 800, party, quiet, mart=91, **kw) == []   # reserve 300 leaves 500: a 700 yen Super Potion is out of reach
+
+
+def test_buy_choice_takes_the_cheapest_total_that_fills_the_gap():
+    both = lambda i: True  # noqa: E731
+    assert heal_items.buy_choice(20, both, 5000) == (POTION, 1)
+    assert heal_items.buy_choice(60, both, 5000) == (POTION, 3)
+    assert heal_items.buy_choice(45, lambda i: i == SUPER_POTION, 5000) == (SUPER_POTION, 1)
+    assert heal_items.buy_choice(40, both, 500) == (POTION, 1)   # cannot fill 40 HP for 500: what the money allows
+    assert heal_items.buy_choice(0, both, 500) is None and heal_items.buy_choice(20, lambda i: False, 5000) is None
+
+
+def test_restock_walks_to_a_mart_that_sells_only_super_potion_but_not_one_with_no_heal_item(tmp_path, monkeypatch):
     stock = {91: [4, 19]}
     monkeypatch.setattr(prices, "stocked", lambda i, m: i in stock.get(m, [i]))
     monkeypatch.setattr(floor, "stocked", prices.stocked)
     monkeypatch.setattr(shopping, "ball_need", lambda goals: False)
     monkeypatch.setattr(shopping, "cave_ahead", lambda goals: False)
-    ctx = make_ctx(tmp_path, 1, 11258, m=91, x=3, y=7)
-    ctx.restock["stats_path"] = str(tmp_path / "none.jsonl")
-    ctx.goals = lambda: {"beat_brock": True, "beat_misty": True, "deliver_parcel": True}
-    assert Restock().step(ctx) is None and not ctx.restock.get("intent")  # the bag is empty and money is 11,258, but 91 has no Potion
-    assert ctx.shop_intent is None
+
+    def go():
+        ctx = make_ctx(tmp_path, 1, 11258, m=91, x=3, y=7)
+        ctx.restock["stats_path"] = str(tmp_path / "none.jsonl")
+        ctx.goals = lambda: {"beat_brock": True, "beat_misty": True, "deliver_parcel": True}
+        return ctx, Restock().step(ctx)
+
+    ctx, d = go()
+    assert d is not None and ctx.restock.get("intent")   # empty bag, Vermilion sells Super Potion: worth the trip
+    stock[91] = [4, 11]
+    ctx, d = go()
+    assert d is None and not ctx.restock.get("intent") and ctx.shop_intent is None   # no Potion or Super Potion at all
+
+
+def test_mart_visit_at_vermilion_buys_a_super_potion(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_buy(emu, item, qty):
+        before = shop.read_money(emu)
+        after = before - qty * prices.price(item)
+        for k, v in bcd(after).items():
+            emu.set(k, v)
+        calls.append((item, qty))
+        return type("R", (), dict(ok=True, reason="ok", bought=qty, money_before=before, money_after=after, bag_after={}))
+
+    monkeypatch.setattr(shop, "buy", fake_buy)
+    monkeypatch.setattr(prices, "stocked", lambda i, m: i in STOCK.get(m, [i]))
+    from pokeagent.explorer.behaviours import restock as restock_mod
+    monkeypatch.setattr(restock_mod, "stocked", prices.stocked)
+    monkeypatch.setattr(shopping, "stocked", prices.stocked)
+    monkeypatch.setattr(shopping, "ball_need", lambda goals: False)
+    monkeypatch.setattr(shopping, "cave_ahead", lambda goals: False)
+    ctx = make_ctx(tmp_path, 1, 6000, m=91, x=2, y=5)
+    ctx.restock, ctx.facing = {"intent": True, "stats_path": str(tmp_path / "none.jsonl")}, "LEFT"
+    Restock().step(ctx)
+    assert calls == [(SUPER_POTION, 2)]   # no battle data: floor 3 = 60 HP, and two Super Potions (100 HP) is the least that reaches it
+    assert shop.read_money(ctx.emu) >= budget.reserve({}, 6000)
 
 
 def test_reserve_is_never_breached():

@@ -7,7 +7,7 @@ visit is what moves the blackout respawn point forward, and the other builder's 
 """
 from __future__ import annotations
 
-from pokeagent.explorer.economy import ledger
+from pokeagent.explorer.economy import heal_items, ledger
 from pokeagent.explorer.economy.prices import HEAL_HP, POTION, price
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
@@ -75,7 +75,7 @@ def walk_to_center(ctx, get=None):
 def field_wants(ctx, get=None) -> bool:
     """Should the cave top-up sequence drink a Potion here (outside a dungeon, no fight)? Cached for RECHECK_EVERY steps."""
     hp, mx = party_hp(ctx.emu)
-    if not mx or ctx.view.m in POKECENTER_MAPS or bag_contents(ctx.emu).get(POTION, 0) <= 0 or ctx.center_intent:
+    if not mx or ctx.view.m in POKECENTER_MAPS or heal_items.heal_count(bag_contents(ctx.emu)) <= 0 or ctx.center_intent:
         return False
     if not (0 < hp < mx * FIELD_BELOW):
         return False
@@ -87,9 +87,10 @@ def field_wants(ctx, get=None) -> bool:
     walk = walk_to_center(ctx, get)
     if walk is None or walk[2] is None or walk[2] not in led.visited_centers:
         return False   # unknown route, or a Pokecenter we have not been in: walk and heal there (respawn point)
-    led.field_decision = potion_beats_walk(walk[0], walk[1], hp, mx)
+    item = heal_items.pick_for_missing(bag_contents(ctx.emu), mx - hp)
+    led.field_decision = potion_beats_walk(walk[0], walk[1], hp, mx, price(item))
     if led.field_decision:
-        ctx.log(f"[field potion: walk to the Pokecenter is {walk[0]:.0f} frames ({walk[1]} grass tiles), HP {hp}/{mx}: drinking a POTION instead]", "res")
+        ctx.log(f"[field potion: walk to the Pokecenter is {walk[0]:.0f} frames ({walk[1]} grass tiles), HP {hp}/{mx}: drinking a heal item instead]", "res")
     return led.field_decision
 
 
