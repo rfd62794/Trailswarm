@@ -235,11 +235,12 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 15:27 · robert-claude-laptop · none → Draft — Claude 2026-11-07: goal procedures (learned, graded step scripts), AfterVictory decision, ProcedureRunner
+- 2026-11-07 15:27 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/runs paths
 <!-- queue:end -->
