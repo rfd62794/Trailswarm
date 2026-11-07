@@ -161,4 +161,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:55 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on PR #150 merging; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/ path
 - 2026-11-07 16:11 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield modules/tests and gitignored kb/rom_tables.json; known false positives. Dependency PR #150 (blocked_cap, ctx.deciding_rule) merged.
 - 2026-11-07 16:11 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-loop-memory-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VXMJ5HCPSC7GB4XVR23B53
+- 2026-11-07 16:16 · dispatcher · launched pid=832; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-loop-memory-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
