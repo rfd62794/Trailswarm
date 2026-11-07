@@ -311,11 +311,12 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 
 | Field | Value |
 |---|---|
-| Status | Draft |
-| Assigned to | - |
+| Status | Queued |
+| Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 15:16 · robert-claude-laptop · none → Draft — Claude 2026-11-07: value-ranked catch plan, Pokedex objective, team_ready gate (supersedes Team_Builder_Directive draft)
+- 2026-11-07 15:17 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on greenfield modules/tests and gitignored kb/ evidence paths
 <!-- queue:end -->
