@@ -25,22 +25,31 @@ def _ship(tmp_path):
     return mem.data["maps"]
 
 
-def test_2f_walks_to_the_stairs_not_east(tmp_path):
+class _Plan:
+    """Stands in for the ROM ship planner: records the goal tiles it was asked for and walks a canned path."""
+    def __init__(self, buttons):
+        self.buttons, self.tiles_asked = buttons, []
+
+    def __call__(self, start, goals):
+        return list(self.buttons)
+
+    def warp_tiles(self, m, dest=None):
+        self.tiles_asked.append((m, dest))
+        return {(m, 36, 4)}
+
+
+def test_2f_and_deck_head_for_the_captains_door_on_2f(tmp_path):
     maps = _ship(tmp_path)
-    step = plan_step(NOW, maps, (0x60, 2, 4), "DOWN")
-    assert step and step[0] == "DOWN" and "toward it over the learned world" in step[1], step
-    step = plan_step(NOW, maps, (0x60, 8, 12), "RIGHT")  # already east on the corridor: come back west
-    assert step and step[0] == "LEFT", step
-
-
-def test_deck_walks_to_the_bow(tmp_path):
-    step = plan_step(NOW, _ship(tmp_path), (0x61, 19, 3), "UP")
-    assert step and step[0] == "LEFT", step
+    for pos, first in (((0x60, 2, 4), "DOWN"), ((0x61, 19, 3), "LEFT"), ((0x63, 13, 6), "UP")):
+        plan = _Plan([first, "UP"])
+        step = plan_step({**NOW, "_ship": {}, "_ship_plan": plan}, maps, pos, "UP")
+        assert step and step[0] == first and "captain's door on 2F" in step[1], (pos, step)
+        assert plan.tiles_asked == [(0x60, 0x65)], plan.tiles_asked   # the door on 2F into the captain's room, never the bow
 
 
 def test_bow_and_captain_done_are_left_alone(tmp_path):
     maps = _ship(tmp_path)
-    assert plan_step(NOW, maps, (0x63, 13, 6), "UP") is None
+    assert plan_step(NOW, maps, (0x65, 3, 4), "UP") is None          # in the captain's room (no ship plan: nothing to route)
     assert plan_step({**NOW, "ss_anne_captain": True}, maps, (0x60, 2, 4), "DOWN") is None
 
 

@@ -54,7 +54,8 @@ def test_weak_lead_on_the_ship_also_walks_off_but_a_fit_one_does_not():
     plan = FakeShipPlan(["DOWN"])
     weak = {**FIT, "_hp": (6, 78), "_ship": {}, "_ship_plan": plan}
     assert plan_step(weak, {}, (0x63, 13, 6), "UP")[0] == "DOWN"
-    assert plan_step({**FIT, "_ship": {}, "_ship_plan": plan}, {}, (0x63, 13, 6), "UP") is None
+    fit = plan_step({**FIT, "_ship": {}, "_ship_plan": plan}, {}, (0x63, 13, 6), "UP")
+    assert fit is None or "walk-off" not in fit[1], fit             # a fit lead is never walked off; the bow is no longer the goal, so it heads for the captain's door
 
 
 def test_walk_off_presses_the_learned_edge_warp_instead_of_oscillating():
