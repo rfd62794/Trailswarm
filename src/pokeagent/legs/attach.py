@@ -53,7 +53,7 @@ def plan(drill_leg: str | None, drill_grind: int | None, drill_steps: int, state
 
 
 def attach(ctx, pl: Plan | None, save_states: bool, states_dir: str | Path, start_state: str | Path | None = None,
-           runs_dir: str | Path = "runs", drills_log: str | Path | None = None, grind_log: str | Path | None = None) -> None:
+           runs_dir: str | Path = "runs", drills_log: str | Path | None = None, grind_log: str | Path | None = None, goto: bool = False) -> None:
     """Hang the hooks on ``ctx``. The saver is refused for runs that started from a discovery state."""
     if save_states and not (start_state and _is_discovery(start_state)):
         ctx.leg_saver = S.LegStateSaver(states_dir, S.route_maps(runs_dir))
@@ -62,7 +62,9 @@ def attach(ctx, pl: Plan | None, save_states: bool, states_dir: str | Path, star
     D.write_meta(ctx.run_dir, {"drill": pl.meta()})
     ctx.opts.steps = pl.steps + 2   # the monitor ends the run at pl.steps; the plain step cap must not preempt its record
     if pl.kind == "leg":
-        ctx.drill = D.DrillMonitor(pl.spec, pl.par, pl.steps, ctx.run_dir, Path(drills_log) if drills_log else D.DRILLS_LOG)
+        ctx.drill = D.DrillMonitor(pl.spec, pl.par, pl.steps, ctx.run_dir, Path(drills_log) if drills_log else D.DRILLS_LOG, emu=ctx.emu)
+        if goto:  # steer: the Goto behaviour routes to the exit tile over the learned map (otherwise the agent follows its own goal)
+            ctx.goto = [pl.spec.map, *pl.spec.exit]
     else:
         from pokeagent.grind.drill import GRIND_LOG, GrindDrillMonitor
         ctx.opts.drill_grind = pl.grind_map
@@ -81,5 +83,6 @@ def add_args(ap) -> None:
     ap.add_argument("--drill-leg", default=None, metavar="MAP:X,Y->X,Y", help="drill ONE leg from its saved entry state; stops at the exit tile / map change")
     ap.add_argument("--drill-grind", type=lambda v: int(v, 0), default=None, metavar="MAP", help="grind drill: start from a saved state on this map, grind its grass")
     ap.add_argument("--drill-steps", type=int, default=600, help="grind drill length in steps (leg drills use 3 x par)")
+    ap.add_argument("--drill-goto", action="store_true", help="leg drill: send the agent to the exit tile (ctx.goto) instead of letting it follow its own goal")
     ap.add_argument("--drills-log", default=None, help="leg drill result log (default runs/legs/drills.jsonl)")
     ap.add_argument("--grind-drills-log", default=None, help="grind drill result log (default runs/legs/grind_drills.jsonl)")

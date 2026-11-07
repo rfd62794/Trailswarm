@@ -64,7 +64,7 @@ def run(args) -> dict:
     from pokeagent.atlas.walkgrid import rom_cave_planner
     from pokeagent.explorer.world import SHIP_MAPS
     legs_attach.attach(ctx, drill_plan, args.save_leg_states, args.leg_states_dir, args.state, drills_log=args.drills_log or work / "drills.jsonl",
-                       grind_log=args.grind_drills_log or work / "grind_drills.jsonl")  # a check never writes the shared logs
+                       grind_log=args.grind_drills_log or work / "grind_drills.jsonl", goto=args.drill_goto)  # a check never writes the shared logs
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
         from pokeagent.bandit.driver import attach

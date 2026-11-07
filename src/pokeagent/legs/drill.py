@@ -80,9 +80,11 @@ class DrillMonitor:
     """Per-press hook. ``observe`` returns True once the drill ended (and has recorded drill_result)."""
 
     def __init__(self, spec: DrillSpec, par_frames: float, max_steps: int, run_dir: Path, log_path: Path | None = DRILLS_LOG,
-                 now=time.time):
+                 now=time.time, emu=None):
         self.spec, self.par, self.max_steps, self.run_dir, self.log_path, self.now = spec, par_frames, max_steps, Path(run_dir), log_path, now
-        self.presses, self.model_frames, self.last_button, self.frames0 = 0, 0.0, "", None
+        self.presses, self.model_frames, self.last_button = 0, 0.0, ""
+        self.frames0 = getattr(emu, "frames", None)   # emulator frames at the drill start (None: first press)
+        self.dest: tuple | None = None
         self.result: dict | None = None
 
     def observe(self, ctx, fr) -> bool:
@@ -91,6 +93,7 @@ class DrillMonitor:
         if self.frames0 is None:
             self.frames0 = getattr(ctx.emu, "frames", 0)
         b, a = tuple(fr.before), tuple(fr.after)
+        self.dest = a if a[0] != self.spec.map else None
         self.presses += 1
         self.last_button = fr.name
         self.model_frames += press_frames({"from": b, "to": a, "moved": b != a})
@@ -110,7 +113,7 @@ class DrillMonitor:
         eff = self.par / self.model_frames if solved and self.model_frames > 0 else None
         self.result = {"source": "drill", "kind": "leg", "leg": self.spec.text, "map": self.spec.map, "entry": list(self.spec.entry),
                        "exit": list(self.spec.exit), "button": self.spec.button or (self.last_button if reason == "left_by_exit" else ""),
-                       "solved": solved, "reason": reason, "steps": ctx.step, "frames": frames, "presses": self.presses,
+                       "solved": solved, "reason": reason, "dest": list(self.dest) if self.dest else None, "steps": ctx.step, "frames": frames, "presses": self.presses,
                        "model_frames": self.model_frames, "par_frames": self.par, "efficiency": eff, "budget_steps": self.max_steps,
                        "run": self.run_dir.name, "t": self.now()}
         try:

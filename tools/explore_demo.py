@@ -148,7 +148,7 @@ def main(argv=None) -> int:
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
                              bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
                              role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
-    legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log)
+    legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log, goto=a.drill_goto)
     if a.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, a.bandit_path, a.bandit_delta or None, a.seed)

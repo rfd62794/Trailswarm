@@ -327,3 +327,16 @@ def test_supervisor_turns_the_drill_share_of_refills_into_drills(tmp_path):
 def test_launcher_drill_args():
     sw = _load("swarm")
     assert sw.drill_args({"leg": "5:2,2->4,2", "state": "s.state"}) == ["--drill-leg", "5:2,2->4,2", "--state", "s.state"]
+
+
+def test_drill_goto_steers_to_the_exit_tile(tmp_path):
+    (tmp_path / "5_2_2.state").write_bytes(b"x")
+    pl = attach.Plan("leg", tmp_path / "5_2_2.state", 40, D.parse("5:2,2->4,2"), 64.0)
+    c = ctx_of(run_dir=tmp_path)
+    c.goto = None
+    attach.attach(c, pl, False, tmp_path, goto=True, drills_log=tmp_path / "d.jsonl")
+    assert c.goto == [5, 4, 2] and isinstance(c.drill, D.DrillMonitor) and c.opts.steps == 42
+    c2 = ctx_of(run_dir=tmp_path)
+    c2.goto = None
+    attach.attach(c2, pl, False, tmp_path, drills_log=tmp_path / "d.jsonl")
+    assert c2.goto is None
