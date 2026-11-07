@@ -224,11 +224,13 @@ function, what you could not do without a ROM, and anything that did not fit.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-state-surgery-directive |
 | Base branch | - |
 | Base commit | 4e9d4ba6cf138ed5cbb25548ce6221a5911ad65b |
+| Head commit | fff1aae1137efabe1ebc73107975b6d98745d90b |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 12:56 · robert-claude-laptop · none → Draft — Claude 2026-11-07: save-state editing v1 (surgery.py + state_edit CLI + synthetic gate)
@@ -236,4 +238,5 @@ function, what you could not do without a ROM, and anything that did not fit.
 - 2026-11-07 13:03 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (src/pokeagent/surgery.py, tests/test_surgery.py, src/pokeagent/statelog.py from the sibling directive) and gitignored evidence paths (kb/rom_tables.json, runs/checkpoints/*.fp.json); known false positive
 - 2026-11-07 13:03 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VJWPNNBEW8JP4PNY8DARJ1
 - 2026-11-07 13:09 · dispatcher · launched pid=24552; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-state-surgery-directive; provisioned: uv sync --frozen
+- 2026-11-07 13:17 · devin-overseer (delegated) · In progress → Review — under delegate.envelope [origin] spent: devin 0 min est. n/a
 <!-- queue:end -->
