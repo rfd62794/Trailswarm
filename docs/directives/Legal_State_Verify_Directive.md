@@ -212,4 +212,5 @@ the `edit_class` rules as implemented, and everything you could not verify witho
 - 2026-11-07 14:30 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07: pytest-only for Devin; CLI checks are controller validation. lint_override: dispatch-path-missing only
 - 2026-11-07 14:31 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (legality.py, envelope.py, three test files) and gitignored evidence (kb/*.json, runs/checkpoints/*.fp.json); known false positives. Entry-point steps reworded to pytest + controller validation.
 - 2026-11-07 15:03 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-legal-state-verify-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VSQ82HZE89YJQWNJ902CQ9
+- 2026-11-07 15:07 · dispatcher · launched pid=6240; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-legal-state-verify-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
