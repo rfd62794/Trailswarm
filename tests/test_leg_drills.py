@@ -429,3 +429,20 @@ def test_drill_backoff_expires_after_the_skip_refills(tmp_path):
 def test_drills_share_is_clamped_to_half():
     sw = _load("swarm")
     assert sw.clamp_drills(0.9) == 0.5 and sw.clamp_drills(-1) == 0.0 and sw.clamp_drills(0.25) == 0.25
+
+
+def test_grind_rate_is_not_recorded_with_under_100_steps_on_the_map(tmp_path):
+    c = ctx_of(run_dir=tmp_path, step=600)
+    m = GrindDrillMonitor(13, 600, tmp_path, tmp_path / "g.jsonl", now=lambda: 2.0, xp_fn=lambda ctx: 100)
+    m.on_map = 5
+    assert m.observe(c, fr((13, 1, 1), (13, 1, 2)))
+    assert m.result["xp_per_step"] is None and m.result["xp_per_min"] is None and m.result["steps_on_map"] == 6
+
+
+def test_drill_does_not_clear_a_slots_segment_failure_streak_on_failure(tmp_path):
+    launches = []
+    sup, _p, t = _drill_supervisor(tmp_path, launches)
+    slot = sup.slots[0]
+    slot.streak = 1
+    sup._start(slot); t["now"] += 5; sup._finish(slot, 1)
+    assert slot.streak == 1

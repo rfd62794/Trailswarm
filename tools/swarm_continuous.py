@@ -240,8 +240,10 @@ class Supervisor:
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
         too_fast = ran < self.fast_s if rc != 0 else (not cfg["segment"] and ran < min(self.fast_s, cfg["steps"] * MIN_S_PER_STEP))
         if cfg.get("drill"):  # a drill's failure is the leg's problem: back that leg off, never pause the slot's segment refills
-            self._note_drill(cfg["drill"], rc != 0 and too_fast and not self.stopping)
-            slot.streak = 0
+            failed = rc != 0 and too_fast and not self.stopping
+            self._note_drill(cfg["drill"], failed)
+            if rc == 0 and not too_fast:
+                slot.streak = 0  # only a drill success clears the slot's segment-failure streak
         elif too_fast and not self.stopping:
             self._note_failure(slot, f"rc={rc}, {ran:.0f}s, budget {cfg['steps']} steps")
         else:

@@ -27,5 +27,6 @@ def train_fight(ctx, hp: int, mx: int, my_lvl: int, e_lvl: int, expected: int) -
         return False
     if e_lvl > my_lvl + OVER_LEVEL:
         return False
-    hit = min(expected, max(4, HIT_CAP_PER_LEVEL * e_lvl))
+    cap = max(4, HIT_CAP_PER_LEVEL * e_lvl)
+    hit = min(expected, cap) if expected else cap   # no damage history for this species: assume the capped estimate
     return hp / mx >= FIGHT_FLOOR and hp > hit

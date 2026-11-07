@@ -42,3 +42,10 @@ def test_not_training_is_unchanged(tmp_path):
 
 def test_a_grind_drill_counts_as_training(tmp_path):
     assert Battle().step(wild(tmp_path, train_need=0, drill=12)) is None
+
+
+def test_unknown_species_uses_the_level_capped_hit_estimate(tmp_path):
+    from pokeagent.explorer.behaviours.battle_train import train_fight
+    ctx = wild(tmp_path)
+    assert train_fight(ctx, 8, 23, 7, 3, 0) is True      # cap max(4, 6) = 6 < 8 HP
+    assert train_fight(ctx, 6, 23, 7, 3, 0) is False     # 6 HP does not exceed one estimated hit (floor passes: 26%)
