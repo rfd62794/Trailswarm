@@ -182,3 +182,17 @@ Use the same `dpg.draw_text(..., parent=dl)` style already used in `_frame` / `d
 Files changed, the test tails, and a 5-line manual checklist for Robert's real-window check (click an agent ->
 camera follows; it follows into a building and across a map change; wheel zoom keeps following; dragging stops it;
 clicking empty map stops it).
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-06 21:14 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
