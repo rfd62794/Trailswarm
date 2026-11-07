@@ -40,6 +40,7 @@ class ExplorerOptions:
     novelty_path: str = "runs/novelty.json"
     novelty_runs: str = "runs"  # the runs directory the discovery log and its review saves go under
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
+    item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
     par_follow: bool = False  # plan_goal's route is walked along the ROM par path (pokeagent.explorer.par_follow)
 
 
@@ -218,6 +219,10 @@ class ExplorerContext:
     shop_intent: Any = None  # ("mart", map|None) while restock walks to a Mart: par_follow treats the trip as a "mart" trip
     bandit: Any = None  # pokeagent.bandit.driver.BanditDriver (None = bandit off: every hook answers as the Explorer would)
     novelty: Any = None  # pokeagent.novelty.tracker.NoveltyTracker (None = novelty off: nothing below changes)
+    item_seq: dict | None = None  # behaviours/use_items.py: the item-use sequence in progress (item, kind, presses, before snapshot ...)
+    item_next_check: int = 0  # step before which use_items does not re-evaluate its policies
+    item_cooldown: dict = field(default_factory=dict)  # item id -> step before which use_items does not try it again
+    xitem: dict | None = None  # item_policies.xitems_battle: this battle's X-item decision {battle, item, count0}
     par: Any = None  # explorer.par_follow.ParState, created on first use when opts.par_follow is on
 
     # --- dict-protocol shim for goals.check_goals ---

@@ -73,6 +73,13 @@ class Ledger:
                           "hp_before": hp_before, "hp_after": hp_after, "battle": battle})
         del self.uses[:-USE_KEEP]
 
+    def item_use(self, ctx, item: int, category: str, why: str, behaviour: str, before: dict, after: dict, battle: bool = False) -> None:
+        """A policy item use (explorer/item_policies): category, reason and the before / after snapshots, in the same ``uses`` list."""
+        self.uses.append({"step": ctx.step, "map": ctx.view.m, "item": item, "category": category, "why": why, "behaviour": behaviour,
+                          "hp_before": before.get("hp", 0), "hp_after": after.get("hp", 0), "battle": battle,
+                          "before": before, "after": after})
+        del self.uses[:-USE_KEEP]
+
     def reserve_ref(self, step: int) -> int:
         return self.ref_money if step - self.ref_step < REF_MEMORY else 0
 
