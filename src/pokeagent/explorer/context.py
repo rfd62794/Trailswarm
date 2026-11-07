@@ -166,9 +166,15 @@ class ExplorerContext:
     switch_train: dict | None = None  # switch_out_lead in progress for this battle
     switch_gave_up: int = -1  # ctx.battles value of the battle whose switch was abandoned
     magikarp_shared: int = 0  # battles in which the trainee was sent out and swapped on turn one
-    gyarados_steps: int = 0  # steps with gyarados the next unmet goal and a Magikarp in the party
-    gyarados_idle: int = 0  # consecutive plan steps at the gyarados stage with the training gate closed or lifted
-    gyarados_skipped: bool = False  # GYARADOS_STEP_CAP spent: the gyarados goal is settled for this run
+    team_ready_steps: int = 0  # steps with team_ready the next unmet goal (was gyarados_steps)
+    team_ready_idle: int = 0  # consecutive plan steps at the team_ready stage with the training gate closed or lifted
+    team_ready_skipped: bool = False  # GYARADOS_STEP_CAP spent: the team_ready goal is settled for this run
+    team_ready_ok: bool = False  # plan_goal's last team verdict at the team_ready stage (team_for().ready)
+    had_team_ready: bool = False  # team_ready_ok latched: once the sim says ready the goal stays settled
+    team_ready_nodata: bool = False  # no ROM/boss data to judge the team_ready stage: settled, never blocks
+    team_plan: list = field(default_factory=list)  # the ranked CatchAction list team_hunt last built
+    team_wants: dict = field(default_factory=dict)  # species -> catch reason for catch_list.catch_wanted(wants=)
+    team_hunt_steps: int = 0  # steps team_hunt has spent hunting this run (TEAM_HUNT_STEP_CAP)
     train_member: int | None = None  # party slot team_readiness names as the shortfall (None when the team is ready)
     team_note: str = ""  # last team-readiness verdict logged (plan_goal)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set

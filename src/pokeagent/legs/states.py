@@ -142,7 +142,7 @@ class LegStateSaver:
         self.done: set[tuple] = set()
         self.saved = 0
         self.count: int | None = None
-        self.trainee_level = 0   # highest trainee level seen at the gyarados stage this run
+        self.trainee_level = 0   # highest trainee level seen at the team_ready stage this run
         self.trainee_pending = 0  # a level gained mid-battle, saved at the next calm press
 
     def observe(self, ctx, fr) -> Path | None:
@@ -172,10 +172,10 @@ class LegStateSaver:
             return None
 
     def observe_trainee(self, ctx, fr) -> Path | None:
-        """At the gyarados stage, save ``gyarados@L<level>.state`` when the Magikarp gains a level (at the next calm press), so the
-        long training segment has resume points. Gated on ctx.gyarados_steps: other stages never read the party here."""
+        """At the team_ready stage, save ``gyarados@L<level>.state`` when the Magikarp gains a level (at the next calm press), so the
+        long training segment has resume points. Gated on ctx.team_ready_steps: other stages never read the party here."""
         try:
-            if getattr(ctx, "gyarados_steps", 0) <= 0:
+            if getattr(ctx, "team_ready_steps", 0) <= 0:
                 return None
             from pokeagent.magikarp import magikarp_stats
             st = magikarp_stats(ctx.emu)

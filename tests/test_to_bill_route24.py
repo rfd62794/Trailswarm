@@ -5,7 +5,7 @@ from pokeagent.explorer.memory import MapMemory
 from pokeagent.explorer.planner import plan_step
 from pokeagent.goals import GOALS
 
-BEFORE = {g: True for g in GOALS[:GOALS.index("gyarados") + 1]}  # past the bridge AND the gyarados stage: to_bill is next
+BEFORE = {g: True for g in GOALS[:GOALS.index("team_ready") + 1]}  # past the bridge AND the team_ready stage: to_bill is next
 GOALS_NOW = {**BEFORE, "_hp": (40, 40), "_level": 30, "_train_level": 8}
 
 

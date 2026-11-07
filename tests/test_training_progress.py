@@ -84,7 +84,7 @@ def _party(emu, level):
 
 
 def _ctx(emu, tmp_path, gy=1):
-    c = SimpleNamespace(emu=emu, run_dir=tmp_path, gyarados_steps=gy, logs=[])
+    c = SimpleNamespace(emu=emu, run_dir=tmp_path, team_ready_steps=gy, logs=[])
     c.log = lambda t, tag=None: c.logs.append(t)
     return c
 

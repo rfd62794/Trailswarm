@@ -45,12 +45,12 @@ class PlanGoal(BehaviourBase):
                 ctx.cut_learner_skipped = True
                 ctx.log(f"[cut_learner: {LEARNER_STEP_CAP} steps without a Cut-capable party member - settled for this run]", "res")
             goals_now_all = ctx.goals()
-        gyarados_stage = next((g for g in GOALS if not goals_now_all.get(g)), None) == "gyarados" and MAGIKARP in party_species(ctx.emu)
-        if gyarados_stage:
-            ctx.gyarados_steps += 1  # raising the trainee is the stage's work while it is the next goal
-            if ctx.gyarados_steps > GYARADOS_STEP_CAP:
-                ctx.gyarados_skipped = True
-                ctx.log(f"[gyarados: {GYARADOS_STEP_CAP} steps with the goal open and a Magikarp in the party - settled for this run]", "res")
+        team_ready_stage = next((g for g in GOALS if not goals_now_all.get(g)), None) == "team_ready"
+        if team_ready_stage:
+            ctx.team_ready_steps += 1  # building the team is the stage's work while it is the next goal
+            if ctx.team_ready_steps > GYARADOS_STEP_CAP:
+                ctx.team_ready_skipped = True
+                ctx.log(f"[team_ready: {GYARADOS_STEP_CAP} steps with the goal open - settled for this run]", "res")
                 goals_now_all = ctx.goals()
         if m == MT_MOON_CENTER and not goals_now_all["buy_magikarp"]:
             ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with
@@ -74,6 +74,13 @@ class PlanGoal(BehaviourBase):
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
         ctx.train_member = team.weakest.slot if team and team.weakest else None
+        if team_ready_stage:
+            if team is None:
+                ctx.team_ready_nodata = True  # no ROM/boss data: never block the route
+            elif team.ready:
+                ctx.team_ready_ok = ctx.had_team_ready = True  # the sim says the party beats the next boss
+            else:
+                ctx.team_ready_ok = False
         need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
         if clamp != ctx.clamp_note:
             ctx.clamp_note = clamp
@@ -84,7 +91,7 @@ class PlanGoal(BehaviourBase):
             ctx.under_level_note = ul
             if ul:
                 ctx.log(f"[readiness] {ul}", "res")
-        need = self._team_need(goals_now_all, need, gyarados_stage)
+        need = self._team_need(ctx, goals_now_all, need)
         need = self._budgeted(ctx, goals_now_all, need, verdict)
         need_raw = need
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
@@ -93,16 +100,16 @@ class PlanGoal(BehaviourBase):
         need = train_need(ctx, goals_now_all, need)  # bandit decision point: grind or skip (unchanged when off)
         ctx.train_need = need  # frontier reads it to seek grass while below the target
         training_live = 0 < lead_level(ctx.emu) < need
-        if gyarados_stage:
-            self._gyarados_idle(ctx, training_live, lead_level(ctx.emu))
+        if team_ready_stage:
+            self._team_ready_idle(ctx, training_live, lead_level(ctx.emu))
         else:
-            ctx.gyarados_idle = 0  # left the stage: "consecutive" restarts on re-entry
+            ctx.team_ready_idle = 0  # left the stage: "consecutive" restarts on re-entry
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need, "_heal_trips": ctx.heal_trips,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
                              "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {})},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
-        if planned is None and gyarados_stage and training_live:
+        if planned is None and team_ready_stage and training_live:
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp_now, mx_now)  # no planner target: go to the grass
         if planned and planned[1].startswith("goal checkpoint"):
             ck = ctx.__dict__["ckpt_steps"]; ck[5] = ck.get(5, 0) + 1  # Vermilion is the only checkpoint town so far
@@ -117,23 +124,29 @@ class PlanGoal(BehaviourBase):
         return None
 
     @staticmethod
-    def _team_need(goals: dict, need: int, has_magikarp: bool) -> int:
-        """At the gyarados stage with a Magikarp in the party, level the trainee until useful: the lead reads
-        min(fighter, trainee + TEAM_GAP), so the gate needs EVOLVE_LEVEL + TEAM_GAP to hold until Gyarados."""
-        if has_magikarp and next((g for g in GOALS if not goals.get(g)), None) == "gyarados":
-            return max(need, EVOLVE_LEVEL + TEAM_GAP)
-        return need
+    def _team_need(ctx: ExplorerContext, goals: dict, need: int) -> int:
+        """At the team_ready stage, level the trainee until useful ONLY while the plan's top action is the
+        Magikarp candidate or the named trainee is a MAGIKARP: the lead reads min(fighter, trainee + TEAM_GAP),
+        so the gate needs EVOLVE_LEVEL + TEAM_GAP to hold until Gyarados. Otherwise the catch plan does the
+        team work and the stage's training level is whatever required_level gives."""
+        if next((g for g in GOALS if not goals.get(g)), None) != "team_ready":
+            return need
+        top = (getattr(ctx, "team_plan", None) or [None])[0]
+        plan_pick = getattr(getattr(getattr(top, "member", None), "candidate", None), "source", "") == "magikarp"
+        species, slot = party_species(ctx.emu), getattr(ctx, "train_member", None)
+        named = slot is not None and 0 <= slot < len(species) and species[slot] == MAGIKARP
+        return max(need, EVOLVE_LEVEL + TEAM_GAP) if plan_pick or named else need
 
     @staticmethod
-    def _gyarados_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
-        """Settle the gyarados goal early when the gate is closed or lifted so the stage has nothing to do."""
-        gained = level is not None and level > getattr(ctx, "gyarados_idle_level", 0)
+    def _team_ready_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
+        """Settle the team_ready goal early when the gate is closed or lifted so the stage has nothing to do."""
+        gained = level is not None and level > getattr(ctx, "team_ready_idle_level", 0)
         if level is not None:
-            ctx.gyarados_idle_level = level
-        ctx.gyarados_idle = 0 if training_live or gained else ctx.gyarados_idle + 1  # a level gain is progress too
-        if ctx.gyarados_idle >= GYARADOS_IDLE_CAP and not ctx.gyarados_skipped:
-            ctx.gyarados_skipped = True
-            ctx.log(f"[gyarados: training gate closed or lifted for {GYARADOS_IDLE_CAP} plan steps - settled for this run]", "res")
+            ctx.team_ready_idle_level = level
+        ctx.team_ready_idle = 0 if training_live or gained else ctx.team_ready_idle + 1  # a level gain is progress too
+        if ctx.team_ready_idle >= GYARADOS_IDLE_CAP and not ctx.team_ready_skipped:
+            ctx.team_ready_skipped = True
+            ctx.log(f"[team_ready: training gate closed or lifted for {GYARADOS_IDLE_CAP} plan steps - settled for this run]", "res")
 
     @staticmethod
     def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
@@ -141,12 +154,12 @@ class PlanGoal(BehaviourBase):
         stage, level = stage_goal(goals), lead_level(ctx.emu)
         if stage is None:
             return need
-        gy = next((g for g in GOALS if not goals.get(g)), None) == "gyarados"
-        goal = "gyarados" if gy else stage  # the gyarados stage has its own budget key: it must not accrue on the next boss's
+        tr = next((g for g in GOALS if not goals.get(g)), None) == "team_ready"
+        goal = "team_ready" if tr else stage  # the team_ready stage has its own budget key: it must not accrue on the next boss's
         ctx.grind = ctx.grind or GrindBudget()
         why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
                                training=0 < level < need, ceiling=level_ceiling(stage),
-                               max_battles=GRIND_BATTLES_GYARADOS if gy else GRIND_BATTLES)
+                               max_battles=GRIND_BATTLES_GYARADOS if tr else GRIND_BATTLES)
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
         return 0 if ctx.grind.lifted(goal) else need

@@ -86,22 +86,22 @@ def test_evolved_magikarp_is_judged_as_gyarados():
     assert karp.useful is True   # L22 >= EVOLVE_LEVEL: the GYARADOS projection carries the hurt-lead sim
 
 
-# --- the gyarados ladder goal ------------------------------------------------------------------------------------
+# --- the team_ready ladder goal (was the gyarados mandate) ---------------------------------------------------------
 
-def test_gyarados_detector_never_blocks():
-    assert GOALS.index("gyarados") == GOALS.index("nugget_bridge") + 1
-    assert GOALS.index("to_bill") == GOALS.index("gyarados") + 1
-    assert "gyarados" not in SIDE_GOALS
-    assert campaign.selectable("gyarados")   # the segment picker may target it: nugget_bridge -> gyarados
-    st: dict = {}
-    emu = FakeEmulator(party_mem([(0xB1, 14, 30, 30), (GYARADOS, 20, 60, 60)]))
-    assert check_goals(emu, st)["gyarados"]                       # owned -> met
-    emu.memory.update(party_mem([(0xB1, 14, 30, 30)]))
-    assert check_goals(emu, st)["gyarados"]                       # sticky: stays met once seen this run
-    assert check_goals(FakeEmulator(party_mem([(0xB1, 14, 30, 30)])), {})["gyarados"]       # never owned a Magikarp -> settled
+def test_team_ready_detector_never_blocks():
+    assert GOALS.index("team_ready") == GOALS.index("nugget_bridge") + 1
+    assert GOALS.index("to_bill") == GOALS.index("team_ready") + 1
+    assert "gyarados" not in GOALS and "team_ready" not in SIDE_GOALS
+    assert campaign.selectable("team_ready")   # the segment picker may target it: nugget_bridge -> team_ready
     karp = FakeEmulator(party_mem([(0xB1, 14, 30, 30), (MAGIKARP, 5, 17, 17)]))
-    assert not check_goals(karp, {})["gyarados"]                  # a Magikarp in the party: the goal is open
-    assert check_goals(karp, {"gyarados_skipped": True})["gyarados"]  # ... unless the stage's step cap ran out
+    st: dict = {}
+    assert not check_goals(karp, st)["team_ready"]                # open while the sim has not said ready
+    st["team_ready_ok"] = True
+    assert check_goals(karp, st)["team_ready"]                    # plan_goal's verdict: the party beats the next boss
+    st["team_ready_ok"] = False
+    assert check_goals(karp, st)["team_ready"]                    # sticky via had_team_ready (set by plan_goal on the latch)
+    assert check_goals(karp, {"team_ready_skipped": True})["team_ready"]  # the stage's step cap ran out
+    assert check_goals(karp, {"team_ready_nodata": True})["team_ready"]   # no boss data: never blocks
 
 
 # --- the training-gate seam and the switch-training target --------------------------------------------------------
@@ -126,7 +126,7 @@ def test_trainee_slot_for_follows_the_magikarp_then_the_named_member():
     assert trainee_slot_for(weak, None) is None    # nobody named
 
 
-# --- review blockers: gyarados training need, idle settle, true lead level, fighter trainee never flees -----------------
+# --- review blockers: team_ready training need, idle settle, true lead level, fighter trainee never flees -------------
 
 def test_true_lead_level_ignores_the_trainee_band():
     from pokeagent.explorer.perceive import true_lead_level
@@ -146,24 +146,35 @@ def test_bandit_and_drill_key_by_the_true_level():
 
 def _gy_ctx(level_pair=((MAGIKARP, 13, 17, 17), (179, 30, 82, 82))):
     from types import SimpleNamespace
-    goals = {g: True for g in GOALS[:GOALS.index("gyarados")]}
+    goals = {g: True for g in GOALS[:GOALS.index("team_ready")]}
     emu = FakeEmulator(party_mem(list(level_pair)))
-    return goals, SimpleNamespace(emu=emu, step=0, battles=0, blackouts_row=0, grind=None, gyarados_idle=0, gyarados_skipped=False,
+    return goals, SimpleNamespace(emu=emu, step=0, battles=0, blackouts_row=0, grind=None, team_ready_idle=0,
+                                  team_ready_skipped=False, team_plan=[], train_member=None,
                                   log=lambda *a, **k: None)
 
 
-def test_gyarados_stage_asks_for_the_team_target_and_its_own_battle_budget():
+def _magikarp_action():
+    from types import SimpleNamespace
+    return SimpleNamespace(member=SimpleNamespace(candidate=SimpleNamespace(source="magikarp")))
+
+
+def test_team_ready_stage_asks_for_the_team_target_and_its_own_battle_budget():
     from pokeagent.explorer.behaviours.plan_goal import PlanGoal
     from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS
     from pokeagent.magikarp import EVOLVE_LEVEL
     assert GRIND_BATTLES_GYARADOS == 120 and GRIND_BATTLES == 25
     goals, ctx = _gy_ctx()
-    assert PlanGoal._team_need(goals, 19, True) >= EVOLVE_LEVEL + TEAM_GAP == 26
-    assert PlanGoal._team_need(goals, 19, False) == 19                         # no Magikarp: untouched
+    ctx.team_plan = [_magikarp_action()]
+    assert PlanGoal._team_need(ctx, goals, 19) >= EVOLVE_LEVEL + TEAM_GAP == 26  # the plan's top action is the Magikarp
+    ctx.team_plan = []
+    assert PlanGoal._team_need(ctx, goals, 19) == 19                             # another action wins: no forced gate
+    ctx.train_member = 0                                                          # ... unless the named trainee IS the Magikarp
+    assert PlanGoal._team_need(ctx, goals, 19) >= 26
+    ctx.train_member = None
     other = {g: True for g in GOALS[:GOALS.index("to_gym")]}
-    assert PlanGoal._team_need(other, 19, True) == 19                          # another stage: untouched
+    assert PlanGoal._team_need(ctx, other, 19) == 19                             # another stage: untouched
     assert PlanGoal._budgeted(ctx, goals, 26, None) == 26
-    ctx.step, ctx.battles = 300, GRIND_BATTLES + 5                              # past 25: gyarados stage keeps training
+    ctx.step, ctx.battles = 300, GRIND_BATTLES + 5                              # past 25: the team_ready stage keeps training
     assert PlanGoal._budgeted(ctx, goals, 26, None) == 26
     ctx.step, ctx.battles = 600, GRIND_BATTLES_GYARADOS
     assert PlanGoal._budgeted(ctx, goals, 26, None) == 0
@@ -181,42 +192,42 @@ def test_other_stages_keep_the_25_battle_budget(monkeypatch):
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 0
 
 
-def test_gyarados_goal_settles_after_idle_closed_gate_steps_not_while_training():
+def test_team_ready_goal_settles_after_idle_closed_gate_steps_not_while_training():
     from pokeagent.explorer.behaviours.plan_goal import PlanGoal
     from pokeagent.magikarp import GYARADOS_IDLE_CAP, GYARADOS_STEP_CAP
     assert GYARADOS_IDLE_CAP == 300 and GYARADOS_STEP_CAP == 6000
     _, ctx = _gy_ctx()
     for _ in range(GYARADOS_IDLE_CAP - 1):
-        PlanGoal._gyarados_idle(ctx, False)
-    assert not ctx.gyarados_skipped
-    PlanGoal._gyarados_idle(ctx, True)                                         # training live: the count restarts
-    assert ctx.gyarados_idle == 0
+        PlanGoal._team_ready_idle(ctx, False)
+    assert not ctx.team_ready_skipped
+    PlanGoal._team_ready_idle(ctx, True)                                         # training live: the count restarts
+    assert ctx.team_ready_idle == 0
     for _ in range(GYARADOS_IDLE_CAP * 2):
-        PlanGoal._gyarados_idle(ctx, True)
-    assert not ctx.gyarados_skipped
+        PlanGoal._team_ready_idle(ctx, True)
+    assert not ctx.team_ready_skipped
     for _ in range(GYARADOS_IDLE_CAP):
-        PlanGoal._gyarados_idle(ctx, False)
-    assert ctx.gyarados_skipped
+        PlanGoal._team_ready_idle(ctx, False)
+    assert ctx.team_ready_skipped
 
 
-def test_gyarados_budget_does_not_leak_into_the_next_boss_stage():
+def test_team_ready_budget_does_not_leak_into_the_next_boss_stage():
     from pokeagent.explorer.behaviours.plan_goal import PlanGoal
     _, ctx = _gy_ctx()
-    gy = {g: True for g in GOALS[:GOALS.index("gyarados")]}
-    assert PlanGoal._budgeted(ctx, gy, 26, None) == 26
-    ctx.step, ctx.battles = 300, 30                                  # 30 flat battles at the gyarados stage
-    assert PlanGoal._budgeted(ctx, gy, 26, None) == 26
-    nxt = {g: True for g in GOALS[:GOALS.index("gyarados") + 1]}
+    tr = {g: True for g in GOALS[:GOALS.index("team_ready")]}
+    assert PlanGoal._budgeted(ctx, tr, 26, None) == 26
+    ctx.step, ctx.battles = 300, 30                                  # 30 flat battles at the team_ready stage
+    assert PlanGoal._budgeted(ctx, tr, 26, None) == 26
+    nxt = {g: True for g in GOALS[:GOALS.index("team_ready") + 1]}
     ctx.step, ctx.battles = 301, 31
     assert PlanGoal._budgeted(ctx, nxt, 26, None) == 26             # first step of the next stage: not pre-lifted
-    assert not ctx.grind.lifted("rival_ss_anne") and not ctx.grind.lifted("gyarados")
+    assert not ctx.grind.lifted("rival_ss_anne") and not ctx.grind.lifted("team_ready")
 
 
-def test_gyarados_idle_resets_on_a_level_gain():
+def test_team_ready_idle_resets_on_a_level_gain():
     from pokeagent.explorer.behaviours.plan_goal import PlanGoal
     _, ctx = _gy_ctx()
     for _ in range(10):
-        PlanGoal._gyarados_idle(ctx, False, 19)
-    assert ctx.gyarados_idle == 9
-    PlanGoal._gyarados_idle(ctx, False, 20)
-    assert ctx.gyarados_idle == 0
+        PlanGoal._team_ready_idle(ctx, False, 19)
+    assert ctx.team_ready_idle == 9
+    PlanGoal._team_ready_idle(ctx, False, 20)
+    assert ctx.team_ready_idle == 0
