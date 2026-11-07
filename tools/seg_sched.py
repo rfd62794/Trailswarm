@@ -41,6 +41,7 @@ class Curriculum:
     def __init__(self, root: Path, clock: Callable[[], float] = time.time, log: Callable[[str], None] = print,
                  quiet_s: float = 30.0):
         self.root, self.clock, self.log, self.quiet_s = Path(root), clock, log, quiet_s
+        self.refused: set[str] = set()
         self.doc = ss.load(self.root)
         self.picked = {k: 0 for k in SHARES}
         self.tries: dict[str, int] = {}   # per-segment UNSOLVED picks this session (rotation)
@@ -85,7 +86,16 @@ class Curriculum:
             for g in seg_split.maybe_split(self.doc):
                 self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
 
+    def _log_refusals(self, segs) -> None:
+        """Say once per checkpoint when a ship-stage state is skipped for a respawn behind Vermilion."""
+        for name in {s.start for s in segs} | {s.end for s in segs}:
+            why = ss.refusal(self.root, name)
+            if why and name not in self.refused:
+                self.refused.add(name)
+                self.log(f"curriculum: refusing checkpoint {name}: {why}; the frontier remakes it")
+
     def groups(self) -> dict[str, list]:
+        self._log_refusals(ss.layout(self.doc))
         segs = [s for s in ss.layout(self.doc) if ss.ckpt_valid(self.root, s.start)]   # in-order checkpoints only
         st = lambda s: ss.stat(self.doc, s.key)  # noqa: E731
         unsolved = sorted((s for s in segs if not ss.is_solved(st(s))),

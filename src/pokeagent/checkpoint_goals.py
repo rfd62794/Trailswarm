@@ -44,11 +44,15 @@ BEHIND_VERMILION = frozenset({0, 1, 2, 3})
 
 
 def read_respawn(state: Path) -> int | None:
+    """The state's recorded respawn map: the goals sidecar first, else its RAM fingerprint (statefp), else unknown."""
     try:
         r = json.loads(sidecar(state).read_text(encoding="utf-8")).get("respawn")
-        return r if isinstance(r, int) else None
-    except (OSError, ValueError, TypeError):
-        return None
+    except (OSError, ValueError, TypeError, AttributeError):
+        r = None
+    if not isinstance(r, int):
+        from pokeagent import statefp
+        r = (statefp.read(state) or {}).get("respawn")
+    return r if isinstance(r, int) else None
 
 
 def respawn_behind(name: str, state: Path | None) -> bool:
@@ -65,9 +69,11 @@ def read_completed(state: Path) -> set[str] | None:
 
 
 def copy_sidecar(src: Path, dst: Path) -> None:
-    if sidecar(src).exists():
-        import shutil
-        shutil.copyfile(sidecar(src), sidecar(dst))
+    import shutil
+    from pokeagent import statefp
+    for side in (sidecar, statefp.sidecar):
+        if side(src).exists():
+            shutil.copyfile(side(src), side(dst))
 
 
 def required(name: str, order: tuple[str, ...]) -> list[str]:

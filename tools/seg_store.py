@@ -217,11 +217,22 @@ def ckpt(root: Path, name: str) -> Path | None:
     return next((p for p in found if not cg.respawn_behind(name, p)), found[0] if found else None)
 
 
+def refusal(root: Path, name: str) -> str | None:
+    """Why checkpoint ``name`` must not start a segment even though it exists: a ship-stage state whose blackout respawns
+    behind Vermilion (Cerulean etc.) sends every lost fight back across the map (2026-11-06/07: 309 ship blackouts landed in
+    Cerulean). None = fine, or the respawn is unknown (no record: cannot judge)."""
+    p = ckpt(root, name)
+    return f"respawn map {cg.read_respawn(p)} is behind Vermilion (5)" if cg.respawn_behind(name, p) else None
+
+
 def ckpt_valid(root: Path, name: str) -> bool:
     """May checkpoint ``name`` start a segment? Only if every earlier selectable goal was complete when it was written
-    (sidecar), or - for an old checkpoint with no sidecar - has a checkpoint of its own (no gap in the chain)."""
+    (sidecar), or - for an old checkpoint with no sidecar - has a checkpoint of its own (no gap in the chain). A ship-stage
+    state whose respawn is behind Vermilion is refused (see ``refusal``): the frontier falls back to the segment that remakes it."""
     if name == "bedroom":
         return ckpt(root, name) is not None
+    if refusal(root, name):
+        return False
     return cg.valid(name, ckpt(root, name), selectable_goals(), lambda g: ckpt(root, g) is not None)
 
 
