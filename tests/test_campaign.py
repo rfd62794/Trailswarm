@@ -23,7 +23,10 @@ SPECS = list(campaign.load_campaign())
 
 
 def _ids(det):
-    return det.get("map", []) if isinstance(det, dict) else []
+    if not isinstance(det, dict):
+        return []
+    inner = next((v for k, v in det.items() if k in ("map_now_with_item", "map_past_x")), det)
+    return inner.get("map", [])
 
 
 def test_ladder_is_long_and_starts_with_todays_25():
@@ -43,7 +46,7 @@ def test_every_goal_has_a_known_detector_shape():
     for g in SPECS:
         d = g["detector"]
         assert d == "unverified" or (isinstance(d, dict) and len(d) == 1 and next(iter(d)) in
-                                     {"map", "badge", "item", "flag", "party", "map_and_badge", "special"}), g["id"]
+                                     {"map", "badge", "item", "flag", "party", "map_and_badge", "map_now_with_item", "map_past_x", "special"}), g["id"]
         if isinstance(d, dict) and "badge" in d:
             assert 0 <= d["badge"] <= 7
 
@@ -101,6 +104,9 @@ def test_unverified_goals_follow_later_goals():
     campaign.infer_unverified(g)
     assert not g["hm01_cut"]
     g["to_pokemon_tower"] = True
+    campaign.infer_unverified(g)
+    assert not g["hm01_cut"] and not g["rival_ss_anne"]                    # a later goal alone is not enough: predecessors missing
+    g["ss_anne_2f"] = g["ss_anne_captain"] = True
     campaign.infer_unverified(g)
     assert g["hm01_cut"] and g["rival_ss_anne"]                           # earlier than a reached goal
     assert not g["snorlax_route12"]                                        # later than the last reached goal
