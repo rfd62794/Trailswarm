@@ -120,7 +120,7 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          "nugget_bridge": 0x23 in seen, "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
     g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
-    g["cut_learner"] = cut_learner_settled(emu, st, _kbmod.ROM_KB)  # special goal: hand-coded, skipped by campaign_goals
+    g["cut_learner"] = g["hm01_cut"] and cut_learner_settled(emu, st, _kbmod.ROM_KB)  # only after HM01 is in hand; special goal: hand-coded, skipped by campaign_goals
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).
     for k in g:

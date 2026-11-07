@@ -134,3 +134,59 @@ def test_catch_target_map_only_while_cut_is_an_uncovered_need():
     assert t is not None and t.map == 0x23
     assert catch_list.catch_target_map(done, ["ODDISH"], HM, WILD, 5, {35}) is None    # the party covers cut -> puzzle is first
     assert catch_list.catch_target_map({g: True for g in GOALS}, ["SQUIRTLE"], HM, WILD, 5, {35}) is None
+
+
+BULBASAUR = 0x99
+
+
+def test_cut_learner_needs_hm01_in_hand(monkeypatch):
+    """A Cut-capable starter must not settle cut_learner in Pallet Town: the goal sits behind hm01_cut."""
+    monkeypatch.setattr(kbmod, "ROM_KB", {"name_of_internal": {str(BULBASAUR): "BULBASAUR", str(SQUIRTLE): "SQUIRTLE"}})
+    monkeypatch.setattr(catch_list, "hm_table", lambda: {"cut": frozenset(HM["cut"])})
+    emu, st = FakeEmulator({0xD35E: 0x0C, 0xD163: 1, 0xD164: BULBASAUR}), {}
+    assert not check_goals(emu, st)["hm01_cut"] and not check_goals(emu, st)["cut_learner"]
+    assert not st.get("had_cut_learner")                                                # no sticky flag set early
+    emu.set(0xD803, 1)
+    assert check_goals(emu, st)["cut_learner"]                                          # HM01 in hand: learner present
+    sq = FakeEmulator({0xD35E: 5, 0xD803: 1, 0xD163: 1, 0xD164: SQUIRTLE})
+    sst = {}
+    assert not check_goals(sq, sst)["cut_learner"]                                      # no learner yet
+    sst["cut_learner_skipped"] = True
+    assert check_goals(sq, sst)["cut_learner"]                                          # settled by the cap
+
+
+def test_frontier_does_not_hunt_grass_when_weak(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours import frontier
+    seen = {}
+    monkeypatch.setattr(frontier, "_memory_step", lambda ctx, m, x, y, **kw: (seen.update(kw) or ("Up", "t")))
+    ctx = _stage_ctx(tmp_path, [SQUIRTLE])
+    ctx.hunt_grass = True
+    ctx.emu.memory.update({0xD16C: 0, 0xD16D: 5, 0xD18D: 0, 0xD18E: 20})              # 5/20 HP: weak
+    frontier.Frontier().step(ctx)
+    assert seen["grass"] == "avoid"
+    ctx.emu.memory.update({0xD16D: 20})
+    frontier.Frontier().step(ctx)
+    assert seen["grass"] == "seek"
+
+
+def test_learner_hunt_repicks_when_target_unreachable(monkeypatch):
+    from pokeagent.explorer.behaviours import learner_hunt as lh
+    a = SimpleNamespace(map=0x10, name="A", species="ODDISH", levels=(5, 6), chance=.3, rate=15)
+    b = SimpleNamespace(map=0x11, name="B", species="ODDISH", levels=(5, 6), chance=.3, rate=15)
+    picks = iter([a, b])
+
+    class G:
+        blocked_now = frozenset()
+        def __init__(self, *_a): pass
+        def path(self, _start, goal):
+            return ["Up", "Up"] if goal((0x11, 0, 0)) else None                         # only B is reachable
+
+    monkeypatch.setattr(lh, "WorldGraph", G)
+    monkeypatch.setattr(lh, "catch_target_map", lambda *a, **k: next(picks))
+    monkeypatch.setattr(lh, "our_party", lambda emu: [])
+    monkeypatch.setattr(lh, "hm_table", lambda: {})
+    monkeypatch.setattr(lh, "table", lambda *a: {})
+    ctx = _beh_ctx({"hm01_cut": True, "cut_learner": False})
+    ctx.emu = None
+    d = LearnerHunt().step(ctx)
+    assert ctx.learner_target is b and d is not None and d.button == "Up"

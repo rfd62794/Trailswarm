@@ -34,16 +34,22 @@ class LearnerHunt(BehaviourBase):
         p = g.path((ctx.view.m, ctx.view.x, ctx.view.y), lambda n: n[0] == target_map)
         return len(p) if p is not None else FAR
 
+    def _pick(self, ctx: ExplorerContext):
+        return catch_target_map(
+            ctx.goals(), our_party(ctx.emu), hm_table(), table(None, "wild_by_map"),
+            ctx.view.m, ctx.mem.data["maps"], distance=lambda _a, b: self._graph_dist(ctx, b))
+
+    def _announce(self, ctx: ExplorerContext, t) -> None:
+        ctx.log(f"[cut_learner: {t.species} on {t.name} (0x{t.map:02X}), L{t.levels[0]}-{t.levels[1]}, "
+                f"{t.chance * 100:.0f}%/encounter]", "res")
+
     def step(self, ctx: ExplorerContext) -> Decision | None:
         t = ctx.learner_target
         if t is None:
-            t = ctx.learner_target = catch_target_map(
-                ctx.goals(), our_party(ctx.emu), hm_table(), table(None, "wild_by_map"),
-                ctx.view.m, ctx.mem.data["maps"], distance=lambda _a, b: self._graph_dist(ctx, b))
+            t = ctx.learner_target = self._pick(ctx)
             if t is None:
                 return None  # no candidate the tables know: exploration goes on (the step cap will settle the goal)
-            ctx.log(f"[cut_learner: {t.species} on {t.name} (0x{t.map:02X}), L{t.levels[0]}-{t.levels[1]}, "
-                    f"{t.chance * 100:.0f}%/encounter]", "res")
+            self._announce(ctx, t)
         v = ctx.view
         if v.m == t.map:
             ctx.hunt_grass = True
@@ -51,5 +57,13 @@ class LearnerHunt(BehaviourBase):
         g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
         p = g.path((v.m, v.x, v.y), lambda n: n[0] == t.map)
         if not p:
-            return None  # no route known to the target map yet: exploration finds one
+            # No known route: the cached pick may be a poor early one. Re-pick; a reachable candidate replaces it.
+            t2 = self._pick(ctx)
+            if t2 is None or t2.map == t.map:
+                return None  # nothing better known: exploration finds a route
+            t = ctx.learner_target = t2
+            self._announce(ctx, t)
+            p = g.path((v.m, v.x, v.y), lambda n: n[0] == t.map)
+            if not p:
+                return None
         return Decision(p[0], "learner_hunt_walk", f"cut_learner: {len(p)} steps to {t.species} grass on {t.name}")
