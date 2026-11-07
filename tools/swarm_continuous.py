@@ -176,6 +176,7 @@ class Supervisor:
             note = f"not merged ({e!r})"
             if keep:
                 note += f", kept in {self._keep(cfg['own'])} for --merge-only"
+        self._merge_bandit(cfg["own"])
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
         self.plan and self.plan.on_finish(cfg, rc)
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
@@ -184,6 +185,17 @@ class Supervisor:
             self._note_failure(slot, f"rc={rc}, {ran:.0f}s, budget {cfg['steps']} steps")
         else:
             slot.streak = 0
+
+    def _merge_bandit(self, own: Path) -> None:
+        """A bandit agent leaves its delta beside its memory file: add it into runs/bandit.json (idempotent by run id)."""
+        from pokeagent.bandit.store import delta_path_for, merge_delta
+        delta = delta_path_for(own)
+        if not delta.exists():
+            return
+        try:
+            merge_delta(self.shared.with_name("bandit.json"), delta)
+        except Exception as e:  # the delta stays on disk for a later merge; never block the slot
+            self.log(f"bandit delta not merged ({e!r}); kept {delta.name}")
 
     def _keep(self, own: Path) -> Path:
         dest = self.swarm_dir / "unmerged"

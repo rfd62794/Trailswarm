@@ -32,6 +32,9 @@ class ExplorerOptions:
     maps_path: str = "runs/maps.json"
     adaptive_pace: bool = False  # A through text boxes at the learned pace (text_press) instead of the fixed settle
     fast_text: bool = False  # run the set_text_speed_fast procedure once at the start
+    bandit: bool = False  # behaviour bandit overrides the Explorer at three decision points (pokeagent.bandit)
+    bandit_path: str = "runs/bandit.json"  # shared table the bandit loads at start
+    bandit_delta: str = ""  # where this run's delta goes ("" = <run_dir>/bandit_delta.json)
 
 
 @dataclass
@@ -201,6 +204,7 @@ class ExplorerContext:
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
+    bandit: Any = None  # pokeagent.bandit.driver.BanditDriver (None = bandit off: every hook answers as the Explorer would)
 
     # --- dict-protocol shim for goals.check_goals ---
     def get(self, key: str, default: Any = None) -> Any:

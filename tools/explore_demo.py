@@ -86,6 +86,9 @@ def main(argv=None) -> int:
                     help="planner trains on Route 1 until the lead reaches this level (Brock sweep: 8/10/12/14)")
     ap.add_argument("--explore-rate", type=float, default=0.2,
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
+    ap.add_argument("--bandit", action="store_true", help="behaviour bandit: fight/flee, heal/push on, grind/skip chosen by Thompson sampling")
+    ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
+    ap.add_argument("--bandit-delta", default="", help="where this run writes its bandit delta (default <run dir>/bandit_delta.json)")
     a = ap.parse_args(argv)
     if a.seed is not None:
         random.seed(a.seed)
@@ -131,7 +134,11 @@ def main(argv=None) -> int:
         opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", steps=a.steps,
                              stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
-                             adaptive_pace=a.adaptive_pace, fast_text=a.fast_text))
+                             adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
+                             bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta))
+    if a.bandit:
+        from pokeagent.bandit.driver import attach
+        attach(ctx, a.bandit_path, a.bandit_delta or None, a.seed)
     from pokeagent.explorer.anomalies import AnomalyMonitor
     from pokeagent.atlas.rom_maps import valid_map_ids
     ctx.anomalies = AnomalyMonitor.for_ctx(ctx, valid_map_ids(a.rom))
@@ -169,6 +176,7 @@ def main(argv=None) -> int:
     pos = ctx.pos
 
     def close_logs() -> None:
+        ctx.bandit is not None and ctx.bandit.save()
         trans.close(); decisions.close()
 
     def on_key(ev):
