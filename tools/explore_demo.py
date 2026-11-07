@@ -87,6 +87,7 @@ def main(argv=None) -> int:
     ap.add_argument("--explore-rate", type=float, default=0.2,
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     ap.add_argument("--bandit", action="store_true", help="behaviour bandit: fight/flee, heal/push on, grind/skip chosen by Thompson sampling")
+    ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--bandit-delta", default="", help="where this run writes its bandit delta (default <run dir>/bandit_delta.json)")
     a = ap.parse_args(argv)
@@ -135,7 +136,7 @@ def main(argv=None) -> int:
                              stop_at_goal=a.stop_at_goal, stop_at_map=a.stop_at_map, headless=a.headless, box_pace=a.box_pace,
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
-                             bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta))
+                             bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow))
     if a.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, a.bandit_path, a.bandit_delta or None, a.seed)

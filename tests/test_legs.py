@@ -90,3 +90,19 @@ def test_route24_south_entry_to_east_edge_par_by_hand():
     g = G.rom_grids()(35)
     frames, path = par(g, (10, 35), (19, 9))
     assert frames == 35 * W and len(path) == 36
+
+
+def test_leg_report_drops_legs_with_battle_presses(tmp_path):
+    import json
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("leg_report", Path(__file__).resolve().parents[1] / "tools" / "leg_report.py")
+    lr = importlib.util.module_from_spec(spec); spec.loader.exec_module(lr)
+    rows = [{"step": 1, "from": [5, 0, 0], "button": "RIGHT", "to": [5, 1, 0], "moved": True},
+            {"step": 2, "from": [5, 1, 0], "button": "DOWN", "to": [7, 1, 1], "moved": True}]
+    run = tmp_path / "explore-x"; run.mkdir()
+    (run / "transitions.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    (run / "decisions.jsonl").write_text(json.dumps({"step": 2, "battle": True}) + "\n")
+    leg = split_legs(rows)[0]
+    assert leg.step1 == 2 and lr.fought(lr.fight_steps(run / "decisions.jsonl"), leg)
+    assert not lr.fought(set(), leg)

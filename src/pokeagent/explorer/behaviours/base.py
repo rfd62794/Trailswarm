@@ -17,6 +17,7 @@ class Decision:
     why: str = ""
     behaviour: str = ""  # filled in by the Selector
     after: Callable[["ExplorerContext"], None] | None = None  # runs right after the press (e.g. grading a replay)
+    driver: str = ""  # who drove the press when it is not the plain rule ("par" = par_follow); written to the decision line
 
 
 class Behaviour(Protocol):
