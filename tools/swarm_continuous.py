@@ -30,6 +30,7 @@ POLL_S = 1.0
 SOLVED_FAST_S = 20.0   # a segment run this quick was already trivially solved
 SOLVED_HOLD_S = 600.0  # ...so --segment auto must not pick it again for 10 minutes
 MIN_S_PER_STEP = 0.05  # a clean exit faster than this per step cannot have used its step budget
+GRIND_REFRESH_EVERY = 5  # fold finished battles into runs/grind_atlas.json every 5th finished run
 
 
 class Supervisor:
@@ -177,6 +178,8 @@ class Supervisor:
             if keep:
                 note += f", kept in {self._keep(cfg['own'])} for --merge-only"
         self._merge_bandit(cfg["own"])
+        if self.finished % GRIND_REFRESH_EVERY == 0:
+            self._refresh_grind()
         cfg["own"].unlink(missing_ok=True)  # merged (or unusable); never merged twice
         self.plan and self.plan.on_finish(cfg, rc)
         self.log(f"slot {slot.idx} finished rc={rc} after {ran:.0f}s, {note}; {self.status()}{self._firsts()}")
@@ -196,6 +199,15 @@ class Supervisor:
             merge_delta(self.shared.with_name("bandit.json"), delta)
         except Exception as e:  # the delta stays on disk for a later merge; never block the slot
             self.log(f"bandit delta not merged ({e!r}); kept {delta.name}")
+
+    def _refresh_grind(self) -> None:
+        """Fold newly finished battles into runs/grind_atlas.json (continuous learning; never blocks a slot)."""
+        try:
+            from pokeagent.grind.refresh import refresh
+            r = refresh(str(self.shared.parent))
+            self.log(f"grind atlas refreshed: {r.get('folded', 0)} battles folded")
+        except Exception as e:
+            self.log(f"grind atlas not refreshed ({e!r})")
 
     def _keep(self, own: Path) -> Path:
         dest = self.swarm_dir / "unmerged"
