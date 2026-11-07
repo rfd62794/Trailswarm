@@ -70,6 +70,8 @@ region; the same four regions become MCP resources so Claude sees exactly what R
   measured by the review tool.
 - **Phase 4, scale and guide**: swarm as the default learner between watched runs; hybrid mode budgets; a
   nightly report (goal steps, stalls, consults, new KB facts); then Misty and beyond.
+- **Other games**: Pokemon Blue first (same engine), then Yellow, Crystal, a non-Pokemon GB game - see
+  docs/superpowers/specs/2026-11-06-layered-methods-design.md "New game onboarding".
 
 ## Open decisions for Robert
 

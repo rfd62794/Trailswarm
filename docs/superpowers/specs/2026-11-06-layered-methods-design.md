@@ -155,6 +155,15 @@ licence in the research, so it is a design reference only. **Never commit ROM-de
 data**: commit generators and tests, and produce the table at setup time into a gitignored path. Modded
 ROMs (built from pokered with changed tables) are test harnesses only, never a source of truth.
 
+### Two layers
+
+- **Hardware layer, identical for every Game Boy game**: the OAM sprite table at 0xFE00 (x, y, tile and
+  flags for every sprite), the VRAM background tile maps at 0x9800/0x9C00, palettes, and tile hashing, which
+  groups identical tiles automatically.
+- **Game adapter, one per title**: generated from its pret disassembly where one exists (pokered for Red/Blue,
+  pokeyellow, pokecrystal), with the same generator and verifier. The agent only talks to the adapter
+  interface, never to a game's addresses.
+
 ## 8. Agents meeting
 
 **Live info by proximity.** Agents share the Shared Map (atlas/world, `[x, y, map]` per agent in the
@@ -186,7 +195,21 @@ Only where a bottleneck is measured and the measurement is recorded in the direc
 pkmn/engine battle simulator (Zig) for lookahead and team-scoring speed, and world-view composition.
 Default stays Python. A rewrite sits behind the same interface as the module it replaces.
 
-## 11. Build order and status
+## 11. New game onboarding
+
+- **Day one in any Game Boy game**: emulator, save states, swarm, hardware perception, map memory that learns
+  walls by bumping, Go-Explore novelty.
+- **Memory discovery**: `tools/ram_discover.py` diffs RAM around events. Games with a disassembly get a
+  generated table; games without one get a draft table from discovery, verified in play.
+- **Claude as engineer for each game**: writes the adapter, the campaign goals and the shields.
+- **What transfers between games**: sprite and tile recognition trained on emulator-made labels, bandit priors
+  (advance dialog, back out of unknown menus, explore the frontier), and shields (never confirm destructive
+  prompts). What doesn't transfer: game facts such as gym teams, HM gates and par routes.
+- **Order**: Pokemon Blue (nearly free), then Yellow (one generated table), then Crystal (new engine, has a
+  disassembly), then a non-Pokemon top-down Game Boy game (first test without a disassembly).
+- **Metric**: hours from a cold start to the first goal, per game, compared with the previous game.
+
+## 12. Build order and status
 
 | Item | Status |
 |---|---|
@@ -203,17 +226,19 @@ Default stays Python. A rewrite sits behind the same interface as the module it 
 | Agent meetings (proximity, then injection, then live link) | next |
 | PC management and the remaining shields | next; after team optimisation |
 | CMA-ES swarm evolution | next; after par exists (par is its fitness signal) |
+| Pokemon Blue adapter | next |
+| New game onboarding (Yellow, Crystal, non-Pokemon) | later |
 
 Dependencies: legs/par -> World par lines, CMA-ES fitness, polish allocation. Toolkit -> NPCs, injection,
 remaining shields. Catch list -> team optimisation -> PC management. Bandit -> team-plan choice.
 
-## 12. Builder's calls (collected)
+## 13. Builder's calls (collected)
 
 Package names (`pokeagent_ramrom`, `team/`, `evolve/`); reward magnitudes; grass-tile cost; proximity
 radius (8 tiles); Q-state bucketing for the team-plan bandit; how a shield reports a blocked attempt to
 the viewer; how far ahead "HM user needed ahead" looks. Everything else here is decided.
 
-## 13. Constraints carried over
+## 14. Constraints carried over
 
 uv + Python 3.12 via `uv run`; no module over 600 lines; layers import downward; ROM and save states never
 committed; live-run gates are Claude verification steps on the laptop; merge commit, not squash.
