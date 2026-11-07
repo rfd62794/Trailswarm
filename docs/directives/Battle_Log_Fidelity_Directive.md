@@ -199,13 +199,15 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-battle-log-fidelity-directive |
 | Base branch | - |
+| Base commit | c0d89df1460cce93c4fbefad92ccb875bcc57382 |
 
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: battle log fidelity + checkpoint stamp + 0xD719 verified
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on gitignored runs/battles.jsonl evidence path
 - 2026-11-07 12:23 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on the gitignored evidence path runs/battles.jsonl; known false positive
+- 2026-11-07 12:23 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-log-fidelity-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGK973P9BJYJZ10VE74T14
 <!-- queue:end -->
