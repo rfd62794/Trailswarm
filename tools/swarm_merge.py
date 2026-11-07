@@ -146,6 +146,8 @@ def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
         for k, e in table.items():
             cur = t.setdefault(k, {"solid": 0, "walkable": 0})
             cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
+    from pokeagent.knowledge import blackout_tax
+    blackout_tax.merge_max(dst, src)  # learned blackout margins: per goal, max of steps (never summed)
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     if edits:  # brain-tools surgery: the journal is folded in AFTER merging so no agent copy can resurrect an edit
         from pokeagent.explorer.edits import apply as apply_edits

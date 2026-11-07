@@ -148,3 +148,32 @@ def test_swarm_merge_reapplies_journal(tmp_path):
     swarm.merge_memory(dst, src, edits=journal)
     assert "3,5,DOWN" not in dst["maps"]["1"]["warps"]
     assert "1:3,5,DOWN" in dst["bad_warps"]
+
+
+def test_swarm_merge_blackout_tax_is_max_per_goal(tmp_path):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    import swarm  # noqa: E402
+    dst = {"maps": {}, "blackout_tax": {"A": {"steps": 3}}}
+    src = {"maps": {}, "blackout_tax": {
+        "A": {"steps": 2},        # lower than the shared copy: the max (3) wins, never summed (5)
+        "B": {"steps": 1},        # only in the agent: copied
+        "Z": {"steps": 0},        # zero: dropped
+        "M": {"steps": "x"},      # malformed value: ignored
+        "N": 5,                   # malformed entry: ignored
+    }}
+    swarm.merge_memory(dst, src)
+    assert dst["blackout_tax"] == {"A": {"steps": 3}, "B": {"steps": 1}}
+    # the other direction: the agent's higher count replaces the shared one
+    dst2 = {"maps": {}, "blackout_tax": {"A": {"steps": 1}}}
+    swarm.merge_memory(dst2, {"maps": {}, "blackout_tax": {"A": {"steps": 4}}})
+    assert dst2["blackout_tax"] == {"A": {"steps": 4}}
+
+
+def test_mapmemory_blackout_tax_roundtrip(tmp_path):
+    maps = _write_maps(tmp_path / "maps.json", _data())
+    mem = MapMemory(maps)
+    mem.data["blackout_tax"] = {"rival_ss_anne": {"steps": 3}}
+    mem.save()
+    assert json.loads(maps.read_text())["blackout_tax"] == {"rival_ss_anne": {"steps": 3}}
+    reloaded = MapMemory(maps)
+    assert reloaded.data["blackout_tax"] == {"rival_ss_anne": {"steps": 3}}

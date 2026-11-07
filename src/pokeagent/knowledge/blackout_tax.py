@@ -71,3 +71,16 @@ def on_win(data: dict, goal: str) -> int:
     else:
         t.pop(goal, None)
     return n
+
+
+def merge_max(dst: dict, src: dict) -> None:
+    """Fold `src`'s blackout tax into `dst` per goal, keeping the MAX of steps (every agent starts from the shared
+    copy, so summing would count the base once per agent). Zero and malformed entries in `src` are dropped."""
+    st = src.get("blackout_tax") if isinstance(src, dict) else None
+    if not isinstance(st, dict):
+        return
+    for goal in st:
+        n = steps(src, goal)
+        if n <= 0:
+            continue
+        _table(dst, create=True)[goal] = {"steps": max(n, steps(dst, goal))}
