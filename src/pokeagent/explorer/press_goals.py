@@ -63,7 +63,8 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
                 write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
                 try:
-                    stamp_fingerprint(ctx.emu, cp / f"{g}.state", ctx.run_dir.name)  # statefp.stamp via the allowed layer
+                    stamp_fingerprint(ctx.emu, cp / f"{g}.state", ctx.run_dir.name,
+                                      inherit=getattr(ctx.opts, "state_path", "") or None)  # a synthetic/promoted start's lineage carries into the checkpoint
                 except Exception:  # noqa: BLE001  (a stamp failure must never lose the checkpoint)
                     pass
             except Exception as e:
