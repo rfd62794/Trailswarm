@@ -98,7 +98,9 @@ def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | 
         return
     end = run / "end.state"
     ck = root / "runs" / "checkpoints"
-    if end.exists() and not (ck / f"{seg.end}.state").exists():
+    plain = ck / f"{seg.end}.state"
+    ahead = cg.read_respawn(end) is not None and not cg.respawn_behind(seg.end, end)
+    if end.exists() and (not plain.exists() or (ahead and cg.respawn_behind(seg.end, plain))):  # or replace a respawn-behind ship state
         ck.mkdir(parents=True, exist_ok=True)
         shutil.copy(end, ck / f"{seg.end}.state")  # sub-segments get their start checkpoint from the first solve
         cg.copy_sidecar(end, ck / f"{seg.end}.state")

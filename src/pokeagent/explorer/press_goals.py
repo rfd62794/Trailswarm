@@ -46,7 +46,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
-                write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS))  # curriculum order check
+                write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
             except Exception as e:
                 ctx.log(f"[checkpoint save failed: {e!r}]", "res")
             gp = Path("runs/milestones.json")

@@ -55,6 +55,9 @@ def run(args) -> dict:
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
                                                                    bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow))
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    from pokeagent.explorer.world import SHIP_MAPS
+    ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, args.bandit_path, work / "bandit_delta.json", args.seed)

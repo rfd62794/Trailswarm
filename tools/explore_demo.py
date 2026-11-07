@@ -148,6 +148,8 @@ def main(argv=None) -> int:
     ctx.ladders = rom_ladders(a.rom)
     from pokeagent.atlas.walkgrid import rom_cave_planner
     ctx.cave_plan = rom_cave_planner(a.rom)
+    from pokeagent.explorer.world import SHIP_MAPS
+    ctx.ship_plan = rom_cave_planner(a.rom, maps=SHIP_MAPS)
     from pokeagent.atlas.collision import rom_walkable_ids
     mem.rom_walkable = rom_walkable_ids(a.rom)
     from pokeagent.atlas.collision import rom_tile_pairs

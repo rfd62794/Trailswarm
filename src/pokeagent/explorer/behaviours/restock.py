@@ -20,6 +20,8 @@ class Restock(BehaviourBase):
     def step(self, ctx: ExplorerContext) -> Decision | None:
         st = ctx.restock
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
+        if st.get("leave"):
+            return self._leave(ctx, st, m, x, y)
         balls, money = bag_contents(ctx.emu).get(rs.BALL_ID, 0), read_money(ctx.emu)
         if not st.get("intent"):
             if not rs.ball_buy_wanted(balls, money, st.get("tries", 0)) or ctx.step < st.get("next_check", 0):
@@ -43,6 +45,22 @@ class Restock(BehaviourBase):
                 return Decision(path[0], "restock_walk", f"{len(path)} steps to a Mart for Poke Balls")
             return self._end(ctx, "no route to a Mart", failed=True)
         return self._in_mart(ctx, m, x, y, money, balls)
+
+    @staticmethod
+    def _leave(ctx, st, m, x, y) -> Decision | None:
+        """The purchase is done: walk out of the Mart instead of handing the room to the frontier (2026-11-06: ~1,000 presses
+        exploring Cerulean's Mart after buying, and a re-entry from the street later - the 3<->67 loop)."""
+        st["leave_steps"] = st.get("leave_steps", 0) + 1
+        if m not in rs.MART_MAPS or st["leave_steps"] > rs.MAX_LEAVE_STEPS:
+            st["leave"], st["leave_steps"] = False, 0
+            return None
+        g = WorldGraph(ctx.mem.data["maps"])
+        g.blocked_now = frozenset(ctx.mem.temp_blocked)
+        p = g.path((m, x, y), lambda n: n[0] != m)
+        if p:
+            return Decision(p[0], "restock_leave", f"{len(p)} steps out of the Mart")
+        door_x = rs.DOOR[0]  # not mapped: every Mart has the door at (3,7), straight down column 3
+        return Decision("RIGHT" if x < door_x else "LEFT" if x > door_x else "DOWN", "restock_leave", "out of the Mart (default layout)")
 
     @staticmethod
     def _path_to(ctx, goal_fn) -> list[str] | None:
@@ -78,13 +96,14 @@ class Restock(BehaviourBase):
             st["bought"] = st.get("bought", 0) + res.bought
         else:
             st.setdefault("failed", set()).add(m)
-        st["intent"] = False
+        st["intent"], st["leave"] = False, True
         return no_press("restock_buy", f"{res.reason}: {res.bought} Poke Balls")
 
     @staticmethod
     def _end(ctx, why: str, failed: bool = False) -> Decision | None:
         st = ctx.restock
         st["intent"] = False
+        st["leave"] = ctx.view.m in rs.MART_MAPS  # ended inside a Mart: walk out first
         if failed:
             st["tries"] = st.get("tries", 0) + 1
         ctx.log(f"[restock: {why}]", "res")

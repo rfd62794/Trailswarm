@@ -212,7 +212,9 @@ def ckpt(root: Path, name: str) -> Path | None:
         p = root / "baselines" / "bedroom.state"
         return p if p.exists() else None
     d = root / "runs" / "checkpoints"
-    return next((p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state") if p.exists()), None)
+    found = [p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state") if p.exists()]
+    # a ship-segment state whose blackout lands behind Vermilion loses to one that does not (when both exist)
+    return next((p for p in found if not cg.respawn_behind(name, p)), found[0] if found else None)
 
 
 def ckpt_valid(root: Path, name: str) -> bool:

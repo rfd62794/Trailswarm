@@ -27,10 +27,34 @@ def completed_goals(goals: dict, initial: Iterable[str], order: Iterable[str]) -
     return [g for g in order if goals.get(g) or g in done]
 
 
-def write_completed(state: Path, completed: Iterable[str]) -> None:
+def write_completed(state: Path, completed: Iterable[str], respawn: int | None = None) -> None:
+    """``respawn`` = wLastBlackoutMap (0xD719) when the state was written: where a blackout from this state lands."""
     tmp = sidecar(state).with_suffix(f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps({"completed": sorted(completed)}), encoding="utf-8")
+    rec = {"completed": sorted(completed)}
+    if respawn is not None:
+        rec["respawn"] = respawn
+    tmp.write_text(json.dumps(rec), encoding="utf-8")
     os.replace(tmp, sidecar(state))
+
+
+# Segments aboard / at the S.S. Anne: a blackout must land in Vermilion (5) or beyond. Pallet 0, Viridian 1, Pewter 2 and
+# Cerulean 3 are behind it (2026-11-06: a ship segment saved with respawn 3 sent every run back to Cerulean).
+SHIP_GOALS = frozenset({"to_ss_anne", "ss_anne_2f", "rival_ss_anne", "ss_anne_captain"})
+BEHIND_VERMILION = frozenset({0, 1, 2, 3})
+
+
+def read_respawn(state: Path) -> int | None:
+    try:
+        r = json.loads(sidecar(state).read_text(encoding="utf-8")).get("respawn")
+        return r if isinstance(r, int) else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def respawn_behind(name: str, state: Path | None) -> bool:
+    """True when the checkpoint ``name`` belongs to a ship segment and its recorded respawn point is behind Vermilion
+    (a state with no record is unknown, not behind)."""
+    return state is not None and name.split("@", 1)[0] in SHIP_GOALS and read_respawn(state) in BEHIND_VERMILION
 
 
 def read_completed(state: Path) -> set[str] | None:
