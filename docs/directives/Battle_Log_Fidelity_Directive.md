@@ -199,11 +199,13 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-battle-log-fidelity-directive |
 | Base branch | - |
 | Base commit | c0d89df1460cce93c4fbefad92ccb875bcc57382 |
+| Head commit | 4e2e8ecdfafe287fc739923224cb91e64d5de6b1 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: battle log fidelity + checkpoint stamp + 0xD719 verified
@@ -211,4 +213,5 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 - 2026-11-07 12:23 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on the gitignored evidence path runs/battles.jsonl; known false positive
 - 2026-11-07 12:23 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-log-fidelity-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VGK973P9BJYJZ10VE74T14
 - 2026-11-07 12:29 · dispatcher · launched pid=2856; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-battle-log-fidelity-directive; provisioned: uv sync --frozen
+- 2026-11-07 12:38 · devin · In progress → Review — Findings: outcome_of() added in grind.py; battle.py gains build_record() (pure helper doing bl.update with all legacy keys + outcome/battle_map/end_map/stage/trainer) and computes outcome from the same trainer/won/moved_away/0xD163 values as battle_outcome; trainer_info captured before ctx.trainer_npc is cleared; PartyLog.end_battle rebuilt so before/after snapshots are independent (party_error=repr(exc) on failure, money still booked, blackouts counted outside the party try, never raises). fled is now outcome=='fled' and map is now battle_map - NO existing test disagreed with the corrected fled/map. press_goals stamps a statefp fingerprint beside every new checkpoint after write_completed, inside its own try. 0xD719 marked verified in ram_map.json (evidence) + ram_names.json (note) with the verbatim text; KNOWLEDGE.md got the RAM row and the battle-fields paragraph. NOT LITERAL (one forced deviation): the directive's verbatim `from pokeagent import statefp` inside explorer/press_goals.py fails the repo's own layering gate test_explorer_package_layering_and_size (explorer/ may import only whitelisted pokeagent.* layers; statefp is not one). Routed the identical call through new checkpoint_goals.stamp_fingerprint (allowed layer; checkpoint_goals already wraps statefp) - same args, same never-fatal placement. Also: mark_trainer entries keep position in `last`, not x/y keys, so trainer_info fills x/y from `last` to match the documented {map,x,y,pic} shape; battle_outcome's call line is byte-identical (0xD163 read a second time for outcome_of); KNOWLEDGE.md row written literally as specified (`2026-11-07: ` + verbatim evidence text, which itself starts with the date, so the cell shows the date twice). Tests: before 1407 passed/36 skipped (75.6s); after 1417 passed/36 skipped (81.6s); tests/test_battle_log_fidelity.py 10 passed. git diff --stat vs base c0d89df: KNOWLEDGE.md +11, Battle_Log_Fidelity_Directive.md 6 (dispatcher queue rows), checkpoint_goals.py +6, ram_map.json 1 line, ram_names.json 4, battle.py +30/-6, grind.py +12, party_log.py +46/-10, press_goals.py +6/-2, test_battle_log_fidelity.py +165. Sample blackout record built by the tests (asserted fields): {"start":3,"kind":2,"enemy_species":165,"turns":[],"end":15,"won":false,"map":97,"presses":12,"fled":false,"outcome":"blackout","battle_map":97,"end_map":3,"stage":"beat_brock","trainer":{"map":97,"pic":55,"x":10,"y":7},"party_before":[[153,5,135,20,20]],"party_after":[[153,5,135,20,20]],"money_before":0,"money_after":0,"potions_before":null}. [origin] spent: devin 9 min est. n/a
 <!-- queue:end -->
