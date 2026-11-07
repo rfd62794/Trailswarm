@@ -199,7 +199,7 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -207,4 +207,5 @@ how the pure record helper is wired, the sample record JSON for a blackout built
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: battle log fidelity + checkpoint stamp + 0xD719 verified
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on gitignored runs/battles.jsonl evidence path
+- 2026-11-07 12:23 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on the gitignored evidence path runs/battles.jsonl; known false positive
 <!-- queue:end -->
