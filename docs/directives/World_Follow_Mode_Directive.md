@@ -188,15 +188,18 @@ clicking empty map stops it).
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-world-follow-mode-directive |
 | Base branch | - |
 | Base commit | 142ef2444942aeadf4c5dfe94d85ee553909ce9a |
+| Head commit | 11f49142be7b92995d1b04ae4a5bde9ab0953843 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-06 21:14 · robert-claude-laptop · none → Queued
 - 2026-11-06 21:15 · robert-claude-laptop · Queued → Approved — lint override: follow.py and tests/test_world_follow.py are new files this directive creates (greenfield false positive)
 - 2026-11-06 21:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6SWMY1ANRG5X42PVQJN0YQZ
 - 2026-11-06 21:25 · dispatcher · launched pid=6980; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-world-follow-mode-directive; provisioned: uv sync --frozen
+- 2026-11-06 21:29 · devin · In progress → Review — [origin] spent: devin 3 min est. n/a
 <!-- queue:end -->
