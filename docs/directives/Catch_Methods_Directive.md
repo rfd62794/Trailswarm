@@ -193,7 +193,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -202,4 +202,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:19 · robert-claude-laptop · none → Draft — Claude 2026-11-07: Gen 1 capture formula, catch policy, damaging-catcher rule; depends on Team_Builder_V2
 - 2026-11-07 15:20 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; depends on Team_Builder_V2 merging first; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/baselines paths
 - 2026-11-07 15:52 · robert-claude-laptop · Queued → Draft — Claude: amend with Robert's hard rule (wild only, never catch an owned/trainer Pokemon)
+- 2026-11-07 15:52 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; wild-only hard rule added; depends on Team_Builder_V2; lint_override: dispatch-path-missing greenfield/gitignored
 <!-- queue:end -->
