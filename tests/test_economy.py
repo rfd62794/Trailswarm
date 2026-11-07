@@ -10,7 +10,7 @@ from pokeagent.emulator import Button, FakeEmulator
 from pokeagent.explorer import party_log, shop
 from pokeagent.explorer.behaviours import Restock
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp, wants_topup
-from pokeagent.explorer.economy import atlas, budget, hp_stats, ledger, outside_use, prices, shopping
+from pokeagent.explorer.economy import atlas, budget, floor, hp_stats, ledger, outside_use, prices, shopping
 from pokeagent.explorer.economy.bundles import candidate_bundles
 from pokeagent.explorer.economy.prices import ESCAPE_ROPE, NUGGET, POKE_BALL, POTION
 from pokeagent.legs import grid as G
@@ -29,22 +29,63 @@ def lst(money, bag=None, **kw):
 
 
 # ---- shopping list ----
-def test_priority_balls_then_potion_floor_then_rope_then_more_potions():
+def test_priority_balls_then_potion_floor_then_rope():
     plenty = lst(20000, cave=True)
     assert [i for i, _ in plenty] == [POKE_BALL, POTION, ESCAPE_ROPE]
-    assert dict(plenty) == {POKE_BALL: 10, POTION: 3, ESCAPE_ROPE: 1}
+    assert dict(plenty) == {POKE_BALL: 10, POTION: 2, ESCAPE_ROPE: 1}  # PARTY max HP 30: the default loss caps at 30 HP = 2 Potions
     tight = lst(2500)  # reserve 300 + 625: 1575 spendable: 7 balls eat it all before any potion
     assert tight == [(POKE_BALL, 7)]
     no_need = lst(20000, needs_balls=False)
     assert POKE_BALL not in dict(no_need)
 
 
-def test_potions_are_sized_by_the_expected_hp_loss():
+def test_potions_are_sized_by_the_expected_hp_loss_and_capped():
     stats = hp_stats.HpStats(overall=[10, 600])
-    big = shopping.shopping_list({}, {POTION: 3}, 20000, [[1, 30, 0, 200, 200]], stats, needs_balls=False, cave=False)
-    assert big == [(POTION, 7)]  # 5 fights x 60 HP = 300 HP = 15 potions, capped at 10, minus the 3 carried
+    big = shopping.shopping_list({}, {POTION: 1}, 20000, [[1, 30, 0, 200, 200]], stats, needs_balls=False, cave=False)
+    assert big == [(POTION, 2)]  # 5 fights x 60 HP = 300 HP = 15 Potions, capped at the floor cap of 3, minus the 1 carried
     thin = shopping.shopping_list({}, {}, 20000, [[1, 30, 0, 200, 200]], None, needs_balls=False, cave=False)
-    assert thin == [(POTION, 3)]  # no data: the default loss gives the floor
+    assert thin == [(POTION, 3)]  # no data: 5 x 12 HP = 60 HP = 3 Potions
+    quiet = hp_stats.HpStats(overall=[10, 30])
+    assert shopping.shopping_list({}, {}, 20000, [[1, 30, 0, 200, 200]], quiet, needs_balls=False, cave=False) == [(POTION, 1)]
+    assert shopping.shopping_list({}, {POTION: 1}, 20000, [[1, 30, 0, 200, 200]], quiet, needs_balls=False, cave=False) == []
+
+
+# ---- the potion floor ----
+def test_floor_is_one_to_three_potions():
+    quiet, rough = hp_stats.HpStats(overall=[10, 10]), hp_stats.HpStats(overall=[10, 900])
+    party = [[1, 30, 0, 79, 79]]
+    assert floor.potion_floor(quiet, party, None) == floor.FLOOR_MIN == 1
+    assert floor.potion_floor(rough, party, None) == floor.FLOOR_CAP == 3
+    assert floor.potion_floor(rough, party, None, scale=0.0) == 1
+
+
+def test_a_single_potion_trip_is_worth_it_only_with_an_empty_bag():
+    one = [(POTION, 1)]
+    assert shopping.cost(one) < shopping.MIN_TRIP_YEN
+    assert shopping.trip_worth(one, {}) and not shopping.trip_worth(one, {POTION: 1})
+    assert not shopping.trip_worth([(POKE_BALL, 1)], {})
+
+
+def test_marts_selling_skips_the_vermilion_mart_for_potions():
+    marts = frozenset({42, 56, 67, 91})
+    stock = {42: [4, 11], 56: [4, 20], 67: [4, 20], 91: [4, 19, 13]}
+    sells = lambda i, m: i in stock[m]  # noqa: E731
+    assert floor.marts_selling([(POTION, 3)], marts, sells) == {56, 67}
+    assert floor.marts_selling([(POKE_BALL, 10), (POTION, 3)], marts, sells) == marts
+    assert floor.marts_selling([(POTION, 1)], frozenset({91}), sells) == frozenset()
+
+
+def test_restock_does_not_walk_into_a_mart_that_lacks_the_potion(tmp_path, monkeypatch):
+    stock = {91: [4, 19]}
+    monkeypatch.setattr(prices, "stocked", lambda i, m: i in stock.get(m, [i]))
+    monkeypatch.setattr(floor, "stocked", prices.stocked)
+    monkeypatch.setattr(shopping, "ball_need", lambda goals: False)
+    monkeypatch.setattr(shopping, "cave_ahead", lambda goals: False)
+    ctx = make_ctx(tmp_path, 1, 11258, m=91, x=3, y=7)
+    ctx.restock["stats_path"] = str(tmp_path / "none.jsonl")
+    ctx.goals = lambda: {"beat_brock": True, "beat_misty": True, "deliver_parcel": True}
+    assert Restock().step(ctx) is None and not ctx.restock.get("intent")  # the bag is empty and money is 11,258, but 91 has no Potion
+    assert ctx.shop_intent is None
 
 
 def test_reserve_is_never_breached():
