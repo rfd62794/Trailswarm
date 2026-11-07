@@ -203,3 +203,12 @@ Caveats: `won` in battle records means we survived, so a fled wild fight counts 
 record holds only the last enemy mon, so a multi-mon trainer is under-counted. Prefer `exp_gained` when present.
 
 - Trainer "Will <name> change POKeMON?" (YES/NO, after our kill, before their next mon): YES opens "Bring out which POKeMON?" with the cursor on slot 0 = the mon already fighting, and A there answers "<name> is already out!" (2026-11-07: 1,564 of 1,566 such loops in runs 11-06/11-07 began at this prompt). Always answer NO (dialog.YESNO_RULES). wPlayerMonNumber (0xCC2F) is read via intervene.screen.active_slot, which cross-checks it against wBattleMon species.
+
+**Gen 1 money and Mart stock (measured 2026-11-07, `runs/battles.jsonl` records with `money_before`/`money_after`).** Of 406
+money-bearing trainer records, 220 were wins and 218 of those paid (the other 2 paid 0); no run was paid twice by the same
+map + lead-enemy pair (0 repeats), so trainer prizes are one-time. Wild fights do not pay (3 of 322 changed money, all other
+causes). Blackouts could not be measured: the 8 lost-fight records in the file predate the money fields and 0 of the 713
+money-bearing records is a blackout; the halving rule (`budget.blackout_cost`, pokered `ResetStatusAndHalveMoneyOnBlackout`) is
+unverified in our data until `runs/economy.json` `blackouts.yen` fills. Mart stock read live (`stock_seen`): Pewter 56 and Cerulean
+67 sell Potion (0x14); Viridian 42 and Vermilion 91 do not (Vermilion: Poke Ball, Super Potion, Ice Heal, Awakening, Parlyz Heal,
+Repel); the battle and field item policies only ever use Potion, never Super Potion.
