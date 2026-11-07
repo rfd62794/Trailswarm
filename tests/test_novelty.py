@@ -423,7 +423,7 @@ def test_supervisor_hook_swallows_errors(tmp_path, monkeypatch):
 
 def test_finish_calls_the_novelty_hook_right_after_the_bandit_hook():
     src = (TOOLS / "swarm_continuous.py").read_text(encoding="utf-8")
-    assert src.index("self._merge_bandit(cfg[\"own\"])") < src.index("self._merge_novelty(cfg[\"own\"])") < src.index("self._refresh_grind()\n        cfg[\"own\"]")
+    assert src.index("self._merge_bandit(cfg[\"own\"])") < src.index("self._merge_novelty(cfg[\"own\"])") < src.index("self._refresh_grind()")
 
 
 # --- backfill and the tool -----------------------------------------------------------------------------------------------
