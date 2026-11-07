@@ -60,7 +60,7 @@ This directive replaces "the Gyarados is the plan" with "a value-ranked catch pl
 - **Pokedex gate thresholds are NOT verified in this repo** (the only recorded one is 10, from the `route2_gate` note). They are a constant `DEX_GATES = (10, 30, 50)` with the comment "thresholds to verify on the ROM; candidates
   10, 30, 50 (Oak's aides); only 10 is recorded in campaign.json". Do not claim more. The controller verifies them on the ROM later and edits the constant.
 - `grind/atlas.py::prior_xp(row, base_exp)` = expected XP per wild encounter on a map for ONE participant (no sharing). Measured on the live tables today: Route 1 23, Route 2 28, Route 22 26, Viridian Forest 38,
-  Route 3 51, Route 24 96, Route 6 130. `explorer/economy/hp_stats.py` is an HP-LOSS statistic, NOT an XP source: do not use it for XP. The fixed fallback when no map table is available is
+  Route 3 51, Route 24 96, Route 6 130. `src/pokeagent/explorer/economy/hp_stats.py` is an HP-LOSS statistic, NOT an XP source: do not use it for XP. The fixed fallback when no map table is available is
   `XP_PER_FIGHT_FALLBACK = 40` (a named constant; roughly the Route 2-3 range), halved for a switched-out trainee (Gen 1 splits experience among participants).
 - Experience still needed, from `exp_for_level` on the live growth groups: SLOW (Magikarp) L13 -> L20 = 7,254 XP; MEDIUM_SLOW (starters, Oddish, Nidoran) L1 -> L16 = 2,535 XP.
   `species_by_dex`: MAGIKARP base_exp 20, SLOW; GYARADOS base_exp 214, SLOW, WATER/FLYING; NIDORAN(M) 60, MEDIUM_SLOW; NIDORAN(F) 59; PIKACHU 82, MEDIUM_FAST; CATERPIE 53, MEDIUM_FAST; PARAS 70, MEDIUM_FAST;
@@ -311,7 +311,7 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -319,4 +319,5 @@ the plan output on the section 2 fixture (ranked actions with value / steps / sc
 **Status log**
 - 2026-11-07 15:16 · robert-claude-laptop · none → Draft — Claude 2026-11-07: value-ranked catch plan, Pokedex objective, team_ready gate (supersedes Team_Builder_Directive draft)
 - 2026-11-07 15:17 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on greenfield modules/tests and gitignored kb/ evidence paths
+- 2026-11-07 15:17 · robert-claude-laptop · Queued → Draft — Claude: lint path fix (hp_stats full path)
 <!-- queue:end -->
