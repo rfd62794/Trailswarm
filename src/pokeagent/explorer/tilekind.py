@@ -112,9 +112,15 @@ def item_tiles(memory_map: dict) -> dict:
 
 def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
              x: int, y: int, block, npcs_here, trainers, items=None, strict: bool = True) -> str:
-    """The legend kind for tile (x,y), by precedence: trainer > item > npc > warp > ledge > object > wall >
-    encounter > grass > interaction > walkable > unknown. ``items`` is a set/dict of item-ball tiles
-    (``item_tiles`` for Remembers, live sprite positions for Sees); None means none are known."""
+    """The legend kind for tile (x,y), by precedence: override > trainer > item > npc > warp > ledge >
+    object > wall > encounter > grass > interaction > walkable > unknown. A ``tile_kind`` journal
+    edit lands in ``memory_map["tile_overrides"]["x,y"]`` and wins over everything. ``items`` is a
+    set/dict of item-ball tiles (``item_tiles`` for Remembers, live sprite positions for Sees);
+    None means none are known."""
+    d = memory_map or {}
+    override = (d.get("tile_overrides") or {}).get(f"{x},{y}")
+    if override:
+        return override
     p = (x, y)
     trainer = trainers.get(p) if hasattr(trainers, "get") else None
     if trainer is not None:
@@ -123,7 +129,6 @@ def classify(memory_map: dict, tile_types: dict, grass_ids: dict, tileset: int,
         return "item"
     if p in (npcs_here or ()):
         return "npc"
-    d = memory_map or {}
     if _prefix_hit(d.get("warps", {}), x, y):
         return "warp"
     if ledge_dir(d, x, y) is not None:

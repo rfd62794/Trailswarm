@@ -11,6 +11,8 @@ from pokeagent.mcp_server import _Tools, build_server
 TOOL_NAMES = {
     "press", "wait", "state", "screenshot", "peek", "snapshot", "diff",
     "save_state", "load_state", "pause", "resume", "note", "explore",
+    "brain_maps", "brain_map", "brain_tile", "brain_find",
+    "brain_diff", "brain_lessons", "brain_edit", "brain_undo",
     # live-agent intervention tools (pokeagent.intervene.mcp_tools)
     "agents_digest", "agent_show", "agent_hold", "agent_release", "agent_macro", "agent_nudge",
 }

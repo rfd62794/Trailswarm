@@ -21,7 +21,7 @@ import os
 import sys
 from pathlib import Path
 
-from pokeagent import cli_hex
+from pokeagent import cli_brain, cli_hex
 from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
@@ -209,6 +209,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_world(sub)
 
     cli_hex.register(sub)
+    cli_brain.register(sub)
     return parser
 
 

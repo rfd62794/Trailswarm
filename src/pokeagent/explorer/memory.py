@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from pokeagent.explorer import items, legend, tilekind
+from pokeagent.explorer import edits, items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
 from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
 from pokeagent.explorer.memory_tiles import TilesMixin
@@ -28,8 +28,9 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
     False so its maps.json gains no new key.
     """
 
-    def __init__(self, path: Path | str, *, record_paths: bool = True):
+    def __init__(self, path: Path | str, *, record_paths: bool = True, edits_path: Path | str | None = None):
         self.path = Path(path)
+        self.edits_path = Path(edits_path) if edits_path is not None else edits.journal_path_for(self.path)
         self.record_paths = record_paths
         self.data = json.loads(self.path.read_text()) if self.path.exists() else {"maps": {}}
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
@@ -40,6 +41,14 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         self.purge_bad_warps()
         self.purged_npc_walls = purge_npc_walls(self.data)  # false walls learned against wandering NPCs
         self.purged_enclosed_walls = purge_enclosed_walls(self.data)  # ... and behind a full-screen page
+        self.apply_edits()
+
+    def apply_edits(self) -> int:
+        """Fold the edit journal into memory; returns the record count. Called on load, via the
+        ``reload_edits`` control command, and inside ``save()`` so stale memory cannot revert surgery."""
+        journal = edits.read_journal(self.edits_path)
+        self.data = edits.apply(self.data, journal)
+        return len(journal)
 
     def purge_bad_warps(self):
         """Warps listed in data['bad_warps'] ('map:x,y,DIR') were learned from forced walks (Oak's escort) and do not
@@ -281,6 +290,7 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
             e["best"] = presses_to_goal
 
     def save(self):
+        self.apply_edits()  # the journal is re-applied on top of whatever this process learned
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".json.tmp")  # atomic replace: a kill mid-write cannot corrupt the memory

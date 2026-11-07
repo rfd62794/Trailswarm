@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-def merge_memory(dst: dict, src: dict) -> dict:
+def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
     for mid, s in src.get("maps", {}).items():
         d = dst.setdefault("maps", {}).setdefault(mid, {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
         for k, n in s.get("visited", {}).items():
@@ -147,6 +147,9 @@ def merge_memory(dst: dict, src: dict) -> dict:
             cur = t.setdefault(k, {"solid": 0, "walkable": 0})
             cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    if edits:  # brain-tools surgery: the journal is folded in AFTER merging so no agent copy can resurrect an edit
+        from pokeagent.explorer.edits import apply as apply_edits
+        apply_edits(dst, edits)
     return dst
 
 
@@ -191,9 +194,10 @@ def merge_lock(shared: Path, wait_s: float = 30.0):
 
 def merge_file_into(shared: Path, own: Path) -> dict:
     """Merge one agent memory file into ``shared`` under the merge lock, write atomically, return the result."""
+    from pokeagent.explorer.edits import journal_path_for, read_journal
     with merge_lock(shared):
         dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
-        merge_memory(dst, json.loads(own.read_text()))
+        merge_memory(dst, json.loads(own.read_text()), edits=read_journal(journal_path_for(shared)))
         tmp = shared.with_suffix(".json.tmp")
         replace_durably(tmp, json.dumps(dst, indent=1), shared)
     return dst

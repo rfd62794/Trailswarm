@@ -207,6 +207,8 @@ def main() -> int:
     swarm_dir = ROOT / "runs" / "swarm"; swarm_dir.mkdir(parents=True, exist_ok=True)
 
     if not a.merge_only:
+        from pokeagent.explorer.edits import JOURNAL_NAME
+        journal = ROOT / "runs" / JOURNAL_NAME
         stack = contextlib.ExitStack(); atexit.register(stack.close)
         try:  # one swarm at a time: two racing swarms would both read "room for N" and overshoot the cap
             stack.enter_context(resources.spawn_lock(ROOT, wait_s=30))
@@ -223,6 +225,8 @@ def main() -> int:
             own = swarm_dir / f"agent{i}.json"
             if shared.exists():
                 shutil.copy(shared, own)
+            if journal.exists():  # agents fold the same surgery into their own copies on load
+                shutil.copy(journal, own.parent / JOURNAL_NAME)
             starter = a.starter or ["bulbasaur", "charmander", "squirtle"][i % 3]
             role_args: list[str] = []
             role = ""
