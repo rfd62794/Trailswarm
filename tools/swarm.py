@@ -27,6 +27,7 @@ PORT_BASE = int(os.environ.get("POKEAGENT_SWARM_PORT_BASE", 8800))  # scratch sw
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pokeagent import resources  # noqa: E402
+from pokeagent.legs import drill_fold, schedule as legs_schedule  # noqa: E402
 from pokeagent.agent_registry import list_agents  # noqa: E402
 from swarm_proc import TreeProc  # noqa: E402
 import swarm_handoff  # noqa: E402
@@ -55,6 +56,11 @@ def job_args(job: dict) -> list[str]:
     return ["--state", job["start"], *job["stop"], "--tag", job["tag"]]
 
 
+def drill_args(drill: dict) -> list[str]:
+    """A leg drill (legs.schedule.pick): re-run one leg from its saved entry state."""
+    return ["--drill-leg", drill["leg"], "--state", drill["state"]]
+
+
 def weakest_segment(n: int) -> str | None:
     """The n-th refill takes the next-weakest goal (consistency < 70%); None when everything is consistent."""
     try:
@@ -71,7 +77,8 @@ class Launcher:
     """Starts one headless explore_demo per config; picks a control port nobody (registry or this swarm) uses."""
 
     def __init__(self, share_frames: bool, roles_mode: bool = False, ram_diff_slots: int = 0, port_base: int | None = None,
-                 bandit_slots: int = 0, par_from: int | None = None, novelty: bool = False):
+                 bandit_slots: int = 0, par_from: int | None = None, novelty: bool = False, save_leg_states: bool = False):
+        self.save_leg_states = save_leg_states  # --save-leg-states: every agent saves a state on each calm map entry (runs/legs/states)
         self.share_frames, self.roles_mode, self.handles = share_frames, roles_mode, []
         self.novelty = novelty  # --novelty: every slot counts global novelty and logs discoveries; only explorer-role slots are paid
         self.par_from = par_from  # slots >= par_from run --par-follow (the top slots, so a bandit A/B on the bottom slots stays separate)
@@ -101,8 +108,8 @@ class Launcher:
     def __call__(self, cfg: dict):
         role_args = ["--explore-rate", str(cfg["explore_rate"]) if "explore_rate" in cfg
                      else "0.5" if cfg["role"] == "explorer" else "0.0"]
-        job = cfg.get("job")
-        if cfg["role"] in ("trainer", "explorer") and self.roles_mode and not job:
+        job, drill = cfg.get("job"), cfg.get("drill")
+        if cfg["role"] in ("trainer", "explorer") and self.roles_mode and not job and not drill:
             ck = ROOT / "runs" / "checkpoints"
             start = next((p for p in (ck / "team_best.state", ck / "to_route1.state") if p.exists()), None)
             if start:
@@ -110,7 +117,7 @@ class Launcher:
         port = self._port()
         cmd = [sys.executable, str(ROOT / "tools" / "explore_demo.py"), "--headless", "--steps", str(cfg["steps"]),
                "--maps", str(cfg["own"]), "--seed", str(cfg["seed"]), "--starter", cfg["starter"], "--control-port", str(port),
-               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + self._bandit_args(cfg) + self._par_args(cfg) + self._novelty_args(cfg) + role_args + (job_args(job) if job else segment_args(cfg["segment"]))
+               "--box-pace", str(cfg["box_pace"])] + (["--frame-share"] if self.share_frames else [])               + (["--ram-diff"] if cfg["slot"] < self.ram_diff_slots else []) + self._bandit_args(cfg) + self._par_args(cfg) + self._novelty_args(cfg) + role_args + (drill_args(drill) if drill else job_args(job) if job else segment_args(cfg["segment"])) + (["--save-leg-states"] if self.save_leg_states else [])
         log = (ROOT / "runs" / "swarm" / f"agent{cfg['slot']}.log").open("a")
         h = TreeProc(cmd, port, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
         self.handles = [x for x in self.handles if x.poll() is None] + [h]
@@ -175,11 +182,12 @@ def run_continuous(a) -> int:
         room, _mx, _live = resources.headroom(ROOT, extra_live=pending)
         return sup[0].running() + room
 
-    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base, bandit_slots(a, n), par_from(a, n), a.novelty), merge_file_into, limit, steps=a.steps,
+    sup.append(sc.Supervisor(ROOT, shared, n, Launcher(a.share_frames, a.roles, a.ram_diff_slots, a.port_base, bandit_slots(a, n), par_from(a, n), a.novelty, a.save_leg_states), merge_file_into, limit, steps=a.steps,
                              starter=a.starter, roles=roles, segment=segment, stop_now=a.stop_now,
                              deadline=time.monotonic() + a.duration * 3600 if a.duration else None,
                              firsts=lambda: sc.goal_firsts(ROOT), heartbeat=touch_lock, watch=make_watch, on_stall=record_stall,
-                             segment_ok=lambda g: bool(segment_args(g)), plan=plan))
+                             segment_ok=lambda g: bool(segment_args(g)), plan=plan,
+                             drills=a.drills, drill_pick=lambda k: legs_schedule.pick(ROOT, k), on_drill=lambda _d: drill_fold.fold_file(ROOT / "runs" / "legs.json", ROOT / "runs" / "legs" / "drills.jsonl")))
     if adopted is not None:
         sup[0].adopt(adopted)
         swarm_handoff.adopt_path(ROOT / "runs" / "swarm", os.getpid()).unlink(missing_ok=True)
@@ -206,6 +214,9 @@ def main() -> int:
                     help="--continuous: curriculum = pick each slot's segment by need (tools/segments.py shows the table)")
     ap.add_argument("--segment", default=None,
                     help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
+    ap.add_argument("--drills", type=float, default=0.0, metavar="F",
+                    help="--continuous: this fraction of refills drill the worst leg (runs/legs.json waste ranking, legs with a saved entry state) instead of a segment; 0 = off")
+    ap.add_argument("--save-leg-states", action="store_true", help="--continuous: agents save a state on each calm map entry (runs/legs/states) for the drills")
     ap.add_argument("--roles", action="store_true",
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     ap.add_argument("--starter", choices=["bulbasaur", "charmander", "squirtle"], default=None,

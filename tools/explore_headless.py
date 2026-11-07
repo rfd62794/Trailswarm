@@ -27,6 +27,7 @@ from pokeagent.explorer.press import Presser  # noqa: E402
 from pokeagent.explorer.seeding import idle_frames  # noqa: E402
 from pokeagent.explorer.text_pace import prompt_waiting  # noqa: E402
 from pokeagent.goals import check_goals  # noqa: E402
+from pokeagent.legs import attach as legs_attach  # noqa: E402
 from pokeagent.segment_names import state_goal  # noqa: E402
 
 
@@ -35,6 +36,10 @@ FRAMES_PER_STEP, BOX_PACE = 4, 6  # explore_demo --headless: decisions every 4 f
 
 def run(args) -> dict:
     random.seed(args.seed)
+    drill_plan = legs_attach.plan(args.drill_leg, args.drill_grind, args.drill_steps, args.leg_states_dir, args.rom,
+                                  args.state if args.state != "baselines/bedroom.state" else None)
+    if drill_plan:
+        args.state, args.steps = str(drill_plan.state), drill_plan.steps + 2
     work = Path(tempfile.mkdtemp(prefix="headless-"))
     if args.maps_copy:
         import shutil
@@ -58,6 +63,8 @@ def run(args) -> dict:
                                                                    role=args.role, novelty=args.novelty, novelty_path=args.novelty_path))
     from pokeagent.atlas.walkgrid import rom_cave_planner
     from pokeagent.explorer.world import SHIP_MAPS
+    legs_attach.attach(ctx, drill_plan, args.save_leg_states, args.leg_states_dir, args.state, drills_log=args.drills_log or work / "drills.jsonl",
+                       grind_log=args.grind_drills_log or work / "grind_drills.jsonl")  # a check never writes the shared logs
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
         from pokeagent.bandit.driver import attach
@@ -126,7 +133,7 @@ def run(args) -> dict:
            "frames_per_page": round(m["box_frames"] / max(1, m["pages"]), 1),
            "option_byte": emu.read(0xD355), "hp_end": [emu.read(0xD16D), emu.read(0xD18E)], "map_end": emu.read(0xD35E), "text_speed": mem.data.get("text_speed"), "types": types,
            "retalked_info_or_sign": retalk, "stats": stats, "goals": [g for g, v in check_goals(emu, ctx).items() if v], "goal_steps": dict(ctx.goal_steps), "starter_species": emu.read(0xD16B),
-           "pace": mem.data.get("text_pace"), "work": str(work)}
+           "pace": mem.data.get("text_pace"), "drill_result": getattr(ctx.drill, "result", None), "leg_states_saved": getattr(ctx.leg_saver, "saved", 0), "work": str(work)}
     emu.close()
     return out
 
@@ -150,6 +157,7 @@ def main(argv=None) -> int:
     ap.add_argument("--novelty", action="store_true", help="novelty tracking on (reads --novelty-path; delta and discoveries stay in the work dir)")
     ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start (read-only here)")
     ap.add_argument("--verbose", action="store_true")
+    legs_attach.add_args(ap)
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
     return 0
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 BAND = 4
+DRILL_GOAL = "drill"   # goal tag of battles fought in a drill run (meta.json "drill"); pooled() still counts them
 FIELDS = ("n", "wins", "blackouts", "presses", "hp_lost", "xp_sum", "xp_n")
 
 
@@ -78,7 +79,7 @@ def fold(stats: dict, rec: dict, run_meta: dict, name_of=None, estimates: dict |
         xp = xp[0] if xp else None
     if xp is None and estimates:
         xp = estimates.get((rec.get("run"), rec.get("start")))
-    goal = str(run_meta.get("stop_at_goal") or "")
+    goal = DRILL_GOAL if run_meta.get("drill") else str(run_meta.get("stop_at_goal") or "")  # drill battles are tagged
     for s in {sp, None}:
         stats.setdefault((s, band(lvl), int(rec["map"]), goal), Obs()).add(rec, xp)
 

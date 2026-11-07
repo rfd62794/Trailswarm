@@ -185,6 +185,10 @@ class Presser:
             except Exception as e:
                 ctx.log(f"[anomaly monitor failed: {e!r}]", "res")
         write_transition(ctx, fr)
+        if ctx.leg_saver is not None:
+            ctx.leg_saver.observe(ctx, fr)  # never raises
         if record_goals(ctx, fr):
             return
+        if ctx.drill is not None and ctx.drill.observe(ctx, fr):
+            return  # the drill ended (drill_result is in meta.json); ctx.done is set
         log_press(ctx, fr)

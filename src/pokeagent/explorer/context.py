@@ -41,6 +41,7 @@ class ExplorerOptions:
     novelty_runs: str = "runs"  # the runs directory the discovery log and its review saves go under
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
+    drill_grind: int | None = None  # grind drill: the map id whose grass the GrindDrill behaviour paces (pokeagent.grind.drill)
     par_follow: bool = False  # plan_goal's route is walked along the ROM par path (pokeagent.explorer.par_follow)
 
 
@@ -65,6 +66,8 @@ class ExplorerContext:
     log: Callable[..., None] = lambda text, tag=None: None
     run_dir: Path = Path(".")
     anomalies: Any = None  # explorer.anomalies.AnomalyMonitor (None = anomaly detection off)
+    leg_saver: Any = None  # legs.states.LegStateSaver (--save-leg-states): saves a state on each calm map entry
+    drill: Any = None  # legs.drill.DrillMonitor / grind.drill.GrindDrillMonitor: ends a drill run and records drill_result
     ram_diff: Any = None  # explorer.ram_diff.RamDiffer (None = event RAM diffs off)
     trans: Any = None  # open transitions.jsonl handle (the demo's per-press log)
     # --- the old st dict, field by field (defaults are what the old st.get(..., default) calls used) ---
