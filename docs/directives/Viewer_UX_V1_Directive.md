@@ -167,4 +167,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; entry-point mentions reworded; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 16:27 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on gitignored kb/rom_tables.json, runs/anomalies.jsonl and the new tests/test_viewer_stadium_pane.py; known false positives. Entry-point mentions reworded. Dependency fix/stadium-opponent merged as PR #149.
 - 2026-11-07 16:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-ux-v1-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VYJD6XMRJQBXSNCYPZ2EJW
+- 2026-11-07 16:31 · dispatcher · launched pid=276; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-ux-v1-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
