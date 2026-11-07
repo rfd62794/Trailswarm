@@ -175,4 +175,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:43 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests/fixtures and gitignored runs/kb paths
 - 2026-11-07 15:56 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing / verification-path-missing on greenfield modules, tests and fixtures under tests/fixtures/review/ and gitignored runs/ and kb/ evidence paths; known false positives.
 - 2026-11-07 15:57 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-review-replay-tools-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VWTFEZXNH4N3917D3J69VD
+- 2026-11-07 16:03 · dispatcher · launched pid=2800; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-review-replay-tools-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
