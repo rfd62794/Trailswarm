@@ -58,7 +58,7 @@ def read(state: Path) -> dict | None:
     try:
         fp = json.loads(sidecar(state).read_text(encoding="utf-8"))
         return fp if isinstance(fp, dict) else None
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
 
 

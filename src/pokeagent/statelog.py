@@ -21,7 +21,7 @@ RESPAWN_RANK = {0: 0, 1: 1, 2: 2, 3: 3, 5: 4}
 RETIRED_DIR = Path("runs/retired")
 # What a corrupt-but-valid-JSON fingerprint raises when a field has the wrong type or shape: such an entry is stale or
 # non-matching, never an error that escapes select() (ckpt() runs inside the swarm scheduler).
-CORRUPT = (TypeError, IndexError, ValueError, KeyError, ZeroDivisionError)
+CORRUPT = (ArithmeticError, TypeError, IndexError, ValueError, KeyError)  # ArithmeticError: ZeroDivision, Overflow
 
 
 @dataclass(frozen=True)
@@ -145,9 +145,9 @@ def select(items: list[Entry], want: Want) -> Entry | None:
     """The best fresh entry satisfying ``want``'s hard filters, ranked (power if strongest, mtime) descending; else None."""
     best, best_key = None, None
     for e in items:
-        if status(e) != "fresh" or not _kept(e, want):
-            continue
         try:
+            if status(e) != "fresh" or not _kept(e, want):
+                continue
             key = (_power(e.fp) if want.strongest else 0.0, e.mtime)
         except CORRUPT:
             continue

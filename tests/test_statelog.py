@@ -237,3 +237,22 @@ def test_retire_missing_path_is_an_error(tmp_path, capsys, monkeypatch):
     assert not (tmp_path / "runs" / "retired").exists()
     with pytest.raises(FileNotFoundError):
         statelog.retire(tmp_path / "nope.state", "x", retired_dir=tmp_path / "r")
+
+
+def test_huge_int_party_and_deep_sidecar_never_raise(tmp_path):
+    """json accepts a 400-digit int: party_hp_fraction/_power then raise OverflowError, and a deeply nested sidecar
+    raises RecursionError in json.loads. Both must degrade to stale/unreadable, never escape select or pick."""
+    good = saved(tmp_path, "g.state", world(hp=79), 1000)
+    huge = saved(tmp_path, "h.state", world(hp=79), 3000)                    # newest: would win if kept
+    fp = statefp.read(huge)
+    fp.update(party=[[1, 10 ** 400, 1, 1]])
+    statefp.write(huge, fp)
+    es = statelog.entries(tmp_path)
+    assert statelog.status(next(e for e in es if e.path == huge)) == "stale"
+    for want in (statelog.Want(), statelog.Want(strongest=True), statelog.Want(min_hp=0.5)):
+        assert statelog.select(es, want).path == good
+        assert statelog.pick(tmp_path, want) == good
+    deep = saved(tmp_path, "d.state", world(hp=79), 4000)
+    statefp.sidecar(deep).write_text("[" * 200000, encoding="utf-8")          # RecursionError inside json.loads
+    assert statefp.read(deep) is None
+    assert statelog.select(statelog.entries(tmp_path), statelog.Want()).path == good
