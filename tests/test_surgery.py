@@ -195,6 +195,46 @@ def test_unknown_or_empty_edits_raise_and_a_failing_edit_writes_nothing():
     assert surgery.apply(emu, {"money": 1234, "respawn": 5}) == []                 # only changed bytes are returned
 
 
+@pytest.mark.parametrize("edits", [
+    {"give": [(0x14, 1)], "take": [(0x13, 1)]},
+    {"heal": True, "set_hp": {0: 5}},
+    {"heal": True, "set_level": {0: 20}},
+    {"set_hp": {0: 5}, "set_level": {0: 20}},
+])
+def test_conflicting_pairs_raise_and_write_nothing(edits):
+    emu = world()
+    _stock(emu, [(0x14, 50), (0x13, 20)])
+    snap = dict(emu.memory)
+    with pytest.raises(surgery.SurgeryError, match="sequential edits"):
+        surgery.apply(emu, edits, base_stats=lambda s: BASE)
+    assert emu.memory == snap
+
+
+@pytest.mark.parametrize("edits", [{"money": True}, {"set_hp": {0: True}}, {"set_level": {0: True}}])
+def test_bool_values_are_refused_as_numbers(edits):
+    emu = world()
+    snap = dict(emu.memory)
+    with pytest.raises(surgery.SurgeryError):
+        surgery.apply(emu, edits, base_stats=lambda s: BASE)
+    assert emu.memory == snap
+
+
+def test_give_only_and_take_only_still_apply_alone():
+    emu = world()
+    _stock(emu, [(0x14, 50)])
+    surgery.apply(emu, {"give": [(0x14, 10)]})
+    assert read_bag(emu) == [(0x14, 60)]
+    surgery.apply(emu, {"take": [(0x14, 60)]})
+    assert read_bag(emu) == []
+
+
+def test_state_edit_refuses_conflicting_flags_with_exit_2(tmp_path, monkeypatch):
+    src = _edit_main(tmp_path, monkeypatch)
+    out = tmp_path / "out.state"
+    assert state_edit.main([str(src), "--out", str(out), "--give", "0x14:1", "--take", "0x13:1"]) == 2
+    assert not out.exists()
+
+
 # --- 9. tools/state_edit.py ------------------------------------------------------------------------------------
 def _edit_main(tmp_path, monkeypatch):
     src = tmp_path / "in.state"

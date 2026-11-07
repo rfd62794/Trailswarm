@@ -87,7 +87,7 @@ def _set_hp(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
     for slot, hp in spec.items():
         if not isinstance(slot, int) or not 0 <= slot < len(party):
             raise SurgeryError(f"set_hp: bad slot {slot!r}")
-        if not isinstance(hp, int) or not 0 <= hp <= party[slot].max_hp:
+        if isinstance(hp, bool) or not isinstance(hp, int) or not 0 <= hp <= party[slot].max_hp:
             raise SurgeryError(f"set_hp: {hp!r} out of range for slot {slot} (max {party[slot].max_hp})")
         hi, lo = _u16(hp)
         base = PARTY_MON1 + slot * PARTY_MON_SIZE
@@ -104,7 +104,7 @@ def _set_level(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
         if not isinstance(slot, int) or not 0 <= slot < len(party):
             raise SurgeryError(f"set_level: bad slot {slot!r}")
         mon = party[slot]
-        if not isinstance(level, int) or not mon.level <= level <= 100:
+        if isinstance(level, bool) or not isinstance(level, int) or not mon.level <= level <= 100:
             raise SurgeryError(f"set_level: {level!r} out of range for slot {slot} (level {mon.level}, raise only)")
         base_stats = ctx.base_stats(mon.species)
         if base_stats is None:
@@ -128,7 +128,7 @@ def _set_level(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
 
 
 def _money(emu, n, ctx: _Ctx) -> list[tuple[int, int]]:
-    if not isinstance(n, int) or not 0 <= n <= 999999:
+    if isinstance(n, bool) or not isinstance(n, int) or not 0 <= n <= 999999:
         raise SurgeryError(f"money: {n!r} out of range (0..999999)")
     return [(MONEY + i, (d // 10 << 4) | d % 10) for i, d in enumerate((n // 10000, n // 100 % 100, n % 100))]
 
@@ -198,6 +198,9 @@ def _position(emu, spec, ctx: _Ctx) -> list[tuple[int, int]]:
 _PLAN = {"heal": _heal, "set_hp": _set_hp, "set_level": _set_level, "money": _money,
          "respawn": _respawn, "give": _give, "take": _take, "position": _position}
 
+# Pairs whose plans read or write the same bytes against ORIGINAL RAM: in one call the later one clobbers the earlier.
+_CONFLICTS = (("give", "take"), ("heal", "set_hp"), ("heal", "set_level"), ("set_hp", "set_level"))
+
 
 def apply(emu, edits: dict, *, max_pp=None, base_stats=None) -> list[tuple[int, int, int]]:
     """Validate EVERY edit first (raise SurgeryError before the first write), then write.
@@ -205,6 +208,10 @@ def apply(emu, edits: dict, *, max_pp=None, base_stats=None) -> list[tuple[int, 
     Returns the writes applied as [(addr, old_byte, new_byte)] in order (only bytes whose value changed)."""
     if not isinstance(edits, dict) or not edits:
         raise SurgeryError("empty edit dict")
+    for a, b in _CONFLICTS:
+        if a in edits and b in edits:
+            raise SurgeryError(f"{a} and {b} cannot be combined in one edit (they clobber each other); "
+                               f"run them as two sequential edits")
     ctx = _Ctx(max_pp, base_stats if base_stats is not None else stats.base_stats_of)
     plan: list[tuple[int, int]] = []
     for name, value in edits.items():
