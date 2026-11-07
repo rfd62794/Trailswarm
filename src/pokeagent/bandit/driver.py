@@ -14,7 +14,6 @@ from pokeagent.bandit.points import ARMS
 from pokeagent.bandit.store import load_cells, write_delta
 from pokeagent.bandit.table import choose, record
 
-SAVE_EVERY = 10  # closed episodes between delta writes (a killed agent keeps what it learned)
 
 
 class BanditDriver:
@@ -78,11 +77,10 @@ class BanditDriver:
         if held is not None and held[2] is ep:
             del self.sticky[ep.point]
         self.closed += 1
-        if self.closed % SAVE_EVERY == 0:
-            self.save()
+        self.save()  # every close: the swarm kills stalled agents, so a kill must lose only the open episodes
 
     def save(self) -> None:
-        """Write this run's delta (cumulative for the run; the merge adds it once, keyed by run id). Unfinished episodes are dropped."""
+        """Write this run's delta (cumulative for the run, written atomically; the merge replaces the run's earlier contribution). Unfinished episodes are dropped."""
         write_delta(self.delta_path, self.run_id, self.delta)
 
 
