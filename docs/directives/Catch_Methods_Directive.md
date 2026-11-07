@@ -206,4 +206,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 15:52 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; wild-only hard rule added; depends on Team_Builder_V2; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 16:31 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield modules (catch_math.py, catcher.py, catch_policy.py, tests) and gitignored kb/rom_tables.json; known false positives. Dependency Team_Builder_V2 merged as PR #151.
 - 2026-11-07 16:31 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-catch-methods-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VYRXTV926N01P1Z5CJ4BAB
+- 2026-11-07 16:34 · dispatcher · launched pid=8220; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-catch-methods-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
