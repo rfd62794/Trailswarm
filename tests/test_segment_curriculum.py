@@ -117,7 +117,7 @@ def test_split_layout_chains_sub_segments():
 
 
 # --- scheduler -----------------------------------------------------------------------------------------------
-def test_shares_70_20_10(tmp_path):
+def test_shares_40_45_15(tmp_path):
     root = mkroot(tmp_path)
     c = seg_sched.Curriculum(root, log=lambda m: None)
     fill(c.doc, "potion", [True] * 20)                       # solved -> polish pool
@@ -125,19 +125,35 @@ def test_shares_70_20_10(tmp_path):
     fill(c.doc, "first_pokemon", [False] * 20)               # unsolved, weakest
     picks = [c.choose() for _ in range(20)]
     cats = [k for k, _ in picks]
-    assert (cats.count("unsolved"), cats.count("frontier"), cats.count("polish")) == (14, 4, 2)
+    assert (cats.count("unsolved"), cats.count("frontier"), cats.count("polish")) == (8, 9, 3)
     assert {s.key for k, s in picks if k == "frontier"} == {"won_battle"}   # the segment after the furthest checkpoint
     assert {s.key for k, s in picks if k == "polish"} == {"potion"}
     order = [s.key for k, s in picks if k == "unsolved"]
     assert order.index("first_pokemon") < order.index("left_house")   # weakest first (0% before 50%)
-    assert order.count("first_pokemon") > order.count("left_house")
+    assert abs(order.count("first_pokemon") - order.count("left_house")) <= 1   # rotated, not hammered
+
+
+def test_frontier_gets_about_45_percent_and_unsolved_rotate_evenly(tmp_path):
+    import math
+    root = mkroot(tmp_path)
+    c = seg_sched.Curriculum(root, log=lambda m: None)
+    fill(c.doc, "potion", [True] * 20)
+    fill(c.doc, "left_house", [True] * 10 + [False] * 10)
+    fill(c.doc, "first_pokemon", [False] * 20)
+    picks = [c.choose() for _ in range(20)]
+    cats = [k for k, _ in picks]
+    assert cats.count("frontier") in (8, 9, 10)
+    uns = [s.key for k, s in picks if k == "unsolved"]
+    n_uns = len(c.groups()["unsolved"])
+    assert n_uns >= 2
+    assert max(uns.count(k) for k in set(uns)) <= math.ceil(len(uns) / n_uns)
 
 
 def test_shares_renormalise_when_a_group_is_empty(tmp_path):
     root = mkroot(tmp_path, ("bedroom", "potion"))
     c = seg_sched.Curriculum(root, log=lambda m: None)
     cats = [c.choose()[0] for _ in range(9)]
-    assert set(cats) == {"unsolved", "frontier"} and cats.count("frontier") == 2   # 70:20 renormalised over 9 picks
+    assert set(cats) == {"unsolved", "frontier"} and cats.count("frontier") == 5   # 40:45 renormalised over 9 picks
 
 
 def test_segment_without_start_checkpoint_is_not_scheduled(tmp_path):

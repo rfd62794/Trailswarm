@@ -3,7 +3,8 @@
 Every refill the Supervisor asks ``Curriculum.next_job(n)`` what the free slot should run:
   1. a pending CONFIRM replay (a new best is only accepted once it re-solves from the same start, seed and memory);
   2. otherwise a segment chosen by NEED, by the named shares below (renormalised over the groups that have
-     a candidate): UNSOLVED (weakest first), FRONTIER (the segment after the furthest checkpoint), POLISH (solved
+     a candidate): UNSOLVED (rotated across ALL unsolved segments: fewest picks this session first, ties weakest
+     first, so early goals the swarm has long passed no longer eat the budget), FRONTIER (the segment after the furthest checkpoint), POLISH (solved
      segments, slowest expected time first, run as explorers to look for tiny optimisations).
 Each job starts from the PREVIOUS segment's best checkpoint (daisy chain), stops at its own end, and gets its own
 step budget instead of one huge run.
@@ -22,11 +23,10 @@ import seg_janitor
 import seg_split
 import seg_store as ss
 
-SHARE_UNSOLVED = 0.70
-SHARE_FRONTIER = 0.20
-SHARE_POLISH = 0.10
+SHARE_UNSOLVED = 0.40
+SHARE_FRONTIER = 0.45
+SHARE_POLISH = 0.15
 SHARES = {"unsolved": SHARE_UNSOLVED, "frontier": SHARE_FRONTIER, "polish": SHARE_POLISH}
-WEAKEST_CYCLE = (0, 0, 0, 1, 1, 2)   # of the three weakest: the weakest 3 of 6 slots, the next 2, the third 1
 BUDGET_MULT, BUDGET_MIN, BUDGET_MAX, BUDGET_DEFAULT = 3, 1500, 6000, 3000
 POLISH_EXPLORE_RATE = 0.5
 CONFIRM_TRIES = 2
@@ -43,6 +43,7 @@ class Curriculum:
         self.root, self.clock, self.log, self.quiet_s = Path(root), clock, log, quiet_s
         self.doc = ss.load(self.root)
         self.picked = {k: 0 for k in SHARES}
+        self.tries: dict[str, int] = {}   # per-segment UNSOLVED picks this session (rotation)
         self.confirming: set[str] = set()
         self.session = int(clock())
         self._depth = 0
@@ -107,12 +108,14 @@ class Curriculum:
         cat = max(avail, key=lambda k: (SHARES[k] / norm * (total + 1) - self.picked[k], SHARES[k]))
         cands = avail[cat]
         if cat == "unsolved":
-            i = min(WEAKEST_CYCLE[self.picked[cat] % len(WEAKEST_CYCLE)], len(cands) - 1)
+            i = min(range(len(cands)), key=lambda j: (self.tries.get(cands[j].key, 0), j))   # cands is weakest-first
         elif cat == "polish":
             i = self.picked[cat] % min(3, len(cands))
         else:
             i = 0
         self.picked[cat] += 1
+        if cat == "unsolved":
+            self.tries[cands[i].key] = self.tries.get(cands[i].key, 0) + 1
         return cat, cands[i]
 
     # --- jobs --------------------------------------------------------------------------------------------

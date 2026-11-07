@@ -202,7 +202,7 @@ def run_continuous(a) -> int:
     return 0
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("--agents", type=int, default=None, help="slot count (default 4; with --upgrade, the adopted agent count)")
     ap.add_argument("--steps", type=int, default=400)
@@ -226,8 +226,11 @@ def main() -> int:
                     help="specialised agents: half train from team_best.state (level up on Route 1), half explore from it (map expansion)")
     ap.add_argument("--starter", choices=["bulbasaur", "charmander", "squirtle"], default=None,
                     help="fix the starter for every agent (default: rotate bulbasaur/charmander/squirtle)")
-    ap.add_argument("--share-frames", action="store_true",
-                    help="agents publish rendered frames to shared memory for tools/watch.py (renders every Nth tick)")
+    ap.add_argument("--share-frames", action="store_true", default=True, dest="share_frames",
+                    help="agents publish rendered frames to shared memory for the viewer / tools/watch.py (renders every "
+                         "Nth tick). ON by default; this flag is accepted for old command lines")
+    ap.add_argument("--no-share-frames", action="store_false", dest="share_frames",
+                    help="turn frame sharing off (the viewer Tiles then show no game picture)")
     ap.add_argument("--ram-diff-slots", type=int, default=0, metavar="N",
                     help="the first N agent slots record event RAM diffs for tools/ram_discover.py (default 0 = off)")
     ap.add_argument("--continuous", action="store_true",
@@ -237,7 +240,11 @@ def main() -> int:
                          "when a live supervisor holds the lock. --agents changes the slot count gradually")
     ap.add_argument("--duration", type=float, default=None, help="--continuous: stop refilling after this many hours")
     ap.add_argument("--stop-now", action="store_true", help="--continuous: on stop, kill running agents instead of letting them finish")
-    a = ap.parse_args()
+    return ap
+
+
+def main() -> int:
+    a = build_parser().parse_args()
     from pokeagent.goals import GOALS
     seg_args: list[str] = []
     if a.merge_only and resources.lock_held(ROOT):

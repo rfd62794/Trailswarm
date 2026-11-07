@@ -17,6 +17,7 @@ from pokeagent.snapshot import AgentSnapshot
 from pokeagent.viewer.panels import BG, DIM, PANE, TEXT, driver_color, plain, span
 from pokeagent.viewer.panels import render as pres
 from pokeagent.viewer.panels import registry
+from pokeagent.viewer.panels.noframe import hint_texture
 from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
 
 _PAD = 5
@@ -222,6 +223,10 @@ class CardView:
                     left = px
                 else:  # unexpected raster size: skip rather than misalign
                     lkey = None
+            elif snap is not None:  # a snapshot but no frame: say why instead of a blank
+                hpx, hw, hh = hint_texture(rw_, th_)
+                if (hw, hh) == (rw_ * ss, th_ * ss):
+                    left, lkey = hpx, ("no-frame", rw_, th_)
             skey = (sw_, th_, top_key[4])
             if self._sees_cache[0] != skey:  # the Sees text changes far less often than the frame
                 self._sees_cache = (skey, _text_tex(sees_lines, sw_, th_, SEES_GRID))
