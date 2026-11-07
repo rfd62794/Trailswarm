@@ -100,6 +100,8 @@ class ExplorerContext:
     burst_maps: set = field(default_factory=set)
     catch_attempt: dict | None = None
     catch_mode: bool = False
+    catch_hint: Any = None     # knowledge.catch_policy.CatchStep for the current catch target (None = today's rules)
+    catch_turns: tuple = (None, None, 0)  # (catch_want key, turn signature, policy turns) for catch_policy.MAX_TURNS
     readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
     stage_goal: str | None = None  # current stage goal (training.stage_goal), published by plan_goal each step
     clamp_note: str = ""      # last readiness clamp logged
