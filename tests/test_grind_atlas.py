@@ -100,3 +100,14 @@ def test_rom_tables_have_base_exp_and_growth():
     from pokeagent.knowledge.kb import ROM_KB
     row = next(r for r in ROM_KB["species_by_dex"].values() if r["name"] == "PIDGEY")
     assert row["base_exp"] == 55 and row["growth"] == "MEDIUM_SLOW"
+
+
+def test_exp_gained_list_and_estimate_field_names(tmp_path):
+    from pokeagent.grind.observed import load_estimates
+    a, b = {}, {}
+    fold(a, battle(2, exp_gained=[40, 9]), {"starter": "S"})   # party_log shape: lead is slot 0
+    fold(b, battle(2, exp_gained=40), {"starter": "S"})        # plain number still accepted
+    assert next(iter(a.values())).xp_sum == next(iter(b.values())).xp_sum == 40
+    p = tmp_path / "xp.jsonl"
+    p.write_text('{"run": "a", "start": 1, "exp_estimate": 24}\n{"run": "a", "start": 2, "xp_estimate": 7}\n')
+    assert load_estimates(p) == {("a", 1): 24.0, ("a", 2): 7.0}

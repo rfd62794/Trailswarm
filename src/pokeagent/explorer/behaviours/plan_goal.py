@@ -10,7 +10,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GrindBudget
 from pokeagent.explorer.training import gate_for, readiness_for, required_level, stage_goal
-from pokeagent.explorer import area_grind
+from pokeagent.explorer import area_grind, par_follow
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
@@ -60,13 +60,19 @@ class PlanGoal(BehaviourBase):
         ctx.train_need = need  # frontier reads it to seek grass while below the target
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need, "_heal_trips": ctx.heal_trips,
-                             "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step},
+                             "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
+                             "_respawn": ctx.emu.read(0xD719), "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {})},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
+        if planned and planned[1].startswith("goal checkpoint"):
+            ck = ctx.__dict__["ckpt_steps"]; ck[5] = ck.get(5, 0) + 1  # Vermilion is the only checkpoint town so far
         if planned and "at Mom, talking" in planned[1]:
             ctx.mom_talk_step = ctx.step; ctx.mom_talk_hp = hp_now
             ctx.slow_until = ctx.step + 12  # healing has a fade: slow down so completion is recognised
+        driver = ""
+        if planned and ctx.opts.par_follow:
+            planned, driver = par_follow.refine(ctx, planned, [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)])
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
-            return Decision(planned[0], "plan_goal", planned[1])
+            return Decision(planned[0], "plan_goal", planned[1], driver=driver)
         return None
 
     @staticmethod

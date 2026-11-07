@@ -54,7 +54,7 @@ def run(args) -> dict:
                           explore_run=False, opts=ExplorerOptions(starter=args.starter, steps=args.steps, headless=True, state_stem=state_goal(Path(args.state).stem), stop_at_goal=args.stop_at_goal, frames_per_step=4,
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
-                                                                   bandit=args.bandit, bandit_path=args.bandit_path))
+                                                                   bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow))
     if args.bandit:
         from pokeagent.bandit.driver import attach
         attach(ctx, args.bandit_path, work / "bandit_delta.json", args.seed)
@@ -135,6 +135,7 @@ def main(argv=None) -> int:
     ap.add_argument("--starter", default="bulbasaur")
     ap.add_argument("--bandit", action="store_true", help="behaviour bandit on (reads --bandit-path, writes <work>/bandit_delta.json)")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
+    ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
     ap.add_argument("--verbose", action="store_true")
     print(json.dumps(run(ap.parse_args(argv)), indent=1))
     return 0
