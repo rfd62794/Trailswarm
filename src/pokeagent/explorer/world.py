@@ -88,8 +88,12 @@ class WorldGraph:
                 self.strict = True
         return p
 
+    last_route: tuple | None = None  # (start, goal node, buttons) of the latest successful path(); par_follow reads the planner's target here
+
     def _bfs(self, start, goal_fn, limit):
         r = self._bfs_node(start, goal_fn, limit)
+        if r and r[1]:
+            WorldGraph.last_route = (start, r[0], r[1])
         return r[1] if r else None
 
     def _bfs_node(self, start, goal_fn, limit):

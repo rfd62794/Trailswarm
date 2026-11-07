@@ -164,3 +164,40 @@ Probed headless in the Viridian Mart (map 42, 0x2A) from `oaks_parcel.state` (pl
 - **to_route9 at step 1710 of a Route 5 run.** The detector was right about the map: Cerulean east edge (39,17) leads to Route 9 (map 20) x=0, y=9, and the run (human-driven) entered it. The assumption was wrong, not the map id: Route 9's west end is open, and the Cut tree stands at x=4 (ahead tiles 64,65,80,81 at x=3). The goal means "past the tree", so it is now `map_past_x` (map 20 and wXCoord >= 5). Route 9 is also reachable from Route 10 (east end), which lands far past x=5 and is real progress.
 - **Still unverified** (no flag/address checked against the ROM): HM01 item id (pokered HM_01 = 0xC4, candidate in campaign.json), HM05 (0xC8), any "beat the S.S. Anne rival" event flag, the Route 9 tree x=4 (read from one run's ahead_tiles, not from the map blocks). rival_ss_anne and hm01_cut stay `unverified`: they now fire only when a later goal is reached AND their `after` goal is reached.
 - `tools/milestones_clean.py` lists milestone entries that cannot be real (report mode; `--apply` writes `runs/milestones.cleaned.json`, never the live file). Its other hits (buy_magikarp without to_route4 in-run, mt_moon floors in a run from `potion`) need a human look; they may be real order-skips, not detector bugs.
+
+## Battle and level logs
+
+XP and leveling data, written by `src/pokeagent/explorer/party_log.py`. Records only ever gain fields; old readers still parse.
+Species are the game's internal ids (the same as `enemy_species`); `kb/rom_tables.json` `dex_of_internal` maps them to dex numbers.
+
+**`runs/battles.jsonl`** (one line per battle, written by `behaviours/battle.py`). The original fields (`start`, `kind`
+1 wild / 2 trainer, `you`, `enemy`, `enemy_species`, `end`, `won`, `run`, `map`, `presses`, `hp_end`, `fled`, `turns`)
+are unchanged. New, snapshotted at battle start and at battle end (verified RAM: party struct exp + level):
+
+| field | shape |
+|---|---|
+| `party_before`, `party_after` | one row per member: `[species, level, exp, hp, max_hp]` |
+| `exp_gained` | per member, after minus before (aligned with `party_after`; a mon caught mid-fight is 0) |
+| `level_ups` | `[{slot, species, from, to}]` |
+| `evolved` | `[{slot, from, to}]` species ids |
+| `moves_learned` | `[{slot, species, moves: [move ids]}]` for moves present after but not before |
+
+Gen 1 evolves a mon after the battle returns to the overworld, so an evolution usually lands in `levels.jsonl`
+(`cause: out_of_battle`, `evolved`) rather than in the battle record.
+Atlas consumers: key on `map`, `kind`, `enemy` (species, level) and sum `exp_gained`; `sum(exp_gained)` is the exp for that fight
+(lead only unless Exp. All or the fight was shared). Records written before this change have none of these fields; treat them as
+missing, or use `runs/xp_estimates.jsonl`.
+
+**`runs/explore-*/levels.jsonl`** (per run): `{step, frame, map, cause, party, [level_ups, evolved, moves_learned]}`, with `cause`
+`start` (baseline), `battle_end` (every battle), or `out_of_battle` (any level/exp/species change outside a fight: rare candy, daycare,
+evolution). `party` rows are as above.
+
+**`runs/explore-*/meta.json` `xp_summary`** (at run exit, via `record_trainee`): `exp_gained`, `levels_gained_by_slot`, `battles`,
+`battles_won`, `blackouts` (lost fights that were not flees), and step counts `steps_grinding` (lead level below
+`ctx.train_need`, the training gate plan_goal sets and frontier's grass-seeking reads), `steps_travelling`, `steps_in_battle`.
+
+**`runs/xp_estimates.jsonl`** (`uv run python tools/xp_backfill.py`, read-only on runs): per past battle, `exp_estimate` =
+base_exp x enemy level / 7 (x1.5 trainer), 0 for a lost or fled fight, `"estimated": true`; `exp_measured` appears when the record
+has real `exp_gained`. Needs the ROM-extracted `kb/rom_tables.json` (gitignored). Shared fights are over-estimated.
+Caveats: `won` in battle records means we survived, so a fled wild fight counts as won (estimate over-counts it); a trainer battle
+record holds only the last enemy mon, so a multi-mon trainer is under-counted. Prefer `exp_gained` when present.

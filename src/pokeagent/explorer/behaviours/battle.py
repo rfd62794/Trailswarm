@@ -20,6 +20,7 @@ from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     POTION, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer import party_log
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
@@ -118,6 +119,7 @@ class Battle(BehaviourBase):
                 ctx.battles = ctx.battles + 1; ctx.battle_pos = (m, x, y)
                 ctx.fx_last = ctx.fx_last_fx = ctx.pending_effect = None  # fresh fight: no carried text state
                 new_battle(ctx)
+                party_log.of(ctx).start_battle(ctx)  # XP/level logging: the party as the fight begins
                 bflag = ctx.emu.read(0xD057)
                 if bflag == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
                     under = [tm_now[8 * 20 + 8], tm_now[8 * 20 + 9], tm_now[9 * 20 + 8], tm_now[9 * 20 + 9]]
@@ -226,6 +228,7 @@ class Battle(BehaviourBase):
                 hp_end, mx_end = party_hp(ctx.emu)
                 bl.update({"end": ctx.step, "won": won, "run": ctx.run_dir.name, "map": m, "presses": ctx.step - bl["start"],
                            "hp_end": [hp_end, mx_end], "fled": not won and hp_end > 0})
+                bl.update(party_log.of(ctx).end_battle(ctx, won, bl["fled"]))  # party_before/after, exp_gained, level_ups, ...
                 with Path("runs/battles.jsonl").open("a", encoding="utf-8") as fh:
                     fh.write(json.dumps(bl) + "\n")
                 # Every battle is a lesson: per enemy species keep fights/wins/fled, HP lost, turns, and the move that

@@ -74,6 +74,8 @@ def fold(stats: dict, rec: dict, run_meta: dict, name_of=None, estimates: dict |
     if lvl < 2:
         return
     xp = rec.get("exp_gained")
+    if isinstance(xp, (list, tuple)):  # party_log writes one gain per member: the lead is slot 0
+        xp = xp[0] if xp else None
     if xp is None and estimates:
         xp = estimates.get((rec.get("run"), rec.get("start")))
     goal = str(run_meta.get("stop_at_goal") or "")
@@ -91,13 +93,13 @@ def pooled(stats: dict, starter: str | None, lvl: int, m: int) -> Obs:
 
 
 def load_estimates(path: Path) -> dict:
-    """{(run, start): xp} from runs/xp_estimates.jsonl (ASSUMED fields: run, start, exp_gained|xp_estimate); {} if absent."""
+    """{(run, start): xp} from runs/xp_estimates.jsonl (fields: run, start, exp_estimate, falling back to exp_gained|xp_estimate); {} if absent."""
     out: dict = {}
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             try:
                 r = json.loads(line)
-                v = r.get("exp_gained", r.get("xp_estimate"))
+                v = next((r[k] for k in ("exp_estimate", "exp_gained", "xp_estimate") if r.get(k) is not None), None)
                 if v is not None:
                     out[(r.get("run"), r.get("start"))] = float(v)
             except (ValueError, AttributeError):

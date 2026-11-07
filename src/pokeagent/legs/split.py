@@ -25,6 +25,7 @@ class Leg:
     button: str                  # the press that leaves the map
     dest: tuple | None           # (map, x, y) arrived at; None when the leg is incomplete
     step0: int                   # transition step number of the first press
+    step1: int = 0               # ... and of the last press of the leg
     buttons: list = field(default_factory=list)
     moved: int = 0
     frames: float = 0.0
@@ -58,6 +59,7 @@ def split_legs(rows, run: str = "") -> list[Leg]:
         if cur is None:
             cur = Leg(run, f[0], (f[1], f[2]), (f[1], f[2]), r["button"], None, int(r.get("step", 0)))
         cur.buttons.append(r["button"])
+        cur.step1 = int(r.get("step", cur.step0))
         cur.moved += bool(r.get("moved"))
         cur.frames += press_frames(r)
         cur.exit, cur.button, prev_to = (f[1], f[2]), r["button"], tuple(t)
