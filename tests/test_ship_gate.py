@@ -226,3 +226,54 @@ def test_route6_is_a_grind_spot_when_under_level_and_a_road_to_vermilion_when_re
     step = sg.route_back_step(g, FIT, pos)
     assert step and "Vermilion" in step[1], step                              # ready: on to the ship
     assert sg.route_back_step(g, {**FIT, "_level": 12}, (0x03, 24, 34)) is not None   # from the Cerulean side it still walks east
+
+
+def test_dock_does_not_end_the_walk_off_and_the_exit_tile_presses_out():
+    """2026-11-07: the dock (0x5E) is a ship map; standing on its exit warp the plan is empty, which used to end the walk-off."""
+    plan, state = FakeShipPlan(["UP"]), {}
+    goals = {**FIT, "_hp": (6, 79), "_ship": state, "_ship_plan": plan}
+    step = plan_step(goals, {}, (0x5E, 14, 1), "UP")
+    assert step and step[0] == "UP" and state["off"] == 1, step
+    step = plan_step(goals, {}, (0x5E, 14, 0), "UP")                  # ON the exit tile: one more press toward the edge
+    assert step and step[0] == "UP" and "walk-off" in step[1] and state["off"] == 1, step
+
+
+def test_vermilion_unhealed_does_not_end_the_walk_off_but_healed_does():
+    state = {"off": 1}
+    goals = {**FIT, "_hp": (6, 79), "_ship": state}
+    sg.left_ship(goals, (0x05, 18, 31))
+    assert state["off"] == 1                                          # in Vermilion at 6/79: still walking off
+    sg.left_ship(goals, (0x59, 3, 4))
+    assert state["off"] == 1                                          # in the Pokecenter: not Vermilion either
+    sg.left_ship({**goals, "_hp": (79, 79)}, (0x05, 18, 31))
+    assert state["off"] == 2                                          # healed in Vermilion: done
+
+
+def test_unhealed_vermilion_heads_for_the_nurse_not_route6_or_the_dock(tmp_path):
+    maps = _vermilion_maps(tmp_path)
+    maps["5"]["warps"]["4,10,UP"] = [0x11, 8, 35]
+    mem = MapMemory(tmp_path / "m2.json")
+    mem.visit(0x11, 8, 35, 1)
+    maps["17"] = mem.data["maps"]["17"]
+    goals = {**FIT, "_hp": (6, 79), "_level": 12, "_respawn": 0x05, "to_vermilion": True}   # under-level AND weak
+    step = plan_step(goals, maps, (0x05, 5, 10), "UP")
+    assert step and "checkpoint" in step[1] and "Route 6" not in step[1], step
+
+
+def test_a_fit_lead_boards_after_the_walk_off():
+    plan = FakeShipPlan(["UP", "LEFT"])
+    goals = {**FIT, "_ship": {"off": 2}, "_ship_plan": plan}
+    step = plan_step(goals, {}, (0x5F, 20, 6), "UP")
+    assert step and "goal boarding" in step[1], step
+
+
+def test_run_starting_in_vermilion_with_respawn_behind_heads_for_the_pokecenter_without_a_learned_door(monkeypatch):
+    """to_ss_anne remade from to_vermilion.best.state: Vermilion, respawn Cerulean, 6/79, a fresh map memory (no learned door)."""
+    from pokeagent.explorer import planner_checkpoint as pc
+    seen = []
+    monkeypatch.setattr(pc, "_rom_step", lambda pos, tile, grid_get=None: seen.append(tile) or "LEFT")
+    goals = {**FIT, "_hp": (6, 79), "_respawn": 0x03, "to_vermilion": True}
+    step = plan_step(goals, {}, (0x05, 19, 1), "DOWN")
+    assert step and step[0] == "LEFT" and "checkpoint" in step[1] and seen == [(0x05, 11, 4)], step
+    at_door = plan_step(goals, {}, (0x05, 11, 4), "UP")
+    assert at_door and at_door[0] == "UP" and "door" in at_door[1], at_door

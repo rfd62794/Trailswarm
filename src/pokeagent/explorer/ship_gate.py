@@ -17,6 +17,7 @@ from pokeagent.explorer.world import SHIP_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
 VERMILION, ROUTE6, DOCK = 0x05, 0x11, 0x5E
+DOCK_EXIT_PRESS = "UP"  # the dock's exit warp (14,0) is on its top edge
 OUTSIDE = 255  # a ROM warp destination "the map you came from": the dock's exit to Vermilion
 SHIP_STAGES = ("to_ss_anne", "rival_ss_anne", "ss_anne_captain")
 # Cerulean -> Route 5 -> Route 5 gate (0x47) -> Underground Path (0x77) -> Route 6 gate (0x4A) -> Route 6 -> Vermilion
@@ -52,9 +53,11 @@ def unfit(goals: dict) -> bool:
 
 
 def left_ship(goals: dict, pos: tuple) -> None:
-    """A walk-off in progress ends when the agent is off the ship."""
+    """A walk-off in progress ends only in Vermilion with a healed lead. The dock (0x5E) is a ship map and the Pokecenter is not
+    Vermilion: reaching either is not the end (2026-11-07: the walk-off was marked done on the dock's exit tile and the agent turned
+    back aboard at 6/79 HP). Until then the Vermilion checkpoint (planner_checkpoint) walks the unhealed lead to the nurse."""
     st = goals.get("_ship")
-    if st is not None and st.get("off") == 1 and pos[0] not in SHIP_MAPS:
+    if st is not None and st.get("off") == 1 and pos[0] == VERMILION and not weak(goals):
         st["off"] = 2
 
 
@@ -69,7 +72,10 @@ def walk_off_step(goals: dict, pos: tuple, maps: dict | None = None) -> tuple[st
     if st["steps"] > WALK_OFF_CAP:
         st["off"] = 2
         return None
-    buttons = plan(pos, plan.warp_tiles(DOCK, OUTSIDE))
+    exits = plan.warp_tiles(DOCK, OUTSIDE)
+    if pos in exits:  # standing ON the edge warp: the plan from here is empty, the exit fires on one more press toward the edge
+        return DOCK_EXIT_PRESS, "goal walk-off: pressing out through the dock's exit to Vermilion"
+    buttons = plan(pos, exits)
     if not buttons:
         st["off"] = 2  # no route (unreadable ROM): stay aboard rather than loop
         return None
@@ -85,8 +91,8 @@ def walk_off_step(goals: dict, pos: tuple, maps: dict | None = None) -> tuple[st
 
 def ready_gate(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
     """Not ready for the ship: in Vermilion go grind on Route 6 (on Route 6 / 11 None lets exploration seek the grass)."""
-    if not under_level(goals) or pos[0] != VERMILION:
-        return None
+    if not under_level(goals) or pos[0] != VERMILION or weak(goals):
+        return None  # a weak lead goes to the nurse first (planner_checkpoint), not to the grass
     p = g.path(pos, _on(ROUTE6))
     if p:
         return p[0], f"goal train: {len(p)} steps to Route 6's grass (under-level for the ship: L{goals.get('_level')} < L{goals.get('_need')})"

@@ -14,28 +14,36 @@ from pokeagent.checkpoint_goals import completed_goals, write_completed
 from pokeagent.goals import GOALS, check_goals, is_unverified
 
 
+def seed_initial_goals(ctx: ExplorerContext) -> None:
+    """Goals already true when the run began (segment runs start from a checkpoint). Called before the FIRST decision as well as by
+    record_goals: seeding only after the first press let step 1 plan against 'potion' and walk a 6/79 lead from Vermilion into Route 6."""
+    if ctx.initial_goals_ready:
+        return
+    goals = check_goals(ctx.emu, ctx)
+    ctx.initial_goals_ready = True
+    ctx.initial_goals = {g for g in GOALS if goals[g]}
+    # A checkpoint named after a goal implies every earlier goal too (a used potion must not send a run that
+    # starts in Viridian City all the way home to the PC - seen 2026-11-03 06:00).
+    stem = ctx.opts.state_stem
+    if stem in GOALS:
+        ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
+    elif stem == "team_best":
+        ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
+    if ctx.initial_goals:
+        ctx.log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(ctx.initial_goals)}]", "res")
+    try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past
+        mp = ctx.run_dir / "meta.json"; meta = json.loads(mp.read_text()); meta["initial_goals"] = sorted(ctx.initial_goals)
+        mp.write_text(json.dumps(meta))
+    except Exception:
+        pass
+
+
 def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
     """Detect goals first reached in this run, checkpoint and persist them. True = the run ended headless (stop here)."""
     goals = check_goals(ctx.emu, ctx)
     if goals["left_house"]:
         ctx.goal_left_house = True
-    if not ctx.initial_goals_ready:
-        ctx.initial_goals_ready = True  # goals already true when the run began (segment runs start from a checkpoint)
-        ctx.initial_goals = {g for g in GOALS if goals[g]}
-        # A checkpoint named after a goal implies every earlier goal too (a used potion must not send a run that
-        # starts in Viridian City all the way home to the PC - seen 2026-11-03 06:00).
-        stem = ctx.opts.state_stem
-        if stem in GOALS:
-            ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
-        elif stem == "team_best":
-            ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
-        if ctx.initial_goals:
-            ctx.log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(ctx.initial_goals)}]", "res")
-        try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past
-            mp = ctx.run_dir / "meta.json"; meta = json.loads(mp.read_text()); meta["initial_goals"] = sorted(ctx.initial_goals)
-            mp.write_text(json.dumps(meta))
-        except Exception:
-            pass
+    seed_initial_goals(ctx)
     for g in GOALS:  # first time each goal is reached IN THIS RUN: remember the step and persist it
         if is_unverified(g):
             continue  # inferred from later goals (no detector of its own): never a goal_frames line, checkpoint or milestone

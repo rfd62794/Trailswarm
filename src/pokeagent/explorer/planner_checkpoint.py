@@ -8,7 +8,7 @@ Capped at CAP planner steps per town per run (the caller counts them) so a missi
 from __future__ import annotations
 
 from pokeagent.explorer.world import WorldGraph
-from pokeagent.explorer.ship_gate import ship_stage, weak
+from pokeagent.explorer.ship_gate import _rom_step, ship_stage, weak
 
 
 def ship_weak(goals: dict) -> bool:
@@ -16,6 +16,7 @@ def ship_weak(goals: dict) -> bool:
     return ship_stage(goals) and weak(goals)
 
 CENTER_OF = {0x05: 0x59}  # town map -> its Pokecenter (Vermilion; add a town once its door is mapped and heal verified)
+DOOR_APPROACH = {0x05: (0x05, 11, 4)}  # town -> the tile below its Pokecenter door (ROM-verified for Vermilion): the fallback when the door is not learned
 CAP = 150
 
 
@@ -31,13 +32,30 @@ def checkpoint_step(g: WorldGraph, goals: dict, pos: tuple, facing: str = "UP") 
         p = g.path(pos, lambda n: n[0] == town)
         if p:
             return p[0], f"goal checkpoint: leaving the Pokecenter ({len(p)} steps)"
-        return (("RIGHT" if pos[1] < 3 else "LEFT"), "goal checkpoint: crossing to the door column") if pos[1] != 3 else ("DOWN", "goal checkpoint: walking out by the door")
+        if pos[1] != 3:  # a fresh map memory has no learned way out of the center: the ROM route to the door column
+            rom = _rom_step(pos, (center, 3, 6))
+            return (rom or ("RIGHT" if pos[1] < 3 else "LEFT")), "goal checkpoint: crossing to the door column"
+        return "DOWN", "goal checkpoint: walking out by the door"
     why = f"goal checkpoint: heal at map 0x{center:02X} so a blackout respawns in 0x{town:02X} (not 0x{respawn:02X})"
     if pos[0] == town:
         p = g.path(pos, lambda n: n[0] == center)
-        return (p[0], f"{why}, {len(p)} steps") if p else None  # door not learned yet: exploration finds it
+        if p:
+            return p[0], f"{why}, {len(p)} steps"
+        return _door_step(g, town, pos, why)  # door not learned yet (a fresh map memory): walk the ROM route to it
     if pos[1] != 3:
         return ("RIGHT" if pos[1] < 3 else "LEFT"), f"{why}: crossing to the counter"
     if pos[2] > 2:
         return "UP", f"{why}: walking up to the nurse"
     return ("A" if facing == "UP" else "UP"), f"{why}: {'talking' if facing == 'UP' else 'facing her'} to the nurse"
+
+
+def _door_step(g: WorldGraph, town: int, pos: tuple, why: str) -> tuple[str, str] | None:
+    """The Pokecenter door of ``town`` by the ROM route when the learned world has no path to it (a run that starts in the town)."""
+    tile = DOOR_APPROACH.get(town)
+    if tile is None:
+        return None
+    if pos == tile:
+        return "UP", f"{why}: through the door"
+    q = g.path(pos, lambda n, tile=tile: n == tile)
+    step = (q[0] if q else None) or _rom_step(pos, tile)
+    return (step, f"{why}: ROM route to the door") if step else None
