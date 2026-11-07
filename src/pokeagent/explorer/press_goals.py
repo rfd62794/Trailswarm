@@ -10,7 +10,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
-from pokeagent.checkpoint_goals import completed_goals, write_completed
+from pokeagent.checkpoint_goals import completed_goals, stamp_fingerprint, write_completed
 from pokeagent.goals import GOALS, check_goals, is_unverified
 
 
@@ -55,6 +55,10 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
                 write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
+                try:
+                    stamp_fingerprint(ctx.emu, cp / f"{g}.state", ctx.run_dir.name)  # statefp.stamp via the allowed layer
+                except Exception:  # noqa: BLE001  (a stamp failure must never lose the checkpoint)
+                    pass
             except Exception as e:
                 ctx.log(f"[checkpoint save failed: {e!r}]", "res")
             gp = Path("runs/milestones.json")
