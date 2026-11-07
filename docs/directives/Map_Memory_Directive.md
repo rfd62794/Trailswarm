@@ -159,11 +159,12 @@ Test tail, line counts, a sample `transitions.jsonl` line, the 13x13 map from a 
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-02 · robert-claude-laptop · none → Draft — map memory + transitions log; Agent_Loop merged; text box directive optional
+- 2026-11-06 21:10 · robert-claude-laptop · Draft → Queued — closing as superseded
 <!-- queue:end -->
