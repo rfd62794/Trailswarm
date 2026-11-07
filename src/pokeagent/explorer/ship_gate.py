@@ -95,8 +95,8 @@ def ready_gate(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None
 
 def route_back_step(g: WorldGraph, goals: dict, pos: tuple, grid_get=None) -> tuple[str, str] | None:
     """Ship ahead again after a blackout: walk from Cerulean / Route 5 / the Underground Path / Route 6 to Vermilion."""
-    if pos[0] not in BACK_MAPS:
-        return None
+    if pos[0] not in BACK_MAPS or (pos[0] == ROUTE6 and under_level(goals)):
+        return None  # Route 6 while under-level is where ready_gate sends the agent to grind: walking back would ping-pong
     p = g.path(pos, _on(VERMILION))
     if p:
         return p[0], f"goal back to the ship: {len(p)} steps to Vermilion over the learned world"

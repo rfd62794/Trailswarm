@@ -56,6 +56,7 @@ def run(args) -> dict:
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
                                                                    bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow,
                                                                    role=args.role, novelty=args.novelty, novelty_path=args.novelty_path))
+    from pokeagent.atlas.walkgrid import rom_cave_planner
     from pokeagent.explorer.world import SHIP_MAPS
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:

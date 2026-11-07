@@ -203,3 +203,13 @@ def test_fit_in_vermilion_walks_to_the_dock(tmp_path):
     maps["94"] = mem.data["maps"]["94"]
     step = plan_step({**FIT, "to_vermilion": True}, maps, (0x05, 3, 10), "UP")
     assert step and step[0] == "RIGHT" and "dock" in step[1], step
+
+
+def test_route6_is_a_grind_spot_when_under_level_and_a_road_to_vermilion_when_ready(tmp_path):
+    maps = _cerulean_to_vermilion(tmp_path)
+    g = WorldGraph(maps)
+    pos = (0x11, 8, 34)
+    assert sg.route_back_step(g, {**FIT, "_level": 12}, pos) is None          # under-level: exploration grinds the grass
+    step = sg.route_back_step(g, FIT, pos)
+    assert step and "Vermilion" in step[1], step                              # ready: on to the ship
+    assert sg.route_back_step(g, {**FIT, "_level": 12}, (0x03, 24, 34)) is not None   # from the Cerulean side it still walks east
