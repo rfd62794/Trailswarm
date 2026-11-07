@@ -115,6 +115,9 @@ class ExplorerContext:
     forget_move: str | None = None
     frontier_at: tuple | None = None  # position the committed route's next button was chosen at
     frontier_route: list = field(default_factory=list)  # buttons left to the committed frontier_target
+    train_route_live: bool = False  # the gyarados stage is training the trainee (plan_goal sets it each step; frontier reads it)
+    deciding_rule: str = ""  # Decision.rule of the press in flight (set by the engine around presser.press)
+    blocked_streak: dict = field(default_factory=dict)  # (pos, button) -> consecutive blocked presses (blocked_cap)
     frontier_target: tuple | None = None  # (map, x, y) frontier tile the frontier behaviour is committed to
     goal_left_house: bool = False
     goto: list | None = None

@@ -55,7 +55,9 @@ class Engine:
         before, box, battle = (view.m, view.x, view.y), view.box, view.battling
         stage, goals_reached = goal_stage(ctx.goals()), len(ctx.goal_steps)
         tossed_before = _tossed(ctx)
+        ctx.deciding_rule = decision.rule  # record_interaction reads it: choose_local's reason text does not say which rule chose
         self.presser.press(decision.button, "agent", decision.why)
+        ctx.deciding_rule = ""
         if decision.after is not None:
             decision.after(ctx)
         after = ctx.pos()
