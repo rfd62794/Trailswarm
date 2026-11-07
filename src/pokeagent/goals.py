@@ -1,6 +1,6 @@
 """Campaign goals: the single source of truth for the goal ladder (data/campaign.json) and its RAM detectors.
 
-The first 25 goals keep the hand-coded detectors in check_goals; the rest are generic detectors from the data file (pokeagent.campaign).
+The first 26 goals keep the hand-coded detectors in check_goals; the rest are generic detectors from the data file (pokeagent.campaign).
 
 tools/{explore_demo,overnight,swarm,review_runs,status}.py all read GOALS from here —
 tests/test_goal_order.py guards against new local copies. goals.json is a stale
@@ -11,10 +11,10 @@ from __future__ import annotations
 from pokeagent import campaign
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
-from pokeagent.magikarp import gyarados_goal, magikarp_goal_settled
+from pokeagent.magikarp import gyarados_goal_settled, magikarp_goal_settled
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
-GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 25 ids are the hand-coded ones below
+GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 26 ids are the hand-coded ones below
 
 def goals_brief(goals: dict) -> str:
     """One short log line for the whole ladder: done/total and the next few unmet goals."""
@@ -22,7 +22,8 @@ def goals_brief(goals: dict) -> str:
 
 
 # Background goals: reported by check_goals and tools/status.py, never part of the ladder (they must not block the route).
-SIDE_GOALS = ["gyarados"]
+# None today (gyarados joined the ladder 2026-11-07); the name stays exported for its consumers.
+SIDE_GOALS: list[str] = []
 
 GOAL_MENU = {"potion": ["WITHDRAW ITEM", "POTION"]}  # menu options to take, in order, while a goal is unmet
 
@@ -117,7 +118,10 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # Cerulean (ROM warps from 0x03): 0x40 Pokecenter (heal_cerulean needs a full party inside it, not just a visit), 0x41 Gym; 0x23 Route 24 is Cerulean's north connection;
          # 0x58 Bill's house is the only warp on Route 25 (0x24). CASCADEBADGE = wObtainedBadges bit1 (ROM 17:5736).
          "heal_cerulean": healed_in_cerulean(emu, st, m), "beat_misty": bool(emu.read(0xD356) & 2),
-         "nugget_bridge": 0x23 in seen, "to_bill": 0x58 in seen,
+         "nugget_bridge": 0x23 in seen,
+         # Robert 2026-11-07: raise the bought Magikarp to Gyarados on Routes 24/25; settled (never blocks) when a
+         # GYARADOS is owned, when no Magikarp was ever owned, or once the stage's step cap is spent (plan_goal).
+         "gyarados": gyarados_goal_settled(emu, st, seen), "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
     g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
     g["cut_learner"] = g["hm01_cut"] and cut_learner_settled(emu, st, _kbmod.ROM_KB)  # only after HM01 is in hand; special goal: hand-coded, skipped by campaign_goals
@@ -127,5 +131,4 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
         if k in st.get("goal_steps", {}) or k in st.get("initial_goals", set()):
             g[k] = True
     campaign.infer_unverified(g)  # unverified goals (no RAM detector) follow from later ones; keeps the ladder from stalling
-    g["gyarados"] = gyarados_goal(emu, st)  # side goal: informational, not in the ladder
     return g

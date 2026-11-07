@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
-from pokeagent.magikarp import fighter, trainee_slot
+from pokeagent.knowledge.readiness import TEAM_GAP
+from pokeagent.magikarp import fighter, magikarp_stats, trainee_slot
 from pokeagent.names import load_registry
 from pokeagent.screentext import CHARMAP
 
@@ -28,9 +29,21 @@ def party_hp(emu) -> tuple[int, int]:
     return hp, mx
 
 
-def lead_level(emu) -> int:
-    """Level of the fighter (the party lead, or the strongest non-Magikarp while a Magikarp is in training)."""
+def true_lead_level(emu) -> int:
+    """The fighter's real level (party lead, or the strongest non-Magikarp while a trainee is out): bandit features and
+    atlas priors are keyed by this, not by the trainee-band level the training gate sees."""
     return fighter(emu)[1] if trainee_slot(emu) is not None else emu.read(0xD18C)
+
+
+def lead_level(emu) -> int:
+    """Level the training gate sees: the fighter's (the party lead, or the strongest non-Magikarp while a Magikarp is
+    in training). While a Magikarp trainee is in the party it is min(fighter level, trainee level + TEAM_GAP):
+    the gate stays open (grass-seeking continues) until the trainee is within TEAM_GAP of the level the stage
+    needs. Once it has evolved the function behaves exactly as before."""
+    if trainee_slot(emu) is None:
+        return emu.read(0xD18C)
+    stats = magikarp_stats(emu)
+    return min(fighter(emu)[1], stats["level"] + TEAM_GAP) if stats else fighter(emu)[1]
 
 
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:

@@ -7,7 +7,7 @@ the switch-in with the best remaining HP. score = HP fraction left on the mons t
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from pokeagent.knowledge.damage import PHYSICAL, expected_damage, type_mult
 from pokeagent.knowledge.kb import table
@@ -17,6 +17,10 @@ from pokeagent.knowledge.party import Combatant, at_level, trainer_mon
 MARGIN = 0.30             # remaining HP fraction wanted on the mons that fought
 MAX_LEVEL, MAX_TURNS = 70, 80
 
+TEAM_GAP = 6               # a useful second member is within this many levels of the lead
+LEAD_HURT = 0.5            # the sim starts the lead at this fraction of its HP: the fight after the lead is hurt or faints
+TEAM_MIN = 2               # members that must be useful before a boss (lead + one)
+
 
 @dataclass(frozen=True)
 class Readiness:
@@ -25,6 +29,24 @@ class Readiness:
     score: float
     lead: str
     text: str                 # the logged decision
+
+
+@dataclass(frozen=True)
+class MemberNeed:
+    slot: int
+    name: str
+    level: int
+    target: int
+    useful: bool
+
+
+@dataclass(frozen=True)
+class TeamReadiness:
+    ready: bool
+    lead: Readiness | None        # the existing lead verdict from assess()
+    members: tuple[MemberNeed, ...]
+    weakest: MemberNeed | None    # the useful-member shortfall to fix first (lowest level among those below target); None when ready
+    text: str                     # the logged decision
 
 
 def _chart(kb) -> dict:
@@ -124,3 +146,81 @@ def assess(party: list[Combatant], boss: list[tuple[int, str]], label: str, kb: 
     note = matchup_text(lead, theirs[0], chart, moves)
     text = f"ready vs {label}: {note} -> ok" if ready else f"train to L{required}: {note}"
     return Readiness(ready, required, round(score, 2), lead.name, text)
+
+
+def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: str,
+                   kb: dict | None = None) -> TeamReadiness | None:
+    """The whole party judged against `boss` (``[(level, species)]``), Magikarp INCLUDED in slot order.
+
+    - ``None`` when ``assess`` would return ``None`` (missing data): empty party or boss, unknown species, no move table.
+    - Lead verdict: ``lead = assess(party_without_trainee, ...)`` exactly as the lead-centric check does today, so the
+      existing lead target is unchanged (the Magikarp trainee never fights a boss).
+    - Team verdict: the same fight simulated with the lead starting at ``LEAD_HURT`` of its HP - "the fight after the
+      lead is hurt or faints". The other members join at their CURRENT level; a MAGIKARP counts as the GYARADOS it
+      becomes only once its level is >= EVOLVE_LEVEL, below that it fights as itself.
+    - Per non-lead member ``target`` = ``max(lead.level - TEAM_GAP, sim_needed)`` capped at ``lead.level`` (and at
+      least EVOLVE_LEVEL for a Magikarp, which is judged as ``trainer_mon("GYARADOS", max(level, EVOLVE_LEVEL))`` for
+      the after-training search). ``sim_needed`` is the member's own level when the hurt-lead sim already passes,
+      else the lowest level in current+1 .. MAX_LEVEL at which that member (``at_level``, or the Gyarados projection
+      for a Magikarp) makes it pass with the other members unchanged; ``lead.level`` when no level passes.
+      ``useful`` = ``level >= target``.
+    - ``ready`` = the lead verdict is ready AND the hurt-lead sim passes AND at least TEAM_MIN members are useful
+      (a one-mon party is TEAM_MIN-short: not ready, ``weakest`` is None and the text says "no second member").
+    - ``weakest`` = the not-useful non-lead member with the lowest level (ties: lowest slot)."""
+    from pokeagent.magikarp import EVOLVE_LEVEL  # deferred: keep this pure module free of the emulator import
+    fighters = [c for c in party if c.name != "MAGIKARP"]
+    lead = assess(fighters, boss, label, kb)
+    if lead is None:
+        return None
+    theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
+    moves = table(kb, "moves")
+    if not theirs or not moves:
+        return None
+    chart = _chart(kb)
+    lead_i = next(i for i, c in enumerate(party) if c.name != "MAGIKARP")
+    lead_c = party[lead_i]
+    hurt = replace(lead_c, hp=int(lead_c.hp * LEAD_HURT))
+    others = [(i, c) for i, c in enumerate(party) if i != lead_i]
+
+    def grown(c: Combatant, level: int) -> Combatant:
+        """`c` trained to `level`: a Magikarp is judged as the GYARADOS it becomes (EVOLVE_LEVEL or later)."""
+        if c.name == "MAGIKARP":
+            g = trainer_mon("GYARADOS", max(level, EVOLVE_LEVEL), kb)
+            if g is not None:
+                return g
+        return at_level(c, level, kb)
+
+    def now(c: Combatant) -> Combatant:
+        """`c` as it fights today: only an evolved (>= EVOLVE_LEVEL) Magikarp counts as its GYARADOS."""
+        return grown(c, c.level) if c.name == "MAGIKARP" and c.level >= EVOLVE_LEVEL else c
+
+    def hurt_sim(at: tuple[int, int] | None = None) -> float:
+        """The hurt-lead fight; `at` = (slot, level) re-levels one member for the sim_needed search."""
+        return fight([hurt] + [grown(c, at[1]) if at and i == at[0] else now(c) for i, c in others],
+                     theirs, chart, moves)
+
+    def sim_needed(i: int, c: Combatant) -> int:
+        """The member's own level when the current sim passes, else the lowest level in current+1..MAX_LEVEL that does."""
+        if hurt_sim() >= MARGIN:
+            return c.level
+        return next((L for L in range(c.level + 1, MAX_LEVEL + 1) if hurt_sim((i, L)) >= MARGIN), lead_c.level)
+
+    rows = [MemberNeed(lead_i, lead_c.name, lead_c.level, lead_c.level, lead.ready)]
+    for i, c in others:
+        floor = EVOLVE_LEVEL if c.name == "MAGIKARP" else 0
+        target = min(lead_c.level, max(lead_c.level - TEAM_GAP, floor, sim_needed(i, c)))
+        rows.append(MemberNeed(i, c.name, c.level, target, c.level >= target))
+    useful = sum(r.useful for r in rows)
+    ready = lead.ready and hurt_sim() >= MARGIN and useful >= TEAM_MIN
+    weakest = None if ready else min((r for r in rows if r.slot != lead_i and not r.useful),
+                                     key=lambda r: (r.level, r.slot), default=None)
+    if ready:
+        text = f"team ready vs {label}: lead L{lead_c.level}, {useful}/{len(rows)} useful"
+    elif len(rows) < TEAM_MIN:
+        text = f"team not ready vs {label}: no second member (lead L{lead_c.level})"
+    elif weakest is not None:
+        text = f"team not ready vs {label}: {weakest.name} L{weakest.level} -> L{weakest.target} (lead L{lead_c.level})"
+    else:
+        why = f"lead needs L{lead.required}" if not lead.ready else "the hurt lead loses"
+        text = f"team not ready vs {label}: {why} (lead L{lead_c.level})"
+    return TeamReadiness(ready, lead, tuple(rows), weakest, text)

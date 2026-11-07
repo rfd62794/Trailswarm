@@ -8,6 +8,7 @@ from __future__ import annotations
 from pokeagent.knowledge import blackout_tax
 
 GRIND_BATTLES = 25
+GRIND_BATTLES_GYARADOS = 120  # the gyarados stage only: a Magikarp level costs 60+ shared-XP fights past ~L15
 GRIND_STEPS = 2500
 GRIND_BLACKOUTS = 2
 CEILING_MARGIN = 6   # lead this far above the route's top wild level: a fight there gives negligible XP
@@ -68,7 +69,7 @@ class GrindBudget:
         return self._lifted.get(goal, "")
 
     def update(self, goal: str, *, level: int, step: int, battles: int, blackouts: int, training: bool,
-               ceiling: int | None = None) -> str | None:
+               ceiling: int | None = None, max_battles: int = GRIND_BATTLES) -> str | None:
         """Feed one planning step; returns the reason the first time the gate for `goal` is lifted, else None."""
         if goal in self._lifted:
             return None
@@ -82,8 +83,8 @@ class GrindBudget:
         if not training:
             return None
         why = None
-        if s["battles_in"] >= GRIND_BATTLES:
-            why = f"{GRIND_BATTLES} battles without a level gain (stuck at L{level})"
+        if s["battles_in"] >= max_battles:
+            why = f"{max_battles} battles without a level gain (stuck at L{level})"
         elif s["steps_in"] >= GRIND_STEPS:
             why = f"{GRIND_STEPS} steps without a level gain (stuck at L{level})"
         elif ceiling is not None and level >= ceiling + CEILING_MARGIN:

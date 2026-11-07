@@ -53,7 +53,7 @@ def _party_xp(ctx) -> float:
 
 def _level(ctx) -> int:
     try:
-        from pokeagent.explorer.perceive import lead_level
-        return lead_level(ctx.emu)
+        from pokeagent.explorer.perceive import true_lead_level
+        return true_lead_level(ctx.emu)
     except Exception:  # noqa: BLE001
         return 0
