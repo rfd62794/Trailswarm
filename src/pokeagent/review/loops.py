@@ -12,6 +12,7 @@ from collections import Counter
 LOOP_MIN_ROWS = 6    # untuned first value: a real loop; a 5-row repeat is still normal play
 LOOP_TEXT_LEN = 60   # untuned first value: enough of the screen text to identify the loop
 BREAK_LOOP_ROWS = 30  # untuned first value: an episode this long is a break, not a hiccup
+LONG_LOOP_ROWS = 10   # untuned first value: an episode this long is reported as a long loop
 
 
 def _norm(text) -> str:
@@ -61,3 +62,36 @@ def find_loops(transitions: list[dict], decisions: list[dict] | None = None) -> 
                              "key": shown, "rule": dom.most_common(1)[0][0] if dom else None})
         i = j
     return episodes
+
+
+def collapse_loops(episodes: list[dict]) -> list[dict]:
+    """One entry per (kind, key) across the run, however many episodes repeat it.
+
+    A near-threshold blocked tile can re-trigger the 6-row threshold dozens of times; that is one
+    loop, not dozens. Each group: ``count`` episodes, ``total_presses``, ``max_presses``, the first
+    ``step`` and last ``end_step``, the most common ``rule``, and ``long`` when any episode reached
+    ``LONG_LOOP_ROWS``. Ordered by first step."""
+    groups: dict[tuple, dict] = {}
+    rules: dict[tuple, Counter] = {}
+    for e in episodes:
+        gk = (e["kind"], tuple(sorted(e["key"].items())))
+        g = groups.get(gk)
+        if g is None:
+            g = groups[gk] = {"kind": e["kind"], "key": e["key"], "count": 0, "total_presses": 0,
+                              "max_presses": 0, "step": e["step"], "end_step": e["end_step"],
+                              "rule": None}
+            rules[gk] = Counter()
+        g["count"] += 1
+        g["total_presses"] += e["presses"]
+        g["max_presses"] = max(g["max_presses"], e["presses"])
+        if e["step"] is not None and (g["step"] is None or e["step"] < g["step"]):
+            g["step"] = e["step"]
+        if e["end_step"] is not None and (g["end_step"] is None or e["end_step"] > g["end_step"]):
+            g["end_step"] = e["end_step"]
+        rules[gk][e["rule"]] += 1
+    out = []
+    for gk, g in groups.items():
+        g["rule"] = rules[gk].most_common(1)[0][0]
+        g["long"] = g["max_presses"] >= LONG_LOOP_ROWS
+        out.append(g)
+    return sorted(out, key=lambda g: (g["step"] is None, g["step"] or -1, g["kind"]))

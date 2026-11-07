@@ -1,7 +1,13 @@
-Synthetic review fixtures. Every run here is hand-written test data (meta.json carries
+Synthetic review fixtures - the layout and scenarios the review tests expect. NOT committed:
+the root .gitignore rule "runs/" also matches tests/fixtures/review/runs/, so this directory holds
+only this README. No generator exists either; the tests that read runs/ (test_review_run,
+test_review_swarm, test_review_replay, test_review_diff, test_cli_review) fail on a clean checkout
+until the runs/ tree is restored. Every run in it is hand-written test data (meta.json carries
 "synthetic": true), NOT a copy of a real run. Layout mirrors runs/: explore-YYYYMMDD-HHMMSS-pid
 dirs with distinct timestamps (2026-11-07 15:00..15:40) plus shared milestones.json, battles.jsonl,
 stalls/, checkpoints/ and segments/inputs/ so the review tools can be exercised read-only.
+
+Scenarios the tests assert on:
 
 run_ok          explore-20261107-150000-1001  solved seg:gyarados run: goal_frames, a 35->36->35
                                             map bounce, a 35->37 warp, a trainer win + a wild win,

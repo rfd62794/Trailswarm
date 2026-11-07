@@ -1,0 +1,35 @@
+{"step": 1, "from": [35, 10, 35], "button": "UP", "to": [35, 10, 34], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 2, "from": [35, 10, 34], "button": "UP", "to": [35, 10, 33], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 3, "from": [35, 10, 33], "button": "UP", "to": [35, 10, 32], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 4, "from": [35, 10, 32], "button": "UP", "to": [35, 10, 31], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 5, "from": [35, 10, 31], "button": "UP", "to": [35, 10, 30], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 6, "from": [35, 10, 30], "button": "UP", "to": [35, 10, 29], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 7, "from": [35, 10, 29], "button": "UP", "to": [35, 10, 28], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 8, "from": [35, 10, 28], "button": "UP", "to": [35, 10, 27], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 9, "from": [35, 10, 27], "button": "UP", "to": [36, 5, 5], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 10, "from": [36, 5, 5], "button": "UP", "to": [36, 5, 4], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 11, "from": [36, 5, 4], "button": "UP", "to": [36, 5, 3], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 12, "from": [36, 5, 3], "button": "UP", "to": [35, 10, 27], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 13, "from": [35, 10, 27], "button": "UP", "to": [35, 10, 26], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 14, "from": [35, 10, 26], "button": "UP", "to": [35, 10, 25], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "claude"}
+{"step": 15, "from": [35, 10, 25], "button": "UP", "to": [37, 3, 3], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 16, "from": [37, 3, 3], "button": "UP", "to": [37, 3, 4], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 17, "from": [37, 3, 4], "button": "A", "to": [37, 3, 4], "moved": false, "textbox": "dialog", "text": "Enemy GENGAR used NIGHT SHADE!", "facing": "UP", "source": "agent"}
+{"step": 18, "from": [37, 3, 4], "button": "A", "to": [37, 3, 4], "moved": false, "textbox": "dialog", "text": "EEVEE used TACKLE!", "facing": "UP", "source": "agent"}
+{"step": 19, "from": [37, 3, 4], "button": "A", "to": [37, 3, 4], "moved": false, "textbox": "dialog", "text": "Enemy GENGAR fainted!", "facing": "UP", "source": "agent"}
+{"step": 20, "from": [37, 3, 4], "button": "A", "to": [37, 3, 4], "moved": false, "textbox": "dialog", "text": "EEVEE gained 162 EXP. Points!", "facing": "UP", "source": "agent"}
+{"step": 21, "from": [37, 3, 4], "button": "A", "to": [37, 3, 4], "moved": false, "textbox": "dialog", "text": "EEVEE grew to level 10!", "facing": "UP", "source": "agent"}
+{"step": 22, "from": [37, 3, 4], "button": "RIGHT", "to": [37, 4, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 23, "from": [37, 4, 4], "button": "A", "to": [37, 4, 4], "moved": false, "textbox": "dialog", "text": "Wild PIDGEY used GUST!", "facing": "RIGHT", "source": "agent"}
+{"step": 24, "from": [37, 4, 4], "button": "A", "to": [37, 4, 4], "moved": false, "textbox": "dialog", "text": "Wild PIDGEY fainted!", "facing": "RIGHT", "source": "agent"}
+{"step": 25, "from": [37, 4, 4], "button": "RIGHT", "to": [37, 5, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 26, "from": [37, 5, 4], "button": "A", "to": [37, 5, 4], "moved": false, "textbox": "dialog", "text": "Used POTION!", "facing": "RIGHT", "source": "agent"}
+{"step": 27, "from": [37, 5, 4], "button": "A", "to": [37, 5, 4], "moved": false, "textbox": "dialog", "text": "Used POTION!", "facing": "RIGHT", "source": "agent"}
+{"step": 28, "from": [37, 5, 4], "button": "A", "to": [37, 5, 4], "moved": false, "textbox": "dialog", "text": "Used POTION!", "facing": "RIGHT", "source": "agent"}
+{"step": 29, "from": [37, 5, 4], "button": "A", "to": [37, 5, 4], "moved": false, "textbox": "dialog", "text": "Here you are!", "facing": "RIGHT", "source": "agent"}
+{"step": 30, "from": [37, 5, 4], "button": "A", "to": [37, 5, 4], "moved": false, "textbox": "dialog", "text": "Here you are!", "facing": "RIGHT", "source": "agent"}
+{"step": 31, "from": [37, 5, 4], "button": "RIGHT", "to": [37, 6, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 32, "from": [37, 6, 4], "button": "RIGHT", "to": [37, 7, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 33, "from": [37, 7, 4], "button": "RIGHT", "to": [37, 8, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 34, "from": [37, 8, 4], "button": "RIGHT", "to": [37, 9, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 35, "from": [37, 9, 4], "button": "RIGHT", "to": [37, 10, 4], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}

@@ -1,0 +1,12 @@
+{"step": 1, "from": [35, 10, 35], "button": "UP", "to": [35, 10, 34], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 2, "from": [35, 10, 34], "button": "UP", "to": [35, 10, 33], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 3, "from": [35, 10, 33], "button": "UP", "to": [35, 10, 32], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 4, "from": [35, 10, 32], "button": "UP", "to": [35, 10, 31], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 5, "from": [35, 10, 31], "button": "UP", "to": [35, 10, 30], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 6, "from": [35, 10, 30], "button": "UP", "to": [35, 10, 29], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 7, "from": [35, 10, 29], "button": "LEFT", "to": [35, 9, 29], "moved": true, "textbox": "none", "text": "", "facing": "LEFT", "source": "agent"}
+{"step": 8, "from": [35, 9, 29], "button": "B", "to": [35, 9, 29], "moved": false, "textbox": "dialog", "text": "Nothing here.", "facing": "LEFT", "source": "agent"}
+{"step": 9, "from": [35, 9, 29], "button": "B", "to": [35, 9, 29], "moved": false, "textbox": "dialog", "text": "Nothing here.", "facing": "LEFT", "source": "agent"}
+{"step": 10, "from": [35, 9, 29], "button": "UP", "to": [35, 9, 28], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 11, "from": [35, 9, 28], "button": "UP", "to": [35, 9, 27], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 12, "from": [35, 9, 27], "button": "UP", "to": [35, 9, 26], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
