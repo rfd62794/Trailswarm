@@ -163,7 +163,7 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -171,4 +171,5 @@ any caller of `required_level`/`readiness_for` you found that this does not reac
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: blackout tax on readiness margin
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new module and new test (greenfield)
+- 2026-11-07 12:49 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files knowledge/blackout_tax.py and tests/test_blackout_tax.py; known false positive. Held until Battle_Log_Fidelity merged (shared battle.py edits); it merged as #136.
 <!-- queue:end -->
