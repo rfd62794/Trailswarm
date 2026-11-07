@@ -222,11 +222,13 @@ where the gate reads the team (`perceive.lead_level` + `plan_goal.py`), and anyt
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-team-readiness-directive |
 | Base branch | - |
 | Base commit | 34ccc1b92eb31f1679df2cc61c49461ef2b8d770 |
+| Head commit | b78b7c93132bf333e453f2e46895df372a671fa7 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 13:01 · robert-claude-laptop · none → Draft — Claude 2026-11-07: team-centric readiness + gyarados ladder goal
@@ -234,4 +236,5 @@ where the gate reads the team (`perceive.lead_level` + `plan_goal.py`), and anyt
 - 2026-11-07 13:20 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on gitignored evidence paths (runs/checkpoints/ss_anne_captain.state.fp.json, kb/rom_tables.json); known false positive
 - 2026-11-07 13:20 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-readiness-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VKV8R3J302ZFK0E1M04JXV
 - 2026-11-07 13:28 · dispatcher · launched pid=3612; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-readiness-directive; provisioned: uv sync --frozen
+- 2026-11-07 13:56 · devin · In progress → Review — [origin] spent: devin 27 min est. n/a
 <!-- queue:end -->
