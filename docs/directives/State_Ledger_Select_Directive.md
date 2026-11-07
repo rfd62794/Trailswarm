@@ -195,7 +195,7 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -203,4 +203,5 @@ Findings first: test tails (before/after), `git diff --stat`, line counts of the
 **Status log**
 - 2026-11-07 12:15 · robert-claude-laptop · none → Draft — Claude 2026-11-07: ledger part 2 from the merged spec
 - 2026-11-07 12:16 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override candidate: dispatch-path-missing on new test file and gitignored runs/ evidence path (greenfield)
+- 2026-11-07 12:21 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing on greenfield files (tests/test_statelog.py) and gitignored evidence paths (runs/checkpoints/*.fp.json); known false positive
 <!-- queue:end -->
