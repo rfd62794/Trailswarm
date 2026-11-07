@@ -12,6 +12,7 @@ from pokeagent.explorer.world import DUNGEON_MAPS, POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
 PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24 = 0x02, 0x0E, 0x0F, 0x03, 0x23
+ROUTE25 = 0x24
 CERULEAN_GYM = 0x41
 OUTDOORS = (PEWTER, ROUTE3, ROUTE4, CERULEAN, ROUTE24, 0x24)
 CAVE = tuple(sorted(DUNGEON_MAPS))
@@ -32,14 +33,17 @@ TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on
            "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None}
 
 
-def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str) -> tuple[str, str] | None:
-    """Push toward a map edge ('RIGHT' = east, 'UP' = north): the extreme visited tile whose `side` is still unknown."""
+def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:
+    """Push toward a map edge ('RIGHT' = east, 'UP' = north): the extreme visited tile whose `side` is still unknown.
+    `occupied` = (x, y) of people standing on the map: a tile whose `side` neighbour holds one only LOOKS unexplored
+    (a person is never learned as a wall), and pushing into him loops forever (Nugget Bridge trainers, 2026-11-06)."""
     d = maps.get(str(pos[0]), {})
     visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
     dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
     tiles = [tuple(map(int, k.split(","))) for k in visited]
     tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
-             and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})]
+             and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})
+             and (t[0] + dx, t[1] + dy) not in occupied]
     order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
     word = "easternmost" if side == "RIGHT" else "northernmost"
     for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
@@ -122,4 +126,11 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if push is None:
         return None  # Mt Moon floors, the Pokecenter door, Bill's house: exploration + learned warps
     home, side, name = push
-    return _edge_frontier(g, maps, pos, stage, side) if pos[0] == home else _back_to(g, pos, stage, home, name)
+    if stage == "to_bill":
+        if pos[0] == ROUTE25:
+            return None  # Bill's house is the only warp on Route 25: exploration finds it (walking back to Route 24 would undo the arrival)
+        east = g.path(pos, _on(ROUTE25)) if pos[0] == home else None
+        if east:  # Route 24's east connection is already learned: walk to it rather than hunting a frontier
+            return east[0], f"goal {stage}: {len(east)} steps to Route 25 over the learned world"
+    occupied = frozenset((sx, sy) for _pic, sx, sy in goals.get("_sprites", ()))
+    return _edge_frontier(g, maps, pos, stage, side, occupied) if pos[0] == home else _back_to(g, pos, stage, home, name)
