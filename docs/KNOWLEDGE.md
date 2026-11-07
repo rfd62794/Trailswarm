@@ -201,3 +201,5 @@ base_exp x enemy level / 7 (x1.5 trainer), 0 for a lost or fled fight, `"estimat
 has real `exp_gained`. Needs the ROM-extracted `kb/rom_tables.json` (gitignored). Shared fights are over-estimated.
 Caveats: `won` in battle records means we survived, so a fled wild fight counts as won (estimate over-counts it); a trainer battle
 record holds only the last enemy mon, so a multi-mon trainer is under-counted. Prefer `exp_gained` when present.
+
+- Trainer "Will <name> change POKeMON?" (YES/NO, after our kill, before their next mon): YES opens "Bring out which POKeMON?" with the cursor on slot 0 = the mon already fighting, and A there answers "<name> is already out!" (2026-11-07: 1,564 of 1,566 such loops in runs 11-06/11-07 began at this prompt). Always answer NO (dialog.YESNO_RULES). wPlayerMonNumber (0xCC2F) is read via intervene.screen.active_slot, which cross-checks it against wBattleMon species.

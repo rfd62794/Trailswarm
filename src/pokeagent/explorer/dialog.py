@@ -8,7 +8,10 @@ from pokeagent.goals import GOAL_MENU
 
 # YES/NO boxes: the answer depends on the question that was on screen just before. First match wins; default YES.
 YESNO_RULES = [("nickname", "NO"), (" name ", "NO"), ("toss", "NO"), ("deposit", "NO"), ("release", "NO"),
-               ("give up", "NO"), (" run ", "NO"), ("", "YES")]  # spaced needles = whole words
+               ("give up", "NO"), (" run ", "NO"),
+               # "Will <trainer> change POKeMON?" after a trainer's mon faints: YES opens the party list with the cursor on
+               # the mon already fighting ("<name> is already out!", looped thousands of presses); NO just fights on.
+               ("change pok", "NO"), ("", "YES")]  # spaced needles = whole words
 
 
 STARTERS = ["BULBASAUR", "CHARMANDER", "SQUIRTLE"]
