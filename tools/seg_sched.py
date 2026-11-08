@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import shutil
 import time
 from datetime import datetime
@@ -23,9 +24,11 @@ from typing import Callable
 import seg_hold
 import seg_ingest
 import seg_janitor
+import seg_sched_grades as ssg
 import seg_split
 import seg_store as ss
 from pokeagent import checkpoint_goals as cg
+from pokeagent import segment_grades as sg
 
 SHARE_UNSOLVED = 0.40
 SHARE_FRONTIER = 0.45
@@ -35,6 +38,16 @@ BUDGET_MULT, BUDGET_MIN, BUDGET_MAX, BUDGET_DEFAULT = 3, 1500, 6000, 3000
 POLISH_EXPLORE_RATE = 0.5
 CONFIRM_TRIES = 2
 
+_log = logging.getLogger(__name__)
+_logged: set[str] = set()   # fallback messages already warned about: a frequent caller does not spam
+
+
+def _warn_once(msg: str) -> None:
+    """log.warning once per distinct message; a grade fallback keeps working but is never silent."""
+    if msg not in _logged:
+        _logged.add(msg)
+        _log.warning(msg)
+
 
 def budget(st: dict) -> int:
     b = ss.accepted(st)
@@ -43,7 +56,7 @@ def budget(st: dict) -> int:
 
 class Curriculum:
     def __init__(self, root: Path, clock: Callable[[], float] = time.time, log: Callable[[str], None] = print,
-                 quiet_s: float = 30.0):
+                 quiet_s: float = 30.0, suite=None):
         self.root, self.clock, self.log, self.quiet_s = Path(root), clock, log, quiet_s
         self.refused: set[str] = set()
         self.doc = ss.load(self.root)
@@ -53,11 +66,40 @@ class Curriculum:
         self.session = int(clock())
         self._depth = 0
         self._warned = False
+        self._gm: dict[str, sg.Grade] = {}   # grades from the last groups() call
+        self._grids = False                  # False = not tried; None = no ROM grids
         self.holds = seg_hold.HoldFile(self.root)   # runs/curriculum_hold.json, re-read only when it changes
         self._hold_seen: dict[tuple[str, str], seg_hold.Hold] = {}   # holds already logged (once each)
+        self.suite = self._resolve_suite(suite)   # None = every segment; else {key: starter|None}
         with self._guard("start-up sweep"):
             with self.txn():
                 seg_janitor.sweep(self.root, self.doc, clock(), log=log)
+
+    # --- grades & suites ------------------------------------------------------------------------------------
+    def _resolve_suite(self, suite):
+        """None, a suite NAME resolved through seg_suites, or a ready {key: starter} member map."""
+        return ssg.resolve_suite(suite, self.doc, self.root, self._grade_map().values(), self.log)
+
+    def _par(self, seg, st) -> float | None:
+        if self._grids is False:
+            try:
+                from pokeagent.legs.grid import rom_grids
+                self._grids = rom_grids()
+            except Exception as e:  # noqa: BLE001 - rom_grids() is opaque (ROM decode): no grids means no par, never a crash
+                _warn_once(f"curriculum: no ROM grids ({type(e).__name__}: {e})")
+                self._grids = None
+        return sg.par_for_best(self.root, st, self._grids)
+
+    def _grade_map(self) -> dict:
+        """key -> Grade; empty on any failure (grading is advisory: scheduling must not die on it)."""
+        try:
+            return {g.key: g for g in sg.grade_all(self.doc, self.root, self.clock(),
+                                                   par_fn=self._par, hold_file=self.holds)}
+        except Exception as e:  # noqa: BLE001
+            if not getattr(self, "_gm_warned", False):
+                self.log(f"curriculum: grading skipped ({e!r})")
+                self._gm_warned = True
+            return {}
 
     @contextlib.contextmanager
     def _guard(self, what: str):
@@ -89,83 +131,45 @@ class Curriculum:
     def refresh(self, finished: set[str] = frozenset(), failed: set[str] = frozenset()) -> None:
         with self.txn():
             seg_ingest.ingest(self.root, self.doc, finished, self.quiet_s, failed)
-            for g in seg_split.maybe_split(self.doc):
+            for g in seg_split.maybe_split(self.doc, root=self.root, par_fn=self._par):
                 self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
+            if self.doc["splits"]:
+                for goal in ssg.rejoin_goals(self.doc, list(self._grade_map().values())):
+                    seg_split.reset(self.doc, [goal])
+                    self.log(f"curriculum: rejoined {goal} (pieces solved+optimized, probes within tolerance)")
 
     def _log_refusals(self, segs) -> None:
-        """Say once per checkpoint when a ship-stage state is skipped for a respawn behind Vermilion."""
-        for name in {s.start for s in segs} | {s.end for s in segs}:
-            why = ss.refusal(self.root, name)
-            if why and name not in self.refused:
-                self.refused.add(name)
-                self.log(f"curriculum: refusing checkpoint {name}: {why}; the frontier remakes it")
-
-    def groups(self) -> dict[str, list]:
-        self._log_refusals(ss.layout(self.doc))
-        segs = [s for s in ss.layout(self.doc) if ss.ckpt_valid(self.root, s.start)]   # in-order checkpoints only
-        st = lambda s: ss.stat(self.doc, s.key)  # noqa: E731
-        unsolved = sorted((s for s in segs if not ss.is_solved(st(s))),
-                          key=lambda s: (ss.rate(st(s)) or 0.0, st(s)["n"]))
-        per = ss.fps(self.doc)
-        polish = sorted((s for s in segs if ss.is_solved(st(s))), key=lambda s: -ss.potential_gain(st(s), per))  # most to win first
-        # frontier: the EARLIEST segment whose end checkpoint is not (validly) there yet, once its start is valid. A stray
-        # checkpoint further up the ladder (a goal reached out of order) never moves it.
-        nxt = next((s for s in ss.layout(self.doc) if not ss.ckpt_valid(self.root, s.end)), None)
-        frontier = [nxt] if nxt is not None and ss.ckpt_valid(self.root, nxt.start) else []
-        return {"unsolved": unsolved, "frontier": frontier, "polish": polish}
+        ssg.log_refusals(self.root, segs, self.refused, self.log)
 
     def _live_holds(self) -> list:
-        """Unexpired holds from the hold file (read at most once per call). Logs each new hold once, and each expiry once.
-        A hold cleared by the operator before it expires is dropped silently."""
+        """Unexpired holds from the hold file (read at most once per call); each new hold and each
+        expiry is logged once."""
         now = datetime.fromtimestamp(self.clock()).astimezone()
-        on_disk = {(h.segment, h.until_text): h for h in self.holds.current()}
-        for key, h in list(self._hold_seen.items()):
-            if h.until <= now:
-                self.log(f"curriculum: hold on {h.segment} expired")
-                del self._hold_seen[key]
-            elif key not in on_disk:
-                del self._hold_seen[key]
-        live = []
-        for key, h in on_disk.items():
-            if h.until <= now:
-                continue
-            if key not in self._hold_seen:
-                self._hold_seen[key] = h
-                self.log(f"curriculum: holding {h.segment} until {h.until_text} ({h.reason})")
-            live.append(h)
-        return live
+        return ssg.live_holds(self.holds, self._hold_seen, now, self.log)
 
-    def choose(self) -> tuple[str, object] | None:
-        g = self.groups()
-        live = self._live_holds()
-        if live:   # a held segment is dropped from every category; an emptied category falls out of the shares
-            g = {k: [s for s in v if not any(h.covers(s.key) for h in live)] for k, v in g.items()}
-        avail = {k: v for k, v in g.items() if v}
-        if not avail:
-            return None
-        norm = sum(SHARES[k] for k in avail)
-        total = sum(self.picked.values())
-        cat = max(avail, key=lambda k: (SHARES[k] / norm * (total + 1) - self.picked[k], SHARES[k]))
-        cands = avail[cat]
-        if cat == "unsolved":
-            i = min(range(len(cands)), key=lambda j: (self.tries.get(cands[j].key, 0), j))   # cands is weakest-first
-        elif cat == "polish":
-            i = self.picked[cat] % min(3, len(cands))
-        else:
-            i = 0
-        self.picked[cat] += 1
-        if cat == "unsolved":
-            self.tries[cands[i].key] = self.tries.get(cands[i].key, 0) + 1
-        return cat, cands[i]
+    def groups(self, gm=None) -> dict[str, list]:
+        self._log_refusals(ss.layout(self.doc))
+        self._gm = self._grade_map() if gm is None else gm   # a passed map = this call's cache
+        return ssg.grade_groups(self.doc, self.root, self._gm, self.suite)
+
+    def choose(self, gm=None) -> tuple[str, object] | None:
+        self._log_refusals(ss.layout(self.doc))
+        self._gm = self._grade_map() if gm is None else gm
+        return ssg.choose(self.doc, self.root, self._gm, self._live_holds(), self.picked, self.tries,
+                          self.suite, SHARES)
 
     # --- jobs --------------------------------------------------------------------------------------------
     def _job(self, seg, kind: str, n: int, start: Path, st: dict) -> dict:
-        tag = f"seg:{seg.key}:{self.session}-{n}"
+        tag = f"seg:{seg.key}:rejoin{self.session}-{n}" if kind == "rejoin_probe" else f"seg:{seg.key}:{self.session}-{n}"
         stop = ["--stop-at-goal", seg.stop_goal] if seg.stop_goal else ["--stop-at-map", str(seg.stop_map)]
         job = {"key": seg.key, "kind": kind, "start": str(start), "stop": stop, "steps": budget(st), "tag": tag,
                "seed": self.session % 100000 + n}
         if kind == "polish":
             job["explore_rate"] = POLISH_EXPLORE_RATE
+        elif kind in ("rejoin_probe", "repro"):
+            job["explore_rate"] = 0.0
+        if self.suite is not None and self.suite.get(seg.key):
+            job["starter"] = self.suite[seg.key]   # a suite member pins its starter (per_starter suites)
         return job
 
     def _confirm(self, seg, st: dict) -> dict:
@@ -179,28 +183,49 @@ class Curriculum:
                 "box_pace": b["box_pace"], "maps_in": b["input"]}
 
     def pending_confirm(self):
-        for seg in ss.layout(self.doc):
-            st = ss.stat(self.doc, seg.key)
-            b = st["best"]
-            if (b and not b["confirmed"] and not b["rejected"] and ss.replayable(b)
-                    and b["tries"] < CONFIRM_TRIES and seg.key not in self.confirming):
-                return seg, st
-        return None
+        return ssg.pending_confirm(self.doc, self.suite, self.confirming, CONFIRM_TRIES)
+
+    def pending_broken_replay(self):
+        """A BROKEN segment whose accepted best is still replayable earns a confirm-style regression
+        replay right after pending confirms; at most one per segment per BROKEN_RECHECK_HOURS."""
+        return ssg.pending_broken_replay(self.doc, self._gm, self.suite, self.confirming, self.clock())
+
+    def pending_repro(self):
+        """A synthetic_only hypothesis earns an organic-reproduction job just below the
+        broken-replay priority, at most once per BROKEN_RECHECK_HOURS."""
+        return ssg.pending_repro(self.doc, self._gm, self.root, self.suite, self.clock())
 
     def next_job(self, n: int) -> dict | None:
         with self.txn():
             self.refresh()
+            self._gm = self._grade_map()
+            job = None
             pc = self.pending_confirm()
             if pc:
                 job = self._confirm(*pc)
             else:
-                pick = self.choose()
+                bp = self.pending_broken_replay()        # regression replay, right after a pending confirm
+                if bp:
+                    job = self._confirm(*bp)
+            if job is None:
+                rp = self.pending_repro()                # organic reproduction of a synthetic-only hypothesis
+                if rp:
+                    seg, st = rp
+                    job = self._job(seg, "repro", n, ss.ckpt(self.root, seg.start), st)
+                    st["jobs"] = st.get("jobs", 0) + 1
+            if job is None:
+                pick = self.choose(gm=self._gm)   # this call's grades, cached (no second grade_all)
                 if pick is None:
                     return None
                 kind, seg = pick
                 st = ss.stat(self.doc, seg.key)
+                kind = "rejoin_probe" if kind == "rejoin" else kind   # share group name -> job kind
                 job = self._job(seg, kind, n, ss.ckpt(self.root, seg.start), st)
                 st["jobs"] = st.get("jobs", 0) + 1
+                if kind in ("unsolved", "frontier") and any(sg.grade_signal(g) for g in self._gm.values()):
+                    f = ssg.frontier_seg(self.doc, self.root, self.suite)
+                    fh = sg.frontier_health(self._gm.get(f.key) if f else None)
+                    job["explore_rate"] = sg.explore_for_health(fh)   # a sick frontier scouts, a healthy one exploits
         self.log(f"curriculum: {job['kind']} {job['key']} from {Path(job['start']).name}, {job['steps']} steps")
         return job
 

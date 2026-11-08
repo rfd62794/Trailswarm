@@ -235,12 +235,12 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goal-procedures-directive |
 | Base branch | - |
 | Base commit | dccf81faf6eb1ed42156ef2b7dbafb527a235423 |
-| Head commit | d8e701bbb01664235d8e95556737fc54c98915e6 |
+| Head commit | 36c4286e8366d952e72cccf7c7aa4927d984cc36 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -250,4 +250,5 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 - 2026-11-07 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W99FWZ4KE4HJ131S4BRZ07
 - 2026-11-07 19:42 · dispatcher · launched pid=11212; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-directive; provisioned: uv sync --frozen
 - 2026-11-07 20:03 · devin · In progress → Review — Goal procedures landed: procedures pkg (schema/predicates/store/seeds/mine + after_victory_rules), nugget_bridge + ss_anne_corridor seeds, tools/procedures_mine.py, AfterVictory + ProcedureRunner behaviours registered per spec. 1854 passed, 40 skipped on uv run pytest -q; pushed on directive/pokeagent-goal-procedures-directive. [origin] spent: devin 21 min est. n/a
+- 2026-11-07 21:57 · robert-claude-laptop · Review → Done — note: PR #162 merged (merge commit 7cdd875) after Sonnet CHANGES-NEEDED (six should-fixes) -> Devin review fixes on a child branch -> main merges -> Haiku delta APPROVE, and a green verify record at 36c4286 (1990 passed, 0 failed, 40 ROM-gated skips). Follow-ups: seeds._rival_step comment that map 96 has no ROM trainer row so the rival step relies on the scripted intercept; a test that a null-target fight_trainer step with no ledger placement returns None.
 <!-- queue:end -->

@@ -35,12 +35,14 @@ def parse_seeds(s: str) -> list[int]:
     return out
 
 
-def build_cmd(root: Path, args, flags: str, seed: int, maps: str | None) -> list[str]:
+def build_cmd(root: Path, args, flags: str, seed: int, maps: str | None, starter: str | None = None) -> list[str]:
     cmd = [sys.executable, str(root / "tools" / "explore_headless.py"), "--rom", str(Path(args.rom).resolve()),
            "--state", str(Path(args.state).resolve()), "--steps", str(args.steps), "--seed", str(seed),
            "--stop-at-goal", args.goal]
     if maps:
         cmd += ["--maps-copy", maps]
+    if starter:
+        cmd += ["--starter", starter]
     return cmd + [t.strip('"') for t in shlex.split(flags, posix=False)]
 
 
@@ -109,13 +111,37 @@ def main(argv=None) -> int:
     ap.add_argument("--maps", default=str(ROOT / "runs" / "maps.json"), help="map memory to snapshot once (missing: fresh)")
     ap.add_argument("--results", default=str(ROOT / "runs" / "ab_results.jsonl"))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--suite", default=None, metavar="NAME",
+                    help="one A/B per member of this suite (runs/segment_sets.json; --state/--goal come from each segment)")
     ap.add_argument("cmd", nargs="?", choices=["list"])
     args = ap.parse_args(argv)
     results = Path(args.results)
     if args.cmd == "list":
-        return cmd_list(results)
+        rc = cmd_list(results)
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import seg_suites  # noqa: E402
+        print("suites: " + ", ".join(sorted(seg_suites.load_suites(ROOT))))
+        return rc
+    if args.suite:
+        members = _suite_members(ROOT, args.suite)
+        if members is None:
+            ap.error(f"unknown or malformed suite {args.suite!r}")
+        if not members:
+            ap.error(f"suite {args.suite!r} resolved to no runnable members")
+        rc = 0
+        for seg, start, starter in members:
+            print(f"--- suite {args.suite}: {seg.key}" + (f" (starter {starter})" if starter else ""))
+            margs = argparse.Namespace(**{**vars(args), "state": start, "goal": seg.stop_goal,
+                                          "label": f"{args.label or args.suite}:{seg.key}"})
+            rc |= _run_ab(margs, starter)
+        return rc
     if not (args.state and args.goal):
-        ap.error("--state and --goal are required")
+        ap.error("--state and --goal are required (or --suite NAME)")
+    return _run_ab(args)
+
+
+def _run_ab(args, starter: str | None = None) -> int:
+    results = Path(args.results)
     seeds = parse_seeds(args.seeds)
     tmp = Path(tempfile.mkdtemp(prefix="ab-"))
     maps = str(tmp / "maps_snapshot.json") if Path(args.maps).exists() else None  # ONE snapshot: identical map memory for A and B
@@ -123,7 +149,7 @@ def main(argv=None) -> int:
     if args.dry_run:
         for v, seed in plan:
             ref = getattr(args, f"{v}_ref")
-            print(f"[{v.upper()} seed {seed}] cwd={tmp / 'cwd'} " + " ".join(build_cmd(Path(f"<worktree@{ref}>") if ref else ROOT, args, getattr(args, v), seed, maps)))
+            print(f"[{v.upper()} seed {seed}] cwd={tmp / 'cwd'} " + " ".join(build_cmd(Path(f"<worktree@{ref}>") if ref else ROOT, args, getattr(args, v), seed, maps, starter)))
         shutil.rmtree(tmp, ignore_errors=True)
         return 0
     if maps:
@@ -136,7 +162,7 @@ def main(argv=None) -> int:
         scratch = tmp / "cwd"
         scratch.mkdir()
         for v, seed in plan:  # sequential: one emulator at a time
-            m = run_one(build_cmd(roots[v], args, getattr(args, v), seed, maps), scratch, args.goal, args.steps)
+            m = run_one(build_cmd(roots[v], args, getattr(args, v), seed, maps, starter), scratch, args.goal, args.steps)
             res[v].append(m)
             print(f"[{v.upper()} seed {seed}] solved={m['solved']} steps={m['steps']} presses={m['presses']} {m.get('error', '')}", flush=True)
     finally:
@@ -152,6 +178,30 @@ def main(argv=None) -> int:
     with results.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
     return 0
+
+
+def _suite_members(root: Path, name: str):
+    """Resolve a suite through seg_suites to (segment, starter) pairs the per-goal flow can run."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import seg_store as ss  # noqa: E402
+    import seg_suites      # noqa: E402
+    from pokeagent import segment_grades as sg  # noqa: E402
+    doc = ss.load(root)
+    members = seg_suites.resolve(name, doc, sg.grade_all(doc, root, time.time()), root)
+    if members is None:
+        return None
+    out = []
+    for m in members:
+        seg = next((s for s in ss.layout(doc) if s.key == m["key"]), None)
+        if seg is None or not seg.stop_goal:
+            print(f"suite {name}: {m['key']} has no goal stop (map-stop sub-segment), skipped")
+            continue
+        start = ss.ckpt(root, seg.start)
+        if start is None:
+            print(f"suite {name}: {m['key']}: no start checkpoint for {seg.start}, skipped")
+            continue
+        out.append((seg, str(start), m.get("starter")))
+    return out
 
 
 if __name__ == "__main__":
