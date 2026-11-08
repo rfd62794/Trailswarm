@@ -1,5 +1,6 @@
 """Layout persistence helpers: ensure_layout/reset_layout, the committed default ini, the tag list."""
-import pytest
+import importlib
+
 
 from pokeagent.viewer import layout_file
 from pokeagent.viewer.ui import tags
@@ -52,7 +53,7 @@ def test_documented_top_level_window_tags():
 
 def test_configure_app_supports_layout_keywords(tmp_path):
     """The installed Dear PyGui 2.x accepts init_file/docking/docking_space (a TypeError fails this)."""
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     dpg.create_context()
     try:
         dpg.configure_app(init_file=str(tmp_path / "layout.ini"), docking=True, docking_space=False)
@@ -62,7 +63,7 @@ def test_configure_app_supports_layout_keywords(tmp_path):
 
 def test_populate_builds_only_documented_top_level_windows(monkeypatch):
     """Every window ``_populate`` creates is in the documented tag list (a new unlabelled window fails)."""
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.model import ViewerModel
     from pokeagent.viewer.ui.window import ViewerWindow
     seen = []
@@ -76,15 +77,21 @@ def test_populate_builds_only_documented_top_level_windows(monkeypatch):
     try:
         win._build()
         dpg.setup_dearpygui()
-    except Exception as e:
-        try:
-            dpg.destroy_context()
-        except Exception:
-            pass
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+    except BaseException:
+        dpg.destroy_context()
+        raise
     try:
         monkeypatch.setattr(dpg, "add_window", record)
         win._populate()
         assert set(seen) == set(tags.TOP_LEVEL_WINDOWS)
     finally:
         dpg.destroy_context()
+
+
+def test_layout_failures_are_logged_not_raised(tmp_path, caplog):
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    with caplog.at_level("WARNING"):
+        layout_file.ensure_layout(tmp_path / "missing.ini", blocker / "sub" / "layout.ini")
+        layout_file.reset_layout(tmp_path / "missing.ini", blocker / "sub" / "layout.ini")
+    assert sum("layout" in r.message for r in caplog.records) == 2

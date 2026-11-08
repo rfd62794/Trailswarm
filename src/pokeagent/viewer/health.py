@@ -8,86 +8,30 @@ the render path only does dict lookups on the last snapshot. Pure except the rea
 from __future__ import annotations
 
 import json
-import re
+import logging
 import threading
 import time
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from pokeagent.invariants.findings import ERROR, WARN
 from pokeagent.invariants.runner import run_all
 from pokeagent.stalls import load_dossiers
+from pokeagent.viewer.health_classify import (  # noqa: F401  (re-exported: the public health API)
+    ANOMALY, ANOMALY_FRESH_S, HEALTH_POLL_S, INVARIANT_EVERY_S, JOIN_SLACK_S, OK, SLOW, STALL_FRESH_S,
+    STALL_SLOW_S, STALLED, AnomalyRef, Health, _dossier_t, _joins, _run_started, classify, run_pid)
 
-JOIN_SLACK_S = 120            # untuned first value: a run joins an agent if it started >= agent.started - this
-STALL_FRESH_S = 900           # untuned first value: a dossier this new makes the card "stalled"
-STALL_SLOW_S = 3600           # untuned first value: an older dossier (up to this) leaves the card "slow"
-ANOMALY_FRESH_S = 600         # untuned first value: an anomaly this new makes the card "anomaly" (top priority)
-HEALTH_POLL_S = 1.0           # the refresh cadence on the poll thread (<= 1 Hz)
-INVARIANT_EVERY_S = 60.0      # untuned first value: how often the one-shot worker re-runs run_all
-
-OK, SLOW, STALLED, ANOMALY = "ok", "slow", "stalled", "anomaly"
-
-_RUN_TAIL = re.compile(r"(?P<day>\d{8})-(?P<hms>\d{6})-(?P<pid>\d+)$")
+log = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class AnomalyRef:
-    run: str
-    step: int
-    type: str
-    png: Path | None
-    state: Path | None
-    mtime: float
-    cause_hint: str = ""
-    provenance: str = ""        # from the anomalies.jsonl row; "" when absent
-
-
-@dataclass(frozen=True)
-class Health:
-    state: str
-    reason: str
-    anomaly: AnomalyRef | None = None
-    dossier_run: str | None = None
-
-
-def run_pid(run: str) -> str | None:
-    """``"explore-20261107-153827-24324"`` -> ``"24324"``; None when the name does not end ``-<pid>``."""
-    tail = str(run).rsplit("-", 1)[-1]
-    return tail if tail.isdigit() else None
-
-
-def _run_started(run: str) -> float | None:
-    """Epoch of the ``YYYYMMDD-HHMMSS`` inside a run name (local time), else None."""
-    m = _RUN_TAIL.search(str(run))
-    if not m:
-        return None
-    try:
-        return datetime.strptime(f"{m['day']}-{m['hms']}", "%Y%m%d-%H%M%S").timestamp()
-    except ValueError:
-        return None
-
-
-def _dossier_t(d: dict) -> float | None:
-    """The dossier's ``t`` (local ISO, no zone) as an epoch; None when absent/unparsable."""
-    t = d.get("t")
-    if not t:
-        return None
-    try:
-        return datetime.fromisoformat(str(t)).timestamp()
-    except ValueError:
-        return None
-
-
-def _joins(run: str, agent_id: str, started: float | None) -> bool:
-    """A run belongs to an agent when it ends in the agent's pid and (when ``started`` is known and the
-    run name parses) it began no earlier than ``started - JOIN_SLACK_S``."""
-    if run_pid(run) is None or run_pid(run) != run_pid(agent_id):
-        return False
-    if started is None:
-        return True
-    t0 = _run_started(run)
-    return t0 is not None and t0 >= started - JOIN_SLACK_S
+def started_map(entries: dict) -> dict[str, float | None]:
+    """``{agent_id: started epoch or None}`` from the registry entries (computed once per refresh)."""
+    out: dict[str, float | None] = {}
+    for aid, e in entries.items():
+        try:
+            out[aid] = float(e["started"]) if isinstance(e, dict) and e.get("started") is not None else None
+        except (TypeError, ValueError):
+            out[aid] = None
+    return out
 
 
 def anomalies_for(root: Path) -> list[AnomalyRef]:
@@ -133,30 +77,6 @@ def anomalies_for(root: Path) -> list[AnomalyRef]:
     return sorted(out, key=lambda a: a.mtime, reverse=True)
 
 
-def classify(agent_id: str, started: float | None, dossiers: list[dict],
-             anomalies: list[AnomalyRef], now: float) -> Health:
-    """anomaly > stalled > slow > ok. An agent with no joined run data is ``ok``."""
-    fresh = [a for a in anomalies
-             if _joins(a.run, agent_id, started) and now - a.mtime <= ANOMALY_FRESH_S]
-    if fresh:
-        a = fresh[0]
-        return Health(ANOMALY, (a.cause_hint or a.type)[:120], anomaly=a)
-    joined = [(t, d) for d in dossiers if _joins(str(d.get("run") or ""), agent_id, started)
-              and (t := _dossier_t(d)) is not None]
-    if joined:
-        t, d = max(joined, key=lambda td: td[0])
-        age = now - t
-        if age <= STALL_FRESH_S:
-            cause = str(d.get("likely_cause") or "")
-            why = str(d.get("reason") or "")
-            return Health(STALLED, (f"{cause} - {why}" if why else cause)[:120],
-                          dossier_run=str(d.get("run") or "") or None)
-        if age <= STALL_SLOW_S:
-            return Health(SLOW, f"stalled {int(age // 60)}min ago"[:120],
-                          dossier_run=str(d.get("run") or "") or None)
-    return Health(OK, "")
-
-
 def break_summary(findings: list) -> dict:
     """``{"errors": n, "warns": n, "top": [first 3 ERROR messages]}``."""
     errors = [f for f in findings if getattr(f, "level", None) == ERROR]
@@ -170,8 +90,9 @@ def poll_due(tick: int, fps: int, poll_s: float = HEALTH_POLL_S) -> bool:
     return tick % max(1, round(fps * poll_s)) == 0
 
 
-def badge_text(counts: dict[str, int], breaks: dict | None) -> str:
-    """``Health: 1 stalled, 1 anomaly | invariants: 0 errors`` (checking... / unavailable variants)."""
+def badge_text(counts: dict[str, int], breaks: dict | None, error: str | None = None) -> str:
+    """``Health: 1 stalled, 1 anomaly | invariants: 0 errors`` (checking... / unavailable variants);
+    ``| read error`` is appended while the last run-file read failed."""
     seg = [f"{counts.get(STALLED, 0)} stalled"]
     if counts.get(ANOMALY):
         seg.append(f"{counts[ANOMALY]} anomaly")
@@ -183,7 +104,7 @@ def badge_text(counts: dict[str, int], breaks: dict | None) -> str:
         inv = "unavailable"
     else:
         inv = f"{breaks.get('errors', 0)} errors"
-    return f"Health: {', '.join(seg)} | invariants: {inv}"
+    return f"Health: {', '.join(seg)} | invariants: {inv}" + (" | read error" if error else "")
 
 
 def worst_state(states: list[str]) -> str:
@@ -192,6 +113,9 @@ def worst_state(states: list[str]) -> str:
         if s in states:
             return s
     return OK
+
+
+_OK_HEALTH = Health(OK, "")
 
 
 class HealthStore:
@@ -208,6 +132,11 @@ class HealthStore:
         self._inv_last = 0.0
         self._inv_running = False
         self._fakes: dict[str, Health] = {}
+        self._agents: dict[str, float | None] = {}   # agent_id -> registry ``started`` epoch (the join key)
+        self._health: dict[str, Health] = {}         # classified once per refresh; health() only looks up
+        self._logged: set[str] = set()               # failure messages already logged (once per failure)
+        self._errors: list[str] = []
+        self.last_error: str | None = None           # last run-file read failure; None after a clean refresh
 
     # -- writes (poll thread only) ---------------------------------------------------
     def _paths(self, root: Path) -> dict[str, Path]:
@@ -220,28 +149,69 @@ class HealthStore:
         except OSError:
             return None
 
-    def refresh(self, root: Path, now: float) -> None:
-        """Stat the watched paths first; re-read only what changed. Never raises."""
+    def _read(self, name: str, fn, root: Path):
+        """Run one reader. On failure: log once, set ``last_error``, return ``(False, None)``."""
+        try:
+            out = fn(root)
+        except Exception as exc:
+            msg = f"{name}: {type(exc).__name__}: {exc}"
+            if msg not in self._logged:
+                self._logged.add(msg)
+                log.warning("health read failed (%s); will retry next refresh", msg)
+            self._errors.append(msg)
+            return False, None
+        return True, out
+
+    def refresh(self, root: Path, now: float, agents: dict[str, float | None] | None = None) -> None:
+        """Stat the watched paths first; re-read only what changed, then classify every agent once.
+
+        A path's mtime is recorded only after its read succeeded, so a failed read is retried next
+        refresh. ``agents`` maps agent_id -> started epoch (kept from the previous call when omitted).
+        Never raises."""
+        self._errors: list[str] = []
         try:
             mt = {k: self._stat(p) for k, p in self._paths(root).items()}
-            dossiers = anomalies = None
             with self._lock:
                 old = dict(self._mtimes)
-                self._mtimes = mt
+            done: dict[str, float | None] = {}
+            dossiers = anomalies = None
+            for k in mt:
+                if mt[k] is None:
+                    done[k] = None          # absent: nothing to read; reappearing counts as a change
             if mt["stalls"] is not None and mt["stalls"] != old.get("stalls"):
-                dossiers = load_dossiers(root)
-            if (mt["anomalies"] is not None and mt["anomalies"] != old.get("anomalies")) or \
-               (mt["jsonl"] is not None and mt["jsonl"] != old.get("jsonl")):
-                anomalies = anomalies_for(root)
+                ok, dossiers = self._read("dossiers", load_dossiers, root)
+                if ok:
+                    done["stalls"] = mt["stalls"]
+            elif mt["stalls"] is not None:
+                done["stalls"] = mt["stalls"]
+            if (mt["anomalies"] is not None and mt["anomalies"] != old.get("anomalies")) or                (mt["jsonl"] is not None and mt["jsonl"] != old.get("jsonl")):
+                ok, anomalies = self._read("anomalies", anomalies_for, root)
+                if ok:
+                    done["anomalies"], done["jsonl"] = mt["anomalies"], mt["jsonl"]
+            else:
+                done["anomalies"], done["jsonl"] = mt["anomalies"], mt["jsonl"]
             with self._lock:
+                self._mtimes = {**old, **done}
                 if dossiers is not None:
                     self._dossiers = dossiers
                     self._prov.update({str(d.get("run")): str(d.get("provenance") or "")
                                        for d in dossiers if d.get("run")})
                 if anomalies is not None:
                     self._anomalies = anomalies
-        except Exception:
-            pass
+                if agents is not None:
+                    self._agents = dict(agents)
+                self._health = {aid: classify(aid, st, self._dossiers, self._anomalies, now)
+                                for aid, st in self._agents.items()}
+        except Exception as exc:
+            self._errors.append(f"refresh: {type(exc).__name__}: {exc}")
+            msg = self._errors[-1]
+            if msg not in self._logged:
+                self._logged.add(msg)
+                log.warning("health refresh failed (%s)", msg)
+        with self._lock:
+            self.last_error = "; ".join(self._errors) or None
+        if not self._errors:
+            self._logged.clear()            # recovered: a later failure logs again
 
     def fake_refresh(self, agent_ids: list[str], now: float) -> None:
         """``--fake`` path: one stalled and one anomaly card so the colours show without run data."""
@@ -278,13 +248,11 @@ class HealthStore:
         threading.Thread(target=work, daemon=True, name="health-invariants").start()
 
     # -- reads (render thread; dict lookups only, never file I/O) ---------------------
-    def health(self, agent_id: str, started: float | None) -> Health:
+    def health(self, agent_id: str, started: float | None = None) -> Health:
+        """The agent's health from the last refresh (``started`` is unused: refresh holds it).
+        An agent not yet seen by a refresh is ``ok``."""
         with self._lock:
-            fake = self._fakes.get(agent_id)
-            dossiers, anomalies = list(self._dossiers), list(self._anomalies)
-        if fake is not None:
-            return fake
-        return classify(agent_id, started, dossiers, anomalies, self._clock())
+            return self._fakes.get(agent_id) or self._health.get(agent_id) or _OK_HEALTH
 
     def breaks(self) -> dict | None:
         with self._lock:

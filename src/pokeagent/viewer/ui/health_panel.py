@@ -7,6 +7,7 @@ into ``viewer_tex`` and shows it in a fixed-size slot with the ``.state`` path a
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import dearpygui.dearpygui as dpg
@@ -15,6 +16,8 @@ from pokeagent.viewer import health as hm
 from pokeagent.viewer.health import HealthStore, AnomalyRef
 from pokeagent.viewer.ui import tags, theme
 from pokeagent.viewer.ui_scale import px
+
+log = logging.getLogger(__name__)
 
 IMG_W, IMG_H = 320, 288       # untuned first values: fixed anomaly image slot (2x a GB frame)
 MAX_ANOMALY_LINES = 5         # untuned first value: recent anomalies listed in the panel
@@ -46,23 +49,16 @@ class HealthPanel:
         self._open = not self._open
         dpg.configure_item(self.panel, show=self._open)
 
-    def _started(self, agent_id: str) -> float | None:
-        e = self._entries.get(agent_id) or {}
-        try:
-            return float(e.get("started")) if e.get("started") is not None else None
-        except (TypeError, ValueError):
-            return None
-
     def update(self, agent_ids: list[str]) -> None:
         store = self._store
         if store is None:
             return
-        hs = [(aid, store.health(aid, self._started(aid))) for aid in agent_ids]
+        hs = [(aid, store.health(aid)) for aid in agent_ids]
         counts: dict[str, int] = {}
         for _, h in hs:
             counts[h.state] = counts.get(h.state, 0) + 1
         br = store.breaks()
-        dpg.configure_item(self.badge, label=hm.badge_text(counts, br))
+        dpg.configure_item(self.badge, label=hm.badge_text(counts, br, store.last_error))
         worst = hm.worst_state([h.state for _, h in hs])
         if worst != self._badge_state:
             self._badge_state = worst
@@ -111,7 +107,8 @@ class HealthPanel:
             try:
                 self._set_detail_image(Path(ref.png))
                 ok = True
-            except Exception:
+            except Exception as exc:
+                log.warning("anomaly image %s failed to load: %s: %s", ref.png, type(exc).__name__, exc)
                 ok = False
         dpg.configure_item(self.detail_img, show=ok)
         dpg.set_value(self.detail_head, head if ok else f"{head} - file missing")

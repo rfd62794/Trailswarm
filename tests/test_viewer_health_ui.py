@@ -1,8 +1,8 @@
 """Health UI under ``dpg.create_context()`` (no viewport): header tint memoise, badge text,
 anomaly click-through, and the 1 Hz poll wiring."""
-from pathlib import Path
 
-import pytest
+import importlib
+
 
 from pokeagent.viewer import health as hm
 
@@ -50,7 +50,7 @@ def test_poller_health_tick_cadence():
 
 
 def test_card_header_tint_memoised_by_state(monkeypatch):
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui import theme
     from pokeagent.viewer.ui.card import CardView
     _ctx(dpg)
@@ -58,9 +58,9 @@ def test_card_header_tint_memoised_by_state(monkeypatch):
         with dpg.window():
             parent = dpg.add_group()
             card = CardView(parent, "a", 300, 200, lambda a: None, lambda a: None)
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     try:
         tints = []
         real = dpg.configure_item
@@ -78,16 +78,16 @@ def test_card_header_tint_memoised_by_state(monkeypatch):
 
 
 def test_anomaly_click_loads_texture_once_and_missing_file(monkeypatch, tmp_path):
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui.health_panel import HealthPanel
     _ctx(dpg)
     try:
         with dpg.window():
             parent = dpg.add_group()
             panel = HealthPanel(parent)
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     try:
         panel.bind(hm.HealthStore(), {})
         png = tmp_path / "explore-20261107-150000-1-42-endless_battle.png"

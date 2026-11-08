@@ -182,7 +182,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
                 if fake:
                     health.fake_refresh(sorted(holder["sources"]), now)
                 else:
-                    health.refresh(root, now)
+                    health.refresh(root, now, health_mod.started_map(dict(holder["entries"])))
                 health.request_invariants(root, now)
             time.sleep(1.0 / fps)
 

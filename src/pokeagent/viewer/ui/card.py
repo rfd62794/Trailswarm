@@ -20,7 +20,8 @@ from pokeagent.viewer.panels import render as pres
 from pokeagent.viewer.panels import registry
 from pokeagent.viewer.panels.noframe import hint_texture
 from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
-from pokeagent.viewer.ui import tags, theme
+from pokeagent.viewer.ui import tags
+from pokeagent.viewer.ui.card_tint import apply_header_tint
 
 _PAD = 5
 _HEADER_H = 15
@@ -135,7 +136,7 @@ class CardView:
         tag = self._img.get("top")
         if tag is not None and dpg.does_item_exist(tag):
             dpg.configure_item(tag, tint_color=(255, 255, 255, 255) if on else (170, 170, 170, 255))
-        self._apply_header_tint()
+        apply_header_tint(self)
 
     def set_health(self, state: str, reason: str = "") -> None:
         """Health-state header tint + one-line reason tooltip; re-themes only when the value changes."""
@@ -144,21 +145,9 @@ class CardView:
             return
         self._memo["health"] = key
         self._health_state = state
-        self._apply_header_tint()
+        apply_header_tint(self)
         if self._tip_text is not None and dpg.does_item_exist(self._tip_text):
             dpg.set_value(self._tip_text, reason)
-
-    def _apply_header_tint(self) -> None:
-        """The header image's tint: the health colour wins when not ok, else the selection tint."""
-        tag = self._img.get("header")
-        if tag is None or not dpg.does_item_exist(tag):
-            return
-        state = getattr(self, "_health_state", OK)
-        if state != OK and state in theme.HEADER_COLOUR:
-            tint = theme.HEADER_COLOUR[state]
-        else:
-            tint = (120, 220, 255, 255) if self._sel else theme.HEADER_COLOUR[OK]
-        dpg.configure_item(tag, tint_color=tint)
 
     # -- layout -----------------------------------------------------------------
     def _geom(self) -> dict[str, tuple[int, int]]:

@@ -5,7 +5,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import pytest
 
 from pokeagent.invariants.findings import ERROR, INFO, WARN, Finding
 from pokeagent.viewer import health as hm
@@ -180,7 +179,7 @@ def test_store_refresh_survives_corrupt_dossier(tmp_path):
 def test_store_health_joins_and_fake_overrides(tmp_path):
     _write_dossier(tmp_path, dossier(run(), NOW - 10))
     store = hm.HealthStore(clock=lambda: NOW)
-    store.refresh(tmp_path, NOW)
+    store.refresh(tmp_path, NOW, {AGENT: STARTED, "explore-99999": STARTED})
     assert store.health(AGENT, STARTED).state == hm.STALLED
     assert store.health("explore-99999", STARTED).state == hm.OK
     store.fake_refresh(["fake-1", "fake-2", "fake-3"], NOW)
@@ -225,3 +224,52 @@ def test_store_reads_do_no_file_io(monkeypatch):
     assert store.breaks() is None
     assert store.anomalies() == []
     assert store.provenance(run()) == ""
+
+
+def test_failed_read_leaves_mtime_unrecorded_and_retries(tmp_path, monkeypatch, caplog):
+    _write_dossier(tmp_path, dossier(run(), NOW - 10))
+    calls = []
+
+    def flaky(root):
+        calls.append(1)
+        if len(calls) < 3:
+            raise OSError("disk hiccup")
+        return [dossier(run(), NOW - 10)]
+
+    monkeypatch.setattr(hm, "load_dossiers", flaky)
+    store = hm.HealthStore(clock=lambda: NOW)
+    with caplog.at_level("WARNING", logger=hm.log.name):
+        store.refresh(tmp_path, NOW, {AGENT: STARTED})
+        assert store.last_error and "OSError" in store.last_error and "disk hiccup" in store.last_error
+        assert store._mtimes.get("stalls") is None            # not recorded after a failed read
+        store.refresh(tmp_path, NOW, {AGENT: STARTED})        # same dir mtime, still retried
+    assert len(calls) == 2
+    assert sum("health read failed" in r.message for r in caplog.records) == 1   # logged once, not per tick
+    store.refresh(tmp_path, NOW, {AGENT: STARTED})            # third try succeeds
+    assert store.last_error is None
+    assert store.health(AGENT, STARTED).state == hm.STALLED
+    store.refresh(tmp_path, NOW, {AGENT: STARTED})            # recorded now: no further read
+    assert len(calls) == 3
+
+
+def test_badge_text_shows_read_error():
+    assert hm.badge_text({}, {"errors": 0}).endswith("invariants: 0 errors")
+    assert hm.badge_text({}, {"errors": 0}, "dossiers: OSError: x").endswith("| read error")
+
+
+def test_health_does_no_classification_after_refresh(tmp_path, monkeypatch):
+    _write_dossier(tmp_path, dossier(run(), NOW - 10))
+    store = hm.HealthStore(clock=lambda: NOW)
+    store.refresh(tmp_path, NOW, {AGENT: STARTED})
+
+    def _raise(*a, **k):
+        raise AssertionError("classify on the render path")
+
+    monkeypatch.setattr(hm, "classify", _raise)
+    assert store.health(AGENT, STARTED).state == hm.STALLED
+    assert store.health("unknown-1", None).state == hm.OK
+
+
+def test_started_map_tolerates_bad_entries():
+    got = hm.started_map({"a": {"started": "12.5"}, "b": {"started": "x"}, "c": {}, "d": None})
+    assert got == {"a": 12.5, "b": None, "c": None, "d": None}

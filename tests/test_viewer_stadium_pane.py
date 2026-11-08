@@ -2,7 +2,8 @@
 the strip gone from world_side. Needs the opponent fix (BattleCard enemy fields from the world model)."""
 from types import SimpleNamespace
 
-import pytest
+import importlib
+
 
 from pokeagent.viewer import modes
 from pokeagent.viewer.model import ViewerModel
@@ -47,14 +48,14 @@ def test_stadium_visible_defaults_to_mode_and_menu_choice_sticks():
 
 
 def test_pane_is_top_level_with_tag_and_toggles(monkeypatch):
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui.stadium_pane import StadiumPane
     _ctx(dpg)
     try:
         pane = StadiumPane(lambda aid: None)
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     try:
         assert dpg.does_item_exist(tags.STADIUM_PANE)
         info = dpg.get_item_info(tags.STADIUM_PANE)
@@ -71,7 +72,7 @@ def test_pane_is_top_level_with_tag_and_toggles(monkeypatch):
 
 
 def test_menu_build_creates_stadium_checkbox():
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui import menu
     from pokeagent.viewer.ui.window import ViewerWindow
     dpg.create_context()
@@ -81,22 +82,22 @@ def test_menu_build_creates_stadium_checkbox():
         menu.build(win)
         assert dpg.does_item_exist(menu.MENU_STADIUM)
         assert dpg.get_value(menu.MENU_STADIUM) in (True, 1)  # default mirrors the world-mode default
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     _destroy(dpg)
 
 
 def test_slots_and_title_follow_world_model():
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui.stadium_pane import StadiumPane
     _ctx(dpg)
     focused = []
     try:
         pane = StadiumPane(focused.append)
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     try:
         wm = _battle_wm(3)
         pane.update(wm, ViewerModel(), now=1.0)
@@ -114,16 +115,16 @@ def test_slots_and_title_follow_world_model():
 
 
 def test_world_side_no_longer_builds_the_strip():
-    dpg = pytest.importorskip("dearpygui.dearpygui")
+    dpg = importlib.import_module("dearpygui.dearpygui")
     from pokeagent.viewer.ui.world_side import WorldSide
     _ctx(dpg)
     fake_view = SimpleNamespace(interiors=SimpleNamespace(mode="inset"), wm=WorldModel(), world=None)
     try:
         with dpg.window():
             side = WorldSide(fake_view)
-    except Exception as e:
+    except BaseException:
         _destroy(dpg)
-        pytest.skip(f"Dear PyGui cannot build widgets without a viewport: {e}")
+        raise
     try:
         for attr in ("slots", "slots_parent", "strip_title", "more"):
             assert not hasattr(side, attr), f"world_side still builds the stadium strip ({attr})"
@@ -135,3 +136,23 @@ def test_world_side_no_longer_builds_the_strip():
 def test_modes_status_text_unchanged():
     assert modes.status_text("world", 3, "a1", None) == \
         "Mode: World  |  Agents: 3  |  Selected: a1  |  Follow: off"
+
+
+def test_stadium_close_button_sticks_hidden():
+    dpg = importlib.import_module("dearpygui.dearpygui")
+    from pokeagent.viewer.ui.window import ViewerWindow
+    dpg.create_context()
+    try:
+        win = ViewerWindow(ViewerModel(), {})
+        win.focus.set_mode("world")
+        dpg.add_texture_registry(tag=tags.VIEWER_TEX, show=False)
+        from pokeagent.viewer.ui.stadium_pane import StadiumPane
+        win._stadium = StadiumPane(win.toggle_focus, on_close=win.on_stadium_close)
+        assert win.stadium_visible() is True                 # world default
+        cb = dpg.get_item_configuration(tags.STADIUM_PANE)["on_close"]
+        cb(tags.STADIUM_PANE, None, None)                    # the title-bar X
+        assert win.stadium_visible() is False                # pref flipped; tick will not re-show it
+    except BaseException:
+        _destroy(dpg)
+        raise
+    _destroy(dpg)

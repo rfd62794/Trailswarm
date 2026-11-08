@@ -6,8 +6,11 @@ the default itself is never written.
 """
 from __future__ import annotations
 
+import logging
 import shutil
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 DEFAULT = Path(__file__).with_name("default_layout.ini")
 
@@ -22,8 +25,8 @@ def ensure_layout(default: Path, target: Path) -> Path:
         if not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(Path(default), target)
-    except OSError:
-        pass
+    except OSError as exc:
+        log.warning("layout seed failed (%s: %s); running without a persisted layout", type(exc).__name__, exc)
     return target
 
 
@@ -33,6 +36,6 @@ def reset_layout(default: Path, target: Path) -> Path:
         target = Path(target)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(Path(default), target)
-    except OSError:
-        pass
+    except OSError as exc:
+        log.warning("layout reset failed (%s: %s)", type(exc).__name__, exc)
     return target

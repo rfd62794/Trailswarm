@@ -27,6 +27,8 @@ from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
 from pokeagent.viewer.ui.stadium_pane import StadiumPane
+from pokeagent.viewer.ui.window_health import HealthLayoutMixin
+from pokeagent.viewer.ui.window_host import CommandHostMixin
 from pokeagent.viewer.ui.world_host import WorldHost
 from pokeagent.world.model import WorldModel
 
@@ -34,7 +36,7 @@ log = logging.getLogger(__name__)
 _BAR_H = 145  # reserved height for the four control-bar rows (status line + three)
 
 
-class ViewerWindow:
+class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
     """Builds and runs the DPG context. ``hold_s_for(agent_id)`` may return the human-hold
     countdown when the agent exposes one (HTTP agents do not -> bare "YOU HAVE IT")."""
 
@@ -82,82 +84,6 @@ class ViewerWindow:
         """Block until queued commands were sent (tests; never call from the render loop)."""
         self._outbox.join()
 
-    # -- host API for control_bar / keys ----------------------------------------
-    def set_scope(self, scope: str) -> None:
-        self.scope = scope
-
-    def selected_id(self) -> str | None:
-        return self.selected
-
-    def speed(self) -> int:
-        return self._speed
-
-    def paused(self) -> bool:
-        return self._paused
-
-    def cycle_speed(self) -> None:
-        self._speed = commands.next_speed(self._speed)
-        self.send_to_targets("speed", n=self._speed)
-
-    def toggle_pause(self) -> None:
-        self._paused = not self._paused
-        self.send_to_targets("pause" if self._paused else "resume")
-
-    def steering(self) -> bool:
-        """Read-only: keyboard steering is on exactly while an agent is focused."""
-        return self.focus.focused is not None
-
-    def target_snaps(self):
-        return [s for aid in self._target_ids() if (s := self.model.snapshot(aid)) is not None]
-
-    def hand_to(self, driver: str) -> None:
-        self.send_to_targets("hand_to", driver=driver)
-
-    def save_state(self, name: str) -> None:
-        self.send_to_targets("save_state", name=name or "slot")
-
-    def load_state(self, name: str) -> None:
-        self.send_to_targets("load_state", name=name or "slot")
-
-    def at_agent_cap(self) -> bool:
-        """Cached (refreshed off the UI thread every 2 s): True when spawning is disabled."""
-        self._spawn.refresh()
-        return self._spawn.capped
-
-    @property
-    def spawn_msg(self) -> str:
-        return self._spawn.message
-
-    def spawn_agent(self, kind: str, args: str) -> None:
-        self._spawn.spawn(kind, args)
-
-    def stop_targets(self) -> None:
-        if self.supervisor is not None:
-            for aid in self._target_ids():
-                pid = self._pid_for(aid)
-                if pid is not None:
-                    self.supervisor.stop(pid)
-
-    def send_to_targets(self, cmd: str, **args) -> None:
-        for aid in self._target_ids():
-            src = self.sources.get(aid)
-            if src is not None:
-                self._outbox.put((src, cmd, args))
-
-    def key_button(self, key_name: str) -> None:
-        """Game key: reaches only the focused agent (never in grid view), <=1 press / 120 ms / key."""
-        hit = steering.press_target(key_name, self.focus.focused, self._throttle)
-        if hit is not None:
-            self._send_one(hit[0], "press", button=hit[1], source="human")
-
-    def hotkey(self, name: str) -> None:
-        """P / T: transport hotkeys, focus view only, one toggle per physical press."""
-        if self.focus.focused is not None and self._gate.allow(name):
-            self.toggle_pause() if name == "pause" else self.cycle_speed()
-
-    def escape(self) -> None:
-        self.leave_focus()
-
     # -- focus / selection --------------------------------------------------------
     def _send_one(self, aid: str, cmd: str, **args) -> None:
         src = self.sources.get(aid)
@@ -187,38 +113,6 @@ class ViewerWindow:
         h = self._health_for(agent_id)
         if h.state == ANOMALY and h.anomaly is not None:
             self.open_anomaly(h.anomaly)   # clicking an anomaly card's header opens it in the side panel
-
-    # -- health / stadium pane / layout ------------------------------------------------
-    def _health_for(self, agent_id: str):
-        """HealthStore lookup: the agent's run join key is its registry ``started`` epoch."""
-        entry = self.entries.get(agent_id) or {}
-        try:
-            started = float(entry.get("started")) if entry.get("started") is not None else None
-        except (TypeError, ValueError):
-            started = None
-        return self.health.health(agent_id, started)
-
-    def open_anomaly(self, ref) -> None:
-        side = getattr(getattr(self.world, "view", None), "side", None)
-        if side is not None:
-            side.show_anomaly(ref)
-
-    def stadium_visible(self) -> bool:
-        """Default follows the mode (shown in World, hidden in Tiles); the menu choice wins for the run."""
-        return self._stadium_pref if self._stadium_pref is not None else self.focus.view == "world"
-
-    def set_stadium_pref(self, on) -> None:
-        self._stadium_pref = bool(on)
-
-    def save_layout(self) -> None:
-        if self._layout_path is not None:
-            dpg.save_init_file(str(self._layout_path))
-            log.info("layout saved to %s", self._layout_path)
-
-    def reset_layout(self) -> None:
-        if self._layout_path is not None:
-            layout_file.reset_layout(layout_file.DEFAULT, self._layout_path)
-            log.info("layout reset to the committed default; applies on next start")
 
     # -- Tiles | World ----------------------------------------------------------
     def set_view_mode(self, mode: str) -> None:
@@ -285,7 +179,7 @@ class ViewerWindow:
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
         self.world.build()
-        self._stadium = StadiumPane(self.toggle_focus)
+        self._stadium = StadiumPane(self.toggle_focus, on_close=self.on_stadium_close)
         menu.build(self)
         self._bar = ControlBar(self._win, self)
         keys.install(self)

@@ -61,9 +61,10 @@ class Slot:
 class StadiumPane:
     """The top-level ``STADIUM_PANE`` window: ``Slot`` widgets plus the overflow note."""
 
-    def __init__(self, on_focus) -> None:
+    def __init__(self, on_focus, on_close=None) -> None:
+        kw = {} if on_close is None else {"on_close": lambda *_a: on_close()}
         self.win = dpg.add_window(tag=tags.STADIUM_PANE, label="Stadium",
-                                  width=px(PANE_W), height=px(PANE_H), show=False)
+                                  width=px(PANE_W), height=px(PANE_H), show=False, **kw)
         with dpg.group(parent=self.win):
             self.title = dpg.add_text("Stadium")
             self.slots_parent = dpg.add_group()
