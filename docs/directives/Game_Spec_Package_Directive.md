@@ -147,12 +147,14 @@ Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-game-spec-package-directive |
 | Base branch | - |
+| Base commit | 2c60008e99b6c8358bd35e53bf0ccd895a51283e |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude: plan phase 2; golden trace owed by Claude verify with ROM
 - 2026-11-08 16:50 · robert-claude-laptop · Queued → Approved
+- 2026-11-08 16:50 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-spec-package-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6YJ8HJDZT00YVG728N2J44F
 <!-- queue:end -->
