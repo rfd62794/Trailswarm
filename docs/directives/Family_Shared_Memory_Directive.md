@@ -148,7 +148,7 @@ Learning from Blue flows into the same shared store as Red: both games' agents g
 uv run python --version
 uv run pytest -q tests/test_family_active.py tests/test_family_provenance.py tests/test_family_disagree.py tests/test_family_overlay.py tests/test_family_fold.py tests/test_family_kb_overlay.py tests/test_swarm_merge_loops.py tests/test_swarm_merge_trainers.py
 ```
-Expected: `Python 3.12.x`; all pass. If `tests/test_swarm_merge.py` does not exist, say so in the Report and run the swarm tests that `git grep -l "merge_memory" -- tests` names.
+Expected: `Python 3.12.x`; all pass.
 
 ```
 uv run pytest -q
@@ -181,12 +181,12 @@ Claude's verify lane (ROM present, fresh worktree of the PR head with `roms/` an
 - [ ] `effective_memory` applies warps, jumps, npcs and `blocked_not`; with no overlay it equals the shared doc. Reads check the overlay first, then shared. <!-- test: tests/test_family_overlay.py --> <!-- new: tests/test_family_overlay.py -->
 - [ ] Both ways: a Blue fold then a Red fold into one shared doc leaves both games' new facts present with correct provenance, and folding the same file twice changes nothing. <!-- test: tests/test_family_fold.py -->
 - [ ] `build_overlay` keeps only differing entries and `read` reapplies them; a synthetic base and game kb differing in one map's entries and one unrelated key round-trip, and writing the overlay leaves a synthetic base kb file byte-identical. <!-- test: tests/test_family_kb_overlay.py --> <!-- new: tests/test_family_kb_overlay.py -->
-- [ ] The two hooks add at most 12 and 6 lines, behave as before when the family is inactive, and `git diff --stat main` shows no change under `src/pokeagent/explorer/`. <!-- test: tests/test_swarm_merge.py -->
+- [ ] The two hooks add at most 12 and 6 lines, behave as before when the family is inactive, and `git diff --stat main` shows no change under `src/pokeagent/explorer/`. <!-- test: tests/test_swarm_merge_loops.py -->
 - [ ] No file over 600 lines.
 
 ## 8. Report
 
-Findings first: the observed split of `ledge_exact`, `ledge_row`, `plain` wall counts on any synthetic fixture you built (state clearly that no real data was used), every reader of `runs/maps.json` found with your decision, whether `tests/test_swarm_merge.py` existed, and any rule above you could not implement as written. Then the command tails from section 5, the diff stat and each new file's line count. State plainly that the golden test and any real-data comparison were NOT run.
+Findings first: the observed split of `ledge_exact`, `ledge_row`, `plain` wall counts on any synthetic fixture you built (state clearly that no real data was used), every reader of `runs/maps.json` found with your decision, whether `tests/test_swarm_merge_loops.py` and `tests/test_swarm_merge_trainers.py` still pass, and any rule above you could not implement as written. Then the command tails from section 5, the diff stat and each new file's line count. State plainly that the golden test and any real-data comparison were NOT run.
 
 ## Forbidden Actions
 

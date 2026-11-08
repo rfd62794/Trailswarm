@@ -9,7 +9,7 @@ Robert, 2026-11-08, settled: the project is public (rfd62794/Trailswarm, MIT) an
 - A single page saying what the project can share and what it cannot. Today the answer is spread across `docs/LEGAL.md` and habit.
 - A ranked plan saying where the project can contribute something new, backed by evidence from the repo's own research report and nothing else.
 
-This directive writes those two documents. It writes no code, no data and no tests.
+This directive writes those two documents. It writes no code and no data; the only test it adds is `tests/test_sharing_docs.py`.
 
 ## 2. Scope
 
@@ -130,7 +130,7 @@ Write in plain, direct language. No marketing words ("revolutionary", "cutting-e
 
 ## 4. What NOT to do
 
-- No code, no tests, no data files, no third file. Do not create `docs/data/` anything.
+- No code, no data files, and no tests other than `tests/test_sharing_docs.py`; no further file. Do not create `docs/data/` anything.
 - Do not edit `docs/LEGAL.md`, `README.md` or any existing file.
 - No ROM, no network, no installs, nothing read outside the worktree.
 - Do not mark anything shared that rules 1, 2 or 6 forbid, or any ROM-derived file or extracted-art dataset as `OK now`.
