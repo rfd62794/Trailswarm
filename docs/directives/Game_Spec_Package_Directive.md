@@ -110,10 +110,10 @@ A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitig
 
 ## Completion criteria
 
-- [ ] `GameSpec` rejects a bad key, an empty hash tuple and a lowercase or short hash, and accepts RED. <!-- test: tests/test_game_spec.py -->
-- [ ] `GAMES` holds exactly `pokemon-red`, `DEFAULT_GAME` is `pokemon-red`, and `get_game("nope")` raises `KeyError` naming the known keys. <!-- test: tests/test_game_registry.py -->
-- [ ] `resolve_game` precedence is `--game`, then `POKEAGENT_GAME`, then the default; an empty env value is ignored; an unknown key raises `UnknownGame` listing the keys. <!-- test: tests/test_game_select.py -->
-- [ ] `run`, `check-rom`, `state` and `mcp` accept `--game pokemon-red` and reject `--game nope` with exit code 2; `world`, `states` and `view` do not gain the flag; `check-rom` output for a Red ROM-shaped file is byte-identical to the output captured before the change (the test pins the three lines using a temporary file whose hash is injected through the registry). <!-- test: tests/test_cli_game_flag.py -->
+- [ ] `GameSpec` rejects a bad key, an empty hash tuple and a lowercase or short hash, and accepts RED. <!-- test: tests/test_game_spec.py --> <!-- new: tests/test_game_spec.py -->
+- [ ] `GAMES` holds exactly `pokemon-red`, `DEFAULT_GAME` is `pokemon-red`, and `get_game("nope")` raises `KeyError` naming the known keys. <!-- test: tests/test_game_registry.py --> <!-- new: tests/test_game_registry.py -->
+- [ ] `resolve_game` precedence is `--game`, then `POKEAGENT_GAME`, then the default; an empty env value is ignored; an unknown key raises `UnknownGame` listing the keys. <!-- test: tests/test_game_select.py --> <!-- new: tests/test_game_select.py -->
+- [ ] `run`, `check-rom`, `state` and `mcp` accept `--game pokemon-red` and reject `--game nope` with exit code 2; `world`, `states` and `view` do not gain the flag; `check-rom` output for a Red ROM-shaped file is byte-identical to the output captured before the change (the test pins the three lines using a temporary file whose hash is injected through the registry). <!-- test: tests/test_cli_game_flag.py --> <!-- new: tests/test_cli_game_flag.py -->
 - [ ] All pre-existing `tests/test_cli.py` cases pass; only `test_check_rom_match_returns_zero` was edited. <!-- test: tests/test_cli.py -->
 - [ ] The git grep above shows exactly one hit for the hash.
 - [ ] Every new `src/pokeagent/game/*.py` is under its line limit and `git diff --stat main` touches only the files in Scope.
