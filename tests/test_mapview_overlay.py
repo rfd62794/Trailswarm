@@ -93,3 +93,17 @@ def test_display_cost_is_flat_as_ghosts_grow():
         return best
 
     assert clocked(tb60) < 3 * clocked(tb5)                         # the cost is not per ghost
+
+
+def test_ghosts_with_no_areas_render_empty_not_raise():
+    tb = tables([ghost()], (), FPS)
+    lay = place([], max_row_width=1000)
+    out = render(positions(tb, 0.1), tb, lay, (0, 0, 50, 20), 1.0)
+    assert out.shape == (20, 50, 4) and not out.any()
+
+
+def test_non_finite_square_is_skipped():
+    from pokeagent.mapview.overlay import _square
+    out = np.zeros((5, 5, 4), np.uint8)
+    _square(out, float("nan"), 2.0, 3, np.array([1, 2, 3], np.uint8))
+    assert not out.any()

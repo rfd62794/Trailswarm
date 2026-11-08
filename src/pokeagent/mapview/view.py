@@ -7,51 +7,23 @@ uploaded as ONE raw texture per frame, so display cost stays flat as ghosts grow
 from __future__ import annotations
 
 import time
-from collections import OrderedDict
 
 import dearpygui.dearpygui as dpg
 import numpy as np
 
 from pokeagent.mapview import overlay, playback
 from pokeagent.mapview.best import best_index
+from pokeagent.mapview.compose import agent_rows, compose_base  # noqa: F401  (re-exported)
 from pokeagent.mapview.layout import LABEL_H, Layout
+from pokeagent.mapview.texcache import TexCache
 from pokeagent.world.follow import Follow
 from pokeagent.world.pyramid import Pyramid, to_gpu
 from pokeagent.world.view import Viewport
 
 ROOT, TEX, CANVAS = "mapview_root", "mapview_tex", "mapview_canvas"
-AGENTS_PANE = "mapview_agents"
+AGENTS_PANE, FOLLOW_CB = "mapview_agents", "mapview_follow_best"
 MAX_TEX, MAX_UPLOADS, COARSEST_F = 40, 2, 8   # chunk cache, uploads per frame, fallback depth
 SPEEDS = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0, "4x": 4.0}
-
-
-def compose_base(snap) -> np.ndarray | None:
-    """The whole space as one RGB image: white background, each area's image at its offset."""
-    w, h = snap.layout.space_w, snap.layout.space_h
-    if not snap.areas or w <= 0 or h <= 0:
-        return None
-    img = np.full((h, w, 3), 255, np.uint8)
-    for a in snap.areas:
-        off, src = snap.layout.offsets.get(a.name), snap.images.get(a.name)
-        if off is not None and src is not None:
-            img[off[1]:off[1] + src.shape[0], off[0]:off[0] + src.shape[1]] = src[..., :3]
-    return img
-
-
-def agent_rows(tb: playback.Tables) -> list[tuple[str, int, int, str]]:
-    """One summary row per distinct agent: (agent, palette slot, ghost count, furthest reached)."""
-    by: dict[str, list] = {}
-    for g in tb.ghosts:
-        by.setdefault(g.agent, []).append(g)
-    rows = []
-    for agent in sorted(by):
-        gs, b = by[agent], best_index(by[agent], tb.area_names)
-        far = "-"
-        if b is not None:
-            r = int(gs[b].area_idx[-1])
-            far = f"{tb.area_names[r] if 0 <= r < len(tb.area_names) else '?'} x{int(gs[b].xs[-1])}"
-        rows.append((agent, overlay.color_index(agent, len(overlay.PALETTE)), len(gs), far))
-    return rows
 
 
 class MapWindow:
@@ -62,12 +34,14 @@ class MapWindow:
         self.clock, self.vp, self.follow = playback.Clock(), Viewport(1, 1), Follow()
         self.trails, self.marks, self.follow_best = True, True, False
         self.status, self.uploads, self.base_builds = "", 0, 0   # uploads/builds are test-visible
-        self.base = self.pyr = self._snap = self._built_key = self._pending_tables = None
+        self.base = self.pyr = self._snap = self._built_key = self._pending_tables = self._built_imgs = None
         self.tables = playback.tables((), (), fps)
         self.frame = playback.positions(self.tables, 0.0)
         self.layout, self.agent_rows, self.best = Layout({}, 0, 0), [], None
         self.overlay_img = np.zeros((1, 1, 4), np.uint8)
-        self._tex, self._overlay_key, self._overlay_tag, self._tex_uploads, self._fitted = OrderedDict(), None, None, 0, False
+        self._tex = TexCache(lambda tag: dpg.delete_item(tag) if dpg.does_item_exist(tag) else None, MAX_TEX)
+        self._overlay_key, self._overlay_tag, self._tex_uploads, self._fitted = None, None, 0, False
+        self._used_stale, self._best_run = False, None
         self._down_at = self._last_mouse = self._follow_t = None
         self.adopt(snapshot)
 
@@ -77,12 +51,14 @@ class MapWindow:
             return
         self._snap = snap
         self.status = "" if snap.found else f"waiting for {snap.source}"
-        key = (snap.layout, snap.areas)
+        # Pixels and layout only: a ``seen``-only change redraws the label, not the base.
+        key = (snap.layout, tuple((a.name, a.width, a.height, id(snap.images.get(a.name))) for a in snap.areas))
+        imgs = tuple(snap.images.get(a.name) for a in snap.areas)   # held so the ids stay unique
         if key != self._built_key:
-            self._built_key, self.layout = key, snap.layout
+            self._built_key, self._built_imgs, self.layout = key, imgs, snap.layout
             self.base, self.base_builds = compose_base(snap), self.base_builds + 1
             self.pyr = Pyramid(self.base) if self.base is not None else None
-            self._tex.clear()
+            self._tex.retire()
             self.vp.world_w, self.vp.world_h = max(1, snap.layout.space_w), max(1, snap.layout.space_h)
             self.vp.cx = min(max(self.vp.cx, 0.0), float(self.vp.world_w))
             self.vp.cy = min(max(self.vp.cy, 0.0), float(self.vp.world_h))
@@ -116,7 +92,7 @@ class MapWindow:
                 for label, attr in (("trails", "trails"), ("marks", "marks")):
                     dpg.add_checkbox(label=label, default_value=True,
                                      callback=cb(lambda a, attr=attr: setattr(self, attr, bool(a))))
-                dpg.add_checkbox(label="follow best", default_value=False,
+                dpg.add_checkbox(label="follow best", default_value=False, tag=FOLLOW_CB,
                                  callback=cb(lambda a: self._set_follow_best(bool(a))))
             with dpg.group(horizontal=True):
                 dpg.add_drawlist(width=800, height=560, tag=CANVAS)
@@ -142,8 +118,16 @@ class MapWindow:
     def _toggle_pause(self) -> None: self.clock.paused = not self.clock.paused
 
     def _set_follow_best(self, on: bool) -> None:
-        self.follow_best = on
+        self.follow_best, self._best_run = on, None
         if not on: self.follow.stop()
+        if not self.headless and dpg.does_item_exist(FOLLOW_CB):
+            dpg.set_value(FOLLOW_CB, on)
+
+    def _user_panned(self) -> None:
+        """A manual pan wins: follow-best goes off (and the checkbox with it), the camera stays put."""
+        self.follow.stop()
+        if self.follow_best:
+            self._set_follow_best(False)
 
     def _follow_agent(self, agent: str) -> None:
         gs = [g for g in self.tables.ghosts if g.agent == agent]
@@ -180,7 +164,7 @@ class MapWindow:
             d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
             if d[0] or d[1]:
                 self.vp.pan(*d)
-                self.follow.stop()
+                self._user_panned()
         self._last_mouse = m if down else None
 
     def tick(self, dt: float, now: float | None = None) -> playback.Frame:
@@ -213,7 +197,8 @@ class MapWindow:
     def _follow_tick(self, now: float, dt: float) -> None:
         if self.follow_best and self.best is not None:
             run = self.tables.runs[self.best]
-            if run != self.follow.agent_id:
+            if run != self._best_run:             # re-target only when the best run changes
+                self._best_run = run
                 self.follow.start(run, now)
         target = self.follow.target(self._points(), now)
         if target is not None:
@@ -232,17 +217,20 @@ class MapWindow:
         dpg.set_value(self._overlay_tag, self.overlay_img.astype(np.float32).ravel() / 255.0)
 
     def _chunk_tex(self, f: int, cx: int, cy: int):
-        key = (id(self.pyr), f, cx, cy)
-        if key in self._tex:
-            self._tex.move_to_end(key)
-            return self._tex[key]
-        if self._tex_uploads >= MAX_UPLOADS: return None
+        if (tag := self._tex.get(f, cx, cy)) is not None:
+            return tag
+        if self._tex_uploads >= MAX_UPLOADS:
+            return self._stale_tex(f, cx, cy)
         self._tex_uploads += 1
         rgb = self.pyr.chunk(f, cx, cy)
         tag = dpg.add_static_texture(rgb.shape[1], rgb.shape[0], to_gpu(rgb), parent=TEX)
-        self._tex[key] = tag
-        while len(self._tex) > MAX_TEX:
-            dpg.delete_item(self._tex.popitem(last=False)[1])
+        self._tex.put(f, cx, cy, tag)
+        return tag
+
+    def _stale_tex(self, f: int, cx: int, cy: int):
+        """Keep the old picture on screen until this chunk's replacement has uploaded."""
+        tag = self._tex.fallback(f, cx, cy)
+        self._used_stale = self._used_stale or tag is not None
         return tag
 
     def _draw(self) -> None:
@@ -251,8 +239,9 @@ class MapWindow:
         dpg.delete_item(CANVAS, children_only=True)
         if self.pyr is None:
             dpg.draw_text((20, 20), self.status or "no areas yet", size=18, parent=CANVAS)
+            self._tex.sweep()
             return
-        vp, self._tex_uploads = self.vp, 0
+        vp, self._tex_uploads, self._used_stale = self.vp, 0, False
         f, chunks = self.pyr.plan(vp.zoom, vp.visible(), MAX_TEX - 10)
         for cx, cy in chunks:
             if (tex := self._chunk_tex(f, cx, cy)) is not None:
@@ -267,6 +256,8 @@ class MapWindow:
                           size=14, parent=CANVAS)
         if self.follow.active:
             dpg.draw_text((12, 8), f"following {self.follow.agent_id}", size=14, parent=CANVAS)
+        if not self._used_stale:
+            self._tex.sweep()        # nothing drawn this frame references the old textures
 
     def _draw_coarser(self, f: int, cx: int, cy: int) -> None:
         g = f * 2

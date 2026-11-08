@@ -94,6 +94,7 @@ def run(source, fps: int = FPS, refresh: float = REFRESH_S) -> int:
     dpg.setup_dearpygui()
     dpg.show_viewport()
     dpg.set_primary_window("mapview_root", True)
+    win.resize(dpg.get_viewport_client_width(), dpg.get_viewport_client_height())
     dpg.set_viewport_resize_callback(
         lambda *_: win.resize(dpg.get_viewport_client_width(), dpg.get_viewport_client_height()))
     last = time.monotonic()

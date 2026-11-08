@@ -7,6 +7,7 @@ are discarded by masks before rasterising.
 """
 from __future__ import annotations
 
+import math
 import zlib
 
 import numpy as np
@@ -40,6 +41,8 @@ def _offsets(tb: Tables, layout) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 def _square(out: np.ndarray, cx: float, cy: float, side: int, rgb: np.ndarray) -> None:
     h, w = out.shape[:2]
+    if not (math.isfinite(cx) and math.isfinite(cy)):
+        return
     cxi, cyi, r = int(round(cx)), int(round(cy)), side // 2
     xa, xb, ya, yb = max(0, cxi - r), min(w, cxi + r + 1), max(0, cyi - r), min(h, cyi + r + 1)
     if xa < xb and ya < yb:
@@ -56,10 +59,11 @@ def _trails(out, frame: Frame, tb: Tables, ox, oy, known, colors, x0, y0, zoom, 
     gid = np.repeat(np.arange(count), keep)
     kth = np.arange(total) - np.repeat(np.cumsum(keep) - keep, keep)
     jj = np.repeat(frame.idx, keep) - kth * stride       # newest first: stride-decimated back
-    aa = np.clip(tb.area_idx[gid, jj].astype(np.intp), 0, None)
+    raw = tb.area_idx[gid, jj].astype(np.intp)
+    aa = np.clip(raw, 0, len(known) - 1)
     px = (ox[aa] + tb.xs[gid, jj] - x0) * zoom
     py = (oy[aa] + tb.ys[gid, jj] - y0) * zoom
-    inside = (tb.area_idx[gid, jj] >= 0) & known[aa] & (px >= 0) & (px < w) & (py >= 0) & (py < h)
+    inside = (raw >= 0) & (raw < len(known)) & known[aa] & (px >= 0) & (px < w) & (py >= 0) & (py < h)
     gi, xi, yi = gid[inside], px[inside].astype(np.intp), py[inside].astype(np.intp)
     age = (np.repeat(frame.idx, keep)[inside] - jj[inside]) / float(TRAIL_POINTS)
     out[yi, xi, :3] = colors[gi]
@@ -73,14 +77,16 @@ def render(frame: Frame, tb: Tables, layout, rect, zoom, palette: np.ndarray = P
     w, h = max(1, int(round((x1 - x0) * zoom))), max(1, int(round((y1 - y0) * zoom)))
     out = np.zeros((h, w, 4), np.uint8)
     count = len(tb.ghosts)
-    if count == 0:
+    if count == 0 or not tb.area_names:
         return out
     ox, oy, known = _offsets(tb, layout)
+    if not known.any():
+        return out
     colors = np.stack([palette[color_index(a, len(palette))] for a in tb.agents])
     if trails:
         _trails(out, frame, tb, ox, oy, known, colors, x0, y0, zoom, w, h)
-    ai = np.clip(frame.area.astype(np.intp), 0, None)
-    ok = (frame.area >= 0) & known[ai]
+    ai = np.clip(frame.area.astype(np.intp), 0, len(known) - 1)
+    ok = (frame.area >= 0) & (frame.area < len(known)) & known[ai]
     hx = (ox[ai] + frame.xs - x0) * zoom
     hy = (oy[ai] + frame.ys - y0) * zoom
     side = max(3, int(3 * zoom))

@@ -89,7 +89,11 @@ class AreaStore:
             if cached is None or self._stamps.get(area.name) != stamp:
                 img = load_image(area)
                 if img is None:
-                    continue                     # unreadable now: retried on the next refresh
+                    if cached is None:
+                        continue                 # unreadable now: retried on the next refresh
+                    areas.append(replace(cached, seen=area.seen))   # keep the last good image
+                    changed = changed or cached.seen != area.seen
+                    continue
                 cached = replace(area, width=int(img.shape[1]), height=int(img.shape[0]))
                 self.images[area.name] = img
                 self._loaded[area.name] = cached

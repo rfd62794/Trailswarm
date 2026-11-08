@@ -125,3 +125,29 @@ def test_refresh_brings_new_ghost_and_wider_area_without_camera_jump(tmp_path, c
             break
         win.tick(1 / 60, time.monotonic())
     assert arrived
+
+
+def test_pan_turns_follow_best_off_and_it_stays_off(tmp_path, ctx):
+    areas, ghosts, holder = holder_for(make_source(tmp_path))
+    win = MapWindow(holder.get(), headless=True)
+    win.build()
+    now = time.monotonic()
+    win.tick(1 / 60, now)
+    win._set_follow_best(True)
+    win.tick(1 / 60, now + 0.02)
+    assert win.follow.active
+    win._user_panned()
+    assert not win.follow_best and not win.follow.active
+    for i in range(3, 10):
+        win.tick(1 / 60, now + i / 60)
+    assert not win.follow.active                                      # no snap-back
+
+
+def test_seen_only_change_does_not_rebuild_the_base(tmp_path, ctx):
+    import dataclasses
+    areas, ghosts, holder = holder_for(make_source(tmp_path))
+    win = MapWindow(holder.get(), headless=True)
+    snap = holder.get()
+    again = dataclasses.replace(snap, areas=tuple(dataclasses.replace(a, seen=0.99) for a in snap.areas))
+    win.adopt(again)
+    assert win.base_builds == 1

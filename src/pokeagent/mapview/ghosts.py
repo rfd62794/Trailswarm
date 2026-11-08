@@ -8,6 +8,7 @@ or -1 for an area not captured yet - such a ghost is simply not drawn until its 
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -44,7 +45,8 @@ def _parse(path: Path, names: list[str] | None) -> tuple[Ghost | None, list[str]
     areas: list[str] = []
     for i, p in enumerate(points):
         if not (isinstance(p, (list, tuple)) and len(p) == 3 and isinstance(p[0], str)
-                and type(p[1]) in (int, float) and type(p[2]) in (int, float)):
+                and type(p[1]) in (int, float) and type(p[2]) in (int, float)
+                and math.isfinite(p[1]) and math.isfinite(p[2])):
             return None, []
         if names is None and p[0] not in lookup:
             lookup[p[0]] = len(lookup)
@@ -69,6 +71,7 @@ class GhostStore:
         self.parsed = 0                          # total files parsed (tests count re-parses)
         self._files: dict[str, tuple[tuple[int, int], Ghost]] = {}
         self._point_areas: dict[str, list[str]] = {}
+        self._bad: dict[str, tuple[int, int]] = {}   # unparseable files: stamp at last failure
 
     def set_area_names(self, names: list[str]) -> bool:
         """Adopt a new shared area order and re-index every cached ghost from its point names,
@@ -105,12 +108,18 @@ class GhostStore:
             if rec is not None and rec[0] == stamp:
                 live[fname] = rec
                 continue
+            if self._bad.get(fname) == stamp:
+                continue                         # known-bad and untouched: do not re-parse
             ghost, areas = _parse(path, self.area_names)
             self.parsed += 1
             changed = True
-            if ghost is not None:
+            if ghost is None:
+                self._bad[fname] = stamp
+            else:
+                self._bad.pop(fname, None)
                 live[fname] = (stamp, ghost)
                 self._point_areas[fname] = areas
+        self._bad = {f: st for f, st in self._bad.items() if f in files}
         gone = set(self._files) - set(live)
         for fname in gone:
             self._point_areas.pop(fname, None)

@@ -87,3 +87,14 @@ def test_area_store_refresh_reloads_only_changes(tmp_path):
     assert store.refresh(src) is True
     assert store.areas[0].width == 64                             # the image wins over the index
     assert store.refresh(src) is False
+
+
+def test_changed_image_that_fails_to_decode_keeps_the_cached_area(tmp_path):
+    src = make_source(tmp_path)
+    store = AreaStore()
+    store.refresh(src)
+    before = [a.name for a in store.areas]
+    img = store.images["a-1"]
+    (src / "maps" / "area_a-1.png").write_bytes(b"not a png at all")
+    store.refresh(src)
+    assert [a.name for a in store.areas] == before and store.images["a-1"] is img

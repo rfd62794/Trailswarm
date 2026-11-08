@@ -4,7 +4,8 @@ from pathlib import Path
 PKG = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "mapview"
 BANNED = ("mario", "pokemon", "kanto", "lives", "score", "map_id")
 LIMITS = {"__init__.py": 40, "areas.py": 150, "layout.py": 120, "ghosts.py": 150,
-          "playback.py": 200, "overlay.py": 200, "best.py": 60, "view.py": 280, "app.py": 150}
+          "playback.py": 200, "overlay.py": 200, "best.py": 60, "view.py": 280, "app.py": 150,
+          "texcache.py": 80, "compose.py": 60}
 
 
 def test_no_game_words_in_the_package():

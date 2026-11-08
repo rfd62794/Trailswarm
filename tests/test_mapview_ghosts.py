@@ -80,3 +80,21 @@ def test_store_reindexes_when_the_area_order_grows(tmp_path):
     assert store.set_area_names(["a-1", "b-1"]) is True
     assert list(store.ghosts[0].area_idx) == [0, 1]                 # appears without re-parsing
     assert store.parsed == 1
+
+
+def test_non_finite_coordinates_reject_the_ghost(tmp_path):
+    for bad in (float("nan"), float("inf")):
+        p = write(tmp_path, "n.json", doc(points=[["a-1", bad, 3]]))
+        assert load_ghost(p, ["a-1"]) is None
+
+
+def test_permanently_bad_file_is_parsed_once(tmp_path):
+    write(tmp_path, "ok.json", doc())
+    (tmp_path / "ghosts" / "bad.json").write_text("{nope", encoding="utf-8")
+    store = GhostStore()
+    store.refresh(tmp_path)
+    n = store.parsed
+    assert store.refresh(tmp_path) is False and store.parsed == n
+    (tmp_path / "ghosts" / "bad.json").write_text("{nope still", encoding="utf-8")
+    store.refresh(tmp_path)
+    assert store.parsed == n + 1
