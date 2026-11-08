@@ -180,6 +180,8 @@ def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
             cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
     if src.get("trainers"):
         merge_trainers(dst, src)  # shared per-ROM trainer knowledge (never per-save 'beaten')
+    if src.get("grind_points"):
+        merge_grind_points(dst, src)  # shared grind-point ledger (measured vs prior, per-map)
     from pokeagent.knowledge import blackout_tax
     blackout_tax.merge_max(dst, src)  # learned blackout margins: per goal, max of steps (never summed)
     merge_loops(dst, src)  # recurring dead (tile, button) actions: union/max, decays with TTL
@@ -233,6 +235,24 @@ def merge_trainers(dst: dict, src: dict) -> dict:
             if cur.get(k) in (None, "", [], {}):
                 cur[k] = v
         cur["provenance"] = "organic"  # an organic run stands behind the merged entry
+    return dst
+
+
+def merge_grind_points(dst: dict, src: dict) -> dict:
+    """Merge ``src["grind_points"]`` ({map id: point dict}) into dst: union by map id, measured values
+    combined by episode-weighted mean (deduped by episode id, so idempotent), organic never overwritten
+    by synthetic - the rules live in pokeagent.grind.points.merge_point, shared with the run-local
+    ledger file runs/grind_points.json. Malformed input is ignored, never raised over."""
+    from pokeagent.grind.points import merge_point
+    rows = src.get("grind_points")
+    if not isinstance(rows, dict):
+        return dst
+    rows = rows.get("points", rows)  # tolerate the file's {"version", "points"} wrapper too
+    dd = dst.setdefault("grind_points", {})
+    for key, e in rows.items():
+        if not isinstance(e, dict):
+            continue
+        dd[key] = merge_point(dd.get(key), e)
     return dst
 
 

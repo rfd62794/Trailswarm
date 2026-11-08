@@ -137,7 +137,8 @@ def test_web_routes(tmp_path):
     from pokeagent.viewer import web
     model = ViewerModel()
     sources = [FakeSource("a1", [snap("a1")], [FRAME]), FakeSource("a2", [snap("a2", kind="rl")], [FRAME])]
-    model.poll(sources)
+    model.set_wants(frames={"a1": 10.0, "a2": 10.0})      # the page declares every card visible here
+    model.poll(sources); model.drain()
     httpd = web.make_server(model, 0)
     port = httpd.server_address[1]
     import threading
@@ -165,7 +166,7 @@ def test_ui_smoke_fakes():
     from pokeagent.viewer.ui.window import ViewerWindow
     model = ViewerModel()
     sources = {f"a{i}": FakeSource(f"a{i}", [snap(f"a{i}")] * 3, [FRAME] * 3) for i in range(6)}
-    model.poll(list(sources.values()))
+    model.poll(list(sources.values())); model.drain()
     win = ViewerWindow(model, sources)
     try:
         win._build()

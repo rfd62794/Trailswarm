@@ -14,7 +14,7 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands, layout_file, modes, steering, ui_scale
+from pokeagent.viewer import commands, layout_file, modes, steering, swarm_rows, ui_scale
 from pokeagent.viewer.health import ANOMALY, HealthStore
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
@@ -27,6 +27,7 @@ from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
 from pokeagent.viewer.ui.stadium_pane import StadiumPane
+from pokeagent.viewer.ui.swarm_page import SwarmPage
 from pokeagent.viewer.ui.window_health import HealthLayoutMixin
 from pokeagent.viewer.ui.window_host import CommandHostMixin
 from pokeagent.viewer.ui.world_host import WorldHost
@@ -43,7 +44,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
                  root: Path | None = None, world: WorldModel | None = None,
-                 health: HealthStore | None = None) -> None:
+                 health: HealthStore | None = None, swarm=None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
         self._spawn = SpawnControl(supervisor, root)
@@ -53,6 +54,9 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         self.health = health or HealthStore()
         self.entries: dict = {}                # agent_id -> registry entry; app.run() assigns before run()
         self._stadium_pref: bool | None = None  # user toggle; None = follow the mode
+        self._swarm_pref: bool | None = None    # user toggle; None = follow the default (swarm runs)
+        self._swarm_default: bool | None = None  # computed on first swarm_visible() call
+        self._swarm_store = swarm or swarm_rows.SwarmRowStore()
         self._layout_path: Path | None = None
         self.selected: str | None = None
         self.scope = "all"
@@ -65,6 +69,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         self._focus_view: FocusView | None = None
         self._bar: ControlBar | None = None
         self._stadium: StadiumPane | None = None
+        self._swarm: SwarmPage | None = None
         self._win = tags.MAIN_WINDOW
         self._last_size: tuple[int, int] = (0, 0)
         self._outbox: queue.Queue = queue.Queue()  # sends run on a worker so the UI never waits on HTTP
@@ -180,6 +185,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
                                      self.leave_focus, self.toggle_focus, self._on_select)
         self.world.build()
         self._stadium = StadiumPane(self.toggle_focus, on_close=self.on_stadium_close)
+        self._swarm = SwarmPage(self.toggle_focus, on_close=self.on_swarm_close)
         menu.build(self)
         self._bar = ControlBar(self._win, self)
         keys.install(self)
@@ -230,13 +236,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
         self.world.tick()
-        if self._stadium is not None:
-            vis = self.stadium_visible()
-            self._stadium.set_visible(vis)
-            if dpg.does_item_exist(menu.MENU_STADIUM):
-                dpg.set_value(menu.MENU_STADIUM, vis)
-            if vis:
-                self._stadium.update(self.world.model, self.model)
+        self._panes_tick()  # Stadium + Swarm top-level windows: visibility, menu mirrors, content
         if self._grid is not None:
             dpg.configure_item(self._grid.area, show=self.focus.view == "grid")
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):
@@ -254,6 +254,8 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
             self._focus_view.update(hold)
         if self._bar is not None:
             self._bar.refresh()
+        self.model.set_wants(self.focus.focused, self.visible_frame_set())  # pull model: the poller
+        self.world.model.set_focus(self.focus.focused)                      # reads only what is on screen
         self._fit()
 
     def run(self) -> None:

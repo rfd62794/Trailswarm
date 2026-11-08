@@ -47,9 +47,10 @@ def test_fake_source_records():
 def test_model_staleness():
     t = [100.0]
     m = ViewerModel(clock=lambda: t[0])
+    m.set_wants(frames={"a": 10.0})                       # frames only for agents the views declared
     f = FakeSource("a", [AgentSnapshot(agent_id="a")], [(b"x", 1, 1)])
     assert m.staleness("a") == "lost"
-    m.poll([f])
+    m.poll([f]); m.drain()
     assert m.staleness("a") == "live" and m.frame("a") == (b"x", 1, 1)
     t[0] = 102.5
     assert m.staleness("a") == "stale"
@@ -58,7 +59,7 @@ def test_model_staleness():
     s = m.snapshot("a")
     s.step = 99
     assert m.snapshot("a").step == 0  # copies
-    m.poll([FakeSource("a")])  # failed poll keeps last snapshot, does not refresh
+    m.poll([FakeSource("a")]); m.drain()  # failed poll keeps last snapshot, does not refresh
     assert m.snapshot("a") is not None and m.staleness("a") == "lost"
     assert m.ids() == ["a"]
 
@@ -108,10 +109,11 @@ def test_commands():
 def test_model_forget_and_prune():
     t = [0.0]
     m = ViewerModel(clock=lambda: t[0])
+    m.set_wants(frames={"a": 10.0})
     m.poll([FakeSource("a", [AgentSnapshot(agent_id="a")], [(b"x", 1, 1)]),
-            FakeSource("b", [AgentSnapshot(agent_id="b")])])
+            FakeSource("b", [AgentSnapshot(agent_id="b")])]); m.drain()
     t[0] = 50.0
-    m.poll([FakeSource("b", [AgentSnapshot(agent_id="b")])])
+    m.poll([FakeSource("b", [AgentSnapshot(agent_id="b")])]); m.drain()
     t[0] = 61.0
     assert m.prune() == ["a"] and m.ids() == ["b"]
     assert m.snapshot("a") is None and m.frame("a") is None

@@ -32,19 +32,16 @@ def trainee_slot(emu) -> int | None:
     return sp.index(MAGIKARP) if MAGIKARP in sp else None
 
 
-def trainee_slot_for(emu, named: int | None) -> int | None:
-    """The switch-training slot: the Magikarp's when one is in the party; else `named` (the slot ctx.train_member
-    names) when it is a non-lead member at least TEAM_GAP below the lead's level."""
+def trainee_slot_for(emu, named: int | None, breakers=(), wild=None) -> int | None:
+    """The switch-training slot: the Magikarp's when one is in the party; else the exp-spread rotation's
+    pick (knowledge.team_plan.trainee_slot): `named` (the slot ctx.train_member names) when it is a
+    non-lead member at least TEAM_GAP below the lead's level, else the lowest band breaker of `breakers`
+    that can survive `wild` (a grind leads the breaker and swaps it out on turn one for the shared exp)."""
     t = trainee_slot(emu)
     if t is not None:
         return t
-    if named is None:
-        return None
-    party = read_party(emu)
-    if not party or named <= 0 or named >= len(party):
-        return None
-    from pokeagent.knowledge.readiness import TEAM_GAP  # deferred: readiness imports this module for EVOLVE_LEVEL
-    return named if party[named].level <= party[0].level - TEAM_GAP else None
+    from pokeagent.knowledge import team_plan  # deferred: readiness imports this module for EVOLVE_LEVEL
+    return team_plan.trainee_slot(read_party(emu), named, breakers, wild)
 
 
 def can_buy(emu) -> bool:

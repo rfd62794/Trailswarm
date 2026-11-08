@@ -17,43 +17,13 @@ import numpy as np
 from pokeagent.agent_registry import list_agents
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
 from pokeagent.viewer import health as health_mod
-from pokeagent.viewer import modes
+from pokeagent.viewer import modes, swarm_rows
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.world.events import BattleEnd, BattleStart, EventBus, Move
 from pokeagent.world.model import WorldModel
-from pokeagent.viewer.sources import AgentSource, HttpShmSource, discover
+from pokeagent.viewer.sources import HttpShmSource, discover
 
 log = logging.getLogger(__name__)
-SNAPSHOT_HZ = 10.0  # spec: snapshots 10 Hz, frames 30 Hz
-
-
-class _Throttle:
-    """AgentSource wrapper: snapshot() at most every ``interval`` s; frame/send pass through."""
-
-    def __init__(self, src: AgentSource, interval: float = 1.0 / SNAPSHOT_HZ) -> None:
-        self._src, self._interval = src, interval
-        self._snap: AgentSnapshot | None = None
-        self._at = 0.0
-
-    @property
-    def agent_id(self) -> str:
-        return self._src.agent_id
-
-    def snapshot(self) -> AgentSnapshot | None:
-        now = time.monotonic()
-        if now - self._at >= self._interval:
-            self._at, self._snap = now, self._src.snapshot()
-        return self._snap
-
-    def frame(self):
-        return self._src.frame()
-
-    def events(self, since: int = 0) -> dict:
-        fn = getattr(self._src, "events", None)
-        return fn(since) if fn else {"events": []}
-
-    def send(self, cmd: str, **args) -> dict:
-        return self._src.send(cmd, **args)
 
 
 class _AnimatedFake:
@@ -123,14 +93,14 @@ def _sources_for(root: Path, fake: int) -> tuple[dict, dict]:
 
 
 def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
-    """Reconcile ``current`` (agent_id -> _Throttle) with ``fresh`` (agent_id -> source) in place:
-    keep existing throttles for agents still present, add new ones, drop vanished ones."""
+    """Reconcile ``current`` (agent_id -> source) with ``fresh`` in place: keep existing sources
+    for agents still present, add new ones, drop vanished ones (poll cadences live in the model)."""
     gone = [aid for aid in current if aid not in fresh]
     for aid in gone:
         del current[aid]
     added = [aid for aid in fresh if aid not in current]
     for aid in added:
-        current[aid] = _Throttle(fresh[aid])
+        current[aid] = fresh[aid]
     return added, gone
 
 
@@ -157,8 +127,9 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
     world = WorldModel()
-    holder = {"sources": {aid: _Throttle(s) for aid, s in sources.items()}, "entries": entries}
+    holder = {"sources": dict(sources), "entries": entries}
     health = health_mod.HealthStore()
+    swarm = swarm_rows.SwarmRowStore()
     stop = threading.Event()
 
     def poller() -> None:
@@ -184,6 +155,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
                 else:
                     health.refresh(root, now, health_mod.started_map(dict(holder["entries"])))
                 health.request_invariants(root, now)
+                swarm.refresh(root, model, holder["entries"], health)   # 1 Hz too: the swarm page's rows
             time.sleep(1.0 / fps)
 
     threading.Thread(target=poller, daemon=True).start()
@@ -195,7 +167,7 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     from pokeagent.viewer.ui.window import ViewerWindow
     from pokeagent.supervisor import Supervisor
     win = ViewerWindow(model, holder["sources"], fps=fps, supervisor=Supervisor(root),
-                       root=root, world=world, health=health)
+                       root=root, world=world, health=health, swarm=swarm)
     win.entries = entries
     win.focus.set_mode(modes.internal("world" if world_mode else mode))
     try:

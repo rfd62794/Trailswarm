@@ -139,6 +139,27 @@ Move meaning: `knowledge/moves.py` maps each ROM effect byte to an `Effect`; eve
 Party readiness (`knowledge/readiness.py`) replaces the fixed training-level table: it simulates our party (RAM stats, known moves) against the boss
 party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only the fallback when the data or the party is missing.
 
+Team management (`knowledge/team_plan.py`, pure): the training gate judges the WHOLE party - `boss_need` runs the same
+best-switch fight, then asks what level EACH slot alone would need to pass, so the verdict names "raise slot k to L" whichever
+slot the strong mon sits in (the marathon run fought Misty with a weak L12 in slot 0 and a L23 Charmeleon in slot 3). While the
+verdict is "not ready" the planner never enters a gym map (`trainers.GYM_BOSSES` covers only beat_brock's 0x36 and
+beat_misty's 0x41 today - later gyms are not gated yet) and the leader's guessed sight line is
+temp-blocked so frontier cannot walk into it; inside the gym the route off the map is walked before anything else. The
+hold stands down once the stage's GrindBudget is spent (the gate lifts: grind exhausted must not lock the boss out). The lead is chosen by matchup before a known boss or an unbeaten trainer target
+(`choose_lead`: best first-turn damage ratio, then HP fraction, then level); on a grind the lowest band breaker leads instead -
+`level_band` asks the lead for the boss level and others within `BAND_BELOW` (4) of it, so the breaker is sent out first and
+swapped on turn one for the Gen 1 shared exp, exactly like the Magikarp trainee (same `trainee_slot_for` mechanism, generalised).
+Mid-battle in trainer fights `switch_choice` picks a switch when the active member is "thin" (foe's best hit over
+`SWITCH_HP_TURNS` = 2 turns >= its HP, or its best move does <= `WEAK_RATIO` = 0.5 of the foe's HP) and a healthy member beats
+its damage ratio by `SWITCH_GAIN` = 1.5 - max `MAX_SWITCHES_PER_BATTLE` = 2 switches a battle. `grind_pressure` (0..1) is the
+one knob `plan_goal` reads for WHEN grinding outranks the plan: band breakers over team size + level gap + recent blackouts +
+a proximity bonus as the boss nears; above `GRIND_PRESSURE_START` (0.5) a grind episode is latched (Grind_Points owns WHERE;
+`train_route` until it lands), below `GRIND_PRESSURE_STOP` (0.2) it releases. At a full party a wanted catch is thrown only
+when a `release_candidate` exists (lowest-value member, never the trainee or a needed HM learner). In Gen 1 a full party
+sends the caught mon to the PC box automatically, so the policy mostly decides whether to THROW at all when every member
+is protected; the `release_pending` mark answers YES only to a deposit-a-POKeMON prompt (UNVERIFIED wording - none is
+recorded), only during the battle it was set in, and lands in the catch record.
+
 ## Poke Mart, text speed, text prompt (ROM-verified 2026-11-05)
 
 Probed headless in the Viridian Mart (map 42, 0x2A) from `oaks_parcel.state` (player at the clerk, (2,5)), with `shop.buy()` driving it.
@@ -241,3 +262,62 @@ Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugge
 `press_interact` did not treat the press as exploring and never temp-blocked his tile; memory_purge had also healed the learned wall, so 1,500 UP presses went into him. The press now carries
 the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
 and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.
+
+## Viewer (pull model, 2026-11-07)
+
+- The poll thread pulls on a per-source cadence instead of polling everything every frame: snapshots
+  at `SNAPSHOT_HZ_IDLE = 2` Hz for unfocused agents / `SNAPSHOT_HZ_FOCUS = 10` Hz for the focused one;
+  world `/events` at `POLL_S_FOCUS = 0.2` s focused / `POLL_S_IDLE = 1.0` s for others; frames only for
+  the on-screen set the views declare via `visible_frame_set` (grid cards `CARD_FRAME_HZ = 10`, the
+  focus card `FOCUS_FRAME_HZ = 30`, Stadium slots `1/FRAME_S`). The render loop reads cached state
+  only. An in-flight source is skipped, never queued; a dead agent (`DEAD_AFTER = 5` failed
+  snapshots) retries at `DEAD_RETRY_S = 2` s and reads no frames. The old app.py `_Throttle` is gone:
+  cadences live in `ViewerModel`/`WorldModel`, demand in `set_wants`/`set_focus` (written by the UI
+  thread each tick).
+- Frame slot header is layout v2 (`telemetry.LAYOUT = 2`, 32-byte header: v1 fields + u32 layout +
+  u32 `SLOT_MAGIC` at offset 20 + f64 `reader_ts` at offset 24). Every shared-memory read stamps
+  the reader heartbeat — the field Agent_Footprint item 2 reads to render frames only while
+  watched; v1 slots are still read correctly (size is only a secondary guard — shared memory is
+  page-rounded on the attaching side, so v2 needs the layout AND magic u32s, not pixel bytes that
+  merely spell 2). Backwards compatibility runs ONE way only. A layout-2 buffer WITHOUT the magic (a
+  publisher started before this change) is read by a new viewer as v1: frames come 16 bytes late and the
+  reader heartbeat is skipped. An OLD viewer reading a NEW publisher also reads frames 16 bytes late.
+  Safe order: restart the agents (publishers) first, then the viewer; or restart both together. Never
+  attach a new viewer to agents that were already running before this change.
+- The Swarm page (View menu checkbox, top-level `SWARM_PAGE` window persisted by init_file) shows
+  one row per agent/slot: live/lost/dead, current segment + curriculum grade (the scorecard's
+  flag words, computed live via `segment_grades.grade_all`), next segment in the curriculum chain, steps/s + RSS from
+  `runs/swarm/agent_stats.jsonl` when the Agent_Footprint sampler writes it (blank otherwise), the
+  health state + reason, and the last goal landed. A row click focuses the agent. Rows assemble at
+  1 Hz on the poll thread (`viewer/swarm_rows.py`, pure); `ui/swarm_page.py` renders them.
+
+**Grind points (2026-11-07).** `src/pokeagent/grind/points.py` keeps one `GrindPoint` per map - grass `patch` (the
+encounter-proven tiles from `maps[m]["encounters"]`), `species` and the `level_band` they imply (top wild level -2..+6),
+an atlas `xp_per_min_prior`, and a measured `xp_per_min` folded from grind episodes (`episodes: {run@step: [rate,
+blackouts, provenance]}` - the id is what makes the swarm merge an episode-weighted mean AND idempotent; a synthetic
+episode never lands on a point holding organic data). `choose` picks the band-covering point with the best rate
+(measured once `n_measured >= 2`, else prior) minus travel and `blackout_rate * BLACKOUT_STEPS`. The run-local copy is
+`runs/grind_points.json` (`{"version": 1, "points": {map: {...}}}`); the shared copy is `maps.json`'s `grind_points`
+table, merged by `swarm_merge.merge_grind_points` like `trainers`. `grind/measure.py` calibrates frames/step from the
+last 20 runs' records (levels.jsonl `step`/`frame` pairs when transitions carry no `frame`; 16 with a log line when no
+runs are readable) - `atlas.FRAMES_PER_STEP` is that value now, so `xp/min` columns everywhere are measured once run
+data exists. `GrindDrill` no longer needs `--drill-grind`: when `ctx.train_need` says the trainee is under level it
+starts an `explorer.grind_episode`, walks to the point and paces its patch, and writes one measured row per episode to
+`runs/legs/grind_drills.jsonl`. While an episode lives, `stay_on_route` returns the point's map plus its Pokecenter map
+and BOTH plan_goal and frontier honour it (frontier's BFS and the warp-avoid check cannot leave the set) - that is the
+Nugget Bridge fix: plan_goal walked UP onto Route 24 while frontier walked DOWN into Cerulean, 358 crossings in the
+marathon run. `tools/grind_report.py --points` prints the ledger (measured vs prior) and the pick per
+(starter, next boss, trainee level).
+
+Restart discipline (PR #165 review): episodes are driven by the engine's per-step `grind_episode.tick`
+(`applies()` only reads `active()`/the under-level flag). A start passes the same `_end_reason` checks an
+episode would face next step plus `not center_intent and not goto and proc is None`; after any end
+`EPISODE_COOLDOWN = 300` steps must pass; an episode under `MIN_EPISODE_STEPS = 50` or with zero battles
+lands in the drill log as an `aborted` row and never folds into the ledger's mean; `grind_episode.start(ctx)`
+is the explicit entry point (PR #166 calls it via getattr). The measured xp is the levels.jsonl exp delta
+(`measure.xp_gained_in_episode`), and `atlas.frames_per_step()`/`STEPS_PER_MIN` are lazy now - importing
+`grind.atlas` touches nothing; the calibration runs once, capped at the newest 20 run dirs under the
+checkout's runs/. Boundary limit: `OutsideSet` covers learned warps AND the edges memory keeps short of a
+warp (`warp_cand` one-sighting changes, `paths` edges where recorded), but an edge the agent has never
+taken even once is not in memory anywhere and cannot be guarded - the hunts (LearnerHunt/TeamHunt/
+TrainerHunt) are simply switched off while an episode lives instead.

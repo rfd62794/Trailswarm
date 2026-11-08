@@ -17,8 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from pokeagent.grind import refresh as R  # noqa: E402
-from pokeagent.grind.atlas import FRAMES_PER_STEP, STEPS_PER_MIN  # noqa: E402
+from pokeagent.grind import measure, refresh as R  # noqa: E402
+from pokeagent.grind.atlas import STEPS_PER_MIN  # noqa: E402
 from pokeagent.grind.centers import center_costs  # noqa: E402
 
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
@@ -36,15 +36,18 @@ def need_levels(kb: dict) -> tuple[dict, dict]:
     gyms it knows, plain readiness vs Surge's party for the rest)."""
     from pokeagent.explorer import training
     from pokeagent.goals import GOALS as LADDER
-    from pokeagent.knowledge import party, readiness, trainers
-    out: dict = {}
+    from pokeagent.knowledge import party, readiness, team_plan, trainers
+    out, team_out = {}, {}
     for sp in STARTERS:
         c = party.trainer_mon(sp, 5, kb)
         if c is None:
             continue
+        # the representative early team: the starter plus the catch plan's Route 1 catches
+        team = [c] + [m for n, lv in (("PIDGEY", 3), ("RATTATA", 3)) if (m := party.trainer_mon(n, lv, kb))]
         for goal in GOALS:
             goals = {g: True for g in LADDER[:LADDER.index(goal)]}
             lvl = None
+            boss = trainers.boss_party(goal, kb, starter_names=[sp])
             if goal in training.TRAIN_LEVEL_BY_GOAL:
                 lvl = training.required_level(goals, 0, [c])[0]
             else:
@@ -53,7 +56,11 @@ def need_levels(kb: dict) -> tuple[dict, dict]:
                 lvl = r.required if r else None
             if lvl:
                 out.setdefault(sp, {})[goal] = lvl
-    return out, {g: "training.required_level" if g in training.TRAIN_LEVEL_BY_GOAL else "readiness.assess" for g in GOALS}
+            if boss:
+                nv = team_plan.boss_need(team, boss, kb, goal)
+                if nv is not None:
+                    team_out.setdefault(sp, {})[goal] = None if nv.ready else nv.need
+    return out, team_out
 
 
 def map_graph(rom_path) -> dict:
@@ -100,10 +107,38 @@ def print_trainer_section(map_id: int, label: str, ledger, party, base_exp: dict
         print(f"area resistance ({label}, {len(entries)} trainers): min margin {area}{who}{weak}")
 
 
+def points_report(runs: Path, doc: dict, kb: dict) -> int:
+    """``--points``: the grind-point ledger (measured vs prior) and the point ``choose`` would pick for
+    each (starter, next boss, trainee level) row of the atlas's saved need table."""
+    from pokeagent.grind.points import GrindLedger, choose
+    led = GrindLedger.load(runs / "grind_points.json")
+    seeded = not led.points
+    if seeded:
+        led.seed_from_atlas(doc, kb=kb)
+    print(f"== grind points ({len(led.points)} known, {'atlas priors' if seeded else 'ledger file'}) ==")
+    for p in sorted(led.points.values(), key=lambda p: p.map_id):
+        meas = f"{p.xp_per_min_measured:.0f} (n={p.n_measured})" if p.xp_per_min_measured is not None else "-"
+        print(f"  0x{p.map_id:02X} {p.name or '?'}: band L{p.level_band[0]}-{p.level_band[1]}, "
+              f"xp/min measured {meas} vs prior {p.xp_per_min_prior:.0f}, center {p.center_cost_frames:.0f}f "
+              f"(map {p.center_map}), blackout {p.blackout_rate:.0%}, {p.provenance}, patch {len(p.patch)}")
+    need = (doc.get("inputs") or {}).get("need") or {}
+    print("== chosen point per (starter, next boss, trainee level) ==")
+    for sp, goals in need.items():
+        for goal, lvl in goals.items():
+            picks = []
+            for t in R.LEVELS:
+                if t < int(lvl):
+                    p = choose(led, [t], int(lvl), None)
+                    picks.append(f"L{t} -> {p.name or ('0x%02X' % p.map_id) if p else 'none'}")
+            print(f"  {sp} before {goal} (needs L{lvl}): " + "; ".join(picks))
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default=str(ROOT / "runs"))
     ap.add_argument("--out", default=None)
+    ap.add_argument("--points", action="store_true", help="print the grind-point ledger and the chosen point per (starter, next boss)")
     a = ap.parse_args(argv)
     runs = Path(a.runs)
     from pokeagent.atlas.rom_maps import map_name
@@ -116,18 +151,24 @@ def main(argv=None) -> int:
     out_path = Path(a.out) if a.out else runs / R.ATLAS
     doc = R.load(out_path)
     n = R.fold_new(doc, runs, kb.get("name_of_internal"))
-    need, _src = need_levels(kb)
+    need, team_need = need_levels(kb)
     rp = rom_path()
     cost = center_costs(map_graph(rp), POKECENTER_MAPS) if rp else {}
-    doc["inputs"] = {"need": need, "center_cost": {str(k): v for k, v in cost.items()}, "candidates": GOAL_MAPS,
+    doc["inputs"] = {"need": need, "team_need": team_need,
+                     "center_cost": {str(k): v for k, v in cost.items()}, "candidates": GOAL_MAPS,
                      "names": {str(m): map_name(m) for m in range(256)}, "rom": bool(rp)}
     doc["atlas"] = R.build_atlas(doc, kb)
     R.save(out_path, doc)
+    fps, n_runs = measure.calibration(runs)
+    step_label = f"{fps:.1f} frames (measured over {n_runs} runs)" if fps is not None else "16 frames (assumed)"
     print(f"folded {n} new battles (cursor {doc['cursor']['offset']}); pokecenter costs: {'ROM map-graph estimate' if rp else 'UNKNOWN'};"
-          f" step = {FRAMES_PER_STEP} frames (assumed)\n")
+          f" step = {step_label}\n")
+    if a.points:
+        return points_report(runs, doc, kb)
     for sp, goals in doc["atlas"].items():
         for goal, lv in goals.items():
-            print(f"== {sp} before {goal} (needs L{need[sp][goal]}) ==")
+            tn = (team_need.get(sp) or {}).get(goal)
+            print(f"== {sp} before {goal} (needs L{need[sp][goal]} solo{f', team L{tn}' if tn else ''}) ==")
             for L, spots in lv.items():
                 row = "  ".join(f"{s['name']} {s['xp_per_min']:.0f}xp/min risk {s['blackout']:.0%} n={s['n_obs']}"
                                 + (f" ~{s['steps_to_goal'] / STEPS_PER_MIN:.0f}min" if s["steps_to_goal"] else "") for s in spots)
