@@ -193,7 +193,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-catch-methods-directive |
 | Base branch | - |
@@ -210,4 +210,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:31 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-catch-methods-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VYRXTV926N01P1Z5CJ4BAB
 - 2026-11-07 16:34 · dispatcher · launched pid=8220; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-catch-methods-directive; provisioned: uv sync --frozen
 - 2026-11-07 19:04 · robert-claude-laptop · In progress → Review — Devin run died before push (pid 8220 gone, log stopped ~16:47); branch recovered from worktree at b568d81, pushed, PR #157 opened by Claude [origin] spent: devin 14 min est. n/a
+- 2026-11-07 19:34 · robert-claude-laptop · Review → Done — note: PR #157 merged (merge commit); Devin run died before push, branch recovered; Sonnet CHANGES-NEEDED -> fixes -> Haiku APPROVE; green verify at 47d8ead (1738 passed, 0 failed, 40 ROM-gated skips). Capture-formula constants still marked unverified pending ROM check.
 <!-- queue:end -->
