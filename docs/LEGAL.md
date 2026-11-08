@@ -20,13 +20,11 @@ of association.
 
 - ROM images or any other copy of game software
 - Boot ROMs, firmware, or decryption keys
-- Real emulator save states or dumps of game memory
 - Extracted game graphics, audio, or text as data files, other than the one documentation image described below
 - Links to, or instructions for obtaining, copies of game software
 
 `roms/`, `baselines/` and `runs/` are gitignored, along with the three files generated from a local ROM under `kb/`:
-`rom_tables.json`, `hm_compat.json` and `items.json`. The `.state` files under `tests/fixtures/` contain only `{}` and
-are not save states.
+`rom_tables.json`, `hm_compat.json` and `items.json`.
 
 ## What is in this repository
 
@@ -36,6 +34,9 @@ behaves.
 One documentation image, `docs/media/world.gif`, shows real agent runs moving across a map rendered from the game's
 own graphics. It is included only to illustrate what the software does, and it will be removed on request from the
 rights holder.
+
+Emulator save states may be included where they help demonstrate or test the software, as is common among similar
+projects. A save state is a snapshot of a running session and cannot be played without the game itself.
 
 RAM labels in `src/pokeagent/data/ram_map.json` are derived from pret/pokered's `pokered.sym`. That repository
 publishes no licence file, so the symbol file itself is not redistributed here.
