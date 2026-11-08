@@ -94,7 +94,7 @@ Head sha, diff stat, wc -l line, test tails, the exact deposit prompt you matche
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-team-management-review-fixes-directive |
 | Base branch | directive/pokeagent-team-management-directive |
@@ -108,4 +108,5 @@ Head sha, diff stat, wc -l line, test tails, the exact deposit prompt you matche
 - 2026-11-07 21:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WGWQD8D3QK0TCMD7KW7TY6
 - 2026-11-07 21:55 · dispatcher · launched pid=27076; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-review-fixes-directive; provisioned: uv sync --frozen
 - 2026-11-07 22:07 · devin · In progress → Review — head 0dfe7c73a7b67faee4994bc4fba7043c8e92e3bd. diff: 10 files, +277/-17 (battle, catch, dialog, plan_goal, switch_out, KNOWLEDGE.md + 4 test files). wc -l: plan_goal 282, switch_out 207, catch 213, context 299, memory 299 - all under 300. Tests: targeted 13-file set 133 passed; full suite 1948 passed, 40 skipped (ROM-gated), 0 failed. Items: (1) gym hold skipped when the stage's GrindBudget lifts (st['gate_lifted'] published by _budgeted; one log line per stage); (2) release_pending carries the battle index and is popped at battle end AND at the next battle's start in battle.py; matcher narrowed to ' deposit '+' pok' - exact Gen 1 prompt wording NOT recorded in KNOWLEDGE.md or the repo, so the match is UNVERIFIED and deliberately narrow ('Want to deposit POKeMON?' gets YES; 'deposit ITEMS'/'release'/'the BOX is full' prompts get NO); KNOWLEDGE.md updated honestly (auto-boxed catch; policy mostly decides whether to throw); (3) catch_mode/catch_hint reset on the party-full skip path; (4) m==gym && !ready routes out via _out_step (WorldGraph BFS to nearest non-gym map) before the grind step; also fixed _leader_avoid's latent NameError (x,y were free vars); (5) tests added: gym hold branch + lift (PlanGoal.step end-to-end), in-gym walk-out, _leader_avoid sight-line block, _matchup_step press flow + MAX_PRESSES cap + matchup_switches record, release_pending lifecycle via Battle().step; (6) KNOWLEDGE.md says GYM_BOSSES covers only Brock 0x36/Misty 0x41; grind_report.need_levels callers checked - sole caller (main:126) unpacks (out, team_out) correctly, no test calls it; (7) nits done: matchup_pick memoised per (step,battle), full_party_slot mark cached per battle (st['release_mark']). [origin] spent: devin 12 min est. n/a
+- 2026-11-08 12:08 · robert-claude-laptop · Review → Done — note: Fixes landed through PR #166 (merge 6641f35); verify 2068 passed at aef479f; Haiku delta review APPROVE.
 <!-- queue:end -->
