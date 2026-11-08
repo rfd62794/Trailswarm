@@ -137,7 +137,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 | Branch | directive/pokeagent-status-care-and-exp-eligibility-d-06cbc6 |
 | Base branch | - |
 | Base commit | 4e91a65d04b36c41df472298a68d9ac89978429f |
-| Head commit | 5bb3694aaa206ce57ee9c1123b0487fbf336391c |
+| Head commit | 41559f8a7578a5efd63302d810e83d4f183ddc61 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
