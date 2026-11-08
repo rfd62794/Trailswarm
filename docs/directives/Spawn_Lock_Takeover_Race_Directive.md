@@ -210,3 +210,17 @@ Expected tail at main 7e8c8d2: about 1709 passed, 40 skipped (the 40 are ROM-gat
 In the Status row: the before/after flake observation (did the stress test fail before the change?), the
 10x loop result, the full-suite tail, the diff stat, and any constant you chose differently from this directive
 and why.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 19:28 · robert-claude-laptop · none → Queued — Claude 2026-11-07: diagnosis of the flaky test_lock_takeover_is_exclusive (empty-content window, rename/link-back resurrection, same-pid release); approve when a Devin slot frees
+<!-- queue:end -->
