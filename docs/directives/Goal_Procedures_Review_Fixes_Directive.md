@@ -107,4 +107,5 @@ you could not do.
 - 2026-11-07 20:57 · robert-claude-laptop · Blocked → Queued — Requeue: PR #162's branch now has main merged (d8e701b, context fields moved to procedures/state.py = finding 3 done); run starts FROM that branch (approve with base_branch) since the sandbox refuses git merge
 - 2026-11-07 20:57 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; requeued with the PR branch (main already merged in) as base because the sandbox refuses git merge
 - 2026-11-07 20:58 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WE23691X2P3PRHTSTTVR23
+- 2026-11-07 21:06 · dispatcher · launched pid=14124; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; resynced: merged directive/pokeagent-goal-procedures-directive into directive/pokeagent-goal-procedures-review-fixes-directive (13 commit(s), clean); provisioned: uv sync --frozen
 <!-- queue:end -->
