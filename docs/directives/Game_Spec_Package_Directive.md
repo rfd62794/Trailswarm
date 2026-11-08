@@ -147,11 +147,12 @@ Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the 
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude: plan phase 2; golden trace owed by Claude verify with ROM
+- 2026-11-08 16:50 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
