@@ -95,7 +95,7 @@ you could not do.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goal-procedures-review-fixes-directive |
 | Base branch | - |
@@ -106,4 +106,5 @@ you could not do.
 - 2026-11-07 20:42 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; review fixes for PR #162 which Robert wants merged
 - 2026-11-07 20:42 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WD4C03TZ3VQYAWZX5JK8AZ
 - 2026-11-07 20:49 · dispatcher · launched pid=26948; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; provisioned: uv sync --frozen
+- 2026-11-07 20:50 · devin · In progress → Blocked — git merge origin/directive/pokeagent-goal-procedures-directive refused by the run's permissions (git merge/rebase/stash are refused); branch is still plain main a69a759 and none of PR #162's files (procedures/, behaviours/after_victory.py) exist to fix. Run needs merge permission for this step or a dispatcher-side pre-merge.
 <!-- queue:end -->
