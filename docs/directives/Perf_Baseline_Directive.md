@@ -122,3 +122,17 @@ Expected: every file under `src/pokeagent/explorer/` under 300.
 ## Report
 
 Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect on the probe's buckets.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:07 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's efficiency request; cProfile evidence pasted (Tk loop 16.5%, BFS 28%, emulator 26%)
+<!-- queue:end -->
