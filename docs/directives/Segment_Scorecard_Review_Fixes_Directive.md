@@ -100,4 +100,5 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #161 (Sonnet CHANGES-NEEDED, five should-fixes); branch merges PR #161's branch first
 - 2026-11-07 20:40 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; review fixes for PR #161 which Robert wants merged
 - 2026-11-07 20:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WD0KXKRYTTZ88XQ2FR7WM0
+- 2026-11-07 20:47 · dispatcher · launched pid=24544; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
