@@ -110,6 +110,6 @@ Tests run without a ROM or a model. Tests that need a real ROM skip unless `POKE
 
 RAM labels in `src/pokeagent/data/ram_map.json` are derived from pret/pokered's `pokered.sym`. That repository publishes no licence file, so the symbol file itself is not redistributed here.
 
-This project is unaffiliated with and not endorsed by Nintendo, Game Freak, Creatures Inc., The Pokemon Company, or any other game publisher. All game titles and characters belong to their respective owners. No ROM or other game software is distributed with this repository, and none ever will be.
+This project is unaffiliated with and not endorsed by Nintendo, Game Freak, Creatures Inc., The Pokemon Company, or any other game publisher. All game titles and characters belong to their respective owners. No ROM or other game software is distributed with this repository.
 
 The [MIT License](LICENSE) covers only the original code and documentation written for this project. It grants no rights in any game, trademark or third-party work. See [docs/LEGAL.md](docs/LEGAL.md) for the project policy and third-party notices.

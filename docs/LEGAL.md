@@ -10,9 +10,8 @@ It grants no rights in any game, character, trademark, or other third-party work
 ## Ownership and affiliation
 
 This project is unaffiliated with and not endorsed by any game publisher or developer. Every game named in this
-repository belongs to its respective owners, including Nintendo, Game Freak, Creatures Inc., The Pokemon Company,
-HAL Laboratory, Square Enix, Tengen and The Tetris Company. Names are used only to identify which game the software
-was tested with.
+repository belongs to its respective owners. Pokemon belongs to Nintendo, Game Freak, Creatures Inc. and The Pokemon
+Company. Names are used only to identify which game the software was tested with.
 
 The project's public name is Trailswarm. The Python package name `pokeagent` is descriptive and carries no claim
 of association.
@@ -22,16 +21,21 @@ of association.
 - ROM images or any other copy of game software
 - Boot ROMs, firmware, or decryption keys
 - Real emulator save states or dumps of game memory
-- Extracted game graphics, audio, or text as data files
+- Extracted game graphics, audio, or text as data files, other than the one documentation image described below
 - Links to, or instructions for obtaining, copies of game software
 
-`roms/`, `baselines/` and `runs/` are gitignored, along with data generated from a local ROM under `kb/`. The
-`.state` files under `tests/fixtures/` are empty placeholders, not save states.
+`roms/`, `baselines/` and `runs/` are gitignored, along with the three files generated from a local ROM under `kb/`:
+`rom_tables.json`, `hm_compat.json` and `items.json`. The `.state` files under `tests/fixtures/` contain only `{}` and
+are not save states.
 
 ## What is in this repository
 
-Original source code, tests and documentation; memory addresses, labels and goal names that describe how a game
-behaves; and a small amount of illustrative imagery in the documentation.
+Original source code, tests and documentation, plus memory addresses, labels and goal names that describe how a game
+behaves.
+
+One documentation image, `docs/media/world.gif`, shows real agent runs moving across a map rendered from the game's
+own graphics. It is included only to illustrate what the software does, and it will be removed on request from the
+rights holder.
 
 RAM labels in `src/pokeagent/data/ram_map.json` are derived from pret/pokered's `pokered.sym`. That repository
 publishes no licence file, so the symbol file itself is not redistributed here.
@@ -43,7 +47,7 @@ project does not provide, locate or recommend sources for game software.
 
 ## Videos and streams
 
-Footage published by this project follows these rules:
+This is the project's policy for any footage it publishes:
 
 - It comes only from lawfully held copies of a game.
 - It adds real commentary or analysis rather than plain gameplay.
