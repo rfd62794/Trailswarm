@@ -20,7 +20,7 @@ from pokeagent.world.pyramid import Pyramid, to_gpu
 from pokeagent.world.view import Viewport
 
 ROOT, TEX, CANVAS = "mapview_root", "mapview_tex", "mapview_canvas"
-OVERLAY_TEX, AGENTS_PANE = "mapview_overlay_tex", "mapview_agents"
+AGENTS_PANE = "mapview_agents"
 MAX_TEX, MAX_UPLOADS, COARSEST_F = 40, 2, 8   # chunk cache, uploads per frame, fallback depth
 SPEEDS = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0, "4x": 4.0}
 
@@ -67,7 +67,7 @@ class MapWindow:
         self.frame = playback.positions(self.tables, 0.0)
         self.layout, self.agent_rows, self.best = Layout({}, 0, 0), [], None
         self.overlay_img = np.zeros((1, 1, 4), np.uint8)
-        self._tex, self._overlay_key, self._tex_uploads, self._fitted = OrderedDict(), None, 0, False
+        self._tex, self._overlay_key, self._overlay_tag, self._tex_uploads, self._fitted = OrderedDict(), None, None, 0, False
         self._down_at = self._last_mouse = self._follow_t = None
         self.adopt(snapshot)
 
@@ -223,12 +223,13 @@ class MapWindow:
     def _upload_overlay(self) -> None:
         h, w = self.overlay_img.shape[:2]
         if self._overlay_key != (w, h):
-            if dpg.does_item_exist(OVERLAY_TEX):
-                dpg.delete_item(OVERLAY_TEX)
+            if self._overlay_tag is not None:
+                dpg.delete_item(self._overlay_tag)
             self._overlay_key = (w, h)
-            dpg.add_raw_texture(w, h, np.zeros(w * h * 4, np.float32),
-                                format=dpg.mvFormat_Float_rgba, tag=OVERLAY_TEX, parent=TEX)
-        dpg.set_value(OVERLAY_TEX, self.overlay_img.astype(np.float32).ravel() / 255.0)
+            # A new id per size: Dear PyGui keeps a deleted item's alias, so reusing a string tag raises.
+            self._overlay_tag = dpg.add_raw_texture(w, h, np.zeros(w * h * 4, np.float32),
+                                                    format=dpg.mvFormat_Float_rgba, parent=TEX)
+        dpg.set_value(self._overlay_tag, self.overlay_img.astype(np.float32).ravel() / 255.0)
 
     def _chunk_tex(self, f: int, cx: int, cy: int):
         key = (id(self.pyr), f, cx, cy)
@@ -259,7 +260,7 @@ class MapWindow:
                 dpg.draw_image(tex, vp.to_screen(x0, y0), vp.to_screen(x1, y1), parent=CANVAS)
             else:
                 self._draw_coarser(f, cx, cy)
-        dpg.draw_image(OVERLAY_TEX, (0, 0), self.overlay_img.shape[:2][::-1], parent=CANVAS)
+        dpg.draw_image(self._overlay_tag, (0, 0), self.overlay_img.shape[:2][::-1], parent=CANVAS)
         seen = {a.name: a.seen for a in self._snap.areas}
         for name, (ax, ay) in self.layout.offsets.items():
             dpg.draw_text(vp.to_screen(ax, ay - LABEL_H + 2), f"{name} {seen.get(name, 0.0):.0%}",
