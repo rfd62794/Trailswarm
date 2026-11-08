@@ -165,11 +165,12 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 13:34 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: Map as third viewer mode with one selection; depends on Game_View_Presets_And_Avatars and PRs 171/172 on main
+- 2026-11-08 13:35 · robert-claude-laptop · Queued → Draft — Superseded by Unified_World_View_Directive.md (no third Map mode); do not dispatch
 <!-- queue:end -->
