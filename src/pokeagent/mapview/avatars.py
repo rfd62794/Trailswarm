@@ -7,6 +7,8 @@ overlay keeps drawing its square.
 """
 from __future__ import annotations
 
+import threading
+
 import numpy as np
 
 KEY_TOL = 24          # per-channel distance from the background colour that keys a pixel out
@@ -74,6 +76,7 @@ class AvatarCache:
         self._crops: dict[tuple, np.ndarray] = {}
         self._opaque: dict[tuple, int] = {}
         self._tinted: dict[tuple, np.ndarray] = {}
+        self._lock = threading.Lock()   # offer runs on the live thread, get on the UI thread
 
     def offer(self, preset, facing: str, frame: np.ndarray, live) -> None:
         """Crop at the live position and keep it only when it beats the held crop."""
@@ -87,26 +90,28 @@ class AvatarCache:
             return
         key = (getattr(preset, "name", preset), facing)
         fit = -abs(float((crop[..., 3] > 0).mean()) - TYPICAL)
-        if fit > self._opaque.get(key, float("-inf")):
-            self._crops[key], self._opaque[key] = crop, fit
-            self._tinted = {k: v for k, v in self._tinted.items() if k[:2] != key}
+        with self._lock:
+            if fit > self._opaque.get(key, float("-inf")):
+                self._crops[key], self._opaque[key] = crop, fit
+                self._tinted = {k: v for k, v in self._tinted.items() if k[:2] != key}
 
     def ready(self) -> bool:
         return bool(self._crops)
 
     def get(self, preset, facing: str, colour) -> np.ndarray | None:
         key = (getattr(preset, "name", preset), facing)
-        crop = self._crops.get(key)
-        if crop is None:                    # LEFT/RIGHT share one picture, mirrored
-            other = {"LEFT": "RIGHT", "RIGHT": "LEFT"}.get(facing)
-            crop = self._crops.get((key[0], other))
-            crop = None if crop is None else crop[:, ::-1]
-        if crop is None:
-            return None
-        tkey = (*key, tuple(int(v) for v in colour))
-        if tkey not in self._tinted:
-            self._tinted[tkey] = tint(crop, tkey[2])
-        return self._tinted[tkey]
+        with self._lock:
+            crop = self._crops.get(key)
+            if crop is None:                    # LEFT/RIGHT share one picture, mirrored
+                other = {"LEFT": "RIGHT", "RIGHT": "LEFT"}.get(facing)
+                crop = self._crops.get((key[0], other))
+                crop = None if crop is None else crop[:, ::-1]
+            if crop is None:
+                return None
+            tkey = (*key, tuple(int(v) for v in colour))
+            if tkey not in self._tinted:
+                self._tinted[tkey] = tint(crop, tkey[2])
+            return self._tinted[tkey]
 
 
 class AvatarSource:

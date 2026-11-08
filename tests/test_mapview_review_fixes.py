@@ -171,3 +171,8 @@ def test_area_at_origin_keeps_left_and_top_edges():
     draw_edges(base, [("a", 0, 0, 20, 20)], {"a": "#ff0000"}, width=2)
     assert (base[5, 0, :3] == (255, 0, 0)).all() and (base[0, 5, :3] == (255, 0, 0)).all()
     assert (base[5, 21, :3] == (255, 0, 0)).all()
+
+
+def test_names_that_sanitise_alike_get_different_files():
+    assert safe_name("run 1") != safe_name("run_1")
+    assert safe_name("run_1") == "run_1"
