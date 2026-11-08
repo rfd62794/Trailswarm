@@ -3,6 +3,9 @@
 Every threshold is a NAMED, untuned first value. The ROM trainer rows carry no facing and no sight
 range, so SIGHT_GUESS guesses the line of sight (4 tiles in the four directions) and TRAINER_APPROACH
 guesses where to stand to fight - both are flagged UNVERIFIED in every log line that leans on them.
+
+The ``save`` action is REPORT-ONLY today: nothing acts on it (the grind report lists it; picking a saved
+trainer for grinding is the follow-up Trainer_Grind_Pick_Directive).
 """
 from __future__ import annotations
 
@@ -49,7 +52,7 @@ def approach_tile(entry: TrainerEntry, player: tuple[int, int, int]) -> tuple[in
     return (entry.x + ux * TRAINER_APPROACH, entry.y + uy * TRAINER_APPROACH)
 
 
-def _margin(party_now, mons, kb) -> float | None:
+def fight_margin(party_now, mons, kb) -> float | None:
     """readiness.fight of the party (already carrying its CURRENT hp) against the ROM party."""
     theirs = [m for lv, n in mons if (m := trainer_mon(n, lv, kb))]
     moves = table(kb, "moves")
@@ -77,7 +80,7 @@ def options(ledger: TrainerLedger, map_id: int, player: tuple[int, int, int], gr
         # the detour the fight adds to the segment route: an approach no farther than the goal is on the way
         on_route = steps <= route_steps
         detour = max(0, steps - route_steps)
-        margin = _margin(party_now, e.mons, kb)
+        margin = fight_margin(party_now, e.mons, kb)
         if margin is None:
             out.append(TrainerOption(e, steps, None, "ignore", "no readiness data to sim the fight"))
         elif margin < ENGAGE_MARGIN:
@@ -98,7 +101,7 @@ def next_target(opts: list[TrainerOption]) -> TrainerOption | None:
                key=lambda o: (o.steps, o.entry.idx), default=None)
 
 
-def block_sight(ctx, opt: TrainerOption, goal_fn) -> str:
+def block_sight(ctx, opt: TrainerOption, goal_fn, quiet: bool = False) -> str:
     """Routing-only avoidance: temp-block the sight line for AVOID_BLOCK_FRAMES, but ONLY while a route to
     the goal still exists with those tiles blocked. When the sight line IS the only route nothing is
     blocked and the decision downgrades to ``engage-forced`` (Nugget Bridge is a single lane)."""
@@ -108,10 +111,12 @@ def block_sight(ctx, opt: TrainerOption, goal_fn) -> str:
     g.blocked_now = frozenset(now | tiles)
     e = opt.entry
     if g.path((ctx.view.m, ctx.view.x, ctx.view.y), goal_fn) is None:
-        ctx.log(f"[trainer_route: {e.cls} p{e.party} sight line is the only route: engage-forced]", "res")
+        if not quiet:
+            ctx.log(f"[trainer_route: {e.cls} p{e.party} sight line is the only route: engage-forced]", "res")
         return "engage-forced"
     for t in tiles:
         ctx.mem.temp_blocked[t] = ctx.frame + AVOID_BLOCK_FRAMES
-    ctx.log(f"[trainer_route: avoiding {e.cls} p{e.party}: SIGHT_GUESS={SIGHT_GUESS} (unverified) line "
-            f"blocked {AVOID_BLOCK_FRAMES} frames]", "res")
+    if not quiet:
+        ctx.log(f"[trainer_route: avoiding {e.cls} p{e.party}: SIGHT_GUESS={SIGHT_GUESS} (unverified) line "
+                f"blocked {AVOID_BLOCK_FRAMES} frames]", "res")
     return "avoid"

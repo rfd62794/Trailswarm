@@ -2,21 +2,19 @@
 
 Sibling of learner_hunt.py: trainer_route.options() ranks the current map's unbeaten/unknown ROM
 placements; the nearest ``engage`` target's APPROACH tile is walked over the learned graph, and an
-``avoid`` trainer's sight line is temp-blocked while a route survives (never the only route). Gated
+``avoid`` trainer's sight line is temp-blocked by trainer_hooks.avoid_pass (any destination, not only
+when this behaviour runs) while a route survives (never the only route). Gated
 like learner_hunt - not battling, no box, no procedure, no goto wanting a tile - plus a per-run step
 cap, so it never blocks the route. It does not drive presses past its own walk decision: plan_goal and
 the planners keep their say.
 """
 from __future__ import annotations
 
-from dataclasses import replace
-
 from pokeagent.explorer import trainer_ledger, trainer_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.trainer_hooks import current_party
 from pokeagent.explorer.world import WorldGraph
-from pokeagent.knowledge.party import our_party
-from pokeagent.ramstructs import read_party
 
 TRAINER_HUNT_STEP_CAP = 2000  # per-run steps spent hunting; untuned first value (it never blocks the route)
 
@@ -34,35 +32,18 @@ class TrainerHunt(BehaviourBase):
         led = trainer_ledger.ledger_for(ctx)
         return any(e.state != "beaten" for e in led.entries(ctx.view.m))
 
-    def _route(self, ctx: ExplorerContext, g: WorldGraph):
-        """(route_steps, goal_fn): the current destination = an explicit goto else the committed
-        frontier tile; (0, None) when nothing is being routed to."""
-        dest = tuple(ctx.goto) if ctx.goto else ctx.frontier_target
-        if not dest:
-            return 0, None
-        p = g.path((ctx.view.m, ctx.view.x, ctx.view.y), lambda n: n == dest)
-        return (len(p) if p is not None else 0), (lambda n, d=dest: n == d)
-
-    def _party(self, ctx: ExplorerContext):
-        """our_party() with each member's HP replaced by its CURRENT hp: a hurt party sims worse."""
-        try:
-            cur = [m.hp for m in read_party(ctx.emu)]
-            party = our_party(ctx.emu)
-            return [replace(c, hp=cur[i]) for i, c in enumerate(party) if i < len(cur)]
-        except Exception:  # noqa: BLE001
-            return []
+    def _route_steps(self, ctx: ExplorerContext, g: WorldGraph) -> int:
+        """Path steps to the committed frontier tile (0 when none): the segment route the options compare to."""
+        dest = ctx.frontier_target
+        p = g.path((ctx.view.m, ctx.view.x, ctx.view.y), lambda n: n == dest) if dest else None
+        return len(p) if p is not None else 0
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        ctx.trainer_hunt_steps += 1
         led = trainer_ledger.ledger_for(ctx)
         player = (ctx.view.m, ctx.view.x, ctx.view.y)
         g = WorldGraph(ctx.mem.data["maps"])
         g.blocked_now = frozenset(ctx.mem.temp_blocked)
-        route_steps, goal_fn = self._route(ctx, g)
-        opts = trainer_route.options(led, ctx.view.m, player, g, route_steps, self._party(ctx))
-        for o in opts:
-            if o.action == "avoid" and goal_fn is not None:
-                trainer_route.block_sight(ctx, o, goal_fn)  # routing-only; downgrades to engage-forced alone
+        opts = trainer_route.options(led, ctx.view.m, player, g, self._route_steps(ctx, g), current_party(ctx))
         t = trainer_route.next_target(opts)
         ctx.trainer_target = None
         if t is None:
@@ -77,5 +58,6 @@ class TrainerHunt(BehaviourBase):
         p = g.path(player, lambda n: n == goal)
         if not p:
             return None
+        ctx.trainer_hunt_steps += 1  # only steps that acted count toward the cap
         return Decision(p[0], "trainer_hunt_walk",
                         f"trainer_hunt: {len(p)} steps to {t.entry.cls} p{t.entry.party} ({goal[1]},{goal[2]})")

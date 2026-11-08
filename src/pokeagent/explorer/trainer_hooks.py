@@ -6,12 +6,17 @@ re-exported from trainer_ledger and never raises.
 from __future__ import annotations
 
 import json
+import logging
+from dataclasses import replace
 from pathlib import Path
 
 from pokeagent.explorer.trainer_ledger import FLAG_LEN, FLAG_LO, MATCH_MAX_DIST, TrainerLedger, load_flag_bits
 from pokeagent.knowledge import items_catalog, trainers
 from pokeagent.knowledge.kb import table
 
+log = logging.getLogger(__name__)
+
+TALK_MATCH_DIST = 1  # a talk probe starts only for an NPC recorded within this many tiles of a ROM placement
 TRAINER_XP = 1.5  # xp_gain's trainer multiplier (grind.xpmath; duplicated: grind is not an explorer layer)
 
 
@@ -79,15 +84,69 @@ def beaten_trainers(ctx) -> set[tuple[int, int, int]]:
     ProcedureRunner call. Never raises; an empty set when there is no ROM data."""
     try:
         return ledger_for(ctx).beaten_tiles()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _log_skip(ctx, exc)
         return set()
 
 
 def _log_skip(ctx, exc) -> None:
+    """Report a swallowed ledger failure through ctx.log; if the logger itself fails, the module logger."""
     try:
         ctx.log(f"[trainer_ledger skipped: {exc!r}]", "res")
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as log_exc:  # noqa: BLE001
+        log.warning("trainer_ledger skipped: %r (ctx.log failed: %r)", exc, log_exc)
+
+
+def current_party(ctx):
+    """our_party() with each member's HP replaced by its CURRENT hp (a hurt party sims worse). [] when the
+    read fails or there is no ROM data; the reason is logged once per battle number."""
+    from pokeagent.knowledge.party import our_party
+    from pokeagent.ramstructs import read_party
+    reason = None
+    try:
+        cur = [m.hp for m in read_party(ctx.emu)]
+        party = our_party(ctx.emu)
+        out = [replace(c, hp=cur[i]) for i, c in enumerate(party) if i < len(cur)]
+        if out:
+            return out
+        reason = "no party data (ROM tables missing?)"
+    except Exception as exc:  # noqa: BLE001
+        reason = repr(exc)
+    led = ledger_for(ctx)
+    if led.party_warned != (ctx.battles, reason):
+        led.party_warned = (ctx.battles, reason)
+        _log_skip(ctx, f"trainer hunt cannot read the party, every trainer is ignore: {reason}")
+    return []
+
+
+def avoid_pass(ctx, led) -> None:
+    """Routing-only sight-line avoidance for whatever destination is being walked to (an explicit goto or
+    the committed frontier tile) - independent of which behaviour is walking, so a planner goto is
+    covered. Re-made only when (map, destination, unbeaten set) changes or the block expires; the
+    "avoiding ..." line is logged once per such change, never per step."""
+    from pokeagent.explorer import trainer_route
+    from pokeagent.explorer.world import WorldGraph
+    v = ctx.view
+    if v.battling or v.box or ctx.proc is not None:
+        return
+    dest = tuple(ctx.goto) if ctx.goto else ctx.frontier_target
+    unbeaten = tuple(e.idx for e in led.entries(v.m) if e.state != "beaten")
+    if not dest or not unbeaten:
+        return
+    key = (v.m, dest, unbeaten)
+    changed = led.avoid_key != key
+    if not changed and ctx.frame < led.avoid_until:
+        return
+    led.avoid_key, led.avoid_until = key, ctx.frame + trainer_route.AVOID_BLOCK_FRAMES
+    player = (v.m, v.x, v.y)
+    g = WorldGraph(ctx.mem.data["maps"])
+    g.blocked_now = frozenset(ctx.mem.temp_blocked)
+    goal_fn = (lambda n, d=dest: n == d)
+    p = g.path(player, goal_fn)
+    opts = trainer_route.options(led, v.m, player, g, len(p) if p is not None else 0, current_party(ctx))
+    for o in opts:
+        if o.action == "avoid":
+            trainer_route.block_sight(ctx, o, goal_fn, quiet=not changed)
 
 
 def tick(ctx) -> None:
@@ -96,12 +155,13 @@ def tick(ctx) -> None:
         led = ledger_for(ctx)
         ensure_maps(ctx)
         battling = bool(getattr(ctx.view, "battling", False) or ctx.in_battle)
-        changed = led.tick(ctx.step, battling=battling)
+        changed = led.tick(ctx.step, battling=battling, text_open=bool(getattr(ctx.view, "box", False)))
         if led.needs_flags() and led.flag_due(ctx.step):
             led.sync_flags(ctx.emu.read_range(FLAG_LO, FLAG_LEN))  # read-only: flags are never written
             changed = True
         if changed:
             led.save(Path(ctx.run_dir) / "trainers.json")
+        avoid_pass(ctx, led)
     except Exception as exc:  # noqa: BLE001  the ledger must never end a run
         _log_skip(ctx, exc)
 
@@ -146,16 +206,17 @@ def note_battle_won(ctx, npc: dict, battle_map: int) -> None:
 
 
 def note_talk(ctx, before, npc: dict, got_text: bool) -> None:
-    """record_interaction's A press at an NPC: match it to a placement and arm the talk probe."""
+    """record_interaction's A press at an NPC: arm the talk probe for the ROM placement the NPC IS (an NPC
+    recorded within TALK_MATCH_DIST tiles of it - never a bystander merely near an unbeaten trainer)."""
     try:
         if not got_text or npc is None:
             return
         led = ledger_for(ctx)
-        idx = led.match(before[0], _positions(npc))
+        idx = led.match(before[0], _positions(npc), max_dist=TALK_MATCH_DIST)
         if idx is not None:
             led.note_talk(before[0], idx, ctx.step)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _log_skip(ctx, exc)
 
 
 def save_run(ctx) -> None:
@@ -164,5 +225,5 @@ def save_run(ctx) -> None:
     if led is not None:
         try:
             led.save(Path(ctx.run_dir) / "trainers.json")
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001  a failed shutdown write loses the run's ledger: say so
+            _log_skip(ctx, f"save_run failed, ledger not written: {exc!r}")

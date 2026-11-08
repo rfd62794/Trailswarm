@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from pokeagent.grind import refresh as R  # noqa: E402
-from pokeagent.grind.atlas import FRAMES_PER_STEP  # noqa: E402
+from pokeagent.grind.atlas import FRAMES_PER_STEP, STEPS_PER_MIN  # noqa: E402
 from pokeagent.grind.centers import center_costs  # noqa: E402
 
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
@@ -76,11 +76,11 @@ def print_trainer_section(map_id: int, label: str, ledger, party, base_exp: dict
                           kb=None) -> None:
     """The 'trainers worth saving or taking' section for one map, plus the area-resistance line.
     Pure renderer: everything needed comes in as arguments."""
-    from pokeagent.grind.trainer_spots import rank_trainer_grinds
+    from pokeagent.grind.trainer_spots import rank_trainer_grinds, spot_xp_per_step
     from pokeagent.knowledge.area_resistance import resistance
     print(f"== trainers worth saving or taking ({label}) ==")
     grinds = rank_trainer_grinds(ledger, map_id, party, base_exp, cat, wild_spots, kb=kb)
-    best_wild = max((s["xp_per_step"] if isinstance(s, dict) else s.xp_per_step for s in wild_spots), default=0.0)
+    best_wild = max((spot_xp_per_step(s) for s in wild_spots), default=0.0)
     if not grinds:
         print("  (none the party beats with margin)")
     for g in grinds:
@@ -130,7 +130,7 @@ def main(argv=None) -> int:
             print(f"== {sp} before {goal} (needs L{need[sp][goal]}) ==")
             for L, spots in lv.items():
                 row = "  ".join(f"{s['name']} {s['xp_per_min']:.0f}xp/min risk {s['blackout']:.0%} n={s['n_obs']}"
-                                + (f" ~{s['steps_to_goal'] / 225:.0f}min" if s["steps_to_goal"] else "") for s in spots)
+                                + (f" ~{s['steps_to_goal'] / STEPS_PER_MIN:.0f}min" if s["steps_to_goal"] else "") for s in spots)
                 print(f"  L{L:>2} (+{need[sp][goal] - int(L)} lv): {row}")
     _trainer_sections(kb, need, doc["atlas"])
     return 0

@@ -62,6 +62,10 @@ class TrainerLedger:
         self.flag_bits = flag_bits or {}
         self._entries: dict[int, list[TrainerEntry]] = {}
         self._talk: dict[tuple[int, int], int] = {}   # (map, idx) -> step the A press first produced text
+        self._talk_text: dict[tuple[int, int], int] = {}   # (map, idx) -> probe steps spent with text scrolling (not counted)
+        self.avoid_key: tuple | None = None           # (map, dest, unbeaten idxs) the sight-line block was last made for
+        self.avoid_until = 0                          # frame the routing-only block expires (re-made quietly after)
+        self.party_warned: tuple | None = None        # (battle no., reason) of the last party-read warning
         self._flag_synced = -LEDGER_SYNC_EVERY
         self._restored: dict[str, dict] = {}          # persisted states, applied as maps are added
         for m, rows in placements.items():
@@ -109,15 +113,16 @@ class TrainerLedger:
             e = entries[idx]
             e.state, e.source, e.step = BEATEN, source, step
 
-    def match(self, map_id: int, positions: list[tuple[int, int]], enemy_species: list[str] | None = None) -> int | None:
+    def match(self, map_id: int, positions: list[tuple[int, int]], enemy_species: list[str] | None = None,
+              max_dist: int = MATCH_MAX_DIST) -> int | None:
         """The ROM placement an NPC corresponds to: smallest Manhattan distance to ANY tile it was seen
         on (a trainer that sights the player walks up, so the battle tile is not the placement); ties
         break toward the placement whose ROM party holds the record's enemy species."""
         species = set(enemy_species or ())
         best = None
         for e in self.entries(map_id):
-            d = min((abs(e.x - px) + abs(e.y - py) for px, py in positions), default=MATCH_MAX_DIST + 1)
-            if d > MATCH_MAX_DIST:
+            d = min((abs(e.x - px) + abs(e.y - py) for px, py in positions), default=max_dist + 1)
+            if d > max_dist:
                 continue
             key = (d, 0 if species & {sp for _lv, sp in e.mons} else 1, e.idx)
             if best is None or key < best[0]:
@@ -142,18 +147,26 @@ class TrainerLedger:
     def note_talk(self, map_id: int, idx: int, step: int) -> None:
         """An A press faced the NPC matching this placement and produced text. The first press arms the
         probe; a battle starting cancels it (tick with battling=True)."""
-        self._talk.setdefault((map_id, idx), step)
+        if (map_id, idx) not in self._talk:
+            self._talk[(map_id, idx)] = step
+            self._talk_text[(map_id, idx)] = 0
 
-    def tick(self, step: int, battling: bool = False) -> bool:
-        """Advance talk probes; True when the ledger changed (the caller may persist)."""
+    def tick(self, step: int, battling: bool = False, text_open: bool = False) -> bool:
+        """Advance talk probes; True when the ledger changed (the caller may persist). Steps with text
+        still scrolling (``text_open``) do not count toward TALK_WAIT_STEPS: a long pre-battle speech is
+        not 'talked and nothing happened'."""
         if battling:
             self._talk.clear()
+            self._talk_text.clear()
             return False
         changed = False
         for (m, idx), started in list(self._talk.items()):
-            if step - started >= TALK_WAIT_STEPS:
+            if text_open:
+                self._talk_text[(m, idx)] = self._talk_text.get((m, idx), 0) + 1
+            if step - started - self._talk_text.get((m, idx), 0) >= TALK_WAIT_STEPS:
                 self.mark_beaten(m, idx, "talk_no_battle", step)
                 del self._talk[(m, idx)]
+                self._talk_text.pop((m, idx), None)
                 changed = True
         return changed
 
