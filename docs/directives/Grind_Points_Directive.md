@@ -208,4 +208,5 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 - 2026-11-07 20:30 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's request (known-good grind points, reuse and exploit them; Nugget Bridge transition stall); inventory-backed
 - 2026-11-07 20:31 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert asked for this tonight
 - 2026-11-07 20:31 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WCG3R86P640TYE1DK3RETD
+- 2026-11-07 20:39 · dispatcher · launched pid=18848; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
