@@ -132,7 +132,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -142,4 +142,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:20 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: add provenance standing rule
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
+- 2026-11-07 19:07 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (same override as Team_Builder_V2 and Catch_Methods); Robert's 2026-11-07 direction queued this row
 <!-- queue:end -->
