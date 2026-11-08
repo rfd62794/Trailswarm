@@ -262,3 +262,34 @@ Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugge
 `press_interact` did not treat the press as exploring and never temp-blocked his tile; memory_purge had also healed the learned wall, so 1,500 UP presses went into him. The press now carries
 the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
 and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.
+
+**Grind points (2026-11-07).** `src/pokeagent/grind/points.py` keeps one `GrindPoint` per map - grass `patch` (the
+encounter-proven tiles from `maps[m]["encounters"]`), `species` and the `level_band` they imply (top wild level -2..+6),
+an atlas `xp_per_min_prior`, and a measured `xp_per_min` folded from grind episodes (`episodes: {run@step: [rate,
+blackouts, provenance]}` - the id is what makes the swarm merge an episode-weighted mean AND idempotent; a synthetic
+episode never lands on a point holding organic data). `choose` picks the band-covering point with the best rate
+(measured once `n_measured >= 2`, else prior) minus travel and `blackout_rate * BLACKOUT_STEPS`. The run-local copy is
+`runs/grind_points.json` (`{"version": 1, "points": {map: {...}}}`); the shared copy is `maps.json`'s `grind_points`
+table, merged by `swarm_merge.merge_grind_points` like `trainers`. `grind/measure.py` calibrates frames/step from the
+last 20 runs' records (levels.jsonl `step`/`frame` pairs when transitions carry no `frame`; 16 with a log line when no
+runs are readable) - `atlas.FRAMES_PER_STEP` is that value now, so `xp/min` columns everywhere are measured once run
+data exists. `GrindDrill` no longer needs `--drill-grind`: when `ctx.train_need` says the trainee is under level it
+starts an `explorer.grind_episode`, walks to the point and paces its patch, and writes one measured row per episode to
+`runs/legs/grind_drills.jsonl`. While an episode lives, `stay_on_route` returns the point's map plus its Pokecenter map
+and BOTH plan_goal and frontier honour it (frontier's BFS and the warp-avoid check cannot leave the set) - that is the
+Nugget Bridge fix: plan_goal walked UP onto Route 24 while frontier walked DOWN into Cerulean, 358 crossings in the
+marathon run. `tools/grind_report.py --points` prints the ledger (measured vs prior) and the pick per
+(starter, next boss, trainee level).
+
+Restart discipline (PR #165 review): episodes are driven by the engine's per-step `grind_episode.tick`
+(`applies()` only reads `active()`/the under-level flag). A start passes the same `_end_reason` checks an
+episode would face next step plus `not center_intent and not goto and proc is None`; after any end
+`EPISODE_COOLDOWN = 300` steps must pass; an episode under `MIN_EPISODE_STEPS = 50` or with zero battles
+lands in the drill log as an `aborted` row and never folds into the ledger's mean; `grind_episode.start(ctx)`
+is the explicit entry point (PR #166 calls it via getattr). The measured xp is the levels.jsonl exp delta
+(`measure.xp_gained_in_episode`), and `atlas.frames_per_step()`/`STEPS_PER_MIN` are lazy now - importing
+`grind.atlas` touches nothing; the calibration runs once, capped at the newest 20 run dirs under the
+checkout's runs/. Boundary limit: `OutsideSet` covers learned warps AND the edges memory keeps short of a
+warp (`warp_cand` one-sighting changes, `paths` edges where recorded), but an edge the agent has never
+taken even once is not in memory anywhere and cannot be guarded - the hunts (LearnerHunt/TeamHunt/
+TrainerHunt) are simply switched off while an episode lives instead.

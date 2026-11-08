@@ -12,7 +12,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import area_grind, par_follow, train_route
+from pokeagent.explorer import area_grind, grind_episode, par_follow, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import blackout_tax, team_plan, trainers
@@ -166,6 +166,9 @@ class PlanGoal(BehaviourBase):
         if planned and ctx.opts.par_follow:
             planned, driver = par_follow.refine(ctx, planned, [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)])
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
+            ep_maps = grind_episode.boundary(ctx)
+            if ep_maps is not None and grind_episode.leaves_set(ctx, planned[0], ep_maps | {m}):
+                return None  # the grind episode pins the run to its maps: this press would leave them
             return Decision(planned[0], "plan_goal", planned[1], driver=driver)
         return None
 
@@ -224,17 +227,13 @@ class PlanGoal(BehaviourBase):
 
     @staticmethod
     def _grind_step(ctx: ExplorerContext, m: int, x: int, y: int, hp: int, mx: int):
-        """The grind decision while the pressure latch holds or the gym door blocks: Grind_Points'
-        grind_episode.start once that directive lands (it owns WHERE to grind; this one owns WHO trains
-        and WHEN grinding outranks the plan), until then the Route 24 training route."""
-        try:
-            from pokeagent.explorer import grind_episode
-        except ImportError:
-            grind_episode = None
-        if grind_episode is not None and getattr(grind_episode, "start", None):
-            step = grind_episode.start(ctx)
-            if step is not None:
-                return step
+        """The grind decision while the pressure latch holds or the gym door blocks. ``grind_episode.start``
+        returns a bool (an episode is live or it is not), never a step: True means the episode now owns the
+        NEXT tick (GrindDrill is registered before PlanGoal and walks it), False means no episode could start.
+        Either way this tick still needs a real press, so both outcomes fall through to the Route 24 training
+        route; ``grind_episode.boundary`` (checked in ``step``) vetoes any press that would leave a live
+        episode's map set."""
+        grind_episode.start(ctx, "the pressure latch")
         return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx)
 
     @staticmethod

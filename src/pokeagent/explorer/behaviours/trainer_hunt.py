@@ -10,7 +10,7 @@ the planners keep their say.
 """
 from __future__ import annotations
 
-from pokeagent.explorer import trainer_ledger, trainer_route
+from pokeagent.explorer import grind_episode, trainer_ledger, trainer_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.trainer_hooks import current_party
@@ -27,7 +27,7 @@ class TrainerHunt(BehaviourBase):
 
     def applies(self, ctx: ExplorerContext) -> bool:
         if (ctx.trainer_hunt_steps > TRAINER_HUNT_STEP_CAP or ctx.view.battling or ctx.view.box
-                or ctx.proc is not None or ctx.goto):
+                or ctx.proc is not None or ctx.goto or grind_episode.active(ctx) is not None):
             return False
         led = trainer_ledger.ledger_for(ctx)
         return any(e.state != "beaten" for e in led.entries(ctx.view.m))

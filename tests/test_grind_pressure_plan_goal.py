@@ -44,6 +44,18 @@ def test_grind_step_uses_train_route_until_grind_episode_lands(monkeypatch):
     assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) is None
 
 
+def test_real_grind_step_handles_start_returning_a_bool(monkeypatch):
+    """grind_episode.start returns bool (never a step): the REAL _grind_step must not index it, and must hand
+    back a real train_route decision for BOTH outcomes (True: the episode owns the next tick; False: no episode)."""
+    ctx = _ctx()
+    seen = []
+    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: ("UP", "to Route 24 grass"))
+    for outcome in (True, False):
+        monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x", o=outcome: seen.append(o) or o)
+        assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) == ("UP", "to Route 24 grass")
+    assert seen == [True, False]
+
+
 def test_pressure_thresholds_bound_the_latch():
     assert team_plan.GRIND_PRESSURE_START > team_plan.GRIND_PRESSURE_STOP > 0
     team = [SimpleNamespace(level=10) for _ in range(4)]
