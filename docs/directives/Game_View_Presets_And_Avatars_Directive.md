@@ -187,11 +187,12 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Draft |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 13:34 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: live position contract, view presets, avatars; needs PRs 171 and 172 on main
+- 2026-11-08 13:35 · robert-claude-laptop · Queued → Draft — Back to Draft to add area gap and edge lines requirement from Robert; will requeue
 <!-- queue:end -->
