@@ -25,8 +25,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from pokeagent.ramlab.flags import FLAG_HI, FLAG_LO
-
+FLAG_LO, FLAG_HI = 0xD747, 0xD886  # wEventFlags block (ramlab.flags.FLAG_LO/FLAG_HI; ramlab is not an explorer layer)
 MATCH_MAX_DIST = 6      # how far (Manhattan, tiles) a walked-up NPC may stand from its ROM placement
 TALK_WAIT_STEPS = 12    # presses of text with no battle after talking = beaten (UNVERIFIED, see docstring)
 LEDGER_SYNC_EVERY = 50  # steps between wEventFlags syncs: RAM is cheap but not per-press

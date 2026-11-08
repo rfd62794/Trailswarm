@@ -5,26 +5,28 @@ re-exported from trainer_ledger and never raises.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from pokeagent.explorer.trainer_ledger import FLAG_LEN, MATCH_MAX_DIST, TrainerLedger, load_flag_bits
-from pokeagent.grind.xpmath import xp_gain
+from pokeagent.explorer.trainer_ledger import FLAG_LEN, FLAG_LO, MATCH_MAX_DIST, TrainerLedger, load_flag_bits
 from pokeagent.knowledge import items_catalog, trainers
 from pokeagent.knowledge.kb import table
-from pokeagent.ramlab.flags import FLAG_LO
+
+TRAINER_XP = 1.5  # xp_gain's trainer multiplier (grind.xpmath; duplicated: grind is not an explorer layer)
 
 
 def run_provenance(ctx) -> str:
-    """``organic`` | ``synthetic`` | ``unknown`` from the start state's fingerprint lineage (PR #147).
-    ``promoted`` earned organic trust; a missing/unreadable record is ``unknown``, never guessed."""
+    """``organic`` | ``synthetic`` | ``unknown`` from the start state's ``<state>.fp.json`` lineage
+    (statefp, PR #147 - read directly because statefp is not an explorer layer). ``promoted`` earned
+    organic trust; a missing/unreadable record is ``unknown``, never guessed."""
     state = getattr(ctx.opts, "state_path", "") or ""
     if not state:
         return "unknown"
     try:
-        from pokeagent import statefp
-        lin = statefp.lineage(Path(state))
-    except Exception:  # noqa: BLE001
+        fp = json.loads(Path(str(state) + ".fp.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return "unknown"
+    lin = fp.get("lineage") or ("synthetic" if fp.get("synthetic") else None)
     return {"organic": "organic", "promoted": "organic", "synthetic": "synthetic"}.get(lin, "unknown")
 
 
@@ -65,7 +67,7 @@ def share_static(ctx, map_id: int) -> None:
     for e in ctx.trainer_ledger.entries(map_id):
         key = f"{map_id}:{e.idx}"
         if key not in rows:
-            xp = sum(xp_gain(base_exp.get(sp, 0), lv, trainer=True) for lv, sp in e.mons)
+            xp = sum(int(base_exp.get(sp, 0)) * lv / 7 * TRAINER_XP for lv, sp in e.mons)
             rows[key] = {"cls": e.cls, "party": e.party,
                          "prize": items_catalog.trainer_prize(cat, e.cls, e.party) if cat else None,
                          "xp": xp or None, "flag_bit": list(e.flag_bit) if e.flag_bit else None,
