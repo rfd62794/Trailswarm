@@ -147,3 +147,17 @@ Expected: every file under `src/pokeagent/explorer/` under 300.
 ## Report
 
 Diff stat, test tails, wc -l line, size numbers, constants chosen, what the controller must measure.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:26 · robert-claude-laptop · none → Queued — Robert approved the efficiency program 2026-11-07; approve only after Perf_Baseline merges (same files)
+<!-- queue:end -->
