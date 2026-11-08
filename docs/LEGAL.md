@@ -16,7 +16,7 @@ Company. Names are used only to identify which game the software was tested with
 The project's public name is Trailswarm. The Python package name `pokeagent` is descriptive and carries no claim
 of association.
 
-## What is never in this repository
+## What is not in this repository
 
 - ROM images or any other copy of game software
 - Boot ROMs, firmware, or decryption keys
@@ -25,6 +25,11 @@ of association.
 
 `roms/`, `baselines/` and `runs/` are gitignored, along with the three files generated from a local ROM under `kb/`:
 `rom_tables.json`, `hm_compat.json` and `items.json`.
+
+Earlier commits briefly included tables generated from a local ROM: moves, the type chart, species names, items and
+HM compatibility (`kb/rom_tables.json`, `kb/items.json`, `src/pokeagent/data/hm_compat.json`). They hold game facts, numbers
+and names, with no images, audio or ROM bytes. They are not in the current tree but remain in the git history. A rights
+holder who wants them removed from the history can open an issue.
 
 ## What is in this repository
 
