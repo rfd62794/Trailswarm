@@ -89,3 +89,17 @@ Expected: context.py <= 299; every file under 300.
 
 Head sha, diff stat, wc -l line, targeted and full-suite tails, the conflicts you resolved in the merge, anything
 you could not do.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #162 (Sonnet CHANGES-NEEDED, six should-fixes); uses heal_walk (#159) and trainer_ledger (#158); branch merges PR #162's branch first
+<!-- queue:end -->
