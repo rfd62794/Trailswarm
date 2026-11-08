@@ -226,4 +226,5 @@ and why.
 - 2026-11-07 19:28 · robert-claude-laptop · none → Queued — Claude 2026-11-07: diagnosis of the flaky test_lock_takeover_is_exclusive (empty-content window, rename/link-back resurrection, same-pid release); approve when a Devin slot frees
 - 2026-11-07 19:39 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; a Devin slot is free (Status_Care finished)
 - 2026-11-07 19:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-spawn-lock-takeover-race-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W9K5XGEVV5FYM50F05W5E3
+- 2026-11-07 19:46 · dispatcher · launched pid=3004; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-spawn-lock-takeover-race-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
