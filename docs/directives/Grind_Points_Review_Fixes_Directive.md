@@ -113,12 +113,14 @@ connections or only warps.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-grind-points-review-fixes-directive |
 | Base branch | directive/pokeagent-grind-points-directive |
+| Base commit | b1178e588de8da2d36554c7e574b21c7aedb5207 |
 
 **Status log**
 - 2026-11-07 21:40 · robert-claude-laptop · none → Queued — Review fixes for PR #165 (Sonnet: 1 blocker restart thrash + 8 should-fixes); approve with base_branch = the PR branch once the fixer's main merge is pushed
 - 2026-11-07 21:49 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; starts from the PR branch (main merged at b1178e5) because the sandbox refuses git merge
+- 2026-11-07 21:49 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WGZZBSBJWA3D9SD90TDT6A
 <!-- queue:end -->
