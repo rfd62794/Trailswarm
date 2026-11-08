@@ -241,6 +241,10 @@ class ExplorerContext:
     pickup_stuck: int = 0  # consecutive pickup walking presses that left the player where they were
     pickup_tries: dict = field(default_factory=dict)  # (map,x,y) -> presses that gave no item text this run
     trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
+    after_victory_seen: int = 0  # ctx.battles_won value AfterVictory last made a decision for
+    after_victory: Any = None    # the last VictoryDecision (procedures.after_victory_rules), for the runner's pause
+    proc_steps: int = 0          # presses spent inside goal procedures this run (RUNNER_STEP_CAP)
+    procedure_run: Any = None    # the procedure runner's in-flight state (NOT ctx.proc: that is the menu-task one)
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
