@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.legs.grass import pace_button, to_grass
 
 
@@ -22,7 +23,8 @@ class GrindDrill(BehaviourBase):
 
     def applies(self, ctx) -> bool:
         m = getattr(ctx.opts, "drill_grind", None)
-        return m is not None and ctx.view.m == m and not ctx.view.box and not ctx.view.battling
+        return (m is not None and ctx.view.m == m and not ctx.view.box and not ctx.view.battling
+                and trainee_ok(ctx).ok)   # a drill never starts with a fainted trainee: it earns no EXP
 
     def step(self, ctx) -> Decision | None:
         g = self._grid(ctx, ctx.view.m)

@@ -182,6 +182,10 @@ class ExplorerContext:
     train_member: int | None = None  # party slot team_readiness names as the shortfall (None when the team is ready)
     team_note: str = ""  # last team-readiness verdict logged (plan_goal)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
+    status_care: dict = field(default_factory=dict)  # behaviours/status_care.py: {seq, request, sig, next_check, last, tries, items_out}
+    trainee_fainted_steps: int = 0  # steps the switch-trainee spent fainted (trainee_gate): review tools subtract them from "training steps"
+    trainee_faint_step: int = -1    # ctx.step trainee_fainted_steps was last incremented (once per step)
+    trainee_faint_log_at: int = -10**9  # ctx.step the "trainee fainted: no exp" line last fired (trainee_gate.FAINT_LOG_EVERY)
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None
     move_nav: int = 0

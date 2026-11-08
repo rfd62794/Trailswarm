@@ -68,6 +68,20 @@ def read_completed(state: Path) -> set[str] | None:
         return None
 
 
+def start_lineage(state_path) -> str:
+    """Record provenance for a run (the standing rule): the start state's lineage - 'organic' | 'synthetic' |
+    'unknown' when there is no state or no lineage record, never guessed. A 'promoted' start counts as organic
+    (its organic equivalence was verified); an unreadable statefp reads 'unknown'."""
+    try:
+        from pokeagent import statefp
+        fp = statefp.read(Path(state_path)) if state_path else None
+    except Exception:  # noqa: BLE001
+        return "unknown"
+    if fp is None:
+        return "unknown"
+    return {"organic": "organic", "synthetic": "synthetic", "promoted": "organic"}.get(statefp.lineage_of(fp), "unknown")
+
+
 def stamp_fingerprint(emu, state: Path, source_run: str | None = None, *, inherit=None) -> None:
     """A fresh RAM fingerprint (statefp) beside a just-written checkpoint state; the caller's try keeps it best effort.
     ``inherit`` is the run's start state: a non-organic start's lineage is carried into the new fingerprint."""

@@ -6,6 +6,7 @@ import random
 from pokeagent.bandit.hook import heal_push_on, train_need
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
@@ -74,6 +75,8 @@ class PlanGoal(BehaviourBase):
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
         ctx.train_member = team.weakest.slot if team and team.weakest else None
+        if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
+            trainee_ok(ctx)  # never train a fainted trainee: heal first (the gate's fix sets center_intent)
         if team_ready_stage:
             if team is None:
                 ctx.team_ready_nodata = True  # no ROM/boss data: never block the route
