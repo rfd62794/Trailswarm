@@ -144,7 +144,7 @@ Diff stat, test tails, wc -l line, constants chosen, what Robert should look at 
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-viewer-pull-model-directive |
 | Base branch | - |
@@ -158,4 +158,5 @@ Diff stat, test tails, wc -l line, constants chosen, what Robert should look at 
 - 2026-11-07 21:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WFQRA69R6M2BFF5DD4SB9Z
 - 2026-11-07 21:32 · dispatcher · launched pid=2384; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-directive; provisioned: uv sync --frozen
 - 2026-11-07 21:48 · devin · In progress → Review — DONE d4eb21e pushed. DIFF: 24 files, +858/-104 (new: viewer/swarm_rows.py 147, ui/swarm_page.py 65, 4 test files). CONSTANTS: SNAPSHOT_HZ_IDLE=2/SNAPSHOT_HZ_FOCUS=10, CARD_FRAME_HZ=10, FOCUS_FRAME_HZ=30, Stadium=1/FRAME_S(10), events POLL_S_FOCUS=0.2/POLL_S_IDLE=1.0, DEAD_AFTER=5->DEAD_RETRY_S=2s (replaced DEAD_EVERY cycle-modulo; test updated). NOTES: _Throttle removed - cadences live in ViewerModel.set_wants/WorldModel.set_focus fed by win.tick's visible_frame_set (grid cards 10Hz, focus 30Hz, stadium 10Hz; max wins). reader_ts added at telemetry layout v2 (HEADER=32, field at off 24, LAYOUT=2 + size double-guard so v1 slots still read at off 16; Agent_Footprint not landed so field+heartbeat added here as allowed). Grade column reads stats[key].grade -> n/a until the scorecard lands; next = next leaf in ss.layout order. web.py frames only for on-screen agents now (was every agent). world/app.py --png gains wm.drain() (was racy). TESTS: targeted 143 passed/1 skipped (the ROM-gated skip); full suite 1927 passed, 40 skipped, 0 failed in 177s. wc -l: all viewer+world files <300 (max card.py 291, window.py 282, world_view.py 282). REAL-WINDOW CHECKLIST for Robert: open `pokeagent world` with the swarm - (1) fps under load vs the old 7fps drop; (2) Swarm page (View menu, default-on when runs/swarm exists): rows show state/segment/grade(n/a)/next/steps-s+RSS(blank until agent_stats exists)/health/goal, click focuses; (3) frames only on focused/stadium cards - world map alone should show no shm traffic. [origin] spent: devin 16 min est. n/a
+- 2026-11-08 12:09 · robert-claude-laptop · Review → Done — note: PR #167 merged (0263bcb); verify 2095 passed at f5732ee; Sonnet review then Haiku delta APPROVE. Directive lint error on tests/test_viewer_swarm_page.py is a false positive: the file exists at the merged head.
 <!-- queue:end -->
