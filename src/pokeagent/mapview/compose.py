@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from pokeagent.mapview import overlay, playback
+from pokeagent.mapview import edges, overlay, playback
 from pokeagent.mapview.best import best_index
 
 
 def compose_base(snap) -> np.ndarray | None:
-    """The whole space as one RGB image: white background, each area's image at its offset."""
+    """The whole space as one RGB image: white background, each area's image at its offset,
+    plus the preset's coloured edge lines drawn once in the gap between stacked areas."""
     w, h = snap.layout.space_w, snap.layout.space_h
     if not snap.areas or w <= 0 or h <= 0:
         return None
@@ -17,6 +18,10 @@ def compose_base(snap) -> np.ndarray | None:
         off, src = snap.layout.offsets.get(a.name), snap.images.get(a.name)
         if off is not None and src is not None:
             img[off[1]:off[1] + src.shape[0], off[0]:off[0] + src.shape[1]] = src[..., :3]
+    preset = getattr(snap, "preset", None)
+    if preset is not None and preset.area_gap_px and preset.edge_palette:
+        rows = edges.rects(snap.areas, snap.layout)
+        edges.draw_edges(img, rows, edges.edge_colours(rows, preset.edge_palette))
     return img
 
 

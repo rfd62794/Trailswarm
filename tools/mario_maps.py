@@ -53,6 +53,11 @@ def area_name(world):
     return f"{world[0]}-{world[1]}"
 
 
+def track_point(w, memory):
+    """One [area, x, y] ghost point for the emulator's current state; the live writer reuses it."""
+    return [area_name(w.world), w.level_progress, int(memory[ADDR_MARIO_Y]) - SPRITE_Y - HUD]
+
+
 def update_columns(columns, cam, frame):
     for sx in range(frame.shape[1]):
         samples = columns.setdefault(cam + sx, [])
@@ -110,10 +115,9 @@ class Cartographer:
                 if settle:
                     settle -= 1
                     continue
-                x, y = self.w.level_progress, int(self.py.memory[ADDR_MARIO_Y])
                 if frame % POINT_EVERY == 0:
-                    points.append([area_name(world), x, y - SPRITE_Y - HUD])
-                cam = x - self.py.memory[ADDR_MARIO_X]
+                    points.append(track_point(self.w, self.py.memory))
+                cam = self.w.level_progress - self.py.memory[ADDR_MARIO_X]
                 if frame % SAMPLE_EVERY == 1 and cam >= 0:
                     a = np.asarray(self.py.screen.image.convert("L"))[HUD:]
                     update_columns(self.levels.setdefault(area_name(world), {}), cam, a)
