@@ -90,11 +90,12 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #161 (Sonnet CHANGES-NEEDED, five should-fixes); branch merges PR #161's branch first
+- 2026-11-07 20:40 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; review fixes for PR #161 which Robert wants merged
 <!-- queue:end -->
