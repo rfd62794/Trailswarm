@@ -9,10 +9,12 @@ from PIL import Image
 
 dpg = pytest.importorskip("dearpygui.dearpygui")
 
-from pokeagent.mapview import playback
+from pokeagent.mapview import overlay, playback
 from pokeagent.mapview.app import Holder, snapshot_once
 from pokeagent.mapview.areas import AreaStore
 from pokeagent.mapview.ghosts import GhostStore
+from pokeagent.mapview.live import LiveStore
+from pokeagent.mapview.presets import resolve
 from pokeagent.mapview.view import MapWindow
 
 
@@ -151,3 +153,70 @@ def test_seen_only_change_does_not_rebuild_the_base(tmp_path, ctx):
     again = dataclasses.replace(snap, areas=tuple(dataclasses.replace(a, seen=0.99) for a in snap.areas))
     win.adopt(again)
     assert win.base_builds == 1
+
+
+def live_file(source, agent="w-live", x=30, y=6):
+    d = source / "live"
+    d.mkdir(exist_ok=True)
+    rec = {"schema": 1, "agent": agent, "run": "", "area": "a-1", "x": x, "y": y,
+           "screen_x": None, "screen_y": None, "updated_at": time.time()}
+    (d / f"{agent}.json").write_text(json.dumps(rec), encoding="utf-8")
+
+
+def live_holder(source, preset=None):
+    areas, ghosts, store = AreaStore(), GhostStore(), LiveStore()
+    snap, _ = snapshot_once(source, areas, ghosts, playback.FPS, store, preset)
+    return areas, ghosts, store, Holder(snap)
+
+
+def test_follow_live_moves_the_centre_and_draws_the_live_agent(tmp_path, ctx):
+    src = make_source(tmp_path)
+    live_file(src)
+    areas, ghosts, store, holder = live_holder(src)
+    win = MapWindow(holder.get(), headless=True)
+    win.build()
+    assert win.follow_live and win.follow_best                     # follow live is the preset default
+    now = time.monotonic()
+    win.tick(1 / 60, now)
+    pt = win._live_pts["w-live"]
+    before = abs(pt[0] - win.vp.cx) + abs(pt[1] - win.vp.cy)
+    for i in range(1, 40):
+        win.tick(1 / 60, now + i / 60)
+    after = abs(pt[0] - win.vp.cx) + abs(pt[1] - win.vp.cy)
+    assert after < before                                          # the camera eased onto the live agent
+    rgb = overlay.PALETTE[overlay.color_index("w-live", len(overlay.PALETTE))]
+    assert (win.overlay_img[..., :3] == rgb).all(-1).any()         # the live agent is in the overlay
+    assert (win.overlay_img[..., :3] == [255, 255, 255]).all(-1).any()  # its white ring
+
+
+def test_no_live_file_falls_back_to_the_best_ghost(tmp_path, ctx):
+    areas, ghosts, store, holder = live_holder(make_source(tmp_path))
+    win = MapWindow(holder.get(), headless=True)
+    win.build()
+    assert win.follow_live and not win.follow_best                 # preference on, nothing to follow yet
+    win._set_follow_best(True)
+    win.tick(1 / 60, time.monotonic())
+    assert win.follow.agent_id in win.tables.runs                  # following a ghost, not a live agent
+
+
+def test_unknown_preset_marks_the_note(tmp_path, ctx):
+    areas, ghosts, store, holder = live_holder(make_source(tmp_path), resolve(game="wat"))
+    win = MapWindow(holder.get(), headless=True)
+    assert win.preset_note == "unknown preset" and win.preset.name == "wat?"
+
+
+def test_new_live_file_changes_snapshot_without_camera_jump(tmp_path, ctx):
+    src = make_source(tmp_path)
+    areas, ghosts, store, holder = live_holder(src)
+    win = MapWindow(holder.get(), headless=True)
+    win.build()
+    win._set_follow_best(False)                                    # follow off: no auto re-enable
+    win.vp.cx, win.vp.cy = 30.0, 18.0
+    live_file(src)
+    snap, changed = snapshot_once(src, areas, ghosts, playback.FPS, store)
+    assert changed and "w-live" in snap.live
+    holder.set(snap)
+    win.adopt(holder.get())
+    win.tick(1 / 60, time.monotonic())
+    assert not win.follow.active                                   # follow stayed off
+    assert (win.vp.cx, win.vp.cy) == (30.0, 18.0)                  # the camera did not jump

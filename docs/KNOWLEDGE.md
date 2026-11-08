@@ -277,6 +277,22 @@ live: new ghosts join at the next loop start, wider images recompose the base wi
 camera. Implementation: `src/pokeagent/mapview/` (pure readers/playback/overlay + a Dear PyGui
 window reusing `world.view`, `world.zoom`, `world.pyramid`, `world.follow`).
 
+Live positions come from a second contract (2026-11-14): a host that is actually running an
+emulator writes `<source>/live/<agent>.json` (schema 1: `{agent, area, x, y, screen_x, screen_y,
+run, updated_at, ...}`) atomically, throttled by the caller (Mario writes ~10 Hz via
+`tools/mario_live.py` from `tools/mario_display.py`). `mapview/live.py` reads those files
+tolerantly and drops any record older than `STALE_S = 5.0` s, so a stopped host's avatar simply
+disappears. With `follow_default = "live"` the window follows the live agent (1 px white ring)
+and falls back to the best ghost when none exists; a live update never moves a camera the user
+is not following. `screen_x`/`screen_y` are the sprite's top-left on the host's frame - with
+`frame_for(agent)` provided, `mapview/avatars.py` crops that picture out of the frame, keys the
+background by ring colour (`KEY_TOL = 24`), tints per agent and keeps the best crop in memory
+only; without a frame source the head stays the generic square. Presets (`mapview/presets.py`,
+the one file allowed to name games) pick avatar size, walk-frame style, follow default, status
+fields and the area gap per game/genre (`--game`/`--preset`/`--genre`; explicit preset wins,
+unknown names show "unknown preset"). `mapview/edges.py` draws a 2 px gap line between stacked
+areas so touching maps read as separate rooms.
+
 ## Viewer (pull model, 2026-11-07)
 
 - The poll thread pulls on a per-source cadence instead of polling everything every frame: snapshots

@@ -29,6 +29,9 @@ class Display:
         self.boot = io.BytesIO()
         self.py.save_state(self.boot)
         self.pub = FramePublisher(AGENT, self.emu)
+        from mario_maps import DIR as MAPDIR
+        from mario_live import LiveWriter, build_record
+        self._live, self._build_record = LiveWriter(MAPDIR, AGENT), build_record
         self.workers = workers
         self.step = 0
         self.best = None
@@ -71,6 +74,12 @@ class Display:
         for _ in range(n):
             self.py.tick(1, True)
             self.pub.publish(advance=False)
+            try:
+                now = time.monotonic()
+                if self._live.due(now):                     # build nothing when no write is due
+                    self._live.maybe_write(self._build_record(self), now)
+            except Exception:
+                pass                                        # a viewer file never stops the emulator
 
     def restart(self):
         self.boot.seek(0)
