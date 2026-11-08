@@ -87,11 +87,13 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-segment-scorecard-review-fixes-directive |
-| Base branch | - |
+| Base branch | directive/pokeagent-segment-scorecard-directive |
 | Base commit | e7bcdc8bd88132783cdf1e3cc9193f58addf1806 |
+| Head commit | c6f38d44fdabfa6724a4b7afd812725bc7cc6583 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #161 (Sonnet CHANGES-NEEDED, five should-fixes); branch merges PR #161's branch first
@@ -99,4 +101,9 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 - 2026-11-07 20:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WD0KXKRYTTZ88XQ2FR7WM0
 - 2026-11-07 20:47 · dispatcher · launched pid=24544; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; provisioned: uv sync --frozen
 - 2026-11-07 20:49 · devin · In progress → Blocked — Refused required command: git merge origin/directive/pokeagent-segment-scorecard-directive (git merge is refused-on-purpose in this sandbox; all merge-equivalents are too). The directive's branch rule requires it as step one: PR #161 head 9abf2b1 is not an ancestor of HEAD and its files (e.g. src/pokeagent/segment_grades.py) are absent, so the five review fixes cannot be applied. Fix: merge PR #161's branch into directive/pokeagent-segment-scorecard-review-fixes-directive before dispatch, or allow git merge for this run, then requeue.
+- 2026-11-07 20:52 · robert-claude-laptop · Blocked → Queued — Requeue: the run needed git merge, which the sandbox refuses; directive rewritten so the run branch starts FROM PR #161's branch (approve with base_branch)
+- 2026-11-07 20:52 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; requeued with the PR branch as base because the sandbox refuses git merge
+- 2026-11-07 20:53 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WDR6413WC7980KAPXQ74BW
+- 2026-11-07 20:58 · dispatcher · launched pid=13744; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; resynced: merged directive/pokeagent-segment-scorecard-directive into directive/pokeagent-segment-scorecard-review-fixes-directive (1 commit(s), clean); provisioned: uv sync --frozen
+- 2026-11-07 21:13 · devin · In progress → Review — All 5 findings applied + optional groups() cache. Head c6f38d4 (pushed). DIFF: 10 files, +463/-275. wc -l: segment_grades.py 257, segment_par.py 83 (new: segment_par/entries_exits_for/par_for_best/make_par_fn, re-exported), seg_sched.py 283, seg_sched_grades.py 213 (new pure fns: grade_groups/frontier_seg/choose/pick/live_holds/rejoin_goals/rejoin_candidates/pending_confirm/pending_broken_replay/pending_repro/resolve_suite/log_refusals), review/segments.py 118. FINDINGS: (1) par code -> segment_par.py; sched steering -> seg_sched_grades.py; all touched <300. (2) log-once WARNING via module logger + seen-set in grade_all par_fn, start_grade, seg_sched._par, review _grids; opaque callees keep Exception + comment. (3) `pokeagent review segments` now read-only by default; --ingest opt-in runs ingest inside ss.locked (same txn as Curriculum.txn); tests updated + new read-only/opt-in test. (4) seg_split.reset sets split_retry_at = n + WINDOW (flap guard). (5) _mean_flag means over attempts carrying the field; None only when none do. Optional: next_job caches _gm into choose() and uses ssg.frontier_seg (one grade_all per call, was 3). TESTS: new test_par_fn_failure_is_logged_once, test_event_rates_mean_over_attempts_carrying_the_field, test_rejoin_does_not_flap_straight_back_to_a_split, test_default_is_read_only_and_ingest_is_opt_in. TARGETED (11 files incl. curriculum_hold): 140 passed, 1 skipped. FULL SUITE: 1909 passed, 40 skipped, 0 failed in 201.62s. [origin] spent: devin 16 min est. n/a
 <!-- queue:end -->

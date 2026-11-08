@@ -23,7 +23,7 @@ Switch training (Magikarp, or any `ctx.train_member` from `team_for`) only pays 
 
 ## 3. Scope (one PR, in order)
 
-1. `explorer/status_care.py` (pure): `status_kinds`, `steps_to_faint`, the care decision table, `poisoners_on`.
+1. `src/pokeagent/explorer/status_care.py` (pure): `status_kinds`, `steps_to_faint`, the care decision table, `poisoners_on`.
 2. Item use: a `StatusCare` behaviour that carries the decision out with the existing item-use machinery (Antidote on the poisoned slot, a Potion, or `ctx.center_intent`).
 3. Shopping: Antidote joins the heal-item source of truth with a floor of 1 when the route ahead has poison.
 4. EXP eligibility: a gate before training; heal first; log "trainee fainted: no exp"; no-progress accounting.
@@ -132,7 +132,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-status-care-and-exp-eligibility-d-06cbc6 |
 | Base branch | - |
@@ -149,4 +149,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 19:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-status-care-and-exp-eligibility-d-06cbc6; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7PJ1YKAG8PYTJQKD3SR1F
 - 2026-11-07 19:10 · dispatcher · launched pid=22368; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-status-care-and-exp-eligibility-d-06cbc6; provisioned: uv sync --frozen
 - 2026-11-07 19:23 · devin · In progress → Review — Done. New tests: 26 passed (tests/test_status_care.py, _shopping, _behaviour, test_trainee_gate.py). Full suite: 1692 passed / 40 skipped / 36 failed - ALL failures are test_review_*/test_cli_review missing-fixture errors (tests/fixtures/review/runs is gitignored and absent on this branch's base; main gained those fixtures after base 4e91a65), plus none from this diff; also the known env failure class noted in the directive. No forbidden file changed (planner*.py, ship_gate.py, planner_checkpoint.py, battle_moves.py untouched). Signatures: status_kinds(byte)->frozenset, steps_to_faint(hp,per_hp=4), decide(party,bag,steps_to_heal,kb)->CareDecision, poisoners_on(map_id,wild_by_map,learnsets,moves,kb), poison_ahead(goals,here_map,wild_by_map,kb), trainee_eligible(party,slot,revive_carried,steps_to_heal,antidote_carried=False)->Eligibility, trainee_ok(ctx). Constants: POISON_STEPS_PER_HP=4, CARE_MARGIN_STEPS=8, ANTIDOTE_FLOOR=1, POISON_LOOKAHEAD=3, TRAINEE_MIN_SAFE_STEPS=30, REVIVE_BEATS_WALK_STEPS=150, RECHECK_EVERY=10, VERIFY_STEPS=20, MAX_TRIES=2, MAX_PRESSES=60, FAINT_LOG_EVERY=100, prices FULL_HEAL=0x34/600, REVIVE=0x35/1500, heal_items.CURE_ITEMS/cure_count. Behaviour order: StatusCare sits after Restock() and before the second UseItems() in default_behaviours() (order test updated). Item machinery CAN target a party slot (rope_press/item_step party_target) - the Antidote/Potion/Revive sequences use it; no new menu code, so no fallback needed. Hooks: PlanGoal.step calls trainee_ok after train_member is computed (center_intent heal-first when ineligible, need untouched); GrindDrill.applies requires trainee_ok.ok. status_care.jsonl rows carry provenance via new checkpoint_goals.start_lineage (statefp wrapped, explorer layer-clean). UNVERIFIED (one place each): status bits in status_kinds, POISON_STEPS_PER_HP/POISON_BATTLE_FRACTION, the EXP rule in trainee_eligible's docstring. Caveat for controller validation: ctx.center_intent is a 'deliberate stop inside a center' marker (plan_goal clears it outside POKECENTER_MAPS); the low-HP planner rule is what actually walks to a nurse - the walk_to_center row requests through it exactly as written, but whether it alone starts a walk in an organic run is the thing to verify. [origin] spent: devin 13 min est. n/a
+- 2026-11-07 21:03 · robert-claude-laptop · Review → Done — note: PR #159 merged (merge commit b273adc) after Sonnet CHANGES-NEEDED -> heal_walk fix -> Sonnet APPROVE -> follow-ups -> Haiku delta APPROVE -> main merge, and a green verify record at d9a5350 (1908 passed, 0 failed, 40 ROM-gated skips). Scope path spelled in full for the Done gate. Controller still owes ROM checks of status bits, poison rate, nurse position.
 <!-- queue:end -->
