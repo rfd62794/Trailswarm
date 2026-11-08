@@ -36,8 +36,9 @@ def test_enters_detects_a_planned_press_into_the_gym():
     assert not PlanGoal._enters(ctx, 0x03, 2, 4, ("A", "goal beat_misty: at the door"), 0x41)
 
 
-def test_grind_step_uses_train_route_until_grind_episode_lands(monkeypatch):
+def test_grind_step_uses_train_route_when_no_episode_starts(monkeypatch):
     ctx = _ctx()
+    monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x": False)
     monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: ("UP", "to Route 24 grass"))
     assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) == ("UP", "to Route 24 grass")
     monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: None)
