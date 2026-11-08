@@ -10,10 +10,7 @@ Since the review, main gained PR #158 (trainer ledger: `src/pokeagent/explorer/t
 survives PlanGoal; `explorer/status_care.py` keeps its state in `status_care.of(ctx)` on `ctx.__dict__` so it adds no
 context fields). Those are the two pieces this PR must now use.
 
-**Branch rule for this run:** the dispatcher creates your branch from main. First: `git fetch origin && git merge
-origin/directive/pokeagent-goal-procedures-directive` so your branch contains PR #162's work; resolve any conflict
-keeping both sides (likely `explorer/context.py`, `behaviours/__init__.py`, `tests/test_explorer_behaviours.py`).
-Then fix, test, push your branch. The coordinator merges it into PR #162's branch. Never push to main; no new PR.
+**Branch rule for this run:** your run branch is created FROM PR #162's branch `directive/pokeagent-goal-procedures-directive` (the coordinator approves this row with that base branch and resolves any conflict with main beforehand), so PR #162's files are already in your worktree. Do NOT run `git merge`, `git rebase` or `git stash` (the sandbox refuses them). Commit and push to your own run branch only; the coordinator merges it back into PR #162's branch. Never push to main; never open a PR.
 
 ## The findings and what to do
 

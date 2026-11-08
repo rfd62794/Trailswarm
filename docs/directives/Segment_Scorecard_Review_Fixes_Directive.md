@@ -7,10 +7,7 @@ PR #161 (branch `directive/pokeagent-segment-scorecard-directive`, head 9abf2b1,
 main 078e8f3) and passed review on correctness, but came back CHANGES-NEEDED on five should-fix findings, quoted
 verbatim below. This directive applies them so the PR can merge.
 
-**Branch rule for this run:** the dispatcher creates your branch from main. Your first commands must be
-`git fetch origin && git merge origin/directive/pokeagent-segment-scorecard-directive` so your branch contains PR
-#161's work (it merges cleanly onto current main). Then make the fixes and push your branch. The coordinator will
-fast-forward or merge your branch into PR #161's branch. Never push to main; never open a PR.
+**Branch rule for this run:** your run branch is created FROM PR #161's branch `directive/pokeagent-segment-scorecard-directive` (the coordinator approves this row with that base branch and resolves any conflict with main beforehand), so PR #161's files are already in your worktree. Do NOT run `git merge`, `git rebase` or `git stash` (the sandbox refuses them). Commit and push to your own run branch only; the coordinator merges it back into PR #161's branch. Never push to main; never open a PR.
 
 ## The findings and what to do
 
