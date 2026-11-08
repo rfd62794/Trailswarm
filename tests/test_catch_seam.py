@@ -133,6 +133,33 @@ def test_catch_logs_the_skip_reason_once_per_battle(tmp_path, monkeypatch):
     assert ctx.catch_mode is False
 
 
+def test_party_full_skip_resets_a_stale_catch_mode(tmp_path, monkeypatch):
+    from pokeagent.knowledge import team_plan
+    _wire(monkeypatch, CatchStep("throw", ball="POKE"))
+    monkeypatch.setattr(catch_mod, "read_party", lambda emu: [object()] * 6)      # a full party
+    monkeypatch.setattr(catch_mod, "full_party_slot", lambda ctx, party: None)   # every member protected
+    ctx = _ctx(tmp_path)
+    ctx.catch_mode, ctx.catch_hint = True, CatchStep("throw", ball="POKE")        # stale from an earlier battle
+    assert Catch().step(ctx) is None
+    assert ctx.catch_mode is False and ctx.catch_hint is None                     # no weaken-only mode survives
+    assert team_plan.of(ctx).get("release_pending") is None                       # ... and no mark was made
+
+
+def test_party_full_mark_records_the_battle_and_is_computed_once(tmp_path, monkeypatch):
+    from pokeagent.knowledge import team_plan
+    _wire(monkeypatch, CatchStep("throw", ball="POKE"))
+    monkeypatch.setattr(catch_mod, "read_party", lambda emu: [object()] * 6)
+    calls = []
+    monkeypatch.setattr(catch_mod, "full_party_slot",
+                        lambda ctx, party: calls.append(1) or 5)
+    ctx = _ctx(tmp_path)
+    Catch().step(ctx)
+    st = team_plan.of(ctx)
+    assert st["release_pending"] == {"species": "PIDGEY", "slot": 5, "battle": ctx.battles}
+    Catch().step(ctx)
+    assert calls == [1]                                        # settled once for the battle
+
+
 def test_turn_signature_does_not_use_object_ids(tmp_path, monkeypatch):
     _wire(monkeypatch, CatchStep("skip", why="x"))
     ctx = _ctx(tmp_path, e_hp=20, e_max=20)

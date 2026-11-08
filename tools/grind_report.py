@@ -36,15 +36,18 @@ def need_levels(kb: dict) -> tuple[dict, dict]:
     gyms it knows, plain readiness vs Surge's party for the rest)."""
     from pokeagent.explorer import training
     from pokeagent.goals import GOALS as LADDER
-    from pokeagent.knowledge import party, readiness, trainers
-    out: dict = {}
+    from pokeagent.knowledge import party, readiness, team_plan, trainers
+    out, team_out = {}, {}
     for sp in STARTERS:
         c = party.trainer_mon(sp, 5, kb)
         if c is None:
             continue
+        # the representative early team: the starter plus the catch plan's Route 1 catches
+        team = [c] + [m for n, lv in (("PIDGEY", 3), ("RATTATA", 3)) if (m := party.trainer_mon(n, lv, kb))]
         for goal in GOALS:
             goals = {g: True for g in LADDER[:LADDER.index(goal)]}
             lvl = None
+            boss = trainers.boss_party(goal, kb, starter_names=[sp])
             if goal in training.TRAIN_LEVEL_BY_GOAL:
                 lvl = training.required_level(goals, 0, [c])[0]
             else:
@@ -53,7 +56,11 @@ def need_levels(kb: dict) -> tuple[dict, dict]:
                 lvl = r.required if r else None
             if lvl:
                 out.setdefault(sp, {})[goal] = lvl
-    return out, {g: "training.required_level" if g in training.TRAIN_LEVEL_BY_GOAL else "readiness.assess" for g in GOALS}
+            if boss:
+                nv = team_plan.boss_need(team, boss, kb, goal)
+                if nv is not None:
+                    team_out.setdefault(sp, {})[goal] = None if nv.ready else nv.need
+    return out, team_out
 
 
 def map_graph(rom_path) -> dict:
@@ -144,10 +151,11 @@ def main(argv=None) -> int:
     out_path = Path(a.out) if a.out else runs / R.ATLAS
     doc = R.load(out_path)
     n = R.fold_new(doc, runs, kb.get("name_of_internal"))
-    need, _src = need_levels(kb)
+    need, team_need = need_levels(kb)
     rp = rom_path()
     cost = center_costs(map_graph(rp), POKECENTER_MAPS) if rp else {}
-    doc["inputs"] = {"need": need, "center_cost": {str(k): v for k, v in cost.items()}, "candidates": GOAL_MAPS,
+    doc["inputs"] = {"need": need, "team_need": team_need,
+                     "center_cost": {str(k): v for k, v in cost.items()}, "candidates": GOAL_MAPS,
                      "names": {str(m): map_name(m) for m in range(256)}, "rom": bool(rp)}
     doc["atlas"] = R.build_atlas(doc, kb)
     R.save(out_path, doc)
@@ -159,7 +167,8 @@ def main(argv=None) -> int:
         return points_report(runs, doc, kb)
     for sp, goals in doc["atlas"].items():
         for goal, lv in goals.items():
-            print(f"== {sp} before {goal} (needs L{need[sp][goal]}) ==")
+            tn = (team_need.get(sp) or {}).get(goal)
+            print(f"== {sp} before {goal} (needs L{need[sp][goal]} solo{f', team L{tn}' if tn else ''}) ==")
             for L, spots in lv.items():
                 row = "  ".join(f"{s['name']} {s['xp_per_min']:.0f}xp/min risk {s['blackout']:.0%} n={s['n_obs']}"
                                 + (f" ~{s['steps_to_goal'] / STEPS_PER_MIN:.0f}min" if s["steps_to_goal"] else "") for s in spots)

@@ -28,6 +28,7 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
 from pokeagent.goals import bag_contents, check_goals
+from pokeagent.knowledge import team_plan
 from pokeagent.magikarp import fighter
 from pokeagent.ramstructs import read_party
 
@@ -133,6 +134,7 @@ class Battle(BehaviourBase):
                 ctx.battles = ctx.battles + 1; ctx.battle_pos = (m, x, y)
                 ctx.fx_last = ctx.fx_last_fx = ctx.pending_effect = None  # fresh fight: no carried text state
                 new_battle(ctx)
+                team_plan.of(ctx).pop("release_pending", None)  # a stale deposit mark never survives into a new fight
                 party_log.of(ctx).start_battle(ctx)  # XP/level logging: the party as the fight begins
                 bflag = ctx.emu.read(0xD057)
                 if bflag == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
@@ -225,6 +227,7 @@ class Battle(BehaviourBase):
             ctx.in_battle = False; ctx.last_battle_hp = None; ctx.potion_hp_before = None
             ctx.no_pp = set(); ctx.all_pp_out = 0; ctx.last_move_choice = None
             _finalize_pending_effect(ctx)  # the fight ended before any result text: the hit reads neutral
+            team_plan.of(ctx).pop("release_pending", None)  # the catch resolved: the deposit YES dies with the battle
             ca = ctx.pop("catch_attempt")
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
                 dn = ca.get("dex") or 0
