@@ -39,6 +39,8 @@ class WorldGraph:
 
     strict = True  # False = optimistic: ignore learned walls (some are false, learned behind an NPC or a fade)
 
+    allowed_maps: frozenset | None = None  # when set, BFS never steps onto a node outside it (grind-episode boundary)
+
     def static_npc_tiles(self, m: int) -> set:
         """Tiles of NPCs that never move and were always seen on ONE tile (cached per map)."""
         cache = self.__dict__.setdefault("_npc_cache", {})
@@ -77,6 +79,12 @@ class WorldGraph:
             if f"{nx},{ny}" in d.get("visited", {}):
                 yield (m, nx, ny), name
 
+    def edges(self, node):
+        """neighbours() filtered by allowed_maps: a grind episode's map set bounds the search."""
+        for nxt, name in self.neighbours(node):
+            if self.allowed_maps is None or nxt[0] in self.allowed_maps:
+                yield nxt, name
+
     def path(self, start, goal_fn: Callable[[tuple], bool], limit: int = 5000) -> list[str] | None:
         """Strict BFS first; if no route, an optimistic one (walls ignored): a false wall gets re-tested and
         cleared on the way instead of leaving the agent with no plan (seen 2026-11-03: stuck at Mom)."""
@@ -109,7 +117,7 @@ class WorldGraph:
                     node, btn = prev[node]
                     out.append(btn)
                 return cur, out[::-1]
-            for nxt, btn in self.neighbours(cur):
+            for nxt, btn in self.edges(cur):
                 if nxt not in prev:
                     prev[nxt] = (cur, btn)
                     q.append(nxt)

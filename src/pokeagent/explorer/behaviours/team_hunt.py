@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections import deque
 
+from pokeagent.explorer import grind_episode
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.economy import heal_items
@@ -58,7 +59,7 @@ class TeamHunt(BehaviourBase):
                 ctx.hunt_grass = False
             self._armed = False
         ok = (ctx.team_hunt_steps <= TEAM_HUNT_STEP_CAP and not ctx.view.battling and not ctx.view.box
-              and ctx.proc is None and ctx.center_intent is None
+              and ctx.proc is None and ctx.center_intent is None and grind_episode.active(ctx) is None
               and not (next((g for g in GOALS if not goals.get(g)), "") or "").startswith(("beat_", "rival_"))
               and ctx.view.m not in SHIP_MAPS and ctx.view.m not in DUNGEON_MAPS and ctx.blackouts_row == 0)
         if ok:

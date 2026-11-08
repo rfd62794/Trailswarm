@@ -26,6 +26,17 @@ def battle(m, won=True, fled=False, presses=40, lvl=10, run="r1", **kw):
             "hp_end": [5, 20], "turns": [{"hp_you": 20}], **kw}
 
 
+def test_import_touches_no_filesystem(monkeypatch):
+    """PR #165 blocker: grind.atlas used to scan runs/ at import; the frames/step calibration is lazy now."""
+    import importlib
+    from pathlib import Path
+    def _raise(self):
+        raise AssertionError("grind.atlas import touched the filesystem")
+    monkeypatch.setattr(Path, "iterdir", _raise)
+    monkeypatch.setattr(Path, "is_dir", lambda self: True)   # pretend runs/ exists: the old code would scan it
+    importlib.reload(atlas)
+
+
 def test_xp_formula_and_curves():
     assert xp_gain(64, 7) == 64.0 and xp_gain(64, 7, trainer=True) == 96.0 and xp_gain(64, 7, participants=2) == 32.0
     assert exp_for_level("MEDIUM_FAST", 10) == 1000 and exp_for_level("MEDIUM_SLOW", 10) == 560

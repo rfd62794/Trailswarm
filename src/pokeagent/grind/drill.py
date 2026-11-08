@@ -15,6 +15,16 @@ from pokeagent.legs.drill import append_log, write_meta
 GRIND_LOG = Path("runs/legs/grind_drills.jsonl")
 DEFAULT_STEPS = 600
 MIN_ON_MAP = 100  # fewer steps on the grind map than this: no XP rate is recorded
+
+
+def log_episode(rec: dict, log_path: Path | None = GRIND_LOG) -> None:
+    """Append one self-started grind episode's row to the drill log: every episode is measured, not only
+    ``--drill-grind`` runs (fields: run, map, start/end step, xp_gained, steps, blackouts, xp_per_min,
+    provenance)."""
+    if log_path:
+        append_log(log_path, rec)
+
+
 class GrindDrillMonitor:
     """Ends the run after ``steps`` and records XP gained per step (party_log's exp total) as drill_result."""
 
