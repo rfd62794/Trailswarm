@@ -95,12 +95,14 @@ you could not do.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-goal-procedures-review-fixes-directive |
 | Base branch | - |
+| Base commit | c04c8c9f091022bba1911d981183d8941a650c6d |
 
 **Status log**
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #162 (Sonnet CHANGES-NEEDED, six should-fixes); uses heal_walk (#159) and trainer_ledger (#158); branch merges PR #162's branch first
 - 2026-11-07 20:42 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; review fixes for PR #162 which Robert wants merged
+- 2026-11-07 20:42 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WD4C03TZ3VQYAWZX5JK8AZ
 <!-- queue:end -->
