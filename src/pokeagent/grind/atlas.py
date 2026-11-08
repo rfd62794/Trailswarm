@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from pokeagent.grind import measure
 from pokeagent.grind.observed import Obs, band, pooled
 from pokeagent.grind.xpmath import xp_gain, xp_needed
 
-FRAMES_PER_STEP = 16      # ASSUMPTION: one explorer step ~ one walked tile (16 frames); calibrate from decisions.jsonl later
-STEPS_PER_MIN = 3600 / FRAMES_PER_STEP
+
+def steps_per_min(fps: float) -> float:
+    return 3600 / fps
+
+
+FRAMES_PER_STEP = measure.frames_per_step_or_default()  # median of the last runs (was an assumed 16)
+STEPS_PER_MIN = steps_per_min(FRAMES_PER_STEP)
 SHRINK_K = 10             # observed battles that outweigh the prior 50:50
 SESSION_BATTLES = 25      # one grind session between heals (explorer.grind.GRIND_BATTLES)
 BLACKOUT_STEPS = 2000     # steps a blackout costs (warp home, walk back, lose the money)

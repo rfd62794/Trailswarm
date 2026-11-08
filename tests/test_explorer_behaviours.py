@@ -260,7 +260,7 @@ def test_explorer_package_layering_and_size():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
-    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names"}  # segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress)
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names", "grind"}  # segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress); grind: the grind-point ledger grind_episode chooses from
     for f in root.rglob("*.py"):
         assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):

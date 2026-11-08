@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer import train_route
+from pokeagent.explorer import grind_episode, train_route
 from pokeagent.explorer.perceive import lead_level, party_hp
 from pokeagent.novelty import steer as novelty_steer
 
@@ -16,12 +16,16 @@ def _tabu(ctx: ExplorerContext, map_id: int) -> set:
     return set(ctx.recent_tiles.get(map_id, ()))
 
 
-def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int) -> tuple[str, str] | None:
+def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int, allowed=None) -> tuple[str, str] | None:
     """Follow the committed frontier route press by press; re-plan only when the target is reached, the
     next step is blocked, the map changes, or the target stops being a frontier. A re-plan keeps the
-    current target unless a new frontier is RETARGET_MARGIN steps closer (hysteresis)."""
+    current target unless a new frontier is RETARGET_MARGIN steps closer (hysteresis). ``allowed`` is the
+    grind episode's map set while one is active: no route may leave it (the Nugget Bridge ping-pong)."""
     pos = (m, x, y)
     mem = ctx.mem
+    if allowed is not None and ctx.frontier_target is not None and ctx.frontier_target[0] not in allowed:
+        ctx.frontier_target = None
+        ctx.frontier_route = []
     if ctx.frontier_target is not None and ctx.frontier_target[0] != m:
         ctx.frontier_target = None  # a target on another map is meaningless here (and is_frontier would misjudge it)
         ctx.frontier_route = []
@@ -44,11 +48,14 @@ def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int) -> tuple[str, s
         ctx.frontier_target = None
         ctx.frontier_route = []
     if ctx.frontier_route:
-        ctx.frontier_at = pos
-        t = ctx.frontier_target
-        return ctx.frontier_route[0], f"frontier: {len(ctx.frontier_route)} steps left to ({t[1]},{t[2]})"
+        if allowed is not None and grind_episode.leaves_set(ctx, ctx.frontier_route[0], allowed):
+            ctx.frontier_target, ctx.frontier_route = None, []  # the route steps off the episode's maps: drop it
+        else:
+            ctx.frontier_at = pos
+            t = ctx.frontier_target
+            return ctx.frontier_route[0], f"frontier: {len(ctx.frontier_route)} steps left to ({t[1]},{t[2]})"
     ctx.frontier_at = None
-    plan = mem.frontier_plan(m, x, y)
+    plan = mem.frontier_plan(m, x, y, allowed=allowed)
     if novelty_steer.active(ctx):  # explorer role only: prefer the frontier whose unexplored side the swarm has seen least
         plan = novelty_steer.plan(ctx, m, x, y) or plan
     if plan is None or not plan[1]:
@@ -68,7 +75,7 @@ def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int) -> tuple[str, s
     return ctx.frontier_route[0], f"frontier: {len(ctx.frontier_route)} steps to ({node[1]},{node[2]})"
 
 
-def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=None, grass: str = "neutral"):
+def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=None, allowed=None, grass: str = "neutral"):
     """The shared explore pick: greedy neighbour choice, or the committed frontier route when every
     neighbour was already seen."""
     name, why, want_frontier = ctx.mem.choose_local(
@@ -77,7 +84,7 @@ def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=Non
         last_dir=ctx.last_dir, tabu=_tabu(ctx, m), reverse_penalty=REVERSE_PENALTY)
     if not want_frontier:
         return name, why
-    step = _frontier_move(ctx, m, x, y)
+    step = _frontier_move(ctx, m, x, y, allowed)
     return step if step else (name, why)
 
 
@@ -124,7 +131,11 @@ class Frontier(BehaviourBase):
         goals_now_all = ctx.goals()
         weak = mx_now and hp_now / mx_now < 0.4
         training = (ctx.hunt_grass and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
+        ep = grind_episode.active(ctx)
+        allowed = frozenset(ep["maps"] | {m}) if ep else None
         name, why = _memory_step(ctx, m, x, y,
-                                 avoid_maps={0x00} if (training and m == 0x0C) else train_route.stay_on_route(m, ctx.train_route_live),
+                                 avoid_maps=train_route.stay_on_route(m, ctx.train_route_live, ep) or
+                                 ({0x00} if (training and m == 0x0C) else None),
+                                 allowed=allowed,
                                  grass="seek" if training else "avoid" if weak else "neutral")
         return Decision(name, "frontier", why)

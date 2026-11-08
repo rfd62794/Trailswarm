@@ -10,7 +10,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
 from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import area_grind, par_follow, train_route
+from pokeagent.explorer import area_grind, grind_episode, par_follow, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import blackout_tax
@@ -121,6 +121,9 @@ class PlanGoal(BehaviourBase):
         if planned and ctx.opts.par_follow:
             planned, driver = par_follow.refine(ctx, planned, [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)])
         if planned and not (ctx.explore_run and m != 0x28 and random.random() < 0.3):  # never gamble in the lab
+            ep_maps = grind_episode.boundary(ctx)
+            if ep_maps is not None and grind_episode.leaves_set(ctx, planned[0], ep_maps | {m}):
+                return None  # the grind episode pins the run to its maps: this press would leave them
             return Decision(planned[0], "plan_goal", planned[1], driver=driver)
         return None
 

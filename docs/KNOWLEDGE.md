@@ -241,3 +241,21 @@ Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugge
 `press_interact` did not treat the press as exploring and never temp-blocked his tile; memory_purge had also healed the learned wall, so 1,500 UP presses went into him. The press now carries
 the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
 and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.
+
+**Grind points (2026-11-07).** `src/pokeagent/grind/points.py` keeps one `GrindPoint` per map - grass `patch` (the
+encounter-proven tiles from `maps[m]["encounters"]`), `species` and the `level_band` they imply (top wild level -2..+6),
+an atlas `xp_per_min_prior`, and a measured `xp_per_min` folded from grind episodes (`episodes: {run@step: [rate,
+blackouts, provenance]}` - the id is what makes the swarm merge an episode-weighted mean AND idempotent; a synthetic
+episode never lands on a point holding organic data). `choose` picks the band-covering point with the best rate
+(measured once `n_measured >= 2`, else prior) minus travel and `blackout_rate * BLACKOUT_STEPS`. The run-local copy is
+`runs/grind_points.json` (`{"version": 1, "points": {map: {...}}}`); the shared copy is `maps.json`'s `grind_points`
+table, merged by `swarm_merge.merge_grind_points` like `trainers`. `grind/measure.py` calibrates frames/step from the
+last 20 runs' records (levels.jsonl `step`/`frame` pairs when transitions carry no `frame`; 16 with a log line when no
+runs are readable) - `atlas.FRAMES_PER_STEP` is that value now, so `xp/min` columns everywhere are measured once run
+data exists. `GrindDrill` no longer needs `--drill-grind`: when `ctx.train_need` says the trainee is under level it
+starts an `explorer.grind_episode`, walks to the point and paces its patch, and writes one measured row per episode to
+`runs/legs/grind_drills.jsonl`. While an episode lives, `stay_on_route` returns the point's map plus its Pokecenter map
+and BOTH plan_goal and frontier honour it (frontier's BFS and the warp-avoid check cannot leave the set) - that is the
+Nugget Bridge fix: plan_goal walked UP onto Route 24 while frontier walked DOWN into Cerulean, 358 crossings in the
+marathon run. `tools/grind_report.py --points` prints the ledger (measured vs prior) and the pick per
+(starter, next boss, trainee level).
