@@ -8,9 +8,9 @@ The ghost format holds no game terms, so any game can write it:
     {"schema": 1, "game": ..., "run": ..., "agent": ..., "outcome": ..., "every": frames_per_point,
      "points": [[area, x, y], ...]}
 """
-import glob
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from mario_moments import MomentBook, classify
+from mario_search import low_priority, parent_gone
 
 DIR = Path("runs") / "mario-land"
 INBOX = DIR / "inbox"
@@ -68,10 +69,10 @@ def render_map(columns):
 
 
 class Cartographer:
-    def __init__(self, macros):
+    def __init__(self, macros, rom_path):
         from pyboy import PyBoy
         self.macros = macros
-        self.py = PyBoy(glob.glob("roms/Super Mario Land*.gb")[0], window="null")
+        self.py = PyBoy(rom_path, window="null")
         self.py.set_emulation_speed(0)
         self.w = self.py.game_wrapper
         self.w.game_area_mapping(self.w.mapping_minimal, 0)
@@ -170,20 +171,23 @@ class Cartographer:
         return None
 
 
-def cartographer_main(end, macros):
-    from watch_mario_land import low_priority
+def cartographer_main(end, macros, rom_path):
     low_priority()
     for d in (INBOX, MAPS, GHOSTS):
         d.mkdir(parents=True, exist_ok=True)
-    c = Cartographer(macros)
+    c = Cartographer(macros, rom_path)
     last_save = 0
-    while time.time() < end:
+    while time.time() < end and not parent_gone():
         doc = c.next_doc()
         if doc is None:
             time.sleep(0.25)
         else:
-            c.write_ghost(doc, c.replay(doc))
-            c.save_moments()
+            try:
+                c.write_ghost(doc, c.replay(doc))
+                c.save_moments()
+            except Exception as e:
+                print(f"cartographer: skipped one inbox document (worker {doc.get('worker')}): {e!r}",
+                      file=sys.stderr, flush=True)
         if c.levels and time.time() - last_save > SAVE_EVERY_S:
             last_save = time.time()
             c.save_maps()
