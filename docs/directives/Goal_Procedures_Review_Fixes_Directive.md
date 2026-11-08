@@ -10,10 +10,7 @@ Since the review, main gained PR #158 (trainer ledger: `src/pokeagent/explorer/t
 survives PlanGoal; `explorer/status_care.py` keeps its state in `status_care.of(ctx)` on `ctx.__dict__` so it adds no
 context fields). Those are the two pieces this PR must now use.
 
-**Branch rule for this run:** the dispatcher creates your branch from main. First: `git fetch origin && git merge
-origin/directive/pokeagent-goal-procedures-directive` so your branch contains PR #162's work; resolve any conflict
-keeping both sides (likely `explorer/context.py`, `behaviours/__init__.py`, `tests/test_explorer_behaviours.py`).
-Then fix, test, push your branch. The coordinator merges it into PR #162's branch. Never push to main; no new PR.
+**Branch rule for this run:** your run branch is created FROM PR #162's branch `directive/pokeagent-goal-procedures-directive` (the coordinator approves this row with that base branch and resolves any conflict with main beforehand), so PR #162's files are already in your worktree. Do NOT run `git merge`, `git rebase` or `git stash` (the sandbox refuses them). Commit and push to your own run branch only; the coordinator merges it back into PR #162's branch. Never push to main; never open a PR.
 
 ## The findings and what to do
 
@@ -95,7 +92,7 @@ you could not do.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goal-procedures-review-fixes-directive |
 | Base branch | - |
@@ -105,4 +102,6 @@ you could not do.
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #162 (Sonnet CHANGES-NEEDED, six should-fixes); uses heal_walk (#159) and trainer_ledger (#158); branch merges PR #162's branch first
 - 2026-11-07 20:42 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; review fixes for PR #162 which Robert wants merged
 - 2026-11-07 20:42 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WD4C03TZ3VQYAWZX5JK8AZ
+- 2026-11-07 20:49 · dispatcher · launched pid=26948; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; provisioned: uv sync --frozen
+- 2026-11-07 20:50 · devin · In progress → Blocked — git merge origin/directive/pokeagent-goal-procedures-directive refused by the run's permissions (git merge/rebase/stash are refused); branch is still plain main a69a759 and none of PR #162's files (procedures/, behaviours/after_victory.py) exist to fix. Run needs merge permission for this step or a dispatcher-side pre-merge.
 <!-- queue:end -->

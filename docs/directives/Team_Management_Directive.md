@@ -199,4 +199,5 @@ Diff stat, test tails, wc -l line, constants chosen and why, and the controller 
 - 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert: team management must exploit the growing team; gate judges slot 0 only (marathon entered Misty's gym with the strong mon in slot 3)
 - 2026-11-07 20:38 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert asked for this tonight
 - 2026-11-07 20:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WCY1B8X0SH90CS62PWX8YM
+- 2026-11-07 20:46 · dispatcher · launched pid=6388; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-directive; provisioned: uv sync --frozen
 <!-- queue:end -->

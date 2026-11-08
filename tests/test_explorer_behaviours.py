@@ -195,9 +195,9 @@ def test_selector_picks_the_first_applicable_in_order(tmp_path):
 
 def test_default_order_is_the_old_agent_step_order():
     names = [b.name for b in default_behaviours()]
-    assert names == ["settle", "guards", "party_order", "post_talk_settle", "readiness", "anomaly_wait", "replay_interrupt", "already_out", "battle_yesno", "battle_text_wait", "battle", "switch_out", "catch", "battle_moves", "cave_escape", "cave_topup", "use_items",
+    assert names == ["settle", "guards", "party_order", "post_talk_settle", "readiness", "anomaly_wait", "replay_interrupt", "already_out", "battle_yesno", "battle_text_wait", "battle", "switch_out", "catch", "battle_moves", "after_victory", "cave_escape", "cave_topup", "use_items",
                      "naming_keyboard", "beat_start", "box_settle", "advance_dialog", "menu", "procedures", "goto", "replay_beat",
-                     "stall_guard", "heal", "restock", "use_items", "goal_talk", "grind_drill", "explore_burst", "pickup", "plan_goal", "learner_hunt", "team_hunt", "trainer_hunt", "frontier"]
+                     "stall_guard", "heal", "restock", "use_items", "goal_talk", "grind_drill", "explore_burst", "pickup", "plan_goal", "learner_hunt", "team_hunt", "trainer_hunt", "procedure_runner", "frontier"]
     assert no_press("x").button == ""
 
 
@@ -260,7 +260,7 @@ def test_explorer_package_layering_and_size():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
-    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names"}  # segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress)
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names", "procedures"}  # segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress); procedures: the goal-procedure schema/rules the runner and after_victory read
     for f in root.rglob("*.py"):
         assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
