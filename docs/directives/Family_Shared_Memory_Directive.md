@@ -204,3 +204,17 @@ Findings first: the observed split of `ledge_exact`, `ledge_row`, `plain` wall c
 - Exec(git diff)
 - Exec(git grep)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-08 17:54 · robert-claude-laptop · none → Queued — Approved by Robert 2026-11-08: gen1-pokemon shared memory with minimal per-game overlay; plan phase 4b, after phase 4 and the compat check
+<!-- queue:end -->
