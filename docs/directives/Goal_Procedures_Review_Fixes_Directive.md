@@ -92,10 +92,10 @@ you could not do.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goal-procedures-review-fixes-directive |
-| Base branch | - |
+| Base branch | directive/pokeagent-goal-procedures-directive |
 | Base commit | c04c8c9f091022bba1911d981183d8941a650c6d |
 
 **Status log**
@@ -105,4 +105,5 @@ you could not do.
 - 2026-11-07 20:49 · dispatcher · launched pid=26948; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-review-fixes-directive; provisioned: uv sync --frozen
 - 2026-11-07 20:50 · devin · In progress → Blocked — git merge origin/directive/pokeagent-goal-procedures-directive refused by the run's permissions (git merge/rebase/stash are refused); branch is still plain main a69a759 and none of PR #162's files (procedures/, behaviours/after_victory.py) exist to fix. Run needs merge permission for this step or a dispatcher-side pre-merge.
 - 2026-11-07 20:57 · robert-claude-laptop · Blocked → Queued — Requeue: PR #162's branch now has main merged (d8e701b, context fields moved to procedures/state.py = finding 3 done); run starts FROM that branch (approve with base_branch) since the sandbox refuses git merge
+- 2026-11-07 20:57 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; requeued with the PR branch (main already merged in) as base because the sandbox refuses git merge
 <!-- queue:end -->
