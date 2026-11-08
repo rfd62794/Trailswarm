@@ -100,7 +100,7 @@ Expected: no new failures against main's tail; ROM-gated tests skip in this work
 
 A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitignored), so every ROM-gated test skips there and a green Devin run proves nothing about real emulation. Claude runs in a fresh worktree of the PR head with `roms/` and `baselines/` junctioned in:
 
-1. `uv run python tools/golden_trace.py` twice: identical transitions both times and identical to the same command on the base commit. This is the gate: a difference rejects the PR.
+1. `uv run pytest -q tests/test_golden_red.py`. This is the gate: a changed hash rejects the PR. It skips in a dispatch worktree because the ROM and baselines are absent; report it as NOT run, not as passed. Claude's ROM-present check runs it before merge. The recorded hash must not change (a deliberate change re-records it from a base-commit run in the same PR). The test relies on the default `roms/Pokemon Red.gb` path, so keep that default for Red.
 2. `uv run pytest -q` with the ROM present: the passed and skipped counts equal base, in particular `tests/test_frame_slots.py`, `tests/test_emulator.py`, `tests/test_atlas_rom.py`, `tests/test_walkgrid.py`, `tests/test_world_view.py`.
 3. `uv run pokeagent check-rom` output equals the base commit's, byte for byte.
 4. A viewer-side spot check that a published frame slot is the same size as before: `uv run pytest -q tests/test_frame_slots.py` with the ROM, plus one `pokeagent world --png out.png --scale 0.25` run compared pixel-for-pixel with the base commit's output (the ROM-path edits in `world/` must not change the render).
@@ -127,7 +127,7 @@ A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitig
 
 ## Report
 
-Diff stat, test tails, both grep outputs, the new files' line counts, which module-level names kept their old name and how each is now assigned, any existing test you had to edit (file and lines), and a plain statement that the golden trace, the ROM-present suite and the `world --png` comparison were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
+Diff stat, test tails, both grep outputs, the new files' line counts, which module-level names kept their old name and how each is now assigned, any existing test you had to edit (file and lines), and a plain statement that `tests/test_golden_red.py` (skipped), the ROM-present suite and the `world --png` comparison were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
 
 ## Forbidden Actions
 

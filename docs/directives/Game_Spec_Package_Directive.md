@@ -96,7 +96,7 @@ Expected: no new failures against main's tail; ROM-gated tests skip in this work
 
 A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitignored), so every ROM-gated test skips there and a green Devin run proves nothing about real emulation. After the PR is up, Claude runs in the main checkout (which has both), on the PR head sha in a fresh worktree with `roms/` and `baselines/` made available by junction:
 
-1. `uv run python tools/golden_trace.py` twice. Expected: identical transitions both times, and identical to the same command on the base commit (the golden trace; a difference means this phase changed Red's behaviour and the PR is rejected).
+1. `uv run pytest -q tests/test_golden_red.py` (the Red golden guard; a changed hash means this phase changed Red's behaviour and the PR is rejected). It skips in a dispatch worktree because the ROM and baselines are absent; report it as NOT run, not as passed. Claude's ROM-present check runs it before merge. The recorded hash must not change (a deliberate change re-records it from a base-commit run in the same PR).
 2. `uv run pokeagent check-rom` with the real Red ROM. Expected: output identical to the base commit's output (`size:`, `sha1:`, `match`, and the boot line).
 3. `uv run pokeagent check-rom --game pokemon-red` equals (2); `POKEAGENT_GAME=nonsense uv run pokeagent check-rom` exits 2 with the known-keys message.
 4. The ROM-gated tests: `uv run pytest -q` in the main checkout; compare the passed and skipped counts with base.
@@ -121,7 +121,7 @@ A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitig
 
 ## Report
 
-Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the line count of each new file, and a plain statement that the golden trace and the real `check-rom` were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
+Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the line count of each new file, and a plain statement that `tests/test_golden_red.py` (skipped) and the real `check-rom` were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
 
 ## Forbidden Actions
 
@@ -132,7 +132,7 @@ Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the 
 
 ## Required from User
 
-- None for the run. The ROM-gated golden-trace check after the run is Claude's verify lane, not Robert's.
+- None for the run. The ROM-gated `tests/test_golden_red.py` check after the run is Claude's verify lane, not Robert's.
 - Sequencing: this is the first of three game-framework directives; `Game_Spec_Rom_Screen_Buttons_Directive.md` must not be approved until this one is merged.
 
 ## Sandbox needs

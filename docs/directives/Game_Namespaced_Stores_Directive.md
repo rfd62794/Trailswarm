@@ -92,7 +92,7 @@ Expected: no new failures against main's tail; ROM-gated tests skip in this work
 
 A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitignored), so every ROM-gated test skips there and a green Devin run proves nothing about real emulation. Claude runs in a fresh worktree of the PR head with `roms/` and `baselines/` junctioned in:
 
-1. `uv run python tools/golden_trace.py` twice: identical transitions both times and identical to the same command on the base commit. This is the gate: a difference means Red's store paths or state loading changed and the PR is rejected.
+1. `uv run pytest -q tests/test_golden_red.py`. This is the gate: a changed hash means Red's store paths or state loading changed and the PR is rejected. It skips in a dispatch worktree because the ROM and baselines are absent; report it as NOT run, not as passed. Claude's ROM-present check runs it before merge. The recorded hash must not change (a deliberate change re-records it from a base-commit run in the same PR). The test reads `runs/explore-*` under its scratch dir, and Red stays on today's paths.
 2. Load every existing checkpoint under `runs/checkpoints` and `runs/legs/states` through a Red emulator (`uv run pokeagent states list` or the `statescmd` check the repo already has, with the ROM): all must still load (they are unlabeled, accepted for Red), none may raise `StateGameMismatch`.
 3. Write one new state with `write_state` under Red and confirm its sidecar has `"game_key": "pokemon-red"` and loads back.
 4. Negative check with the ROM: hand-edit a COPY of a sidecar (in a temp dir, not under `runs/`) to `"game_key": "other"` and confirm the load is refused with the message naming both keys and the emulator state is unchanged.
@@ -119,7 +119,7 @@ A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitig
 
 ## Report
 
-Diff stat, test tails, the grep output, the new files' line counts, the list of executable `runs/` paths you found and deliberately left (with a one-line reason each), any existing test edited (file and lines), the exact refusal message text, and a plain statement that the golden trace, the existing-state load check and the ROM-present suite were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
+Diff stat, test tails, the grep output, the new files' line counts, the list of executable `runs/` paths you found and deliberately left (with a one-line reason each), any existing test edited (file and lines), the exact refusal message text, and a plain statement that `tests/test_golden_red.py` (skipped), the existing-state load check and the ROM-present suite were NOT run (no ROM in the worktree) and are owed by the Claude verify lane.
 
 ## Forbidden Actions
 
