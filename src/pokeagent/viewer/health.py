@@ -184,7 +184,9 @@ class HealthStore:
                     done["stalls"] = mt["stalls"]
             elif mt["stalls"] is not None:
                 done["stalls"] = mt["stalls"]
-            if (mt["anomalies"] is not None and mt["anomalies"] != old.get("anomalies")) or                (mt["jsonl"] is not None and mt["jsonl"] != old.get("jsonl")):
+            anomalies_changed = mt["anomalies"] is not None and mt["anomalies"] != old.get("anomalies")
+            jsonl_changed = mt["jsonl"] is not None and mt["jsonl"] != old.get("jsonl")
+            if anomalies_changed or jsonl_changed:
                 ok, anomalies = self._read("anomalies", anomalies_for, root)
                 if ok:
                     done["anomalies"], done["jsonl"] = mt["anomalies"], mt["jsonl"]
