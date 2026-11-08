@@ -154,4 +154,5 @@ Diff stat, test tails, wc -l line, constants chosen, what Robert should look at 
 - 2026-11-07 21:26 · robert-claude-laptop · none → Queued — Robert approved the efficiency program 2026-11-07; viewer-only, independent of Perf_Baseline
 - 2026-11-07 21:27 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert approved the efficiency program
 - 2026-11-07 21:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WFQRA69R6M2BFF5DD4SB9Z
+- 2026-11-07 21:32 · dispatcher · launched pid=2384; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
