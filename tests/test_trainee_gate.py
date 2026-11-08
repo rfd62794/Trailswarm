@@ -10,8 +10,8 @@ from pokeagent.explorer.economy import outside_use
 from pokeagent.explorer.economy.prices import REVIVE
 from pokeagent.explorer.memory import MapMemory
 from pokeagent.explorer.status_care import trainee_eligible as elig
-from pokeagent.explorer.status_care import MonStatus
-from pokeagent.explorer.trainee_gate import trainee_ok
+from pokeagent.explorer.status_care import MonStatus, of
+from pokeagent.explorer.trainee_gate import trainee_check, trainee_ok
 
 
 def M(slot, hp, mx=40, kinds=frozenset()):
@@ -69,14 +69,15 @@ def test_fainted_trainee_sets_heal_intent_logs_and_accounts(tmp_path, monkeypatc
     lines = []
     ctx.log = lambda t, tag=None: lines.append(t)
     e = trainee_ok(ctx)
-    assert not e.ok and e.fix == "center" and ctx.center_intent == "trainee_gate"
-    assert ctx.trainee_fainted_steps == 1
+    assert not e.ok and e.fix == "center" and of(ctx)["walk"] is not None      # a heal-walk request, not center_intent
+    assert of(ctx)["fainted_steps"] == 1
     assert any("trainee fainted: no exp" in l and "slot 1" in l for l in lines)  # no ROM tables: species logs as 0x85
-    row = json.loads((tmp_path / "status_care.jsonl").read_text().splitlines()[-1])
+    rows = [json.loads(l) for l in (tmp_path / "status_care.jsonl").read_text().splitlines()]
+    row = next(r for r in rows if r["event"] == "trainee_fainted")
     assert row["event"] == "trainee_fainted" and row["slot"] == 1 and row["provenance"] == "unknown"
     ctx.step += 1                                                        # same faint, next step: counted, not re-logged
     trainee_ok(ctx)
-    assert ctx.trainee_fainted_steps == 2 and len([l for l in lines if "trainee fainted" in l]) == 1
+    assert of(ctx)["fainted_steps"] == 2 and len([l for l in lines if "trainee fainted" in l]) == 1
 
 
 def test_fainted_trainee_far_from_a_center_requests_the_revive(tmp_path, monkeypatch):
@@ -88,7 +89,7 @@ def test_fainted_trainee_far_from_a_center_requests_the_revive(tmp_path, monkeyp
     monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: None)
     e = trainee_ok(ctx)
     assert not e.ok and e.fix == "revive" and ctx.center_intent is None
-    assert ctx.status_care["request"] == (REVIVE, 1)                     # StatusCare uses it on that slot
+    assert of(ctx)["request"] == (REVIVE, 1)                     # StatusCare uses it on that slot
 
 
 def test_grind_drill_never_starts_with_a_fainted_trainee(tmp_path, monkeypatch):
@@ -110,3 +111,26 @@ def test_fainted_trainee_produces_no_training_progress():
     gained = [{"step": 1, "party": [[153, 14, 500, 30, 40], [133, 5, 100, 0, 17]]},
               {"step": 2, "party": [[153, 14, 500, 30, 40], [133, 6, 160, 10, 19]]}]
     assert training_progress(gained) is True
+
+
+def test_trainee_check_is_pure_and_skips_the_path_search_for_a_healthy_trainee(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: calls.append(1) or (160, 0, 0x40))
+    ok = karp_ctx(tmp_path, hp=10)
+    assert trainee_check(ok).ok and calls == []                          # alive + unpoisoned: no walk computed
+    sick = karp_ctx(tmp_path, hp=0)
+    before = dict(of(sick))
+    assert not trainee_check(sick).ok and not trainee_check(sick).ok
+    assert of(sick) == before and sick.center_intent is None and not (tmp_path / "status_care.jsonl").exists()
+
+
+def test_plan_goal_stands_down_for_a_fainted_trainee_with_a_heal_walk(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    ctx = karp_ctx(tmp_path, hp=0)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 10, 0, 0x40))
+    ctx.mem.data["maps"] = {"14": {"visited": {"5,6": 1, "5,7": 1}, "blocked": [], "warps": {"5,7,DOWN": [0x40, 3, 7]}}}
+    assert PlanGoal().step(ctx) is None                                  # no training decision for a fainted trainee
+    assert of(ctx)["walk"] is not None                                   # and the heal walk is what is pending
+    ctx2 = karp_ctx(tmp_path / "b", hp=10)                               # a healthy trainee: no walk requested
+    PlanGoal().step(ctx2)
+    assert of(ctx2).get("walk") is None

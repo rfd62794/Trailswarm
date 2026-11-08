@@ -10,9 +10,12 @@ checkpoint file: a gap in the chain proves it was reached out of order.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Callable, Iterable
+
+_log = logging.getLogger(__name__)
 
 SUFFIX = ".goals.json"
 
@@ -68,6 +71,16 @@ def read_completed(state: Path) -> set[str] | None:
         return None
 
 
+_LINEAGE_LOGGED: set[str] = set()
+
+
+def _lineage_note(key: str, text: str) -> None:
+    """One log line per distinct reason per process: the provenance read is per run, not per step."""
+    if key not in _LINEAGE_LOGGED:
+        _LINEAGE_LOGGED.add(key)
+        _log.warning("%s", text)
+
+
 def start_lineage(state_path) -> str:
     """Record provenance for a run (the standing rule): the start state's lineage - 'organic' | 'synthetic' |
     'unknown' when there is no state or no lineage record, never guessed. A 'promoted' start counts as organic
@@ -75,9 +88,12 @@ def start_lineage(state_path) -> str:
     try:
         from pokeagent import statefp
         fp = statefp.read(Path(state_path)) if state_path else None
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _lineage_note("error", f"start_lineage: statefp read failed ({exc!r}): provenance 'unknown'")
         return "unknown"
     if fp is None:
+        if state_path:
+            _lineage_note("norecord", f"start_lineage: no readable fingerprint beside {state_path}: provenance 'unknown'")
         return "unknown"
     return {"organic": "organic", "synthetic": "synthetic", "promoted": "organic"}.get(statefp.lineage_of(fp), "unknown")
 

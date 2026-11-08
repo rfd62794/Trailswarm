@@ -9,6 +9,7 @@ from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
 from pokeagent.explorer.economy import outside_use
 from pokeagent.explorer.economy.prices import ANTIDOTE
 from pokeagent.explorer.memory import MapMemory
+from pokeagent.explorer.status_care import of
 
 MAP, PX, PY, BATTLE = 0xD35E, 0xD362, 0xD361, 0xD057
 COUNT, MON1, SIZE = 0xD163, 0xD16B, 44
@@ -58,12 +59,49 @@ def test_applies_only_for_a_poisoned_member_out_of_battle(tmp_path):
     assert not StatusCare().applies(ctx)
 
 
-def test_walk_row_sets_center_intent(tmp_path, monkeypatch):
+def _road_to_center(ctx):
+    """Map 0x0D with a visited road tile and a recorded warp (5,7) DOWN into a Pokecenter (map 0x40)."""
+    ctx.mem.data["maps"] = {"13": {"visited": {"5,6": 1, "5,7": 1}, "blocked": [], "warps": {"5,7,DOWN": [0x40, 3, 7]}}}
+
+
+def test_walk_row_requests_a_heal_walk_that_presses_toward_the_center(tmp_path, monkeypatch):
     ctx = poison_ctx(tmp_path)       # hp 5 -> 17 steps to faint
     monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
+    _road_to_center(ctx)
     b = StatusCare()
-    assert b.applies(ctx) and b.step(ctx) is None
-    assert ctx.center_intent == "status_care"
+    assert b.applies(ctx)
+    d = b.step(ctx)
+    assert d is not None and d.button == "DOWN" and d.rule == "heal_walk"     # a real press toward the nurse
+    assert of(ctx)["walk"] is not None and ctx.center_intent is None
+    # the request survives: PlanGoal-free steps keep walking; the next step, one tile on, presses on
+    ctx.emu.set(PY, 7)
+    ctx.refresh()
+    assert b.applies(ctx) and b.step(ctx).button == "DOWN"
+    ctx.view.m = 0x40                                          # inside the center: cross to x=3 (we stand at x=5)
+    d = b.step(ctx)
+    assert d.button == "LEFT" and ctx.center_intent == "status_care"
+
+
+def test_heal_walk_is_abandoned_with_a_logged_reason_when_no_route_is_known(tmp_path, monkeypatch):
+    ctx = poison_ctx(tmp_path)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
+    lines = []
+    ctx.log = lambda t, tag=None: lines.append(t)
+    b = StatusCare()
+    assert b.step(ctx) is None and of(ctx).get("walk") is None          # no graph: abandoned, not stuck
+    assert any("abandoned" in l and "no known route" in l for l in lines)
+    from pokeagent.explorer import heal_walk
+    assert not heal_walk.start(ctx, "again")                            # cooling down: no restart loop
+
+
+def test_walk_ends_when_the_party_is_healed(tmp_path, monkeypatch):
+    ctx = poison_ctx(tmp_path)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
+    _road_to_center(ctx)
+    b = StatusCare()
+    b.step(ctx)
+    ctx.emu.set(MON1 + 4, 0)                                   # the nurse cured the poison
+    assert b.step(ctx) is None and of(ctx).get("walk") is None
 
 
 def test_poison_ok_row_is_quiet_and_logs_once_per_change(tmp_path, monkeypatch):
@@ -72,7 +110,7 @@ def test_poison_ok_row_is_quiet_and_logs_once_per_change(tmp_path, monkeypatch):
     lines = []
     ctx.log = lambda t, tag=None: lines.append(t)
     b = StatusCare()
-    assert b.step(ctx) is None and ctx.center_intent is None
+    assert b.step(ctx) is None and ctx.center_intent is None and of(ctx).get("walk") is None
     ctx.step += 99
     assert b.step(ctx) is None
     assert len([l for l in lines if "status_care" in l]) == 1        # one line per change, not per step
@@ -84,16 +122,16 @@ def _seq_ctx(tmp_path, antidotes=1):
     mem[0xD31D] = 1
     mem[0xD31E], mem[0xD31F] = ANTIDOTE, antidotes
     ctx = make_ctx(tmp_path, mem)
-    ctx.status_care["sig"] = (8,)    # pretend the poison was just seen
+    of(ctx)["sig"] = (8,)    # pretend the poison was just seen
     return ctx
 
 
 def test_verify_after_use_clears_on_the_status_byte(tmp_path):
     ctx = _seq_ctx(tmp_path)
-    ctx.status_care["seq"] = {"item": ANTIDOTE, "slot": 0, "presses": 3, "tries": 0, "bag0": 1, "used_at": None}
+    of(ctx)["seq"] = {"item": ANTIDOTE, "slot": 0, "presses": 3, "tries": 0, "bag0": 1, "used_at": None}
     ctx.emu.set(0xD31F, 0)           # the Antidote left the bag
     ctx.emu.set(MON1 + 4, 0)         # ... and the poison bit cleared
-    assert StatusCare().step(ctx) is None and ctx.status_care["seq"] is None
+    assert StatusCare().step(ctx) is None and of(ctx)["seq"] is None
 
 
 def test_a_failed_antidote_use_is_retried_at_most_max_tries(tmp_path, monkeypatch):
@@ -102,17 +140,49 @@ def test_a_failed_antidote_use_is_retried_at_most_max_tries(tmp_path, monkeypatc
     b = StatusCare()
     for i in range(MAX_TRIES):
         d = b.step(ctx)              # starts the sequence (rope_press: empty screen -> START)
-        assert d is not None and ctx.status_care["seq"] is not None
+        assert d is not None and of(ctx)["seq"] is not None
         for _ in range(MAX_PRESSES):
             d = b.step(ctx)
-        assert ctx.status_care["seq"] is None and ctx.status_care["tries"] == i + 1
-    assert ctx.status_care["items_out"]                               # written off for this poisoning
-    assert ctx.center_intent == "status_care"                         # falls back to the nurse walk
+        assert of(ctx)["seq"] is None and of(ctx)["tries"] == i + 1
+    assert of(ctx)["items_out"]                               # written off for this poisoning
+    assert of(ctx)["walk"] is not None                                # falls back to the nurse walk
+
+
+def test_applies_is_a_pure_read(tmp_path, monkeypatch):
+    ctx = poison_ctx(tmp_path)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
+    before = dict(of(ctx))
+    b = StatusCare()
+    assert b.applies(ctx) and b.applies(ctx)
+    assert of(ctx) == before and not (tmp_path / "status_care.jsonl").exists()
 
 
 def test_decision_row_written_with_provenance(tmp_path, monkeypatch):
     ctx = poison_ctx(tmp_path)
     monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
     StatusCare().step(ctx)
-    row = json.loads((tmp_path / "status_care.jsonl").read_text().splitlines()[-1])
-    assert row["event"] == "decision" and row["action"] == "walk_to_center" and row["provenance"] == "unknown"
+    rows = [json.loads(l) for l in (tmp_path / "status_care.jsonl").read_text().splitlines()]
+    row = next(r for r in rows if r["event"] == "decision")             # (then the walk is abandoned: no graph here)
+    assert row["action"] == "walk_to_center" and row["provenance"] == "unknown"
+
+
+def test_record_row_failure_is_logged_once(tmp_path, caplog):
+    from pokeagent.explorer.status_care import record_row
+    ctx = poison_ctx(tmp_path)
+    ctx.run_dir = tmp_path / "missing" / "dir"                       # the append fails: no such directory
+    with caplog.at_level("WARNING"):
+        record_row(ctx, {"event": "x"})
+        record_row(ctx, {"event": "y"})
+    assert sum("status_care.jsonl row not written" in r.message for r in caplog.records) == 1
+
+
+def test_status_bits_come_from_catch_math_and_start_lineage_says_why(tmp_path, caplog):
+    from pokeagent import checkpoint_goals as cg
+    from pokeagent.explorer.status_care import status_kinds
+    from pokeagent.knowledge import catch_math as cm
+    assert status_kinds(cm.PSN_BIT) == frozenset({"poison"}) and status_kinds(cm.PAR_BIT) == frozenset({"paralysis"})
+    cg._LINEAGE_LOGGED.clear()
+    with caplog.at_level("WARNING"):
+        assert cg.start_lineage(tmp_path / "none.state") == "unknown"
+        assert cg.start_lineage(tmp_path / "none.state") == "unknown"
+    assert sum("no readable fingerprint" in r.message for r in caplog.records) == 1

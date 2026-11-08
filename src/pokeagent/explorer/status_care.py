@@ -12,14 +12,19 @@ UNVERIFIED Gen 1 facts (from memory of pokered; ONE helper each so the controlle
 from __future__ import annotations
 
 import json
+import logging
 import math
 from dataclasses import dataclass
 from pathlib import Path
 
 from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, HEAL_HP, POTION, REVIVE, SUPER_POTION, price
 from pokeagent.knowledge import encounters
+from pokeagent.knowledge.catch_math import BRN_BIT, FRZ_BIT, PAR_BIT, PSN_BIT, SLP_MASK
 from pokeagent.knowledge.kb import table
 
+log = logging.getLogger(__name__)
+
+MAX_TRIES = 2                    # failed item uses before the item is written off for this episode (untuned first value)
 POISON_STEPS_PER_HP = 4          # UNVERIFIED (from memory of pokered ApplyOutOfBattlePoisonDamage): 1 HP per 4 walked tiles
 POISON_BATTLE_FRACTION = 1 / 16  # UNVERIFIED: in-battle poison/burn tick share of max HP (not used here; battle owns it)
 CARE_MARGIN_STEPS = 8            # extra steps of slack before the nearest known heal (untuned first value)
@@ -55,15 +60,22 @@ class Eligibility:
 
 
 def status_kinds(byte: int) -> frozenset[str]:
-    """The party-struct status byte -> the status names on it. UNVERIFIED decode (from memory of pokered):
-    sleep = low 3 bits (a counter 1..7), poison bit 3, burn bit 4, freeze bit 5, paralysis bit 6."""
+    """The party-struct status byte -> the status names on it (all of them, unlike catch_math.status_kind's
+    one). The bit constants are catch_math's, so verifying them there fixes both: sleep = low 3 bits (a counter
+    1..7), poison, burn, freeze, paralysis ("paralysis" here, "paralyse" in catch_math). UNVERIFIED (pokered)."""
     kinds = set()
-    if byte & 0x07:
+    if byte & SLP_MASK:
         kinds.add("sleep")
-    for bit, name in ((0x08, "poison"), (0x10, "burn"), (0x20, "freeze"), (0x40, "paralysis")):
+    for bit, name in ((PSN_BIT, "poison"), (BRN_BIT, "burn"), (FRZ_BIT, "freeze"), (PAR_BIT, "paralysis")):
         if byte & bit:
             kinds.add(name)
     return frozenset(kinds)
+
+
+def of(ctx) -> dict:
+    """The run's status-care state dict ({seq, request, walk, sig, next_check, last, tries, items_out, ...}),
+    held on the context's __dict__ (not a dataclass field: context.py is at its line ceiling)."""
+    return ctx.__dict__.setdefault("_status_care", {})
 
 
 def steps_to_faint(hp: int, per_hp: int = POISON_STEPS_PER_HP) -> int:
@@ -181,11 +193,13 @@ def record_row(ctx, row: dict) -> None:
                "provenance": provenance(ctx), **row}
         with (ctx.run_dir / "status_care.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec) + "\n")
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001  a failed row never ends a run, but it is said once
+        if not of(ctx).get("row_warned"):
+            of(ctx)["row_warned"] = True
+            log.warning("status_care.jsonl row not written: %r (further failures suppressed)", exc)
 
 
 __all__ = ["MonStatus", "CareDecision", "Eligibility", "POISON_STEPS_PER_HP", "POISON_BATTLE_FRACTION",
            "CARE_MARGIN_STEPS", "ANTIDOTE_FLOOR", "POISON_LOOKAHEAD", "TRAINEE_MIN_SAFE_STEPS",
-           "REVIVE_BEATS_WALK_STEPS", "ITEM_NAME", "status_kinds", "steps_to_faint", "decide",
+           "REVIVE_BEATS_WALK_STEPS", "ITEM_NAME", "status_kinds", "of", "steps_to_faint", "decide",
            "poisoners_on", "poison_ahead", "trainee_eligible", "provenance", "record_row"]

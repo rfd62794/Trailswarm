@@ -5,26 +5,30 @@ walk to the nearest known Pokecenter (economy.outside_use.walk_to_center, in FRA
 field-Potion machinery (cave_escape.rope_press -> item_use.item_step), which CAN target a party slot
 (``party_target``): START -> ITEM -> scroll to the item -> USE -> pick the poisoned slot. A used cure must VERIFY:
 the poison bit clears within VERIFY_STEPS presses of the item leaving the bag, and a failed use is not retried past
-MAX_TRIES (then the walk fallback applies). ``walk_to_center`` sets ``ctx.center_intent`` exactly as the directive
-asks - the planner's heal path owns the nurse walk (nothing else). Never inside a battle (battle poison is the
-battle behaviours'), never while a boss segment's fight step runs (ctx.proc / battling guards).
+MAX_TRIES (then the walk fallback applies). The walk is explorer.heal_walk: a request kept in the status-care
+state that THIS behaviour carries out press by press (it runs before PlanGoal) until the nurse has healed the party or
+the walk is abandoned with a logged reason. (``ctx.center_intent`` only means "inside a center on purpose"; PlanGoal
+clears it on the road, so it cannot carry a request.) ``applies`` is a pure read; every action lives in ``step``.
+Never inside a battle (battle poison is the battle behaviours'), never while a boss segment's fight step runs
+(ctx.proc / battling guards).
 """
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.cave_escape import rope_press
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer import heal_walk
 from pokeagent.explorer.economy import outside_use
 from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, HEAL_HP, REVIVE
-from pokeagent.explorer.status_care import (ITEM_NAME, CareDecision, MonStatus, decide, record_row, status_kinds,
-                                            steps_to_faint)
+from pokeagent.explorer.status_care import (ITEM_NAME, MAX_TRIES, CareDecision, MonStatus, decide, of, record_row,
+                                            status_kinds, steps_to_faint)
+from pokeagent.explorer.trainee_gate import trainee_check, trainee_ok
 from pokeagent.goals import bag_contents
 from pokeagent.legs import grid as G
 from pokeagent.ramstructs import read_party
 
 RECHECK_EVERY = 10   # steps between care re-evaluations while a member is poisoned (untuned first value)
 VERIFY_STEPS = 20    # presses after the item left the bag in which the poison bit (or HP for a Revive) must move
-MAX_TRIES = 2        # failed item uses before the item is written off for this poisoning episode
 MAX_PRESSES = 60     # one use sequence's press budget (a party pick is ~15 presses)
 
 
@@ -41,30 +45,43 @@ class StatusCare(BehaviourBase):
     name = "status_care"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        st = ctx.status_care
+        """Pure read. Walk / sequence / request in flight own the screen; else a poison to care for or an
+        ineligible trainee (whose gate actions run in step)."""
+        st = of(ctx)
         if ctx.view.battling or ctx.in_battle:
-            st["seq"] = None   # a fight interrupted the sequence: drop it, re-evaluate after the battle
-            return False
-        if st.get("seq") is not None or st.get("request") is not None:
-            return True        # a started sequence (or a trainee_gate cure request) owns the screen until it ends
+            return False       # a fight interrupted the sequence: step drops it after the battle
+        if st.get("seq") is not None or st.get("request") is not None or st.get("walk") is not None:
+            return True        # a started sequence, a cure request or a heal walk owns the screen until it ends
         if ctx.view.box or ctx.proc is not None or ctx.center_intent is not None:
             return False
-        sig = tuple(p.status for p in read_party(ctx.emu))
-        if sig != st.get("sig"):   # a status change re-evaluates at once (a poison appearing)
-            st["sig"], st["items_out"], st["tries"] = sig, False, 0
+        if not trainee_check(ctx).ok:
+            return True
         if not any("poison" in status_kinds(p.status) for p in read_party(ctx.emu) if p.hp > 0):
             return False
-        return ctx.step >= st.get("next_check", 0)
+        sig = tuple(p.status for p in read_party(ctx.emu))
+        return sig != st.get("sig") or ctx.step >= st.get("next_check", 0)   # a status change re-evaluates at once
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        st = ctx.status_care
+        st = of(ctx)
+        seq = st.get("seq")
+        if seq is not None and seq.get("battle", ctx.battles) != ctx.battles:
+            st["seq"] = seq = None   # a fight interrupted the sequence: drop it, re-evaluate
+        if seq is None and st.get("walk") is None:
+            trainee_ok(ctx)          # the gate's actions (counters, log row, heal walk / cure request) live here
         if st.get("seq") is not None:
             return self._use(ctx, st, st["seq"])
         req = st.pop("request", None)
         if req is not None:   # trainee_gate asked for a cure on a specific slot (a Revive or an Antidote)
-            st["seq"] = {"item": req[0], "slot": req[1], "presses": 0, "tries": st.get("tries", 0),
+            st["seq"] = {"item": req[0], "slot": req[1], "presses": 0, "tries": st.get("tries", 0), "battle": ctx.battles,
                          "bag0": bag_contents(ctx.emu).get(req[0], 0), "used_at": None}
             return self._use(ctx, st, st["seq"])
+        if st.get("walk") is not None:
+            return heal_walk.step(ctx)
+        sig = tuple(p.status for p in read_party(ctx.emu))
+        if sig != st.get("sig"):
+            st["sig"], st["items_out"], st["tries"] = sig, False, 0
+        if not any("poison" in status_kinds(p.status) for p in read_party(ctx.emu) if p.hp > 0):
+            return None
         party = _rows(ctx.emu)
         steps = _heal_steps(ctx)
         dec = decide(party, bag_contents(ctx.emu), steps)
@@ -82,10 +99,10 @@ class StatusCare(BehaviourBase):
                              "species": worst.slot, "hp": worst.hp, "max_hp": worst.max_hp,
                              "steps_to_faint": steps_to_faint(worst.hp), "steps_to_heal": steps})
         if dec.action == "walk_to_center":
-            ctx.center_intent = "status_care"   # the same field the heal path honours; nothing else
-            return None
+            heal_walk.start(ctx, f"status_care: {dec.why}")   # a request that outlives PlanGoal steps
+            return heal_walk.step(ctx)
         if dec.action in ("antidote", "potion") and dec.slot is not None and dec.item is not None:
-            st["seq"] = {"item": dec.item, "slot": dec.slot, "presses": 0, "tries": st.get("tries", 0),
+            st["seq"] = {"item": dec.item, "slot": dec.slot, "presses": 0, "tries": st.get("tries", 0), "battle": ctx.battles,
                          "bag0": bag_contents(ctx.emu).get(dec.item, 0), "used_at": None}
             return self._use(ctx, st, st["seq"])
         return None   # "none" or "nothing_available": logged once above; exploration continues (other guards own it)
@@ -127,7 +144,7 @@ class StatusCare(BehaviourBase):
         if st["tries"] >= MAX_TRIES:
             st["items_out"] = True   # write the item off for this poisoning: the next decision walks instead
             if _heal_steps(ctx) is not None:
-                ctx.center_intent = "status_care"
+                heal_walk.start(ctx, "status_care: item use failed")
         ctx.log(f"[status_care: {why} ({st['tries']}/{MAX_TRIES})]", "res")
         return Decision("B", "status_care_fail", f"status care: {why}; backing out")
 
