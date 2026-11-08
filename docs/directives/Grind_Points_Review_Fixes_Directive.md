@@ -107,3 +107,17 @@ Expected: each under 300.
 
 Head sha, diff stat, wc -l line, test tails, the constants chosen, and whether `OutsideSet` now covers edge
 connections or only warps.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:40 · robert-claude-laptop · none → Queued — Review fixes for PR #165 (Sonnet: 1 blocker restart thrash + 8 should-fixes); approve with base_branch = the PR branch once the fixer's main merge is pushed
+<!-- queue:end -->
