@@ -1,16 +1,27 @@
 """``pokeagent review segments``: the segment scorecard - grades, effective shares, rejoin candidates.
 
 Reads runs/segments.json (and optionally ingests finished runs first), grades every segment through
-``pokeagent.segment_grades``, and returns one JSON-able dict the text renderer prints. Read-only on the
-checkout except the same ingest+save ``tools/segments.py`` already does (disable with --no-ingest).
+``pokeagent.segment_grades``, and returns one JSON-able dict the text renderer prints. Read-only on
+the checkout by default; --ingest opts into the same locked ingest+save the curriculum does.
 """
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+_log = logging.getLogger(__name__)
+_logged: set[str] = set()   # fallback messages already warned about: a frequent caller does not spam
+
+
+def _warn_once(msg: str) -> None:
+    """log.warning once per distinct message; a grade fallback keeps working but is never silent."""
+    if msg not in _logged:
+        _logged.add(msg)
+        _log.warning(msg)
 
 
 def _tools():
@@ -35,7 +46,8 @@ def _grids():
     try:
         from pokeagent.legs.grid import rom_grids
         return rom_grids()
-    except Exception:  # noqa: BLE001 - no ROM -> no par, never a crash
+    except Exception as e:  # noqa: BLE001 - rom_grids() is opaque (ROM decode): no ROM -> no par, never a crash
+        _warn_once(f"review segments: no ROM grids ({type(e).__name__}: {e})")
         return None
 
 
@@ -47,14 +59,18 @@ def _frontier(ss, root, doc):
     return None
 
 
-def summarise(root: Path, suite: str | None = None, do_ingest: bool = True, now: float | None = None) -> dict:
-    """The whole scorecard as JSON-able data. Raises ValueError on an unknown suite name."""
+def summarise(root: Path, suite: str | None = None, do_ingest: bool = False, now: float | None = None) -> dict:
+    """The whole scorecard as JSON-able data. Raises ValueError on an unknown suite name. Read-only
+    unless do_ingest: then the ingest runs under ss.locked, the same segments.json transaction the
+    curriculum's Curriculum.txn takes, so a supervisor's write is never clobbered."""
     sg, ss, seg_ingest, seg_hold, seg_split, seg_suites = _load_mods()
     root = Path(root)
     now = time.time() if now is None else now
-    doc = ss.load(root)
-    if do_ingest and seg_ingest.ingest(root, doc):
-        ss.save(root, doc)
+    if do_ingest:
+        with ss.locked(root) as doc:      # read-modify-write under the store lock, like Curriculum.txn
+            seg_ingest.ingest(root, doc)
+    else:
+        doc = ss.load(root)
     grades = sg.grade_all(doc, root, now, par_fn=sg.make_par_fn(root, _grids()),
                           hold_file=seg_hold.HoldFile(root))
     gmap = {g.key: g for g in grades}

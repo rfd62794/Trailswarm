@@ -1,4 +1,5 @@
 """segment_grades: solved/optimized/stale/broken/held flags, health, event rates, par."""
+import logging
 import sys
 from pathlib import Path
 
@@ -113,6 +114,33 @@ def test_health_and_event_rates():
     st["attempts"] = [att(True, frames=800)] * 20       # fields absent -> unknown, never guessed
     g = grade(doc)
     assert g.blackout_rate is None and g.stall_rate is None and g.loop_rate is None
+
+
+def test_event_rates_mean_over_attempts_carrying_the_field():
+    doc = ss.empty_doc()
+    st = st_for(doc)
+    st["attempts"] = ([att(True, frames=800)] * 10                          # old attempts: no field
+                      + [att(True, frames=800, blackouts=1, stalled=True, loops=0)] * 5
+                      + [att(True, frames=800, blackouts=0, stalled=False, loops=1)] * 5)
+    st["n"], st["solves"] = 20, 20
+    g = grade(doc)
+    assert g.blackout_rate == 0.5 and g.stall_rate == 0.5 and g.loop_rate == 0.5   # the 10 carriers, not all-or-nothing
+
+
+def test_par_fn_failure_is_logged_once_per_distinct_message(tmp_path, caplog):
+    doc = ss.empty_doc()
+    st = st_for(doc)
+    st["attempts"], st["n"], st["solves"] = [att(True)] * 20, 20, 20
+
+    def boom(seg, st):
+        raise ValueError("no par today")
+
+    sg._logged.clear()   # module-level seen-set: do not inherit messages from earlier tests
+    with caplog.at_level(logging.WARNING, logger="pokeagent.segment_grades"):
+        for _ in range(2):
+            grades = sg.grade_all(doc, tmp_path, NOW, par_fn=boom)
+            assert all(g.par is None for g in grades)              # fallback behaviour kept
+    assert sum("par_fn failed: ValueError: no par today" in r.message for r in caplog.records) == 1
 
 
 def test_start_grade_ok_missing_refusal(tmp_path):

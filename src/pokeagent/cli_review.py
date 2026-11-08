@@ -73,7 +73,7 @@ def _cmd_segments(args) -> int:
         return render.error(f"unreadable root: {root}", args.json)
     from pokeagent.review import segments as rseg
     try:
-        s = rseg.summarise(root, suite=args.suite, do_ingest=not args.no_ingest)
+        s = rseg.summarise(root, suite=args.suite, do_ingest=args.ingest)
     except ValueError as e:
         return render.error(str(e), args.json)
     render.emit(s, args.json, render.segments_text(s))
@@ -117,7 +117,8 @@ def _add_commands(rsub) -> None:
     g = rsub.add_parser("segments", help="segment scorecard: grades, effective shares, rejoin candidates")
     g.add_argument("--root", default=".", metavar="DIR", help="checkout root holding runs/ (default: cwd)")
     g.add_argument("--suite", default=None, metavar="NAME", help="only this suite's segments (runs/segment_sets.json)")
-    g.add_argument("--no-ingest", action="store_true", help="read runs/segments.json as it is; do not scan run folders")
+    g.add_argument("--ingest", action="store_true",
+                   help="scan run folders and update runs/segments.json under its lock first (default: read-only)")
     g.add_argument("--json", action="store_true")
     g.set_defaults(func=_cmd_segments)
 

@@ -215,13 +215,17 @@ def should_rejoin(doc: dict, goal: str, grades, pieces) -> bool:
 
 
 def reset(doc: dict, goals: list[str] | None = None) -> list[str]:
-    """Undo splits (all, or the named goals); the sub-segments' stats are dropped, the parent's history is kept."""
+    """Undo splits (all, or the named goals); the sub-segments' stats are dropped, the parent's history is kept.
+    The parent also earns a WINDOW cooldown: its window median may still exceed SPLIT_PAR_MULT x par, so without
+    split_retry_at the very next maybe_split would re-split it straight back (a rejoin flap)."""
     out = []
     for g in list(doc["splits"]):
         if goals is None or g in goals:
             del doc["splits"][g]
             for k in [k for k in doc["stats"] if k.startswith(f"{g}@")]:
                 del doc["stats"][k]
-            doc["stats"].get(g, {}).pop("split_retry_at", None)
+            st = doc["stats"].get(g)
+            if st is not None:
+                st["split_retry_at"] = st["n"] + WINDOW   # no re-split until WINDOW more attempts
             out.append(g)
     return out

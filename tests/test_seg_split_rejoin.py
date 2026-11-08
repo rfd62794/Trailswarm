@@ -100,6 +100,25 @@ def test_should_rejoin_and_reset(tmp_path):
     assert "to_route2" not in doc["splits"] and "to_route2@01" not in doc["stats"]
 
 
+def test_rejoin_does_not_flap_straight_back_to_a_split(tmp_path):
+    doc = ss.empty_doc()
+    _solved_pieces(doc)
+    pieces = [s for s in ss.layout(doc) if s.goal == "to_route2"]
+    grades = _grades_for(doc)
+    parent_st = ss.stat(doc, "to_route2")
+    parent_st["attempts"], parent_st["n"] = [att(True, frames=800, rejoin=True)] * 2, 20
+    assert seg_split.should_rejoin(doc, "to_route2", grades, pieces)
+    seg_split.reset(doc, ["to_route2"])
+    # the rejoined parent gets a WINDOW cooldown: its window median still beats 3x par, but the
+    # retry gate must stop maybe_split re-splitting it on the very next refresh
+    assert parent_st["split_retry_at"] == 20 + ss.WINDOW
+    parent_st["attempts"] = [att(True, frames=900)] * 20
+    assert not seg_split.should_split_long(parent_st, 200.0)          # 900 > 3x200 but gated
+    assert seg_split.maybe_split(doc, par_fn=lambda s, st_: 200.0) == []
+    parent_st["n"] = 20 + ss.WINDOW                                   # WINDOW more attempts later...
+    assert seg_split.should_split_long(parent_st, 200.0)              # ...the long-solve split may fire
+
+
 def test_rejoin_probe_job_tag_and_rate(tmp_path):
     # the parent segment's start is 'deliver_parcel': every earlier goal needs a checkpoint for it to be valid
     root = mkroot(tmp_path, ("bedroom", "potion", "left_house", "first_pokemon", "won_battle",

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import shutil
 import time
 from datetime import datetime
@@ -23,11 +24,11 @@ from typing import Callable
 import seg_hold
 import seg_ingest
 import seg_janitor
+import seg_sched_grades as ssg
 import seg_split
 import seg_store as ss
 from pokeagent import checkpoint_goals as cg
 from pokeagent import segment_grades as sg
-from pokeagent import statefp
 
 SHARE_UNSOLVED = 0.40
 SHARE_FRONTIER = 0.45
@@ -36,6 +37,16 @@ SHARES = {"unsolved": SHARE_UNSOLVED, "frontier": SHARE_FRONTIER, "polish": SHAR
 BUDGET_MULT, BUDGET_MIN, BUDGET_MAX, BUDGET_DEFAULT = 3, 1500, 6000, 3000
 POLISH_EXPLORE_RATE = 0.5
 CONFIRM_TRIES = 2
+
+_log = logging.getLogger(__name__)
+_logged: set[str] = set()   # fallback messages already warned about: a frequent caller does not spam
+
+
+def _warn_once(msg: str) -> None:
+    """log.warning once per distinct message; a grade fallback keeps working but is never silent."""
+    if msg not in _logged:
+        _logged.add(msg)
+        _log.warning(msg)
 
 
 def budget(st: dict) -> int:
@@ -67,20 +78,15 @@ class Curriculum:
     # --- grades & suites ------------------------------------------------------------------------------------
     def _resolve_suite(self, suite):
         """None, a suite NAME resolved through seg_suites, or a ready {key: starter} member map."""
-        if suite is None or isinstance(suite, dict):
-            return dict(suite) if suite is not None else None
-        import seg_suites
-        members = seg_suites.resolve(suite, self.doc, list(self._grade_map().values()), self.root, log=self.log)
-        if members is None:
-            raise ValueError(f"unknown or malformed suite {suite!r} (runs/segment_sets.json)")
-        return {m["key"]: m.get("starter") for m in members}
+        return ssg.resolve_suite(suite, self.doc, self.root, self._grade_map().values(), self.log)
 
     def _par(self, seg, st) -> float | None:
         if self._grids is False:
             try:
                 from pokeagent.legs.grid import rom_grids
                 self._grids = rom_grids()
-            except Exception:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - rom_grids() is opaque (ROM decode): no grids means no par, never a crash
+                _warn_once(f"curriculum: no ROM grids ({type(e).__name__}: {e})")
                 self._grids = None
         return sg.par_for_best(self.root, st, self._grids)
 
@@ -94,9 +100,6 @@ class Curriculum:
                 self.log(f"curriculum: grading skipped ({e!r})")
                 self._gm_warned = True
             return {}
-
-    def _in_suite(self, key: str) -> bool:
-        return self.suite is None or key in self.suite
 
     @contextlib.contextmanager
     def _guard(self, what: str):
@@ -131,119 +134,29 @@ class Curriculum:
             for g in seg_split.maybe_split(self.doc, root=self.root, par_fn=self._par):
                 self.log(f"curriculum: split {g} at maps {[hex(m) for m in self.doc['splits'][g]]}")
             if self.doc["splits"]:
-                gm = self._grade_map()
-                for goal in list(self.doc["splits"]):
-                    pieces = [s for s in ss.layout(self.doc) if s.goal == goal]
-                    if seg_split.should_rejoin(self.doc, goal, list(gm.values()), pieces):
-                        seg_split.reset(self.doc, [goal])
-                        self.log(f"curriculum: rejoined {goal} (pieces solved+optimized, probes within tolerance)")
+                for goal in ssg.rejoin_goals(self.doc, list(self._grade_map().values())):
+                    seg_split.reset(self.doc, [goal])
+                    self.log(f"curriculum: rejoined {goal} (pieces solved+optimized, probes within tolerance)")
 
     def _log_refusals(self, segs) -> None:
-        """Say once per checkpoint when a ship-stage state is skipped for a respawn behind Vermilion."""
-        for name in {s.start for s in segs} | {s.end for s in segs}:
-            why = ss.refusal(self.root, name)
-            if why and name not in self.refused:
-                self.refused.add(name)
-                self.log(f"curriculum: refusing checkpoint {name}: {why}; the frontier remakes it")
-
-    def groups(self) -> dict[str, list]:
-        self._log_refusals(ss.layout(self.doc))
-        segs = [s for s in ss.layout(self.doc)
-                if ss.ckpt_valid(self.root, s.start) and self._in_suite(s.key)]   # in-order checkpoints only
-        self._gm = self._grade_map()
-        st = lambda s: ss.stat(self.doc, s.key)  # noqa: E731
-        # effective-solved: a synthetic_only hypothesis is not a solve for the shares; a broken segment is
-        # work to redo (unsolved rotation), never polish. Without grade data every flag is off: today's behaviour.
-        def eff_solved(s):
-            g = self._gm.get(s.key)
-            return ss.is_solved(st(s)) and not (g and g.synthetic_only)
-
-        def broken(s):
-            g = self._gm.get(s.key)
-            return bool(g and g.broken)
-
-        def stale(s):
-            g = self._gm.get(s.key)
-            return bool(g and g.stale)
-
-        unsolved = sorted((s for s in segs if not eff_solved(s) or broken(s)),
-                          key=lambda s: (ss.rate(st(s)) or 0.0, st(s)["n"]))
-        per = ss.fps(self.doc)
-        polish = sorted((s for s in segs if eff_solved(s) and not broken(s)),
-                        key=lambda s: (not stale(s), -ss.potential_gain(st(s), per)))  # stale first, then most to win
-        # frontier: the EARLIEST segment whose end checkpoint is not (validly) there yet, once its start is valid. A stray
-        # checkpoint further up the ladder (a goal reached out of order) never moves it.
-        nxt = next((s for s in ss.layout(self.doc)
-                    if not ss.ckpt_valid(self.root, s.end) and self._in_suite(s.key)), None)
-        frontier = [nxt] if nxt is not None and ss.ckpt_valid(self.root, nxt.start) else []
-        return {"unsolved": unsolved, "frontier": frontier, "polish": polish}
+        ssg.log_refusals(self.root, segs, self.refused, self.log)
 
     def _live_holds(self) -> list:
-        """Unexpired holds from the hold file (read at most once per call). Logs each new hold once, and each expiry once.
-        A hold cleared by the operator before it expires is dropped silently."""
+        """Unexpired holds from the hold file (read at most once per call); each new hold and each
+        expiry is logged once."""
         now = datetime.fromtimestamp(self.clock()).astimezone()
-        on_disk = {(h.segment, h.until_text): h for h in self.holds.current()}
-        for key, h in list(self._hold_seen.items()):
-            if h.until <= now:
-                self.log(f"curriculum: hold on {h.segment} expired")
-                del self._hold_seen[key]
-            elif key not in on_disk:
-                del self._hold_seen[key]
-        live = []
-        for key, h in on_disk.items():
-            if h.until <= now:
-                continue
-            if key not in self._hold_seen:
-                self._hold_seen[key] = h
-                self.log(f"curriculum: holding {h.segment} until {h.until_text} ({h.reason})")
-            live.append(h)
-        return live
+        return ssg.live_holds(self.holds, self._hold_seen, now, self.log)
 
-    def _rejoin_candidates(self, live: list) -> list:
-        """Parent segments whose split pieces are all solved+optimized: they earn probe jobs at REJOIN_SHARE
-        until the parent's own probes prove the joined segment (should_rejoin then undoes the split)."""
-        out = []
-        for goal in self.doc["splits"]:
-            if any(h.covers(goal) for h in live):
-                continue
-            pieces = [s for s in ss.layout(self.doc) if s.goal == goal]
-            if self.suite is not None and goal not in self.suite and not any(p.key in self.suite for p in pieces):
-                continue
-            if not all((g := self._gm.get(p.key)) is not None and g.solved and g.optimized
-                       and not g.synthetic_only for p in pieces):
-                continue
-            parent = seg_split.parent_segment(self.doc, goal)
-            if parent is not None and ss.ckpt_valid(self.root, parent.start):
-                out.append(parent)
-        return out
+    def groups(self, gm=None) -> dict[str, list]:
+        self._log_refusals(ss.layout(self.doc))
+        self._gm = self._grade_map() if gm is None else gm   # a passed map = this call's cache
+        return ssg.grade_groups(self.doc, self.root, self._gm, self.suite)
 
-    def choose(self) -> tuple[str, object] | None:
-        g = self.groups()
-        live = self._live_holds()
-        if live:   # a held segment is dropped from every category; an emptied category falls out of the shares
-            g = {k: [s for s in v if not any(h.covers(s.key) for h in live)] for k, v in g.items()}
-        eff = sg.effective_shares(list(self._gm.values()), SHARES)
-        rejoin = self._rejoin_candidates(live)
-        if rejoin:  # probes take their 5% off the top; the other shares keep their proportions
-            eff = {k: v * (1 - sg.REJOIN_SHARE) for k, v in eff.items()} | {"rejoin": sg.REJOIN_SHARE}
-            g["rejoin"] = rejoin
-        avail = {k: v for k, v in g.items() if v}
-        if not avail:
-            return None
-        norm = sum(eff[k] for k in avail)
-        total = sum(self.picked.values())
-        cat = max(avail, key=lambda k: (eff[k] / norm * (total + 1) - self.picked.get(k, 0), eff[k]))
-        cands = avail[cat]
-        if cat == "unsolved":
-            i = min(range(len(cands)), key=lambda j: (self.tries.get(cands[j].key, 0), j))   # cands is weakest-first
-        elif cat == "polish":
-            i = self.picked.get(cat, 0) % min(3, len(cands))
-        else:
-            i = 0
-        self.picked[cat] = self.picked.get(cat, 0) + 1
-        if cat == "unsolved":
-            self.tries[cands[i].key] = self.tries.get(cands[i].key, 0) + 1
-        return cat, cands[i]
+    def choose(self, gm=None) -> tuple[str, object] | None:
+        self._log_refusals(ss.layout(self.doc))
+        self._gm = self._grade_map() if gm is None else gm
+        return ssg.choose(self.doc, self.root, self._gm, self._live_holds(), self.picked, self.tries,
+                          self.suite, SHARES)
 
     # --- jobs --------------------------------------------------------------------------------------------
     def _job(self, seg, kind: str, n: int, start: Path, st: dict) -> dict:
@@ -270,57 +183,17 @@ class Curriculum:
                 "box_pace": b["box_pace"], "maps_in": b["input"]}
 
     def pending_confirm(self):
-        for seg in ss.layout(self.doc):
-            if not self._in_suite(seg.key):
-                continue
-            st = ss.stat(self.doc, seg.key)
-            b = st["best"]
-            if (b and not b["confirmed"] and not b["rejected"] and ss.replayable(b)
-                    and b["tries"] < CONFIRM_TRIES and seg.key not in self.confirming):
-                return seg, st
-        return None
+        return ssg.pending_confirm(self.doc, self.suite, self.confirming, CONFIRM_TRIES)
 
     def pending_broken_replay(self):
         """A BROKEN segment whose accepted best is still replayable earns a confirm-style regression
-        replay right after pending confirms: re-run the recorded input to see if the solve survives.
-        At most one per segment per BROKEN_RECHECK_HOURS. Not replayable -> the scorecard still shows
-        it broken and the normal unsolved rotation carries it."""
-        now = self.clock()
-        for seg in ss.layout(self.doc):
-            if not self._in_suite(seg.key):
-                continue
-            g = self._gm.get(seg.key)
-            if not g or not g.broken or g.held:
-                continue
-            st = ss.stat(self.doc, seg.key)
-            b = ss.accepted(st)
-            if not ss.replayable(b) or seg.key in self.confirming:
-                continue
-            if now - st.get("recheck_at", 0) < sg.BROKEN_RECHECK_HOURS * 3600:
-                continue
-            st["recheck_at"] = now
-            return seg, st
-        return None
+        replay right after pending confirms; at most one per segment per BROKEN_RECHECK_HOURS."""
+        return ssg.pending_broken_replay(self.doc, self._gm, self.suite, self.confirming, self.clock())
 
     def pending_repro(self):
-        """A synthetic_only hypothesis earns an organic-reproduction job (a normal attempt from an
-        organic start) just below the broken-replay priority, at most once per BROKEN_RECHECK_HOURS."""
-        now = self.clock()
-        for seg in ss.layout(self.doc):
-            if not self._in_suite(seg.key):
-                continue
-            g = self._gm.get(seg.key)
-            if not g or not g.synthetic_only or g.held:
-                continue
-            st = ss.stat(self.doc, seg.key)
-            if now - st.get("repro_at", 0) < sg.BROKEN_RECHECK_HOURS * 3600:
-                continue
-            start = ss.ckpt(self.root, seg.start)
-            if start is None or not statefp.is_organic(start):
-                continue                      # the reproduction must be organic; a promoted start doesn't prove it
-            st["repro_at"] = now
-            return seg, st
-        return None
+        """A synthetic_only hypothesis earns an organic-reproduction job just below the
+        broken-replay priority, at most once per BROKEN_RECHECK_HOURS."""
+        return ssg.pending_repro(self.doc, self._gm, self.root, self.suite, self.clock())
 
     def next_job(self, n: int) -> dict | None:
         with self.txn():
@@ -341,7 +214,7 @@ class Curriculum:
                     job = self._job(seg, "repro", n, ss.ckpt(self.root, seg.start), st)
                     st["jobs"] = st.get("jobs", 0) + 1
             if job is None:
-                pick = self.choose()
+                pick = self.choose(gm=self._gm)   # this call's grades, cached (no second grade_all)
                 if pick is None:
                     return None
                 kind, seg = pick
@@ -350,8 +223,8 @@ class Curriculum:
                 job = self._job(seg, kind, n, ss.ckpt(self.root, seg.start), st)
                 st["jobs"] = st.get("jobs", 0) + 1
                 if kind in ("unsolved", "frontier") and any(sg.grade_signal(g) for g in self._gm.values()):
-                    fg = self.groups()["frontier"]
-                    fh = sg.frontier_health(self._gm.get(fg[0].key) if fg else None)
+                    f = ssg.frontier_seg(self.doc, self.root, self.suite)
+                    fh = sg.frontier_health(self._gm.get(f.key) if f else None)
                     job["explore_rate"] = sg.explore_for_health(fh)   # a sick frontier scouts, a healthy one exploits
         self.log(f"curriculum: {job['kind']} {job['key']} from {Path(job['start']).name}, {job['steps']} steps")
         return job
