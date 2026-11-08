@@ -3,7 +3,29 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.viewer.health import ANOMALY, OK, SLOW, STALLED
 from pokeagent.viewer.panels import BG, PANE, TEXT, DIM
+
+# card header tint per health state (ok = the header's current plain tint); also the badge colour
+HEADER_COLOUR = {
+    OK: (255, 255, 255, 255),
+    SLOW: (255, 200, 80, 255),      # amber
+    STALLED: (255, 80, 80, 255),    # red
+    ANOMALY: (255, 80, 255, 255),   # magenta
+}
+_STATE_THEMES: dict[str, int] = {}
+
+
+def health_theme(state: str) -> int | None:
+    """One dpg theme per health state (created once, memoised); None for ok (no override)."""
+    if state == OK:
+        return None
+    if state not in _STATE_THEMES:
+        with dpg.theme() as t:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Text, HEADER_COLOUR.get(state, HEADER_COLOUR[OK]))
+        _STATE_THEMES[state] = t
+    return _STATE_THEMES[state]
 
 
 def _rgba(hex_color: str, a: int = 255) -> tuple[int, int, int, int]:

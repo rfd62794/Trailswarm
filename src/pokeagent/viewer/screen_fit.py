@@ -37,11 +37,15 @@ def viewport_size(area: tuple[int, int] | None, scale: float = 1.0) -> tuple[int
     return (max(640, min(dw, w - round(MARGIN_W * scale))), max(480, min(dh, h - round(MARGIN_H * scale))))
 
 
-def open_viewport(clear_color) -> None:
-    """DPI awareness first, then context + viewport sized in physical pixels (never taller than the screen)."""
+def open_viewport(clear_color, init_file=None) -> None:
+    """DPI awareness first, then context + viewport sized in physical pixels (never taller than the screen).
+
+    ``init_file`` (optional) configures Dear PyGui layout persistence before the viewport exists."""
     import dearpygui.dearpygui as dpg
     from pokeagent.viewer import ui_scale
     scale = ui_scale.init()
     dpg.create_context()
+    if init_file:
+        dpg.configure_app(init_file=str(init_file), docking=True, docking_space=False)
     vw, vh = viewport_size(work_area(), scale)
     dpg.create_viewport(title="PokeAgent viewer", width=vw, height=vh, x_pos=0, y_pos=0, clear_color=clear_color)
