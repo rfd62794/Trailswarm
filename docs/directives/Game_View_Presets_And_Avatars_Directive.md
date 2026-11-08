@@ -196,11 +196,13 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-game-view-presets-and-avatars-directive |
 | Base branch | - |
 | Base commit | 155bf84a62d8a207881ed41d00cf91f83285fb3f |
+| Head commit | 0a5c59122cc6fecbfe02a0b03b5c65be142184da |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 13:34 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: live position contract, view presets, avatars; needs PRs 171 and 172 on main
@@ -209,4 +211,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 - 2026-11-08 13:51 · robert-claude-laptop · Queued → Approved
 - 2026-11-08 13:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6Y8104YFMMP4QBDW1MBE7MG
 - 2026-11-08 13:55 · dispatcher · launched pid=4152; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; provisioned: uv sync --frozen
+- 2026-11-08 14:25 · devin · In progress → Review — [origin] spent: devin 29 min est. n/a
 <!-- queue:end -->
