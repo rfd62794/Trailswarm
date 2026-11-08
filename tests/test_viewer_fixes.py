@@ -87,17 +87,16 @@ def test_rl_snapshot_cached_from_trainer_thread(tmp_path):
 # --- poller discovery ---------------------------------------------------------------
 
 def test_merge_sources_over_cycles():
-    from pokeagent.viewer.app import _Throttle, merge_sources
+    from pokeagent.viewer.app import merge_sources
     cur: dict = {}
     a, b, c = FakeSource("a"), FakeSource("b"), FakeSource("c")
     assert merge_sources(cur, {"a": a, "b": b}) == (["a", "b"], [])
-    ta = cur["a"]
-    assert isinstance(ta, _Throttle)
+    assert cur["a"] is a                                  # raw sources kept; cadences live in the model
     for _ in range(3):                                   # steady state: identities are kept
         assert merge_sources(cur, {"a": a, "b": b}) == ([], [])
-        assert cur["a"] is ta
+        assert cur["a"] is a
     assert merge_sources(cur, {"a": a, "c": c}) == (["c"], ["b"])
-    assert set(cur) == {"a", "c"} and cur["a"] is ta
+    assert set(cur) == {"a", "c"} and cur["a"] is a
 
 
 def test_poller_keeps_agents_across_rediscovery(monkeypatch):
@@ -131,7 +130,7 @@ def test_web_host_check_and_no_innerhtml():
     from pokeagent.viewer.model import ViewerModel
     assert "innerHTML" not in web._PAGE and "textContent" in web._PAGE
     model = ViewerModel()
-    model.poll([FakeSource("a1", [snap("a1")], [FRAME])])
+    model.poll([FakeSource("a1", [snap("a1")], [FRAME])]); model.drain()
     httpd = web.make_server(model, 0)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     port = httpd.server_address[1]
@@ -185,7 +184,7 @@ def test_window_sends_on_worker_thread():
             return super().send(cmd, **args)
     model = ViewerModel()
     src = Src("a", [snap("a")], [FRAME])
-    model.poll([src])
+    model.poll([src]); model.drain()
     win = ViewerWindow(model, {"a": src})
     win.selected = "a"; win.toggle_focus("a")
     t0 = time.monotonic()
@@ -210,22 +209,27 @@ def test_poll_hung_agent_does_not_starve_live_ones():
     srcs = [Hung("h1"), Hung("h2"), *live]
     t0 = time.monotonic()
     model.poll(srcs)
+    model.drain()
     assert time.monotonic() - t0 < 0.9                   # parallel: ~0.5 s, not 1.0 s+
     assert all(model.snapshot(f"l{i}") is not None for i in range(3))
 
 
 def test_dead_agents_retried_rarely():
-    from pokeagent.viewer.model import DEAD_AFTER, DEAD_EVERY, ViewerModel
+    from pokeagent.viewer.model import DEAD_AFTER, DEAD_RETRY_S, ViewerModel
+    t = [0.0]
     calls = []
 
     class Dead(FakeSource):
         def snapshot(self):
             calls.append(1)
             return None
-    model, d = ViewerModel(), Dead("d")
-    for _ in range(DEAD_AFTER + DEAD_EVERY * 2):
+    model, d = ViewerModel(clock=lambda: t[0]), Dead("d")
+    for k in range(60):                                  # 12 s at 0.2 s ticks
+        t[0] = k * 0.2
         model.poll([d])
-    assert len(calls) < DEAD_AFTER + 4
+    model.drain()
+    # DEAD_AFTER failures on the idle cadence, then one retry per DEAD_RETRY_S (~6 over 12 s)
+    assert len(calls) < DEAD_AFTER + 12 / DEAD_RETRY_S + 2
 
 
 def test_explorer_sees_has_rows(tmp_path):
@@ -243,7 +247,7 @@ def test_toggle_pause_sends_pause_first():
     from pokeagent.viewer.model import ViewerModel
     from pokeagent.viewer.ui.window import ViewerWindow
     model, src = ViewerModel(), FakeSource("a", [snap("a")], [FRAME])
-    model.poll([src])
+    model.poll([src]); model.drain()
     win = ViewerWindow(model, {"a": src})
     win.selected = "a"
     win.toggle_pause()

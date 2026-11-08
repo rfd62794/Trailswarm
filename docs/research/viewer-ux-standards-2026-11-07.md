@@ -64,6 +64,8 @@ Mark: M = matches, G = gap, D = deliberate difference.
 
 Do not copy: a browser/web rewrite (Robert chose native); Twitch chat-vote UI; stream overlays/OBS compositing (non-goal); W&B/TensorBoard hosted services or chart-first layouts (we watch games, not loss curves); BizHawk piano-roll editing; dense multi-window debug sprawl (PyBoy/mGBA tools are opt-in); anything modelled on Claude/Gemini stream layouts we could not confirm.
 
+Addendum 2026-11-07 (pull model): the data feed now follows the same discipline as the recommendations — polls on a per-source cadence (2/10 Hz snapshots idle/focused, 0.2/1.0 s events focused/idle, frames only for on-screen cards) and renders at fps from cached state; the frame slot carries a reader heartbeat (`reader_ts`, header layout v2) so agents can render only while watched. One new window beyond the ranked list: the Swarm page — one row per slot (state, segment + curriculum grade, next segment, steps/s + RSS, health, last goal) — an opt-in native pane like the Stadium one, not a chart-first layout.
+
 ## 8. Sources
 All retrieved 2026-11-07 via WebSearch/WebFetch (search-result summaries; several official docs not retrievable, flagged above): DPG init files and discussion 1088; AWS Grafana thresholds; OBS commit mirror; docs.pyboy.dk/plugins; CoreWeave W&B docs; tb-like (PyPI); bgb.bircd.org/manual.html; mgba.io 0.6.0 post (2017-07-16); tasvideos BizHawk history; TechCrunch (2025-02-25); rentry Gemini about (2025-06-12); PWhiddy/PokemonRedExperiments; livesplit.org/components; Bulbapedia TPP.
 Not found: official TensorBoard/Ray/OBS docs, a confirmed Claude-stream party/goal panel, any OpenAI hide-and-seek viewer source.

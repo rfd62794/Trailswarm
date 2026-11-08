@@ -48,7 +48,7 @@ def test_committed_default_layout_ini_parses():
 
 
 def test_documented_top_level_window_tags():
-    assert set(tags.TOP_LEVEL_WINDOWS) == {tags.MAIN_WINDOW, tags.STADIUM_PANE}
+    assert set(tags.TOP_LEVEL_WINDOWS) == {tags.MAIN_WINDOW, tags.STADIUM_PANE, tags.SWARM_PAGE}
 
 
 def test_configure_app_supports_layout_keywords(tmp_path):

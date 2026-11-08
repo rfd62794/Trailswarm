@@ -20,6 +20,7 @@ def png(args: argparse.Namespace) -> int:
         tracks = fake_tracks(world.layout, args.fake)
     else:
         wm.poll(discover(Path(args.root)))
+        wm.drain()                                        # poll is async: land the reads before exporting
         tracks = wm.tracks()
         now = time.monotonic()
         for t in tracks:

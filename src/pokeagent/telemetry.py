@@ -8,13 +8,17 @@ name without touching the emulator. No new dependencies (stdlib only).
 from __future__ import annotations
 
 import os
+import struct
 import time
 from pathlib import Path
 from multiprocessing import shared_memory
 from typing import Optional
 
 FRAME_W, FRAME_H = 160, 144
-HEADER = 16  # u64 seq | u16 w | u16 h | u32 owner pid (seqlock: odd seq = write in progress)
+LAYOUT = 2       # slot header layout version (bumped for the reader heartbeat; Agent_Footprint item 2)
+HEADER_V1 = 16   # v1: u64 seq | u16 w | u16 h | u32 owner pid (seqlock: odd seq = write in progress)
+HEADER = 32      # v2: v1 fields | u32 layout | u32 reserved | f64 reader_ts (epoch, reader's heartbeat)
+LAYOUT_OFF, READER_TS_OFF = 16, 24
 SLOT_PREFIX = "pokeagent_frames_"
 
 
@@ -25,6 +29,33 @@ def slot_name(agent_id: int | str, pid: int | None = None) -> str:
 
 def slot_owner(buf) -> int:
     return int.from_bytes(buf[12:16], "little")
+
+
+def slot_layout(buf) -> int:
+    """The slot's header layout: ``LAYOUT`` when the v2 fields are present, else 1.
+
+    A v1 slot's layout bytes are pixel data; its smaller total size gives it away, so an old
+    agent's slot can never be mistaken for v2."""
+    if len(buf) >= HEADER + FRAME_W * FRAME_H * 3 and \
+            int.from_bytes(buf[LAYOUT_OFF:LAYOUT_OFF + 4], "little") == LAYOUT:
+        return LAYOUT
+    return 1
+
+
+def slot_header(buf) -> int:
+    """Byte offset where the frame data starts (``HEADER`` on v2, ``HEADER_V1`` on an old slot)."""
+    return HEADER if slot_layout(buf) == LAYOUT else HEADER_V1
+
+
+def reader_ts(buf) -> float:
+    """The reader heartbeat stamped into a v2 header (0.0 before the first read)."""
+    return struct.unpack_from("<d", buf, READER_TS_OFF)[0]
+
+
+def write_reader_ts(buf, ts: float) -> None:
+    """Reader heartbeat: the viewer stamps its read time into a v2 slot (a no-op on old slots)."""
+    if slot_layout(buf) == LAYOUT:
+        struct.pack_into("<d", buf, READER_TS_OFF, ts)
 
 
 def _stale_slot_removed(name: str) -> bool:
@@ -67,6 +98,7 @@ class FramePublisher:
             except FileExistsError:  # dead owner but handles still open (Windows): cannot reclaim
                 raise FileExistsError(f"frame slot {self.name} is held by a dead publisher's open handles") from None
         self.shm.buf[12:16] = os.getpid().to_bytes(4, "little")
+        self.shm.buf[LAYOUT_OFF:LAYOUT_OFF + 4] = LAYOUT.to_bytes(4, "little")
         w, h = self.dims()
         self.shm.buf[8:10] = w.to_bytes(2, "little")
         self.shm.buf[10:12] = h.to_bytes(2, "little")
@@ -87,7 +119,7 @@ class FramePublisher:
             data = bytes(out)
         self.seq += 1
         self.shm.buf[0:8] = (self.seq | 1).to_bytes(8, "little")
-        self.shm.buf[16:16 + len(data)] = data
+        self.shm.buf[HEADER:HEADER + len(data)] = data
         self.seq += 1
         self.shm.buf[0:8] = self.seq.to_bytes(8, "little")
 
@@ -139,12 +171,14 @@ class FrameSubscriber:
                 return None
         try:
             b = self.shm.buf
+            write_reader_ts(b, time.time())  # heartbeat: someone is watching this slot
+            hdr = slot_header(b)
             s1 = int.from_bytes(b[0:8], "little")
             if s1 == 0 or s1 & 1:
                 return None  # never written, or mid-write
             w = int.from_bytes(b[8:10], "little") or FRAME_W
             h = int.from_bytes(b[10:12], "little") or FRAME_H
-            data = bytes(b[16:16 + w * h * 3])
+            data = bytes(b[hdr:hdr + w * h * 3])
             if int.from_bytes(b[0:8], "little") != s1:
                 return None  # torn read; next tick gets a clean frame
             self.seq = s1

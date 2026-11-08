@@ -13,7 +13,7 @@ def win():
     from pokeagent.viewer.ui.window import ViewerWindow
     model = ViewerModel()
     srcs = {i: FakeSource(i, [snap(i)], [FRAME]) for i in ("a", "b")}
-    model.poll(list(srcs.values()))
+    model.poll(list(srcs.values())); model.drain()
     return ViewerWindow(model, srcs)
 
 
@@ -78,7 +78,7 @@ def test_dpg_headless_follow_button_selection_and_bar():
     from pokeagent.viewer.ui.window import ViewerWindow
     model = ViewerModel()
     srcs = {i: FakeSource(i, [snap(i)] * 3, [FRAME] * 3) for i in ("a", "b")}
-    model.poll(list(srcs.values()))
+    model.poll(list(srcs.values())); model.drain()
     win = ViewerWindow(model, srcs)
     try:
         win._build()
