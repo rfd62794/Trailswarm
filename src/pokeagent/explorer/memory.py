@@ -36,6 +36,9 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         self.recent_talk: set = set()  # spots talked to this run: never re-probe them (Mom loop, 2026-11-03)
         self.temp_blocked: dict = {}  # (map, x, y) -> step it expires: a wanderer NPC's tile, routing only, never saved
         self._item_picked_run: set = set()  # (map, x, y) balls already counted as picked THIS run (not persisted)
+        # (map, x, y) of beaten ROM trainer placements: a set or a callable -> set, wired by
+        # trainer_ledger.ledger_for; the person-tile rule treats those tiles as a person's (never frontier).
+        self.beaten_tiles = None
         self.rom_pairs = None  # tileset -> frozenset of blocked (stand, ahead) tile pairs (atlas.collision.rom_tile_pairs)
         self.rom_walkable = None  # tileset -> frozenset of ROM-walkable tile ids (atlas.collision), wired by the demo; ROM wins over learning
         self.purge_bad_warps()

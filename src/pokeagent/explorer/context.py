@@ -237,6 +237,9 @@ class ExplorerContext:
     pickup_stuck: int = 0  # consecutive pickup walking presses that left the player where they were
     pickup_tries: dict = field(default_factory=dict)  # (map,x,y) -> presses that gave no item text this run
     trainer_npc: dict | None = None  # the npc entry marked trainer by the current trainer battle
+    trainer_ledger: Any = None       # explorer.trainer_ledger.TrainerLedger: per-run beaten state, made lazily
+    trainer_target: tuple | None = None  # (map, x, y) approach tile trainer_route.next_target named; goto may read it
+    trainer_hunt_steps: int = 0      # steps trainer_hunt has spent walking this run (TRAINER_HUNT_STEP_CAP)
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)

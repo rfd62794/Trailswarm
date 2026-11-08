@@ -146,12 +146,60 @@ def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
         for k, e in table.items():
             cur = t.setdefault(k, {"solid": 0, "walkable": 0})
             cur["solid"] = max(cur["solid"], e.get("solid", 0)); cur["walkable"] = max(cur["walkable"], e.get("walkable", 0))
+    if src.get("trainers"):
+        merge_trainers(dst, src)  # shared per-ROM trainer knowledge (never per-save 'beaten')
     from pokeagent.knowledge import blackout_tax
     blackout_tax.merge_max(dst, src)  # learned blackout margins: per goal, max of steps (never summed)
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     if edits:  # brain-tools surgery: the journal is folded in AFTER merging so no agent copy can resurrect an edit
         from pokeagent.explorer.edits import apply as apply_edits
         apply_edits(dst, edits)
+    return dst
+
+
+def merge_trainers(dst: dict, src: dict) -> dict:
+    """Merge ``src["trainers"]`` (``{"<map>:<idx>": {cls, party, prize, xp, flag_bit, provenance}}``) into dst.
+
+    Shared static knowledge only: 'beaten' is per save and is never carried. Union of keys; for a key in
+    both, keep non-empty values and prefer a set ``flag_bit``; two disagreeing non-None flag_bits keep
+    dst's and record ``"conflict": true``. Synthetic entries are UNCONFIRMED (the provenance standing
+    rule): one never overrides, fills or conflicts with an entry that is already there, a ``flag_bit``
+    seen only from synthetic runs is stored as ``flag_bit_unconfirmed`` (``sync_flags`` ignores it), and
+    an organic run reproducing the same bit promotes it to ``flag_bit``. Idempotent; malformed input
+    ignored; 'unknown' provenance can never promote."""
+    rows = src.get("trainers")
+    if not isinstance(rows, dict):
+        return dst
+    dd = dst.setdefault("trainers", {})
+    for key, e in rows.items():
+        if not isinstance(e, dict):
+            continue
+        e = {k: v for k, v in e.items() if k != "beaten"}
+        cur = dd.get(key)
+        if cur is None:
+            new = dict(e)
+            if e.get("provenance") != "organic" and new.get("flag_bit") is not None:
+                new["flag_bit_unconfirmed"] = new.pop("flag_bit")  # a hypothesis, not a RAM truth
+            dd[key] = new
+            continue
+        if e.get("provenance") != "organic":
+            continue  # unconfirmed: never overrides, fills or conflicts with what is there
+        fb = e.get("flag_bit")
+        if fb is not None:
+            if cur.get("flag_bit") is None:
+                if fb == cur.get("flag_bit_unconfirmed"):
+                    del cur["flag_bit_unconfirmed"]  # an organic run reproduced the bit: promoted
+                else:
+                    cur.pop("flag_bit_unconfirmed", None)
+                cur["flag_bit"] = fb
+            elif cur["flag_bit"] != fb:
+                cur["conflict"] = True
+        for k, v in e.items():
+            if k in ("flag_bit", "provenance", "conflict"):
+                continue
+            if cur.get(k) in (None, "", [], {}):
+                cur[k] = v
+        cur["provenance"] = "organic"  # an organic run stands behind the merged entry
     return dst
 
 

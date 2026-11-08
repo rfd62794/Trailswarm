@@ -4,7 +4,7 @@ This is the old ``agent_step()`` closure's job, minus the window and the HTTP AP
 """
 from __future__ import annotations
 
-from pokeagent.explorer import party_log
+from pokeagent.explorer import party_log, trainer_ledger
 from pokeagent.explorer.behaviours import default_behaviours
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -42,6 +42,7 @@ class Engine:
         seed_initial_goals(ctx)  # before the first decision, not after the first press
         decision = self.selector.choose(ctx)
         party_log.of(ctx).tick(ctx)  # level timeline: out-of-battle level/exp changes, grind/travel step counts
+        trainer_ledger.tick(ctx)  # trainer ledger: new maps, talk probes, the 50-step flag sync (never raises)
         self.last_decision = decision
         if decision is None or not decision.button:
             return decision  # nothing to do, or a wait: the step is used without a press

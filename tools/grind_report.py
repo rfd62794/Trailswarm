@@ -72,6 +72,34 @@ def map_graph(rom_path) -> dict:
     return g
 
 
+def print_trainer_section(map_id: int, label: str, ledger, party, base_exp: dict, cat, wild_spots,
+                          kb=None) -> None:
+    """The 'trainers worth saving or taking' section for one map, plus the area-resistance line.
+    Pure renderer: everything needed comes in as arguments."""
+    from pokeagent.grind.trainer_spots import rank_trainer_grinds
+    from pokeagent.knowledge.area_resistance import resistance
+    print(f"== trainers worth saving or taking ({label}) ==")
+    grinds = rank_trainer_grinds(ledger, map_id, party, base_exp, cat, wild_spots, kb=kb)
+    best_wild = max((s["xp_per_step"] if isinstance(s, dict) else s.xp_per_step for s in wild_spots), default=0.0)
+    if not grinds:
+        print("  (none the party beats with margin)")
+    for g in grinds:
+        e = g.entry
+        verdict = "take" if g.xp_per_step >= best_wild else "save"
+        prize = f" + {g.prize}yen" if g.prize else ""
+        print(f"  {e.cls} p{e.party} ({e.x},{e.y}): {g.value:.0f} value / {g.steps:.0f} steps = "
+              f"{g.xp_per_step:.2f}xp/step (xp {g.xp:.0f}{prize}, margin {g.margin:+.2f}) - {verdict} vs wild {best_wild:.2f}")
+    entries = ledger.entries(map_id)
+    res = resistance(party, [list(e.mons) for e in entries], None, None, kb)
+    if res:
+        worst = min((i for i, t in enumerate(res["trainers"]) if t["margin"] is not None),
+                    key=lambda i: res["trainers"][i]["margin"], default=None)
+        who = f" ({entries[worst].cls} p{entries[worst].party})" if worst is not None else ""
+        weak = f", weak to: {', '.join(res['weak_to'])}" if res["weak_to"] else ""
+        area = f"{res['area_margin']:+.2f}" if res["area_margin"] is not None else "n/a"
+        print(f"area resistance ({label}, {len(entries)} trainers): min margin {area}{who}{weak}")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default=str(ROOT / "runs"))
@@ -104,7 +132,34 @@ def main(argv=None) -> int:
                 row = "  ".join(f"{s['name']} {s['xp_per_min']:.0f}xp/min risk {s['blackout']:.0%} n={s['n_obs']}"
                                 + (f" ~{s['steps_to_goal'] / 225:.0f}min" if s["steps_to_goal"] else "") for s in spots)
                 print(f"  L{L:>2} (+{need[sp][goal] - int(L)} lv): {row}")
+    _trainer_sections(kb, need, doc["atlas"])
     return 0
+
+
+def _trainer_sections(kb: dict, need: dict, atlas: dict) -> None:
+    """For each starter/goal, the trainer-grind section of every candidate map with ROM trainers,
+    next to that map's wild spots at the lead's lowest listed level - report only: GrindDrill does
+    not change (Trainer_Grind_Pick_Directive is the follow-up)."""
+    from pokeagent.atlas.rom_maps import map_name
+    from pokeagent.explorer.trainer_ledger import TrainerLedger
+    from pokeagent.knowledge import items_catalog, party, trainers
+    cat = items_catalog.load()
+    base_exp = {r.get("name"): int(r.get("base_exp") or 0) for r in kb.get("species_by_dex", {}).values()}
+    for sp in STARTERS:
+        for goal in GOALS:
+            lead_lv = (need.get(sp) or {}).get(goal)
+            levels = (atlas.get(sp) or {}).get(goal) or {}
+            if not lead_lv or not levels:
+                continue
+            ours = [party.trainer_mon(sp, int(min(levels, key=int)), kb)]
+            wild = [s for s in levels[min(levels, key=int)] if s.get("map_id") in GOAL_MAPS.get(goal, [])]
+            for m in GOAL_MAPS.get(goal, []):
+                rows = trainers.trainers_on(m, kb)
+                if not rows:
+                    continue
+                ledger = TrainerLedger({m: rows})  # nothing beaten yet: the full one-time board
+                spots = [s for s in wild if s.get("map_id") == m]
+                print_trainer_section(m, map_name(m), ledger, [c for c in ours if c], base_exp, cat, spots, kb=kb)
 
 
 if __name__ == "__main__":
