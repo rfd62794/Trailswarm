@@ -132,10 +132,11 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-status-care-and-exp-eligibility-d-06cbc6 |
 | Base branch | - |
+| Base commit | 4e91a65d04b36c41df472298a68d9ac89978429f |
 
 **Status log**
 - 2026-11-07 16:20 · robert-claude-laptop · none → Draft — Claude 2026-11-07: poison care/Antidote, shopping floor, EXP eligibility gate
@@ -143,4 +144,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:24 · robert-claude-laptop · Queued → Draft — Claude: add provenance standing rule
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 19:07 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (same override as Team_Builder_V2 and Catch_Methods); Robert's 2026-11-07 direction queued this row
+- 2026-11-07 19:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-status-care-and-exp-eligibility-d-06cbc6; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7PJ1YKAG8PYTJQKD3SR1F
 <!-- queue:end -->
