@@ -166,4 +166,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; provenance column + synthetic_only grade; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 19:09 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (same override as Team_Builder_V2 and Catch_Methods); Robert's 2026-11-07 direction queued this row
 - 2026-11-07 19:09 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7T9SQJAMWZQDKRJRWZCGW
+- 2026-11-07 19:12 · dispatcher · launched pid=8564; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
