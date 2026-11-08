@@ -226,3 +226,17 @@ Findings first: the verdict and rule table for the committed fixtures, any propo
 - Exec(uv run python tools/game_compat.py)
 - Exec(uv run pytest)
 - Exec(git diff)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-08 17:54 · robert-claude-laptop · none → Queued — Approved by Robert 2026-11-08: repeatable compatibility check, the gate for Yellow; plan phase 4a, after phase 4
+<!-- queue:end -->
