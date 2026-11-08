@@ -198,7 +198,7 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-grind-points-directive |
 | Base branch | - |
@@ -212,4 +212,5 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 - 2026-11-07 20:31 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WCG3R86P640TYE1DK3RETD
 - 2026-11-07 20:39 · dispatcher · launched pid=18848; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; provisioned: uv sync --frozen
 - 2026-11-07 20:57 · devin · In progress → Review — [origin] spent: devin 18 min est. n/a
+- 2026-11-08 12:08 · robert-claude-laptop · Review → Done — note: PR #165 merged (937b77f); verify 2029 passed at 3390351; Sonnet review then Haiku delta APPROVE.
 <!-- queue:end -->
