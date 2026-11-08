@@ -192,3 +192,17 @@ Expected: every file under 300.
 Diff stat, the three test tails, the wc -l line, which constants you chose differently and why, and the list of
 things the controller must validate on real runs (measured xp/min for Route 24 vs Route 25 vs Mt Moon, the calibrated
 frames/step, and a headless grind episode from `baselines/` that ends without a 3<->35 bounce).
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 20:30 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's request (known-good grind points, reuse and exploit them; Nugget Bridge transition stall); inventory-backed
+<!-- queue:end -->
