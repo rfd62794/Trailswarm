@@ -14,7 +14,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.behaviours.battle_run import cave_catch_allowed
 from pokeagent.explorer.behaviours.item_use import item_list_open, item_step
-from pokeagent.explorer.behaviours.switch_out import switch_press
+from pokeagent.explorer.behaviours.switch_out import MAX_PRESSES, switch_press
 from pokeagent.explorer.catch_list import catch_wanted, dex_owned_count, upcoming_needs
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines
 from pokeagent.explorer.perceive import frame_lines
@@ -23,7 +23,7 @@ from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE, status_kind
 from pokeagent.knowledge.catch_policy import decide, may_throw_ctx
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import our_party, species_row, trainer_mon
-from pokeagent.ramstructs import read_battle_mon, read_enemy_mon
+from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
 BALL_NAME = {"POKE": "POKe BALL", "GREAT": "GREAT BALL", "ULTRA": "ULTRA BALL", "MASTER": "MASTER BALL"}
@@ -37,7 +37,10 @@ def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_ma
     if not party or wild is None:
         return None
     pos = read_battle_mon(ctx.emu).party_pos
-    active = party[pos] if 0 <= pos < len(party) else party[0]
+    lead = pos if 0 <= pos < len(party) else 0
+    active = party[lead]
+    raw = read_party(ctx.emu)   # current HP per slot (Combatant.hp is the max); only trusted when the slots line up
+    party_hp = [(m.hp, m.max_hp) for m in raw] if len(raw) == len(party) else None
     items = (ROM_KB or {}).get("items", {})
     price = {name: int((items.get(str(i)) or {}).get("price") or FALLBACK_PRICE.get(name, 200))
              for name, i in BALLS.items()}
@@ -47,7 +50,7 @@ def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_ma
                   {name: bag.get(i, 0) for name, i in BALLS.items()}, price,
                   {(a, d): e for a, d, e in table(None, "type_chart")}, table(None, "moves"), turn=turn,
                   kind=ctx.bv.kind, trainer_npc=ctx.trainer_npc,
-                  battle_log_kind=(ctx.battle_log or {}).get("kind"))
+                  battle_log_kind=(ctx.battle_log or {}).get("kind"), lead=lead, party_hp=party_hp)
 
 
 class Catch(BehaviourBase):
@@ -77,8 +80,9 @@ class Catch(BehaviourBase):
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
-        if not (want and balls and dex_no and e_max and may_throw_ctx(ctx)
-                and (not owned or want.startswith(("can learn", "planned")))):
+        gave_up = ctx.catch_switch[0] == ctx.catch_want[0] and ctx.catch_switch[1] > MAX_PRESSES
+        if gave_up or not (want and balls and dex_no and e_max and may_throw_ctx(ctx)
+                           and (not owned or want.startswith(("can learn", "planned")))):
             ctx.catch_mode = False
             ctx.catch_hint = None
             return None
@@ -87,7 +91,7 @@ class Catch(BehaviourBase):
         # a throw went through, our move was chosen); menu-walking steps between actions are not turns.
         enemy = read_enemy_mon(ctx.emu)
         key = ctx.catch_want[0]
-        sig = (e_hp, enemy.status, bv.my_sp, balls, id(ctx.pending_move), id(ctx.catch_attempt))
+        sig = (e_hp, enemy.status, bv.my_sp, balls, (ctx.pending_move or {}).get("step"), (ctx.catch_attempt or {}).get("step"))
         prev = ctx.catch_turns
         turn = prev[2] if prev[0] == key else 0
         if prev[0] != key or prev[1] != sig:
@@ -96,6 +100,9 @@ class Catch(BehaviourBase):
         hint = _policy_hint(ctx, sp_name, e_lvl, e_hp, e_max, bag, turn)
         ctx.catch_hint = hint
         ctx.catch_mode = hint is None or hint.kind != "skip"  # a skip means fight it out normally
+        if hint is not None and hint.kind == "skip" and ctx.catch_skip_logged != key:
+            ctx.catch_skip_logged = key
+            ctx.log(f"[catch: not catching {sp_name} L{e_lvl}: {hint.why}]", "res")
         if hint is not None and hint.kind == "throw":
             if run_line is None and not item_list_open(lines_now):
                 return None
@@ -116,9 +123,15 @@ class Catch(BehaviourBase):
         if hint is not None and hint.kind == "switch":
             btn = switch_press(frame_lines(ctx.view.tm), screen_lines(ctx.view.tm),
                                ctx.emu.read(MENU_ITEM), hint.slot)
-            if btn is not None:
-                return Decision(btn, "catch_switch", f"catch: {hint.why}")
-            return None
+            if btn is None:
+                return None  # text scrolling / animation: the usual dialog handling runs
+            n = (ctx.catch_switch[1] if ctx.catch_switch[0] == key else 0) + 1
+            ctx.catch_switch = (key, n)
+            if n > MAX_PRESSES:  # the menus are not what we think (the game refuses the switch): fight on
+                ctx.catch_mode, ctx.catch_hint = False, None
+                ctx.log(f"[catch: switch gave up after {MAX_PRESSES} presses on {sp_name}; fighting on]", "res")
+                return Decision("B", "catch_switch_failed", "catch switch abandoned: backing out of the menu")
+            return Decision(btn, "catch_switch", f"catch: {hint.why} (press {n})")
         if hint is None and ratio <= 0.35 and (run_line is not None or item_list_open(lines_now)):
             # No ROM data for the policy (catch_hint is None): the original rule - a POKE BALL at <=35% HP.
             # A ball throw never opens a party prompt.

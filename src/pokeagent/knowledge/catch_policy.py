@@ -17,14 +17,14 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from pokeagent.knowledge.catch_math import STATUS_BONUS, best_ball, p_catch
-from pokeagent.knowledge.catcher import catcher_slot, max_damage, min_damage, safe_moves
-from pokeagent.knowledge.damage import PHYSICAL, expected_damage, type_mult
+from pokeagent.knowledge.catcher import catcher_slot, max_damage, move_row, raw_damage, safe_moves
 from pokeagent.knowledge.moves import effect_of
 from pokeagent.knowledge.party import Combatant
 
 ACCEPTABLE_P = 0.15            # throw an unweakened target only if one ball has at least this chance; untuned
 STATUS_MIN_GAIN = 0.05         # a status move is worth a turn only if it raises P(catch) by at least this (after its own hit chance); untuned
 WEAKEN_TARGET = 0.35           # stop reducing HP at or below this fraction (the existing catch.py threshold); untuned
+CATCHER_MIN_HP = 0.25          # never switch in a catcher below this HP fraction (= magikarp.CATCHER_MIN_HP)
 MAX_TURNS = 8                  # give up the attempt after this many policy turns on one wild mon
 CRIT_SAFETY = 2.0              # "could it KO" margin: max-roll damage x this (a crit roughly doubles); untuned
 
@@ -53,24 +53,13 @@ def may_throw_ctx(ctx) -> bool:
                      (getattr(ctx, "battle_log", None) or {}).get("kind"))
 
 
-def _move_row(name: str, moves: dict) -> dict | None:
-    return next((m for m in (moves or {}).values() if m.get("name") == name), None)
-
-
-def _expected(att: Combatant, mv: dict, dfn: Combatant, chart: dict) -> float:
-    phys = mv.get("type", "") in PHYSICAL
-    return expected_damage(att.level, int(mv.get("power", 0) or 0), att.stats[0] if phys else att.stats[3],
-                           dfn.stats[1] if phys else dfn.stats[3], stab=mv.get("type", "") in att.types,
-                           eff=type_mult(chart, mv.get("type", ""), list(dfn.types)))
-
-
 def _status_step(active: Combatant, wild_hp: int, wild_hp_max: int, catch_rate: int,
                  ball_name: str, p_now: float, moves: dict) -> CatchStep | None:
     """The best status move whose accuracy-weighted P(catch) gain clears STATUS_MIN_GAIN, else None.
     A damaging move with a status side effect is a damaging move, not a candidate (kind == "status" only)."""
     best = None
     for name in active.moves:
-        mv = _move_row(name, moves)
+        mv = move_row(name, moves)
         e = effect_of(mv)
         if e is None or e.kind != "status" or e.status not in STATUS_BONUS:
             continue
@@ -94,10 +83,13 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
            wild_status: str | None, catch_rate: int, bag: dict[str, int], price: dict[str, int],
            chart: dict, moves: dict, turn: int = 0, *,
            kind: int | None = 1, trainer_npc: object | None = None,
-           battle_log_kind: int | None = None) -> CatchStep:
+           battle_log_kind: int | None = None, lead: int | None = None,
+           party_hp: list[tuple[int, int]] | None = None) -> CatchStep:
     """The next step toward catching ``wild``, first match wins: skip past MAX_TURNS / no ball / trainer
-    battle; the overpower gate (switch to a catcher, or throw at full HP, or skip); a status move; the
-    least-damaging safe hit while above WEAKEN_TARGET; then the best-value ball."""
+    battle; the overpower gate (switch to a catcher, or throw when one ball is acceptable, or skip); a status move; the
+    least-damaging safe hit while above WEAKEN_TARGET; then the best-value ball.
+    ``lead`` is the active mon's party slot (``party.index`` would pick the first of two identical mons);
+    ``party_hp`` is (current, max) HP per slot so a fainted / under-CATCHER_MIN_HP member is never the catcher."""
     if not may_throw(kind, trainer_npc, battle_log_kind):
         return CatchStep("skip", why="trainer battle: cannot catch")
     if wild is None or active is None or wild_hp_max <= 0 or catch_rate <= 0:
@@ -111,14 +103,16 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
     ball_name, p_now = ball
     if not safe_moves(active, wild, chart, moves):
         # the overpower gate: every damaging move KOs even at the minimum roll (or none exists)
-        lead = next((i for i, c in enumerate(party or ()) if c == active), 0)
-        slot = catcher_slot(party or [], [wild], chart, moves, lead=lead)
+        if lead is None:
+            lead = next((i for i, c in enumerate(party or ()) if c == active), 0)
+        fit = None if party_hp is None else [mx > 0 and hp > 0 and hp / mx >= CATCHER_MIN_HP for hp, mx in party_hp]
+        slot = catcher_slot(party or [], [wild], chart, moves, lead=lead, fit=fit)
         if slot is not None:
             return CatchStep("switch", slot=slot, p=p_now,
                              why=f"overpowered: switch to the catcher in slot {slot + 1}")
-        if wild_hp >= wild_hp_max and p_now >= ACCEPTABLE_P:
+        if p_now >= ACCEPTABLE_P:
             return CatchStep("throw", ball=ball_name, p=p_now,
-                             why=f"overpowered, no catcher: throwing {ball_name} at full HP (p={p_now:.2f})")
+                             why=f"overpowered, no catcher: throwing {ball_name} (p={p_now:.2f})")
         return CatchStep("skip", why="overpowered, no catcher, P(catch) too low")
     if not wild_status:
         step = _status_step(active, wild_hp, wild_hp_max, catch_rate, ball_name, p_now, moves)
@@ -126,9 +120,9 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
             return step
     if wild_hp / wild_hp_max > WEAKEN_TARGET:
         okay = [n for n in safe_moves(active, wild, chart, moves)
-                if max_damage(active, _move_row(n, moves), wild, chart) * CRIT_SAFETY < wild_hp]
+                if max_damage(active, move_row(n, moves), wild, chart) * CRIT_SAFETY < wild_hp]
         if okay:
-            pick = min(okay, key=lambda n: (_expected(active, _move_row(n, moves), wild, chart), n))
+            pick = min(okay, key=lambda n: (raw_damage(active, move_row(n, moves), wild, chart), n))
             return CatchStep("damage_move", move=pick, p=p_now,
                              why=f"weakening: {pick} is the least-damaging hit that cannot KO")
         return CatchStep("throw", ball=ball_name, p=p_now,

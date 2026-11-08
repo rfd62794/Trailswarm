@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import replace
 from types import SimpleNamespace
 
-import pytest
 
 from pokeagent.explorer.stats import stat_value
 from pokeagent.knowledge.catch_policy import (ACCEPTABLE_P, MAX_TURNS, CatchStep, decide, may_throw,
                                              may_throw_ctx)
+from pokeagent.knowledge.catcher import catcher_slot
 from pokeagent.knowledge.party import Combatant
 
 
@@ -121,9 +121,27 @@ def test_overpower_gate_switch_throw_and_skip():
     assert step.kind == "switch" and step.slot == 2                        # the qualifying catcher, not the lead
     step = _decide(lead, pidgey, 15, 15)                                   # no catcher: full HP + easy species -> throw
     assert step.kind == "throw" and step.p >= ACCEPTABLE_P
+    hurt = _decide(lead, _wild("PIDGEY", 3, 9), 9, 15)                     # no catcher, hurt, P fine -> throw (no full-HP gate)
+    assert hurt.kind == "throw" and hurt.p >= ACCEPTABLE_P
     rare = _wild("RARE", 3, 16)
     step = _decide(lead, rare, 16, 16, rate=45)                            # no catcher, P too low -> skip
     assert step.kind == "skip" and "overpowered" in step.why
+
+
+def test_catcher_must_be_fit_and_lead_index_is_used():
+    lead = _mon("BIGLEAD", 25)
+    karp = _mon("KARP", 15, ("SPLASH", "TACKLE"))
+    pidgey = _wild("PIDGEY", 3, 15)
+    party = [lead, karp]
+    ok = _decide(lead, pidgey, 15, 15, party=party, party_hp=[(60, 60), (40, 40)])
+    assert ok.kind == "switch" and ok.slot == 1
+    for hp in (0, 9):                                                      # fainted / under 25% of 40
+        step = _decide(lead, pidgey, 15, 15, party=party, party_hp=[(60, 60), (hp, 40)])
+        assert step.kind != "switch"
+    twins = [_mon("BIGLEAD", 25), _mon("BIGLEAD", 25), karp]               # identical mons: lead index decides
+    step = _decide(twins[1], pidgey, 15, 15, party=twins, lead=1)
+    assert step.kind == "switch" and step.slot == 2
+    assert catcher_slot(twins, [pidgey], CHART, MOVES, lead=1, fit=[True, True, False]) is None
 
 
 # 4. the ball choice and the weaken target
