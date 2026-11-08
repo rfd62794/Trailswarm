@@ -28,11 +28,15 @@ MACROS = [("run", [R, B], 12), ("run far", [R, B], 24), ("short hop", [R, B, A],
           ("wait", [], 8), ("walk", [R], 8), ("walk through the exit", [R], 720)]
 WAIT = len(MACROS) - 1
 BUCKET = 24
-PROBE = 100
+PROBE = 240
+RETIRE_AFTER = 40            # consecutive deaths from one save point before it stops being tried
+OFF_SCREEN_Y = 165           # Mario sprite y once he has fallen below the screen
+DEATH_SAMPLE = 15
 LEVELS = [(w, l) for w in range(1, 5) for l in range(1, 4)]
 AGENT = "mario-land"
 DIR = Path("runs") / "mario-land"
 BEST = DIR / "best.json"
+INBOX = DIR / "inbox"
 
 
 def low_priority():
@@ -91,6 +95,8 @@ class Worker:
         self.w.start_game()
         self.rng = random.Random(index * 7919 + int(time.time()))
         self.tries = self.deaths = 0
+        self.sent = 0
+        self.last_sent = 0
         self.boot = self.save()
         self.cells = {self.key(): {"state": self.boot, "seq": [], "lives": self.w.lives_left}}
 
@@ -108,9 +114,26 @@ class Worker:
     def tick(self, n):
         self.py.tick(n, False)
 
-    def publish(self, key):
+    def send(self, seq, outcome):
+        """Hand an attempt to the cartographer, at most one every two seconds."""
+        now = time.time()
+        if now - self.last_sent < 2:
+            return
+        self.last_sent = now
+        self.sent += 1
+        write_json(INBOX / f"{self.index}-{self.sent}.json",
+                   {"seq": seq, "outcome": outcome, "worker": self.index, "at": now})
+
+    def retired(self, key):
+        return self.cells[key].get("fails", 0) >= RETIRE_AFTER
+
+    def survives(self, lives):
+        self.tick(PROBE)
+        return self.w.lives_left >= lives and self.py.memory[0xC201] < OFF_SCREEN_Y
+
+    def publish(self, key, replacing=False):
         doc = read_json(BEST)
-        if doc is None or key > as_key(doc):
+        if doc is None or key > as_key(doc) or (replacing and key == as_key(doc)):
             write_json(BEST, {"key": [list(key[0]), key[1]], "seq": self.cells[key]["seq"], "worker": self.index,
                               "lives": self.cells[key]["lives"], "at": time.time()})
 
@@ -126,7 +149,8 @@ class Worker:
             self.cells[k] = {"state": self.save(), "seq": list(doc["seq"]), "lives": self.w.lives_left}
 
     def attempt(self):
-        order = sorted(self.cells, reverse=True)
+        ranked = sorted(self.cells, reverse=True)
+        order = [k for k in ranked if not self.retired(k)] or ranked
         pick = order[min(int(self.rng.expovariate(0.35)), len(order) - 1)]
         cell = self.cells[pick]
         self.load(cell["state"])
@@ -141,17 +165,22 @@ class Worker:
             self.tries += 1
             if self.w.lives_left < cell["lives"] or self.w.game_over():
                 self.deaths += 1
+                cell["fails"] = cell.get("fails", 0) + 1
+                if self.deaths % DEATH_SAMPLE == 0:
+                    self.send(seq, "death")
                 return
             k = self.key()
-            if k > pick and k not in self.cells:
+            replacing = k in self.cells and self.retired(k)
+            if k > pick and (k not in self.cells or replacing):
                 blob = self.save()
-                self.tick(PROBE)
-                alive = self.w.lives_left >= cell["lives"]
+                alive = self.survives(cell["lives"])
                 self.load(blob)
                 if alive:
                     self.cells[k] = {"state": blob, "seq": list(seq), "lives": self.w.lives_left}
+                    cell["fails"] = 0
                     if k == max(self.cells):
-                        self.publish(k)
+                        self.publish(k, replacing)
+                        self.send(seq, "best")
 
 
 def worker_main(index, end):
@@ -259,8 +288,11 @@ def main():
     low_priority()
     DIR.mkdir(parents=True, exist_ok=True)
     BEST.unlink(missing_ok=True)
+    INBOX.mkdir(parents=True, exist_ok=True)
     end = time.time() + a.minutes * 60
     procs = [mp.Process(target=worker_main, args=(i, end), daemon=True) for i in range(a.workers)]
+    from mario_maps import cartographer_main
+    procs.append(mp.Process(target=cartographer_main, args=(end, MACROS), daemon=True))
     for p in procs:
         p.start()
     from pokeagent import agent_registry

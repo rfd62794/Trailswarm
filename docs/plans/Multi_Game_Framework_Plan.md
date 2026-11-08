@@ -51,6 +51,30 @@ Wanted, no ROM yet: Kirby's Dream Land, Final Fantasy Adventure.
 | 9 | NES backend spike behind `Emulator`, then Zelda and Tetris | Claude spike first | boots, RAM read, save state | decide whether NES is worth it |
 | 10 | Yellow, Kirby, Final Fantasy Adventure | later | per game | each is its own go |
 
+## The game-agnostic view
+
+The viewer learns no game terms. It has three parts:
+
+1. **Map source, one per game.** It supplies an image per area. Mario builds levels from captured play, Pokemon keeps
+   its Kanto map, and a flip-screen game supplies rooms. A scrolling game needs a camera position to take part.
+2. **Position contract, shared.** Every agent reports area, x and y, plus a run id and an outcome. The ghost format
+   in `tools/mario_maps.py` is the first version.
+3. **Viewer.** Two tabs: Gameplay (`tools/watch_game.py`, one large screen) and Map (stitched areas, ghosts, trails, death
+   marks, follow the best).
+
+Numerous agents are shown as ghosts. Each attempt is an input sequence, so its positions are recorded once and
+replayed together at normal speed. Display cost stays flat however many are shown.
+
+| # | Step | Who | Status |
+|---|---|---|---|
+| V1 | Search stops retrying save points that keep dying | Claude, needs ROM | built in `tools/watch_mario_land.py` |
+| V2 | Per-level map building and ghost tracks | Claude, needs ROM | built in `tools/mario_maps.py` |
+| V3 | Position contract on `GameSpec`, Map tab in the viewer | Devin, after phases 2 to 4 | not started |
+| V4 | Scored moments: per-attempt events such as kills and score jumps, kept for the video plan | Claude or Devin | proposed |
+| V5 | Pokemon moves onto the same contract last | Devin | not started |
+
+Check first: `world/model.py` looks event-driven and may be reusable, but `world/` was surveyed as Kanto-specific.
+
 ## Phase 6 in more detail
 
 This is the phase that makes the rest worth doing. It is the difference between "the code accepts a game" and
