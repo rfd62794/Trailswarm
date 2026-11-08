@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from mario_moments import classify
-from mario_value import add_event, best_order, should_replace
+from mario_value import add_event, best_order, carried_fails, should_replace
 
 R, B, A, L = "right", "b", "a", "left"
 MACROS = [("run", [R, B], 12), ("run far", [R, B], 24), ("short hop", [R, B, A], 10), ("jump", [R, B, A], 20),
@@ -29,6 +29,7 @@ PROBE = 240
 RETIRE_AFTER = 40            # consecutive deaths from one save point before it stops being tried
 OFF_SCREEN_Y = 165           # Mario sprite y once he has fallen below the screen
 DEATH_SAMPLE = 15
+TIMER_REFRESH = 4            # frames between timer baseline refreshes; a stale baseline would make every kill a bonus
 DIR = Path("runs") / "mario-land"
 INBOX = DIR / "inbox"
 BEST_GLOB = "best-*.json"
@@ -114,7 +115,8 @@ class Worker:
         self.last_sent = 0
         self.boot = self.save()
         self.start_meter(0)
-        self.cells = {self.key(): {"state": self.boot, "seq": [], "lives": self.w.lives_left, "value": 0}}
+        self.cells = {self.key(): {"state": self.boot, "seq": [], "lives": self.w.lives_left, "value": 0,
+                                  "progress": self.w.level_progress}}
         self.best = (max(self.cells), 0)
 
     def key(self):
@@ -132,17 +134,23 @@ class Worker:
     def start_meter(self, value):
         self.value = value
         self.score, self.coins, self.timer = self.w.score, self.w.coins, self.w.time_left
+        self.frame = 0
 
     def tick(self, n):
-        """Advance n frames, adding style value; the grid is read only on a frame where the score rose."""
+        """Advance n frames, adding style value. Only the score is read each frame; coins and the timer are read
+        when the score rose (and the timer baseline every TIMER_REFRESH frames), the grid only on a rise."""
         for _ in range(n):
             self.py.tick(1, False)
-            score, coins, timer = self.w.score, self.w.coins, self.w.time_left
-            gained = score - self.score
-            if gained > 0:
-                kind = classify(gained, coins > self.coins, timer < self.timer, self.w.game_area())
-                self.value = add_event(self.value, kind, gained)
-            self.score, self.coins, self.timer = score, coins, timer
+            self.frame += 1
+            score = self.w.score
+            if score != self.score:
+                gained, coins, timer = score - self.score, self.w.coins, self.w.time_left
+                if gained > 0:
+                    kind = classify(gained, coins > self.coins, timer < self.timer, self.w.game_area())
+                    self.value = add_event(self.value, kind, gained)
+                self.score, self.coins, self.timer = score, coins, timer
+            elif self.frame % TIMER_REFRESH == 0:
+                self.coins, self.timer = self.w.coins, self.w.time_left
 
     def send(self, seq, outcome):
         """Hand an attempt to the cartographer, at most one every two seconds."""
@@ -179,10 +187,12 @@ class Worker:
         self.load(self.boot)
         for m in doc["seq"]:
             press_macro(self.py, m, self.tick)
-        k, lives = self.key(), self.w.lives_left
+        k, lives, progress = self.key(), self.w.lives_left, self.w.level_progress
         old = self.cells.get(k)
-        if old is None or should_replace(old["value"], old["lives"], self.value, lives):
-            self.cells[k] = {"state": self.save(), "seq": list(doc["seq"]), "lives": lives, "value": self.value}
+        if old is None or should_replace(old["value"], old["lives"], self.value, lives, old["progress"], progress):
+            fails = carried_fails(old.get("fails", 0), old["progress"], progress) if old else 0
+            self.cells[k] = {"state": self.save(), "seq": list(doc["seq"]), "lives": lives, "value": self.value,
+                             "progress": progress, "fails": fails}
         self.best = max(self.best, best_order(doc))
 
     def attempt(self):
@@ -213,7 +223,9 @@ class Worker:
         k = self.key()
         old = self.cells.get(k)
         fresh = k > pick and (old is None or self.retired(k))
-        better = old is not None and should_replace(old["value"], old["lives"], self.value, self.w.lives_left)
+        progress = self.w.level_progress
+        better = old is not None and should_replace(old["value"], old["lives"], self.value, self.w.lives_left,
+                                                    old["progress"], progress)
         if not (fresh or better):
             return
         blob, value = self.save(), self.value
@@ -222,7 +234,9 @@ class Worker:
         self.load(blob, value)
         if not alive:
             return
-        self.cells[k] = {"state": blob, "seq": list(seq), "lives": self.w.lives_left, "value": value}
+        fails = 0 if fresh else carried_fails(old.get("fails", 0), old["progress"], progress)
+        self.cells[k] = {"state": blob, "seq": list(seq), "lives": self.w.lives_left, "value": value,
+                         "progress": progress, "fails": fails}
         if fresh:
             cell["fails"] = 0
         else:

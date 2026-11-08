@@ -46,3 +46,15 @@ def test_best_ordering():
     assert V.best_order(doc((1, 1), 7, 300)) > V.best_order(doc((1, 1), 7, 200))   # value breaks ties
     assert V.best_order(doc((1, 1), 7)) == V.best_order(doc((1, 1), 7, 0))         # missing value is 0
     assert V.best_order(doc((1, 1), 7, 1)) > V.best_order(doc((1, 1), 7))
+
+
+def test_replacement_does_not_regress_position():
+    assert V.should_replace(100, 3, 200, 3, old_progress=10, new_progress=10)
+    assert V.should_replace(100, 3, 200, 3, old_progress=10, new_progress=15)
+    assert not V.should_replace(100, 3, 200, 3, old_progress=10, new_progress=9)
+
+
+def test_fails_carry_unless_progress_rises():
+    assert V.carried_fails(30, 10, 10) == 30      # value-only growth keeps the death count
+    assert V.carried_fails(30, 10, 9) == 30
+    assert V.carried_fails(30, 10, 11) == 0       # further along resets it

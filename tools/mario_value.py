@@ -20,9 +20,16 @@ def add_event(value, kind, points):
     return value + event_value(kind, points)
 
 
-def should_replace(old_value, old_lives, new_value, new_lives):
-    """A same-cell arrival replaces the stored one only with a strictly higher value and no fewer lives."""
-    return new_value > old_value and new_lives >= old_lives
+def should_replace(old_value, old_lives, new_value, new_lives, old_progress=0, new_progress=0):
+    """A same-cell arrival replaces the stored one only with a strictly higher value, no fewer lives, and no
+    less progress within the bucket."""
+    return new_value > old_value and new_lives >= old_lives and new_progress >= old_progress
+
+
+def carried_fails(old_fails, old_progress, new_progress):
+    """A replacement keeps the cell's death count unless it also got further, so a cell that only grows in value
+    cannot dodge retirement."""
+    return 0 if new_progress > old_progress else old_fails
 
 
 def as_key(doc):
