@@ -198,14 +198,18 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-grind-points-directive |
 | Base branch | - |
 | Base commit | 37fe0cdc4abbc77cad7acc78d4500ded33cb7d35 |
+| Head commit | 3e1770e0c7ff0253fff2b5eedee87deba1071455 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 20:30 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's request (known-good grind points, reuse and exploit them; Nugget Bridge transition stall); inventory-backed
 - 2026-11-07 20:31 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert asked for this tonight
 - 2026-11-07 20:31 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WCG3R86P640TYE1DK3RETD
+- 2026-11-07 20:39 · dispatcher · launched pid=18848; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-directive; provisioned: uv sync --frozen
+- 2026-11-07 20:57 · devin · In progress → Review — [origin] spent: devin 18 min est. n/a
 <!-- queue:end -->
