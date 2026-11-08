@@ -198,11 +198,12 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-07 20:30 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's request (known-good grind points, reuse and exploit them; Nugget Bridge transition stall); inventory-backed
+- 2026-11-07 20:31 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert asked for this tonight
 <!-- queue:end -->
