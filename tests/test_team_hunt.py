@@ -196,3 +196,10 @@ def test_step_walks_arms_grass_and_bounds():
 def test_behaviour_order():
     names = [b.name for b in default_behaviours()]
     assert names.index("learner_hunt") < names.index("team_hunt") < names.index("frontier")
+
+
+# 7. PR #165: a live grind episode pins the run to its map set - the hunts do not apply during one
+def test_a_live_grind_episode_pauses_the_hunt():
+    h = TeamHunt(); c = _ok_ctx()
+    c._grind_state = {"episode": {"maps": {c.view.m}, "point": None}}
+    assert not h.applies(c)                                          # an outside-set target is not pursued

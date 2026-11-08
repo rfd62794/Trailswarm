@@ -74,8 +74,8 @@ def test_missing_files_yield_blanks(tmp_path):
     rows = swarm_rows.build_rows(tmp_path, ["a"], lambda aid: "live",
                                  snaps.get, {"a": {"pid": 5}}, lambda aid: None)
     r = rows[0]
-    # an empty doc still grades: a segment with no attempts is the scorecard's "stale"
-    assert r["grade"] == "stale" and r["steps_s"] == "" and r["rss"] == "" and r["health"] == "ok"
+    # no scorecard data for the segment reads n/a (the grader's "stale" means data that went old)
+    assert r["grade"] == "n/a" and r["steps_s"] == "" and r["rss"] == "" and r["health"] == "ok"
 
 
 def test_state_mapping():

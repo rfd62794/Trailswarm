@@ -113,3 +113,26 @@ def test_stale_then_fresh_heartbeat_as_the_publisher_reads_it():
         s.close()
     finally:
         p.close()
+
+
+def test_layout2_buffer_without_magic_reads_as_v1_pinned():
+    """A pre-change layout-2 publisher (layout word set, NO magic) is read by a new viewer as v1: frames at
+    offset 16 (so 16 bytes early in a 32-byte-header buffer) and no heartbeat. This pins the documented
+    behaviour: restart agents before/with the viewer (docs/KNOWLEDGE.md, Viewer pull model)."""
+    shm = shared_memory.SharedMemory(name=f"pokeagent_frames_nomagic_{os.getpid()}", create=True,
+                                     size=HEADER + FRAME_BYTES)
+    try:
+        shm.buf[0:8] = (2).to_bytes(8, "little")
+        shm.buf[8:10] = FRAME_W.to_bytes(2, "little")
+        shm.buf[10:12] = FRAME_H.to_bytes(2, "little")
+        shm.buf[LAYOUT_OFF:LAYOUT_OFF + 4] = LAYOUT.to_bytes(4, "little")   # layout 2, magic bytes left zero
+        assert slot_layout(shm.buf) == 1
+        telemetry.write_reader_ts(shm.buf, 123.0)
+        assert reader_ts(shm.buf) == 0.0                                    # heartbeat skipped
+        s = FrameSubscriber(shm.name)
+        data, w, h = s.read()
+        assert data[:4] == bytes(shm.buf[HEADER_V1:HEADER_V1 + 4])          # read at the v1 offset 16
+        s.close()
+    finally:
+        shm.close()
+        shm.unlink()

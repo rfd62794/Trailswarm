@@ -121,7 +121,9 @@ def _grade(gmap: dict, segment: str) -> str:
     if not segment or segment == NA:
         return NA
     g = gmap.get(segment) or gmap.get(segment.split("@", 1)[0])
-    return NA if g is None else _grade_word(g)
+    if g is None or (g.last_ts is None and not g.attempts):
+        return NA  # no scorecard data at all reads n/a; the grader's "stale" is for data that went old
+    return _grade_word(g)
 
 
 def _agent_stats(root: Path) -> dict[str, dict]:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
-from pokeagent.knowledge import trainers
+from pokeagent.knowledge import team_plan, trainers
 from pokeagent.knowledge.readiness import MARGIN, Readiness, TeamReadiness, assess, team_readiness
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
@@ -79,12 +79,35 @@ def team_for(goals: dict, party: list | None) -> TeamReadiness | None:
     return _cache[key]
 
 
+def boss_need_for(goals: dict, party: list | None) -> team_plan.Need | None:
+    """The WHOLE party (Magikarp included) vs the stage boss: the team-level gate (knowledge.team_plan).
+    Same boss lookup, label and cache as readiness_for/team_for; None without data."""
+    goal = stage_goal(goals)
+    if goal is None or not party:
+        return None
+    key = ("need", goal, tuple(party))
+    if key not in _cache:
+        boss = trainers.boss_party(goal, starter_names=[c.name for c in party]) or (trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
+        _cache.clear() if len(_cache) > 64 else None
+        _cache[key] = team_plan.boss_need(party, boss, None, BOSS_LABEL[goal]) if boss else None
+    return _cache[key]
+
+
 def under_level(goals: dict, party: list | None, floor: int = 0) -> tuple[int, int, int] | None:
-    """(needed level, current lead level, gap) when our lead is below the next stage's required level, else None.
-    One source for the planner log, the bandit's train point and the grind atlas: all three read required_level."""
+    """(needed level, current level, gap) when the TEAM fails the next stage's verdict, else None.
+    The gate judges the whole party: "under" whenever boss_need says not ready, whichever slot holds
+    the strong mon (`current` is the level of the member the verdict would raise). One source for the
+    planner log, the bandit's train point and the grind atlas: all three read required_level."""
     if not party:
         return None
-    needed, current = required_level(goals, floor, party)[0], party[0].level
+    needed = required_level(goals, floor, party)[0]
+    nv = boss_need_for(goals, party)
+    if nv is not None:
+        if nv.ready:
+            return None
+        i = nv.raise_slot if nv.raise_slot is not None else nv.lead_slot
+        return (needed, party[i].level, needed - party[i].level)
+    current = max(c.level for c in party)  # no sim data: the strongest member answers, not slot 0
     return (needed, current, needed - current) if current < needed else None
 
 
@@ -107,12 +130,15 @@ def required_level(goals: dict, floor: int = 8, party: list | None = None) -> tu
         return floor, ""
     if before_route2(goals):  # the Brock target must not hold the run on Route 1 before Viridian (2026-11-06: 1,700 steps)
         return floor, ""
-    verdict, table = readiness_for(goals, party), TRAIN_LEVEL_BY_GOAL[goal]
-    if not verdict:
+    table = TRAIN_LEVEL_BY_GOAL[goal]
+    fighters = [c for c in (party or ()) if c.name != "MAGIKARP"] or list(party or ())
+    verdict, nv = readiness_for(goals, fighters), boss_need_for(goals, party)
+    sim_need = nv.need if nv is not None else (verdict.required if verdict else None)
+    if sim_need is None:
         return max(table, floor), ""
     cap = table + CAP_ABOVE_TABLE
-    note = f"clamp L{verdict.required} -> L{cap} vs {BOSS_LABEL[goal]}: consider a counter catch" if verdict.required > cap else ""
-    return max(min(verdict.required, cap), floor), note
+    note = f"clamp L{sim_need} -> L{cap} vs {BOSS_LABEL[goal]}: consider a counter catch" if sim_need > cap else ""
+    return max(min(sim_need, cap), floor), note
 
 
 def train_level_for(goals: dict, floor: int = 8, party: list | None = None) -> int:

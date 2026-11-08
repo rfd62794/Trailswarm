@@ -48,8 +48,12 @@ class NavMixin:
             if (map_id, x + tdx, y + tdy) in self.temp_blocked and n not in tried:
                 tried.append(n)
         for n in list(DIRS):  # do not take a connection/warp back to a map we are deliberately done with
-            w = d["warps"].get(f"{x},{y},{n}")
-            if w and avoid_maps and w[0] in avoid_maps and n not in tried:
+            key = f"{x},{y},{n}"
+            w = d["warps"].get(key)
+            if avoid_maps and n not in tried and (
+                    (w is not None and w[0] in avoid_maps)
+                    or (w is None and getattr(avoid_maps, "leads_out", None) is not None
+                        and avoid_maps.leads_out(map_id, key))):  # one-sighting/recorded edge off the set
                 tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
         fdx, fdy = DIRS.get(facing, (0, 0))
@@ -82,9 +86,10 @@ class NavMixin:
         why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[2]}x"
         return best[1], why, best[2] > 0
 
-    def _frontier_graph(self) -> WorldGraph:
+    def _frontier_graph(self, allowed=None) -> WorldGraph:
         g = WorldGraph(self.data["maps"]); g.strict = True
         g.blocked_now = frozenset(self.temp_blocked)
+        g.allowed_maps = frozenset(allowed) if allowed is not None else None
         return g
 
     def _frontier(self, d: dict, visited: dict, blocked: set, n: tuple) -> bool:
@@ -135,10 +140,11 @@ class NavMixin:
             return False
         return self._frontier(m, m.get("visited", {}), set(m.get("blocked", [])), node)
 
-    def frontier_plan(self, map_id, x, y):
-        """(target node, buttons) of the nearest frontier tile on this map, or None."""
+    def frontier_plan(self, map_id, x, y, allowed=None):
+        """(target node, buttons) of the nearest frontier tile on this map, or None. ``allowed`` bounds the
+        route's intermediate maps (a grind episode's map set): the plan may never leave it."""
         d = self.m(map_id); visited, blocked = d["visited"], set(d["blocked"])
-        return self._frontier_graph()._bfs_node(
+        return self._frontier_graph(allowed)._bfs_node(
             (map_id, x, y), lambda n: n[0] == map_id and self._frontier(d, visited, blocked, n), 4000)
 
     def route_to(self, map_id, x, y, target: tuple):
