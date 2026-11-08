@@ -11,7 +11,7 @@ The continuous swarm (`tools/swarm.py --continuous --plan curriculum`) ran 8 age
 - crossed Nugget Bridge (Route 24),
 - mapped battles on the way.
 
-It is currently stuck before Bill's house: the `to_bill` segment is at 0 of 288 attempts.
+Update (2026-11-08): the `to_bill` segment has been solved. Best run `explore-20261107-082910-320` reached Bill's house (map `0x58`) in 2,177 steps on 2026-11-07, at about a 10% success rate over recent attempts. This confirms the segment, not the full curriculum chain.
 
 ## Battle-text wait (merged, PR #90)
 
