@@ -28,4 +28,4 @@ def safe_name(agent: str) -> str:
     """The agent name as a file stem: no separators or odd characters, never empty or hidden.
     A name that had to change gets a short hash, so "run 1" and "run_1" never share a file."""
     stem = re.sub(r"[^A-Za-z0-9._-]", "_", agent).lstrip(".")[:64] or "agent"
-    return stem if stem == agent else f"{stem}-{hashlib.sha1(agent.encode()).hexdigest()[:8]}"
+    return stem if stem == agent or not agent else f"{stem}-{hashlib.sha1(agent.encode()).hexdigest()[:8]}"
