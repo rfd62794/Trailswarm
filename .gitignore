@@ -4,6 +4,7 @@ baselines/
 __pycache__/
 .pytest_cache/
 runs/
+!tests/fixtures/review/runs/
 .devin-scratch/
 
 kb/rom_tables.json

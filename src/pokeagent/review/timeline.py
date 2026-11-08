@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from collections import Counter
 
-from pokeagent.review.events import BUY_RULES, HEAL_RULES, build_events
+from pokeagent.review.events import BUY_RULES, HEAL_RULES, build_events, is_reserved
 from pokeagent.review.load import RunData
-from pokeagent.review.loops import BREAK_LOOP_ROWS, find_loops
+from pokeagent.review.loops import BREAK_LOOP_ROWS, LONG_LOOP_ROWS, collapse_loops, find_loops
 from pokeagent.review.rules import top_rules
 
 MAX_EVENTS = 200        # untuned first value: the timeline stays one screen of events
 TOP_UNCLASSIFIED = 5    # untuned first value: enough unknown rules to grow HEAL_RULES/BUY_RULES
+UNCLASSIFIED_MAX_SHARE = 0.05   # a rule this common is part of normal play, not an unknown to name
+HEAL_BUY_ADJACENT = ("item", "potion", "mart", "center", "buy", "heal")  # names worth classifying
 
 
 def _goal_firsts(data: RunData) -> list[str]:
@@ -72,15 +74,31 @@ def _levels(data: RunData) -> dict:
 
 
 def _unclassified(decisions: list[dict], n: int = TOP_UNCLASSIFIED) -> list[dict]:
-    """Top rules matching NEITHER named tuple - so the lists can be improved from output, not guessed."""
+    """Rules matching NEITHER named tuple whose name is heal/buy-adjacent and that are rare enough
+    (at most ``UNCLASSIFIED_MAX_SHARE`` of presses) to be a gap rather than the main behaviour."""
     out = []
     for r in top_rules(decisions, n=len(decisions) or 1):
         name = str(r["rule"]).lower()
-        if not any(t in name for t in HEAL_RULES) and not any(t in name for t in BUY_RULES):
-            out.append(r)
+        if any(t in name for t in HEAL_RULES) or any(t in name for t in BUY_RULES):
+            continue
+        if r["share"] > UNCLASSIFIED_MAX_SHARE or not any(t in name for t in HEAL_BUY_ADJACENT):
+            continue
+        out.append(r)
         if len(out) == n:
             break
     return out
+
+
+def truncate_events(events: list[dict], max_events: int) -> tuple[list[dict], int]:
+    """Cap the timeline at ``max_events`` without ever dropping a reserved event (stall, blackout,
+    break-length loop). Returns (kept events in step order, number omitted)."""
+    if len(events) <= max_events:
+        return events, 0
+    reserved = [e for e in events if is_reserved(e)]
+    rest = [e for e in events if not is_reserved(e)]
+    kept = reserved[:max_events] + rest[:max(0, max_events - len(reserved))]
+    kept.sort(key=lambda e: (e.get("step") is None, e.get("step") or -1, e["kind"]))
+    return kept, len(events) - len(kept)
 
 
 def _breaks(data: RunData, episodes: list[dict]) -> list[dict]:
@@ -110,8 +128,7 @@ def summarise(data: RunData, max_events: int = MAX_EVENTS) -> dict:
             keep.append({"kind": "wild_battles", "step": wild[0].get("step"), "count": len(wild),
                          "wins": sum(1 for e in wild if e.get("won"))})
             events = sorted(keep, key=lambda e: (e.get("step") is None, e.get("step") or -1, e["kind"]))
-        omitted = max(0, len(events) - max_events)
-        events = events[:max_events]
+        events, omitted = truncate_events(events, max_events)
     return {"run": data.name,
             "start_time": data.start_time.isoformat(timespec="seconds") if data.start_time else None,
             "skipped_rows": data.skipped_rows,
@@ -119,7 +136,8 @@ def summarise(data: RunData, max_events: int = MAX_EVENTS) -> dict:
             "events": events,
             "events_omitted": omitted,
             "event_counts": event_counts,
-            "loops": episodes,
+            "loops": collapse_loops(episodes),
+            "long_loops": sum(1 for e in episodes if e["presses"] >= LONG_LOOP_ROWS),
             "rules": top_rules(data.decisions),
             "unclassified_rules": _unclassified(data.decisions),
             "levels": _levels(data),

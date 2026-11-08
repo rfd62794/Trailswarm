@@ -1,0 +1,23 @@
+{
+ "run": "explore-20261107-151000-1002",
+ "t": "2026-11-07T15:12:00",
+ "slot": 2,
+ "reason": "no new goal and only 3 new tiles in the last 600 presses",
+ "presses": 60,
+ "map": 35,
+ "x": 10,
+ "y": 8,
+ "segment": "gyarados",
+ "seed": 50,
+ "starter": "bulbasaur",
+ "goal_stage": "gyarados",
+ "signature": {"map": 35, "behaviour": "frontier", "rule": "frontier", "button": "UP", "outcome": "blocked", "sprite_adjacent": false},
+ "signature_key": "35|frontier|frontier|UP|blocked|False",
+ "dominant": {"behaviour": "frontier", "rule": "frontier", "button": "UP", "outcome": "blocked", "rule_share": 1.0, "tiles_in_window": 3, "reversal_share": 0.0},
+ "histogram": {"window": 40, "buttons": {"UP": 40}, "outcomes": {"blocked": 40}, "button_outcome": {"UP:blocked": 40}},
+ "text_on_screen": {"textbox": "none", "recent": []},
+ "sprites_near": [],
+ "start_state": {"state": null, "tag": "seg:gyarados:1-2", "stop_at_goal": "gyarados", "stop_at_map": null, "inputs_dir": null, "state_file": null, "maps_copy": null},
+ "likely_cause": "blocked by a learned wall the planner keeps targeting",
+ "decisions_tail": []
+}

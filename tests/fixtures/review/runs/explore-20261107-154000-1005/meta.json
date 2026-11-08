@@ -1,0 +1,1 @@
+{"synthetic": true, "start": "nugget_bridge", "stop_at_goal": "gyarados", "stop_at_map": null, "tag": "seg:gyarados:1-4", "steps": 3000, "explore_rate": 0.0, "box_pace": 8, "starter": "bulbasaur", "seed": 80, "window": false, "git_sha": "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", "initial_goals": ["to_bill", "gyarados"]}
