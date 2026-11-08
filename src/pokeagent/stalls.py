@@ -13,6 +13,7 @@ from pathlib import Path
 
 TAIL = 60            # decisions kept verbatim in the dossier
 WINDOW = 600         # presses the histogram and the dominants cover
+LOOPS_ROWS = 5000    # loops.jsonl rows scanned for the top vetoed actions
 SPRITE_RADIUS = 2
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 
@@ -134,6 +135,20 @@ def likely_cause(sig: dict, outcomes: dict, text: str, textbox: str, reversal_sh
     return "unclassified: read the decisions tail"
 
 
+def top_vetoed(rows: list[dict], n: int = 5) -> list[dict]:
+    """The n most frequent vetoed (situation, button) groups from a run's loops.jsonl rows (veto +
+    veto_exhausted events). Each entry: {map, x, y, facing, button, rule, count}."""
+    groups: dict[tuple, dict] = {}
+    for r in rows:
+        if r.get("kind") not in ("veto", "veto_exhausted"):
+            continue
+        key = (r.get("map"), r.get("x"), r.get("y"), r.get("facing"), r.get("text"), r.get("button"))
+        g = groups.setdefault(key, {"map": key[0], "x": key[1], "y": key[2], "facing": key[3],
+                                    "button": key[5], "rule": r.get("rule"), "count": 0})
+        g["count"] += 1
+    return sorted(groups.values(), key=lambda g: -g["count"])[:n]
+
+
 def build_dossier(root: Path, run: str, stall: dict | None = None, maps_doc: dict | None = None,
                   anomalies: list[dict] | None = None, rdir: Path | None = None) -> dict | None:
     """Dossier for ``root/runs/<run>`` (or ``rdir``) or None when the run has no decisions. ``stall`` is the stalls.jsonl row."""
@@ -162,6 +177,8 @@ def build_dossier(root: Path, run: str, stall: dict | None = None, maps_doc: dic
     buttons, outcomes = dict(Counter(r.get("button") for r in win)), dict(Counter(r.get("outcome") for r in win))
     rev = sum(1 for r in win if r.get("reversal")) / len(win)
     tiles = len({(r.get("map"), r.get("x"), r.get("y")) for r in win})
+    loops_rows = _jsonl_tail(rdir / "loops.jsonl", LOOPS_ROWS)
+    prog_rows = _jsonl_tail(rdir / "progress.jsonl", 1)
     return {
         "run": run, "t": (stall or {}).get("t"), "slot": (stall or {}).get("slot"),
         "reason": (stall or {}).get("reason"), "presses": (stall or {}).get("presses") or last.get("step"),
@@ -177,6 +194,8 @@ def build_dossier(root: Path, run: str, stall: dict | None = None, maps_doc: dic
         "sprites_near": sprites,
         "start_state": start_state_info(root, meta),
         "likely_cause": likely_cause(sig, outcomes, texts[-1] if texts else "", textbox, rev, tiles),
+        "top_vetoed": top_vetoed(loops_rows),
+        "since_progress": prog_rows[-1].get("since") if prog_rows else None,
         "decisions_tail": win[-TAIL:],
     }
 

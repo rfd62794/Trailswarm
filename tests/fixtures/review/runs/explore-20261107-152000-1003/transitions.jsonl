@@ -1,0 +1,30 @@
+{"step": 1, "from": [37, 4, 10], "button": "UP", "to": [37, 4, 9], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 2, "from": [37, 4, 9], "button": "UP", "to": [37, 4, 8], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 3, "from": [37, 4, 8], "button": "UP", "to": [37, 4, 8], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 4, "from": [37, 4, 8], "button": "UP", "to": [37, 4, 8], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 5, "from": [37, 4, 8], "button": "UP", "to": [37, 4, 8], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 6, "from": [37, 4, 8], "button": "UP", "to": [37, 4, 8], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 7, "from": [37, 4, 8], "button": "UP", "to": [37, 4, 8], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 8, "from": [37, 4, 8], "button": "RIGHT", "to": [37, 5, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 9, "from": [37, 5, 8], "button": "RIGHT", "to": [37, 6, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 10, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 11, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 12, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 13, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 14, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 15, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 16, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 17, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 18, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 19, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 20, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 21, "from": [37, 6, 8], "button": "B", "to": [37, 6, 8], "moved": false, "textbox": "dialog", "text": "BULBASAUR is already out!", "facing": "RIGHT", "source": "agent"}
+{"step": 22, "from": [37, 6, 8], "button": "RIGHT", "to": [37, 7, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 23, "from": [37, 7, 8], "button": "RIGHT", "to": [37, 8, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 24, "from": [37, 8, 8], "button": "RIGHT", "to": [37, 9, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 25, "from": [37, 9, 8], "button": "RIGHT", "to": [37, 10, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 26, "from": [37, 10, 8], "button": "RIGHT", "to": [37, 11, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 27, "from": [37, 11, 8], "button": "RIGHT", "to": [37, 12, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 28, "from": [37, 12, 8], "button": "RIGHT", "to": [37, 13, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 29, "from": [37, 13, 8], "button": "RIGHT", "to": [37, 14, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 30, "from": [37, 14, 8], "button": "RIGHT", "to": [37, 15, 8], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}

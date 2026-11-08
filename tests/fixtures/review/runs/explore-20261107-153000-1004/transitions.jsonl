@@ -1,0 +1,20 @@
+{"step": 1, "from": [36, 3, 10], "button": "UP", "to": [36, 3, 9], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 2, "from": [36, 3, 9], "button": "UP", "to": [36, 3, 8], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 3, "from": [36, 3, 8], "button": "UP", "to": [36, 3, 7], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 4, "from": [36, 3, 7], "button": "UP", "to": [36, 3, 6], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 5, "from": [36, 3, 6], "button": "UP", "to": [36, 3, 5], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 6, "from": [36, 3, 5], "button": "RIGHT", "to": [36, 4, 5], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 7, "from": [36, 4, 5], "button": "RIGHT", "to": [36, 5, 5], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 8, "from": [36, 5, 5], "button": "A", "to": [36, 5, 5], "moved": false, "textbox": "dialog", "text": "Wild RATTATA used TACKLE!", "facing": "RIGHT", "source": "agent"}
+{"step": 9, "from": [36, 5, 5], "button": "A", "to": [36, 5, 5], "moved": false, "textbox": "dialog", "text": "EEVEE used TACKLE!", "facing": "RIGHT", "source": "agent"}
+{"step": 10, "from": [36, 5, 5], "button": "A", "to": [36, 5, 5], "moved": false, "textbox": "dialog", "text": "Wild RATTATA used TAIL WHIP!", "facing": "RIGHT", "source": "agent"}
+{"step": 11, "from": [36, 5, 5], "button": "A", "to": [36, 5, 5], "moved": false, "textbox": "dialog", "text": "EEVEE fainted!", "facing": "RIGHT", "source": "agent"}
+{"step": 12, "from": [36, 5, 5], "button": "A", "to": [5, 6, 6], "moved": false, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 13, "from": [5, 6, 6], "button": "UP", "to": [5, 6, 5], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 14, "from": [5, 6, 5], "button": "UP", "to": [5, 6, 4], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 15, "from": [5, 6, 4], "button": "UP", "to": [5, 6, 3], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 16, "from": [5, 6, 3], "button": "UP", "to": [5, 6, 2], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 17, "from": [5, 6, 2], "button": "UP", "to": [5, 6, 1], "moved": true, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 18, "from": [5, 6, 1], "button": "UP", "to": [5, 6, 1], "moved": false, "textbox": "none", "text": "", "facing": "UP", "source": "agent"}
+{"step": 19, "from": [5, 6, 1], "button": "RIGHT", "to": [5, 7, 1], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}
+{"step": 20, "from": [5, 7, 1], "button": "RIGHT", "to": [5, 8, 1], "moved": true, "textbox": "none", "text": "", "facing": "RIGHT", "source": "agent"}

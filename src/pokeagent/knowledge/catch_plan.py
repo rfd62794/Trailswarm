@@ -16,12 +16,13 @@ from dataclasses import dataclass
 
 from pokeagent.explorer import restock
 from pokeagent.explorer.economy import budget
+from pokeagent.knowledge import catch_math
 from pokeagent.knowledge.encounters import map_name, slot_chances, species_on
 from pokeagent.knowledge.party import species_row
 from pokeagent.knowledge.team_value import BOSS_HORIZON, MemberValue, candidates_for, member_value
 
 TEAM_SIZE = 6
-CATCH_HP_FACTOR = 2.0          # untuned: a weakened (<=35% HP) target is about twice as catchable as the raw (catch_rate + 1) / 256
+PLAN_HP_FRACTION = 0.35        # the weaken target the plan assumes a throw happens at (catch_policy.WEAKEN_TARGET)
 BALL_MARGIN = 2                # spare balls on top of the expected need
 STEPS_PER_BALL = 20            # presses spent on one throw (weaken + ITEM menu); untuned
 MAP_DISTANCE_FALLBACK = 12     # steps per map-id of distance when the learned graph has no path (|map id difference|)
@@ -48,13 +49,14 @@ class CatchAction:
 
 
 def p_catch(catch_rate: int) -> float:
-    """Catch chance of one ball on a weakened target (Catch_Methods_Directive replaces this with the real formula)."""
-    return min(0.95, (catch_rate + 1) / 256 * CATCH_HP_FACTOR)
+    """Catch chance of one Poke Ball on a target weakened to PLAN_HP_FRACTION (knowledge.catch_math's formula)."""
+    return catch_math.p_catch(catch_rate, hp=round(PLAN_HP_FRACTION * 100), hp_max=100)
 
 
 def expected_balls(catch_rate: int) -> int:
     """Balls one catch is expected to need, plus the spare margin."""
-    return math.ceil(1 / p_catch(catch_rate)) + BALL_MARGIN
+    throws = catch_math.expected_throws(p_catch(catch_rate))
+    return (math.ceil(throws) if math.isfinite(throws) else 999) + BALL_MARGIN
 
 
 def map_prior_xp(row: dict, base_exp: dict) -> float:

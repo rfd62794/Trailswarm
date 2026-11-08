@@ -1,0 +1,12 @@
+{"step": 1, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 35, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 2, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 34, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 3, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 33, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 4, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 32, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 5, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 31, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 6, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 10, "y": 30, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 7, "behaviour": "frontier", "rule": "frontier", "button": "LEFT", "map": 35, "x": 10, "y": 29, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 8, "behaviour": "guards", "rule": "menu_back_out", "button": "B", "map": 35, "x": 9, "y": 29, "goal_stage": "gyarados", "box": true, "battle": false, "outcome": "menu", "reversal": false}
+{"step": 9, "behaviour": "guards", "rule": "menu_back_out", "button": "B", "map": 35, "x": 9, "y": 29, "goal_stage": "gyarados", "box": true, "battle": false, "outcome": "menu", "reversal": false}
+{"step": 10, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 9, "y": 29, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 11, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 9, "y": 28, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}
+{"step": 12, "behaviour": "frontier", "rule": "frontier", "button": "UP", "map": 35, "x": 9, "y": 27, "goal_stage": "gyarados", "box": false, "battle": false, "outcome": "moved", "reversal": false}

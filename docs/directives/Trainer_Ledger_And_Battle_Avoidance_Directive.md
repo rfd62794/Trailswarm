@@ -143,11 +143,13 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-trainer-ledger-and-battle-avoidan-996cc6 |
 | Base branch | - |
 | Base commit | 0e8aa6571457986e193ec7e1ad3b7171198f4d31 |
+| Head commit | d7926e0f68ff69aeb6ac4f13c602fe921b55f67d |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 16:19 · robert-claude-laptop · none → Draft — Claude 2026-11-07: trainer ledger (per-save beaten state), next-target/avoid/save, resistance report
@@ -156,4 +158,6 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:25 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; provenance rule; lint_override: dispatch-path-missing greenfield/gitignored
 - 2026-11-07 19:05 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (same override as Team_Builder_V2 and Catch_Methods); Robert's 2026-11-07 direction queued this row
 - 2026-11-07 19:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-trainer-ledger-and-battle-avoidan-996cc6; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7JXG3SBDHA0C29DGGMWEV
+- 2026-11-07 19:08 · dispatcher · launched pid=8212; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-trainer-ledger-and-battle-avoidan-996cc6; provisioned: uv sync --frozen
+- 2026-11-07 19:29 · devin · In progress → Review — [origin] spent: devin 21 min est. n/a
 <!-- queue:end -->
