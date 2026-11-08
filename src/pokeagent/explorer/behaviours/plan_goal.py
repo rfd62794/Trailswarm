@@ -9,11 +9,11 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
-from pokeagent.explorer.training import gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
+from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import area_grind, par_follow, train_route
-from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
-from pokeagent.knowledge import blackout_tax
+from pokeagent.knowledge import blackout_tax, team_plan, trainers
 from pokeagent.knowledge.cut_learner import LEARNER_STEP_CAP
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
@@ -64,10 +64,17 @@ class PlanGoal(BehaviourBase):
         party_all = our_party(ctx.emu) if not ctx.view.battling else []   # real stats and moves; skipped mid-battle
         party = [c for c in party_all if c.name != "MAGIKARP"]  # the trainee never fights a boss: readiness judges the real team
         verdict = readiness_for(goals_now_all, party)
-        if verdict and verdict.text != ctx.readiness_note:
-            ctx.readiness_note = verdict.text
+        nv = boss_need_for(goals_now_all, party_all)  # the TEAM gate: judges every slot, not only the lead
+        st = team_plan.of(ctx)
+        st["breakers"] = team_plan.band_breakers(party_all, team_plan.level_band(party_all, nv.need)) if nv else ()
+        note = nv.text if nv else (verdict.text if verdict else "")
+        if note and note != ctx.readiness_note:
+            ctx.readiness_note = note
             extra = extras.get(ctx.stage_goal, 0.0)
-            ctx.log(f"[readiness] {verdict.text} (score {verdict.score:+.2f}, need L{verdict.required})"
+            score = nv.team_score if nv else verdict.score
+            weak = f", weak slots {','.join(str(s + 1) for s in nv.weak_slots)}" if nv and nv.weak_slots else ""
+            lead = f", lead slot {nv.lead_slot + 1}" if nv else ""
+            ctx.log(f"[readiness] {note} (score {score:+.2f}, need L{nv.need if nv else verdict.required}{lead}{weak})"
                     f"{f' (+{extra:.2f} blackout margin)' if extra > 0 else ''}", "res")
         team = team_for(goals_now_all, party_all)  # the hurt-lead verdict: is a second member useful for the boss?
         if team and team.text != ctx.team_note:
@@ -81,12 +88,12 @@ class PlanGoal(BehaviourBase):
                 ctx.team_ready_ok = ctx.had_team_ready = True  # the sim says the party beats the next boss
             else:
                 ctx.team_ready_ok = False
-        need, clamp = required_level(goals_now_all, ctx.opts.train_level, party)
+        need, clamp = required_level(goals_now_all, ctx.opts.train_level, party_all)
         if clamp != ctx.clamp_note:
             ctx.clamp_note = clamp
             if clamp:
                 ctx.log(f"[readiness] {clamp}", "res")
-        ul = under_level_note(goals_now_all, party, ctx.opts.train_level)
+        ul = under_level_note(goals_now_all, party_all, ctx.opts.train_level)
         if ul != ctx.under_level_note:
             ctx.under_level_note = ul
             if ul:
@@ -99,7 +106,19 @@ class PlanGoal(BehaviourBase):
         need = area_grind.capped_need(ctx, m, need, lead_level(ctx.emu), bool(goals_now_all.get("to_route2")))
         need = train_need(ctx, goals_now_all, need)  # bandit decision point: grind or skip (unchanged when off)
         ctx.train_need = need  # frontier reads it to seek grass while below the target
-        training_live = 0 < lead_level(ctx.emu) < need
+        lead = lead_level(ctx.emu)
+        pressure = team_plan.grind_pressure(party_all, need, self._boss_gap(ctx, m, x, y), ctx.blackouts_row,
+                                            breakers=st.get("breakers", ()), ready=bool(nv and nv.ready), lead_level=lead)
+        if pressure != st.get("pressure"):
+            ctx.log(f"[team_plan: grind pressure {st.get('pressure')} -> {pressure}]", "res")
+            st["pressure"] = pressure
+        if pressure >= team_plan.GRIND_PRESSURE_START and need > 0:
+            if not st.get("grinding"):
+                ctx.log(f"[team_plan: grind latch on at pressure {pressure:.2f}]", "res")
+            st["grinding"] = True
+        elif pressure < team_plan.GRIND_PRESSURE_STOP and st.pop("grinding", None):
+            ctx.log(f"[team_plan: grind latch off at pressure {pressure:.2f}]", "res")
+        training_live = 0 < lead < need
         if team_ready_stage:
             self._team_ready_idle(ctx, training_live, lead_level(ctx.emu))
         else:
@@ -112,6 +131,18 @@ class PlanGoal(BehaviourBase):
         ctx.train_route_live = bool(team_ready_stage and training_live)
         if planned is None and team_ready_stage and training_live:
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp_now, mx_now)  # no planner target: go to the grass
+        # the team gate holds at the gym door: while not ready the planner's stage push must not enter
+        gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
+        if nv is not None and not nv.ready and gym is not None:
+            self._leader_avoid(ctx, m, gym)
+            if m == gym or self._enters(ctx, m, x, y, planned, gym):
+                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)
+        elif st.get("grinding") and need > 0:
+            grind = self._grind_step(ctx, m, x, y, hp_now, mx_now)
+            errands = ("checkpoint", "heal", "pokecenter", "parcel", "potion", "magikarp", "mom")
+            if grind is not None and (planned is None or planned[1].startswith("goal ")
+                    and not any(k in planned[1].lower() for k in errands)):
+                planned = grind
         if planned and planned[1].startswith("goal checkpoint"):
             ck = ctx.__dict__["ckpt_steps"]; ck[5] = ck.get(5, 0) + 1  # Vermilion is the only checkpoint town so far
         if planned and "at Mom, talking" in planned[1]:
@@ -139,6 +170,58 @@ class PlanGoal(BehaviourBase):
                      and MAGIKARP in species)
         named = slot is not None and 0 <= slot < len(species) and species[slot] == MAGIKARP
         return max(need, EVOLVE_LEVEL + TEAM_GAP) if plan_pick or named else need
+
+    @staticmethod
+    def _boss_gap(ctx: ExplorerContext, m: int, x: int, y: int) -> int:
+        """Learned-world route steps to the stage boss's gym map (trainers.GYM_BOSSES), or NEAR_STEPS
+        when the stage has no gym map or no path is known: "no data" reads as far away, never urgent."""
+        gym = (trainers.GYM_BOSSES.get(ctx.stage_goal or "") or (None, None, None))[2]
+        if gym is None:
+            return team_plan.NEAR_STEPS
+        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
+        p = g.path((m, x, y), lambda n: n[0] == gym)
+        return len(p) if p is not None else team_plan.NEAR_STEPS
+
+    @staticmethod
+    def _enters(ctx: ExplorerContext, m: int, x: int, y: int, planned, gym: int) -> bool:
+        """True when the planned directional press takes a learned warp onto the gym map."""
+        if not planned or planned[0] not in ("UP", "DOWN", "LEFT", "RIGHT"):
+            return False
+        dest = ctx.mem.data["maps"].get(str(m), {}).get("warps", {}).get(f"{x},{y},{planned[0]}")
+        return bool(dest) and dest[0] == gym
+
+    @staticmethod
+    def _leader_avoid(ctx: ExplorerContext, m: int, gym: int) -> None:
+        """On the gym map while not ready: keep the leader's (and gym trainers') sight lines temp-blocked
+        for routing (trainer_route.block_sight, PR #158) so frontier cannot walk into them."""
+        if m != gym:
+            return
+        from pokeagent.explorer import trainer_route
+        from pokeagent.explorer.trainer_hooks import current_party, ledger_for
+        led = ledger_for(ctx)
+        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
+        st = team_plan.of(ctx)
+        key = (m, tuple(e.idx for e in led.entries(m) if e.state != "beaten"))
+        quiet = st.get("avoid_key") == key   # one log line per unbeaten-set change, not per step
+        st["avoid_key"] = key
+        for o in trainer_route.options(led, m, (m, x, y), g, 0, current_party(ctx)):
+            if o.action == "avoid":
+                trainer_route.block_sight(ctx, o, lambda n, gm=gym: n[0] != gm, quiet=quiet)
+
+    @staticmethod
+    def _grind_step(ctx: ExplorerContext, m: int, x: int, y: int, hp: int, mx: int):
+        """The grind decision while the pressure latch holds or the gym door blocks: Grind_Points'
+        grind_episode.start once that directive lands (it owns WHERE to grind; this one owns WHO trains
+        and WHEN grinding outranks the plan), until then the Route 24 training route."""
+        try:
+            from pokeagent.explorer import grind_episode
+        except ImportError:
+            grind_episode = None
+        if grind_episode is not None and getattr(grind_episode, "start", None):
+            step = grind_episode.start(ctx)
+            if step is not None:
+                return step
+        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx)
 
     @staticmethod
     def _team_ready_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:

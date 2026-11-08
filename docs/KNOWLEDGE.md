@@ -139,6 +139,23 @@ Move meaning: `knowledge/moves.py` maps each ROM effect byte to an `Effect`; eve
 Party readiness (`knowledge/readiness.py`) replaces the fixed training-level table: it simulates our party (RAM stats, known moves) against the boss
 party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only the fallback when the data or the party is missing.
 
+Team management (`knowledge/team_plan.py`, pure): the training gate judges the WHOLE party - `boss_need` runs the same
+best-switch fight, then asks what level EACH slot alone would need to pass, so the verdict names "raise slot k to L" whichever
+slot the strong mon sits in (the marathon run fought Misty with a weak L12 in slot 0 and a L23 Charmeleon in slot 3). While the
+verdict is "not ready" the planner never enters a gym map (`trainers.GYM_BOSSES` ids) and the leader's guessed sight line is
+temp-blocked so frontier cannot walk into it. The lead is chosen by matchup before a known boss or an unbeaten trainer target
+(`choose_lead`: best first-turn damage ratio, then HP fraction, then level); on a grind the lowest band breaker leads instead -
+`level_band` asks the lead for the boss level and others within `BAND_BELOW` (4) of it, so the breaker is sent out first and
+swapped on turn one for the Gen 1 shared exp, exactly like the Magikarp trainee (same `trainee_slot_for` mechanism, generalised).
+Mid-battle in trainer fights `switch_choice` picks a switch when the active member is "thin" (foe's best hit over
+`SWITCH_HP_TURNS` = 2 turns >= its HP, or its best move does <= `WEAK_RATIO` = 0.5 of the foe's HP) and a healthy member beats
+its damage ratio by `SWITCH_GAIN` = 1.5 - max `MAX_SWITCHES_PER_BATTLE` = 2 switches a battle. `grind_pressure` (0..1) is the
+one knob `plan_goal` reads for WHEN grinding outranks the plan: band breakers over team size + level gap + recent blackouts +
+a proximity bonus as the boss nears; above `GRIND_PRESSURE_START` (0.5) a grind episode is latched (Grind_Points owns WHERE;
+`train_route` until it lands), below `GRIND_PRESSURE_STOP` (0.2) it releases. At a full party a wanted catch is thrown only
+when a `release_candidate` exists (lowest-value member, never the trainee or a needed HM learner); the box prompt then answers
+YES and the mark lands in the catch record.
+
 ## Poke Mart, text speed, text prompt (ROM-verified 2026-11-05)
 
 Probed headless in the Viridian Mart (map 42, 0x2A) from `oaks_parcel.state` (player at the clerk, (2,5)), with `shop.buy()` driving it.

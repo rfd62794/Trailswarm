@@ -47,9 +47,12 @@ def magikarp_offer(question: str) -> bool:
     return "magikarp" in q and " 500 " in q and "nickname" not in q and "name" not in q.split()
 
 
-def yesno_answer(question: str, starter: str = "any", buy_magikarp: bool = False, offer_text: str = "") -> tuple[str, str]:
+def yesno_answer(question: str, starter: str = "any", buy_magikarp: bool = False, offer_text: str = "",
+                 release_pending: bool = False) -> tuple[str, str]:
     q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "
     pitch = " " + "".join(ch for ch in (offer_text or question).lower() if ch.isalnum() or ch == " ") + " "
+    if release_pending and (" deposit " in q or " box " in q):
+        return "YES", "a party-full catch marked a member for deposit"  # never "release": that deletes the mon
     if "magikarp" in pitch and " for just " in pitch and "nickname" not in pitch and not magikarp_offer(pitch):
         return "NO", "a MAGIKARP pitch, but not the 500 offer"
     if magikarp_offer(offer_text or question):  # YES only for this offer at 500, and only while the buy_magikarp goal is open

@@ -10,25 +10,69 @@ from __future__ import annotations
 
 import re
 
+from dataclasses import replace
+
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
+from pokeagent.explorer.kb import ROM_KB
+from pokeagent.knowledge import team_plan
+from pokeagent.knowledge.party import our_party, trainer_mon
+from pokeagent.knowledge.readiness import best_move
 from pokeagent.magikarp import MAGIKARP, MAX_RUNS, party_species, switch_candidate, trainee_slot_for
-from pokeagent.ramstructs import read_battle_mon
+from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 MAX_PRESSES = 30  # a switch is about 6 presses; past this the menus are not what we think: fight on
 
 
 def trainee_out(ctx: ExplorerContext) -> int | None:
     """Party slot of the switch-trainee actually out in this battle, else None. The active mon only counts when its
-    own party_pos AND species agree with the trainee slot (a Magikarp party: identical to the old species match)."""
-    t = trainee_slot_for(ctx.emu, ctx.train_member)
+    own party_pos AND species agree with the trainee slot (a Magikarp party: identical to the old species match).
+    The trainee slot is the exp-spread rotation's pick: a named weak member or the lowest band breaker, never only
+    the Magikarp (team_plan.of(ctx)["breakers"] is published by plan_goal each step)."""
+    t = trainee_slot_for(ctx.emu, ctx.train_member, team_plan.of(ctx).get("breakers") or ())
     if t is None:
         return None
     b, sp = read_battle_mon(ctx.emu), party_species(ctx.emu)
     return t if b.party_pos == t and t < len(sp) and b.species == sp[t] else None
+
+
+def _foe(ctx: ExplorerContext):
+    """The enemy Combatant at its CURRENT hp for the matchup maths, else None (no ROM data)."""
+    e = read_enemy_mon(ctx.emu)
+    name = (ROM_KB or {}).get("name_of_internal", {}).get(str(e.species))
+    foe = trainer_mon(name, e.level) if name else None
+    return replace(foe, hp=max(1, e.hp)) if foe is not None else None
+
+
+def matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
+    """(slot, why) of team_plan.switch_choice for this TRAINER battle, or None: the active member is
+    "thin" (the foe's best hit over SWITCH_HP_TURNS turns meets or beats its HP, or its best move does
+    <= WEAK_RATIO of the foe's HP) and a healthy member beats its damage ratio by SWITCH_GAIN."""
+    bv = ctx.bv
+    if bv is None or getattr(bv, "kind", None) != 2:  # a wild battle (1), or a view stub without a kind
+        return None
+    bl = ctx.battle_log or {}
+    n_sw = bl.get("matchup_switches", 0)
+    party, foe = our_party(ctx.emu), _foe(ctx)
+    b = read_battle_mon(ctx.emu)
+    if not party or foe is None or not (0 <= b.party_pos < len(party)):
+        return None
+    hp_now = [m.hp for m in read_party(ctx.emu)]
+    pick = team_plan.switch_choice(party, b.party_pos, foe, None, hp_now=hp_now, switches=n_sw,
+                                   trainee=trainee_slot_for(ctx.emu, ctx.train_member))
+    if pick is None:
+        return None
+    from pokeagent.knowledge.kb import table
+    chart = {(a, d): e for a, d, e in table(None, "type_chart")}
+    moves, active = table(None, "moves"), party[b.party_pos]
+    cur = hp_now[b.party_pos] if b.party_pos < len(hp_now) else active.hp
+    inc = best_move(foe, active, chart, moves)[0]
+    why = (f"thin: foe hits {inc:.0f}x{team_plan.SWITCH_HP_TURNS} vs {cur} HP" if inc * team_plan.SWITCH_HP_TURNS >= cur
+           else f"weak: best hit <= {team_plan.WEAK_RATIO:.0%} of foe")
+    return pick, why
 
 
 def switch_press(frames: list[str], screen: list[str], cur: int, target: int) -> str | None:
@@ -68,7 +112,9 @@ class SwitchOut(BehaviourBase):
     def applies(self, ctx: ExplorerContext) -> bool:
         if not ctx.view.battling or ctx.bv is None or ctx.switch_gave_up == ctx.battles:
             return False
-        return ctx.switch_train is not None or trainee_out(ctx) is not None
+        st = team_plan.of(ctx)
+        return (ctx.switch_train is not None or trainee_out(ctx) is not None
+                or st.get("matchup") is not None or matchup_pick(ctx) is not None)
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         sw = ctx.switch_train
@@ -78,7 +124,7 @@ class SwitchOut(BehaviourBase):
                 ctx.magikarp_shared += 1
                 ctx.log(f"[{sw['rule']}: done after {sw['presses']} presses (Magikarp shared {ctx.magikarp_shared} battles)]", "res")
                 ctx.switch_train = None
-            return None
+            return self._matchup_step(ctx)
         target = switch_candidate(ctx.emu, t)
         tm = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
         if target is None:
@@ -115,3 +161,36 @@ class SwitchOut(BehaviourBase):
             ctx.log("[switch_train: gave up (menus did not behave); fighting with the Magikarp]", "res")
             return Decision("B", "switch_train_failed", "switch_train abandoned: backing out of the menu")
         return Decision(btn, sw["rule"], f"{sw['rule']} (press {sw['presses']})")
+
+    def _matchup_step(self, ctx: ExplorerContext) -> Decision | None:
+        """The matchup switch in a trainer battle: PKMN -> the better member -> SWITCH, once per
+        decision, the per-battle count kept on the battle record (team_plan.MAX_SWITCHES_PER_BATTLE)."""
+        st = team_plan.of(ctx)
+        b = read_battle_mon(ctx.emu)
+        mu = st.get("matchup")
+        if mu and mu.get("battle") != ctx.battles:
+            mu = None; st.pop("matchup", None)
+        if mu and b.party_pos == mu["target"]:  # the swap landed
+            if ctx.battle_log is not None:
+                ctx.battle_log["matchup_switches"] = ctx.battle_log.get("matchup_switches", 0) + 1
+            ctx.log(f"[{mu['rule']}: done after {mu['presses']} presses]", "res")
+            st.pop("matchup", None)
+            return None
+        tm = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
+        pick = (mu["target"], mu["why"]) if mu else matchup_pick(ctx)
+        if pick is None:
+            return None
+        btn = switch_press(frame_lines(tm), screen_lines(tm), ctx.emu.read(MENU_ITEM), pick[0])
+        if btn is None:
+            return None  # text scrolling / animation: the usual dialog handling runs
+        if mu is None:
+            names = species_names(ctx.emu)
+            who = names[b.party_pos] if 0 <= b.party_pos < len(names) else "?"
+            mu = st["matchup"] = {"battle": ctx.battles, "target": pick[0], "presses": 0, "why": pick[1],
+                                  "rule": f"switch_matchup: {who} -> {names[pick[0]]} ({pick[1]})"}
+        mu["presses"] += 1
+        if mu["presses"] > MAX_PRESSES:
+            ctx.switch_gave_up = ctx.battles; st.pop("matchup", None)
+            ctx.log("[switch_matchup: gave up (menus did not behave); fighting on]", "res")
+            return Decision("B", "switch_matchup_failed", "switch_matchup abandoned: backing out of the menu")
+        return Decision(btn, mu["rule"], f"{mu['rule']} (press {mu['presses']})")

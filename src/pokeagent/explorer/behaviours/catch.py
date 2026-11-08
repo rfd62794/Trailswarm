@@ -20,13 +20,32 @@ from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines
 from pokeagent.explorer.perceive import frame_lines
 from pokeagent.goals import bag_contents
 from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE, status_kind
+from pokeagent.knowledge.catch_plan import TEAM_SIZE
 from pokeagent.knowledge.catch_policy import decide, may_throw_ctx
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import our_party, species_row, trainer_mon
+from pokeagent.knowledge import team_plan
+from pokeagent.magikarp import trainee_slot_for
 from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
 BALL_NAME = {"POKE": "POKe BALL", "GREAT": "GREAT BALL", "ULTRA": "ULTRA BALL", "MASTER": "MASTER BALL"}
+
+
+def full_party_slot(ctx: ExplorerContext, party) -> int | None:
+    """The member a full party marks for deposit when a wanted catch lands, else None: the lowest-value
+    member (its level when no member scoring is at hand), never the trainee, never a learner the run
+    still needs. The caught mon goes to the PC box; the mark is what a later deposit prompt answers."""
+    if len(party or ()) < TEAM_SIZE:
+        return None
+    from pokeagent.explorer.catch_list import HM_MOVE, hm_table, upcoming_needs
+    needs, hm = upcoming_needs(ctx.goals()), hm_table()
+    protected = {i for i, c in enumerate(party)
+                 if any(n in HM_MOVE and (c.name in hm.get(n, ()) or HM_MOVE[n] in c.moves) for n in needs)}
+    t = trainee_slot_for(ctx.emu, ctx.train_member)
+    if t is not None:
+        protected.add(t)
+    return team_plan.release_candidate(party, protected=protected, values=[c.level for c in party])
 
 
 def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_max: int,
@@ -80,6 +99,18 @@ class Catch(BehaviourBase):
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
+        # Party full: throw only when the plan marks a member for deposit (the box prompt answers YES,
+        # the mark is recorded on the catch attempt); otherwise the catch is skipped with "party full".
+        release_slot = None
+        if want and len(read_party(ctx.emu)) >= TEAM_SIZE:
+            release_slot = full_party_slot(ctx, our_party(ctx.emu))
+            if release_slot is None:
+                if ctx.catch_skip_logged != ctx.catch_want[0]:
+                    ctx.catch_skip_logged = ctx.catch_want[0]
+                    ctx.log(f"[catch: skipping {sp_name}: party full]", "res")
+                return None
+            team_plan.of(ctx)["release_pending"] = {"species": sp_name, "slot": release_slot}
+            ctx.log(f"[catch: party full - slot {release_slot + 1} marked for deposit for {sp_name}]", "res")
         gave_up = ctx.catch_switch[0] == ctx.catch_want[0] and ctx.catch_switch[1] > MAX_PRESSES
         if gave_up or not (want and balls and dex_no and e_max and may_throw_ctx(ctx)
                            and (not owned or want.startswith(("can learn", "planned")))):
@@ -109,7 +140,8 @@ class Catch(BehaviourBase):
             ball_id = BALLS.get(hint.ball, POKE_BALL)           # unknown names fall back to the Poke Ball
             ball_name = BALL_NAME.get(hint.ball, "POKe BALL")
             ctx.catch_attempt = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2),
-                                 "step": ctx.step, "dex": dex_no, "ball": hint.ball}
+                                 "step": ctx.step, "dex": dex_no, "ball": hint.ball,
+                                 **({"release_slot": release_slot} if release_slot is not None else {})}
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
             dec = item_step(ctx, lines_now, cur_c, ball_id, ball_name,
                             f"CATCH {hint.ball or 'POKE'} at {ratio:.0%} HP (p={hint.p:.2f})")
