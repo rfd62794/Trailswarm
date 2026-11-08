@@ -152,7 +152,7 @@ Diff stat, test tails, the exact test lines changed in `tests/test_cli.py`, the 
 | Branch | directive/pokeagent-game-spec-package-directive |
 | Base branch | - |
 | Base commit | 2c60008e99b6c8358bd35e53bf0ccd895a51283e |
-| Head commit | 438c8d7f511985ddb629cdd117e525db45a79160 |
+| Head commit | 34159f39625d7571b4c65a66864c93b43fb6676d |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
