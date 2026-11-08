@@ -9,6 +9,7 @@ from pokeagent.novelty import steer as novelty_steer
 
 REVERSE_PENALTY = 2   # visits added to a direction that undoes the last successful move (choose_local)
 TABU_LEN = 8          # tiles stood on in the last N moves on a map count +1 visit in choose_local
+PATROL_REVERSE_PENALTY = 10_000  # no frontier left: walk on, turn round only when no other way is open (no dithering)
 RETARGET_MARGIN = 3   # a new frontier must be this many steps closer to replace the committed target
 
 
@@ -77,15 +78,24 @@ def _frontier_move(ctx: ExplorerContext, m: int, x: int, y: int, allowed=None) -
 
 def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=None, allowed=None, grass: str = "neutral"):
     """The shared explore pick: greedy neighbour choice, or the committed frontier route when every
-    neighbour was already seen."""
-    name, why, want_frontier = ctx.mem.choose_local(
-        m, x, y, ctx.facing, ctx.view.tm, ctx.emu.read(0xD367),
-        avoid_maps=avoid_maps, grass=grass,
-        last_dir=ctx.last_dir, tabu=_tabu(ctx, m), reverse_penalty=REVERSE_PENALTY)
+    neighbour was already seen. With no frontier reachable the greedy pick would balance visit counts and
+    dither between two tiles (Cerulean Gym corridor, 2026-11-07: 50-75% reversals), so it patrols instead."""
+    def pick(reverse_penalty: int):
+        return ctx.mem.choose_local(
+            m, x, y, ctx.facing, ctx.view.tm, ctx.emu.read(0xD367),
+            avoid_maps=avoid_maps, grass=grass,
+            last_dir=ctx.last_dir, tabu=_tabu(ctx, m), reverse_penalty=reverse_penalty)
+    name, why, want_frontier = pick(REVERSE_PENALTY)
     if not want_frontier:
         return name, why
     step = _frontier_move(ctx, m, x, y, allowed)
-    return step if step else (name, why)
+    if step:
+        return step
+    p_name, p_why, _ = pick(PATROL_REVERSE_PENALTY)
+    if allowed is not None and grind_episode.leaves_set(ctx, p_name, allowed):
+        # a patrol step must not leave the episode's map set either: the plain pick if it stays, else A in place
+        return (name, why) if not grind_episode.leaves_set(ctx, name, allowed) else ("A", "episode boundary: patrol stays on the map set")
+    return p_name, f"{p_why} (no frontier: patrolling)"
 
 
 class ExploreBurst(BehaviourBase):

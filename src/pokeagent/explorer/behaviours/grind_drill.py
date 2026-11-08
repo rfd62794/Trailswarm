@@ -10,6 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer import grind_episode, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.perceive import party_hp
+from pokeagent.explorer.trainee_gate import trainee_check
 from pokeagent.legs.grass import pace_button, to_grass
 
 
@@ -31,10 +32,11 @@ class GrindDrill(BehaviourBase):
     def applies(self, ctx) -> bool:
         m = getattr(ctx.opts, "drill_grind", None)
         if m is not None:
-            return ctx.view.m == m and not ctx.view.box and not ctx.view.battling
+            return (ctx.view.m == m and not ctx.view.box and not ctx.view.battling
+                    and trainee_check(ctx).ok)   # a drill never starts with a fainted trainee (pure read; StatusCare acts)
         if ctx.view.box or ctx.view.battling:
             return False
-        return grind_episode.update(ctx) is not None
+        return trainee_check(ctx).ok and grind_episode.update(ctx) is not None   # same gate on the self-started path
 
     def step(self, ctx) -> Decision | None:
         ep = grind_episode.active(ctx)

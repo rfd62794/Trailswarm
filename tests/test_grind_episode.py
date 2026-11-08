@@ -132,3 +132,18 @@ def test_frontier_plan_never_routes_through_a_forbidden_map(tmp_path):
     plan = ctx.mem.frontier_plan(35, 10, 35)            # synthetic: without the guard it goes via map 3
     assert plan is not None and plan[0] == (35, 9, 35) and plan[1][0] == "UP"
     assert ctx.mem.frontier_plan(35, 10, 35, allowed={35, 64}) is None
+
+
+def test_patrol_fallback_never_leaves_the_episode_map_set(tmp_path):
+    """Synthetic: map 35 fully explored (no frontier), its only way on is the learned warp UP to map 3. The
+    patrol fallback (PR #164) must not take it while an episode holds {35, 64}; with no episode it may."""
+    from pokeagent.explorer.behaviours.frontier import _memory_step
+    maps = {"35": {"visited": {"10,35": 5}, "blocked": ["10,35,DOWN", "10,35,LEFT", "10,35,RIGHT"],
+                   "warps": {"10,35,UP": [3, 10, 35]}, "encounters": {}},
+            "3": {"visited": {"10,35": 1}, "blocked": [], "warps": {"10,35,DOWN": [35, 10, 35]}, "encounters": {}}}
+    ctx = make_ctx(tmp_path, m=35, x=10, y=35, maps=maps)
+    ctx.mem.recent_talk |= {"10,35,DOWN", "10,35,LEFT", "10,35,RIGHT"}
+    free = _memory_step(ctx, 35, 10, 35)[0]
+    bounded = _memory_step(ctx, 35, 10, 35, allowed=frozenset({35, 64}))[0]
+    assert free == "UP"                                   # no episode: the warp is the way on
+    assert bounded != "UP"                                # the episode boundary holds for the patrol too

@@ -7,15 +7,22 @@ from __future__ import annotations
 
 import math
 
-from pokeagent.explorer.economy.prices import HEAL_HP, POTION, SUPER_POTION, price
+from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, HEAL_HP, POTION, SUPER_POTION, price
 
 HEAL_ITEMS = tuple(sorted(HEAL_HP, key=HEAL_HP.get))   # smallest heal first: (POTION, SUPER_POTION)
 POTION_HP = HEAL_HP[POTION]                              # one "Potion-equivalent" = 20 HP
+CURE_ITEMS = (ANTIDOTE, FULL_HEAL)                     # status cures: Antidote, or the pricier Full Heal standing in
 
 
 def heal_count(bag: dict) -> int:
     """Heal items carried (any kind)."""
     return sum(max(0, bag.get(i, 0)) for i in HEAL_ITEMS)
+
+
+def cure_count(bag: dict) -> int:
+    """Status-cure items carried (Antidote / Full Heal). NOT in HEAL_ITEMS: they restore no HP, so bag_hp and
+    potion_floor maths are untouched."""
+    return sum(max(0, bag.get(i, 0)) for i in CURE_ITEMS)
 
 
 def bag_hp(bag: dict) -> int:
@@ -56,4 +63,4 @@ def buy_choice(need_hp: int, stock, afford: int):
     return (cheap[0][1], afford // cheap[0][0]) if cheap else None
 
 
-__all__ = ["HEAL_ITEMS", "HEAL_HP", "POTION", "SUPER_POTION", "bag_hp", "buy_choice", "heal_count", "pick_for_missing", "potion_equivalents"]
+__all__ = ["HEAL_ITEMS", "CURE_ITEMS", "HEAL_HP", "POTION", "SUPER_POTION", "bag_hp", "buy_choice", "cure_count", "heal_count", "pick_for_missing", "potion_equivalents"]

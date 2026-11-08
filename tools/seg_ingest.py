@@ -18,6 +18,7 @@ from pathlib import Path
 
 from pokeagent import checkpoint_goals as cg
 from pokeagent import statefp
+from pokeagent.segment_grades import run_ts
 from pokeagent.segment_names import BEST_SUFFIX
 from seg_store import KEEP_ATTEMPTS, fps, input_path, job_dir, layout, remove_tree, stat
 
@@ -70,9 +71,42 @@ def calibrate(doc: dict, run: Path) -> None:
         prev_s, prev_f = r["step"], r["frame"]
 
 
-def build_attempt(run: Path, meta: dict, stop: str, milestones: dict | None = None, per_step: float = 10.5) -> dict:
+def _battle_index(root: Path) -> dict[str, int]:
+    """run name -> blackout count, from ONE pass over the shared runs/battles.jsonl."""
+    out: dict[str, int] = {}
+    try:
+        for r in _jl(root / "runs" / "battles.jsonl"):
+            if r.get("outcome") == "blackout" and r.get("run"):
+                out[r["run"]] = out.get(r["run"], 0) + 1
+    except OSError:
+        pass
+    return out
+
+
+def _provenance(root: Path, tag: str | None, meta: dict) -> str:
+    """``organic`` | ``synthetic`` | ``unknown``: the start state's lineage (statefp). The job's kept
+    start copy is the best evidence; meta["start"] (a path or a checkpoint name) is the fallback.
+    unknown when no start resolves - never guessed."""
+    lineage = getattr(statefp, "lineage", None)
+    if lineage is None:
+        return "unknown"                                 # no lineage reader (pre-#147 code)
+    start = _job_record(root, tag).get("start") if tag else None
+    if not start:
+        s = meta.get("start")
+        if s:
+            cands = [Path(str(s)), root / "baselines" / f"{s}.state", root / "runs" / "checkpoints" / f"{s}.state"]
+            start = next((str(c) for c in cands if c.exists()), None)
+    if not start:
+        return "unknown"
+    return "organic" if lineage(Path(start)) == "organic" else "synthetic"
+
+
+def build_attempt(run: Path, meta: dict, stop: str, milestones: dict | None = None, per_step: float = 10.5,
+                  root: Path | None = None, battle_index: dict | None = None) -> dict:
     """One attempt. Old runs have no goal_frames.jsonl: their solve comes from milestones.json with frames ESTIMATED
-    (steps x calibrated frames per press) and flagged ``est`` - good for solve rates, never trusted as a best."""
+    (steps x calibrated frames per press) and flagged ``est`` - good for solve rates, never trusted as a best.
+    The scorecard fields (git_sha/ts/blackouts/stalled/provenance/loops) are additive: runs without them
+    grade as unknown."""
     gf = next((r for r in _jl(run / "goal_frames.jsonl") if r["goal"] == stop), None)
     steps = len(_jl(run / "transitions.jsonl"))
     est = False
@@ -80,10 +114,18 @@ def build_attempt(run: Path, meta: dict, stop: str, milestones: dict | None = No
         ms = next((e for e in (milestones or {}).get(stop, []) if e["run"] == run.name), None)
         if ms:
             gf, est = {"step": ms["step"], "frame": round(ms["step"] * per_step)}, True
+    tag = meta.get("tag") or ""
+    loops = run / "loops.jsonl"
     return {"run": run.name, "solved": gf is not None, "frames": gf["frame"] if gf else 0, "est": est,
             "steps": gf["step"] if gf else steps, "seed": meta.get("seed"), "starter": meta.get("starter"),
             "explore_rate": meta.get("explore_rate"), "box_pace": meta.get("box_pace"), "budget": meta.get("steps"), "maps": _maps_seen(run),
-            "tagged": bool(meta.get("tag")), "outside": sum(1 for r in _jl(run / "transitions.jsonl") if r.get("source", "agent") != "agent")}
+            "tagged": bool(tag), "outside": sum(1 for r in _jl(run / "transitions.jsonl") if r.get("source", "agent") != "agent"),
+            "git_sha": meta.get("git_sha") or None, "ts": run_ts(run.name),
+            "blackouts": battle_index.get(run.name, 0) if battle_index is not None else None,
+            "stalled": ((root / "runs" / "stalls" / f"{run.name}.json").exists() if root is not None else None),
+            "provenance": _provenance(root, tag, meta) if root is not None else "unknown",
+            "loops": sum(1 for r in _jl(loops) if r.get("kind") == "veto") if loops.exists() else None,
+            "rejoin": "rejoin" in tag}
 
 
 def _stop_name(seg) -> str:
@@ -209,12 +251,19 @@ def ingest(root: Path, doc: dict, finished_tags: set[str] = frozenset(), quiet_s
     ``finished_tags`` (its process exited) or nothing in its folder changed for ``quiet_s`` (not a live agent's).
     ``failed_tags`` are jobs the stall watchdog stopped: a real failure even though they used little of their budget."""
     segs = {s.key: s for s in layout(doc)}
+    for g in doc["splits"]:   # a rejoin probe targets the parent goal the split hid: route it to the parent bucket
+        if g not in segs:
+            piece = next((s for s in layout(doc) if s.goal == g), None)
+            if piece is not None:
+                from seg_store import Segment
+                segs[g] = Segment(g, g, piece.start, g, g, None)
     done = set(doc["ingested"])
     n = 0
     try:
         milestones = json.loads((root / "runs" / "milestones.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         milestones = {}
+    battle_index = _battle_index(root)   # one pass for every run this call ingests
     runs = sorted((root / "runs").glob("explore-*"), key=lambda p: p.name)  # names start with the start time
     for run in runs:
         if run.name in done or not (run / "meta.json").exists():
@@ -232,7 +281,7 @@ def ingest(root: Path, doc: dict, finished_tags: set[str] = frozenset(), quiet_s
         if seg is None:
             continue
         calibrate(doc, run)
-        att = build_attempt(run, meta, _stop_name(seg), milestones, fps(doc))
+        att = build_attempt(run, meta, _stop_name(seg), milestones, fps(doc), root=root, battle_index=battle_index)
         if (not att["solved"] and not confirm_of and meta.get("tag") not in failed_tags
                 and att["budget"] and att["steps"] < ABORTED_BELOW * att["budget"]):
             release_input(root, doc, meta.get("tag"))
