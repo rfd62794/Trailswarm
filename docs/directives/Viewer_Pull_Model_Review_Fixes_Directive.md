@@ -94,15 +94,18 @@ Head sha, diff stat, wc -l line, test tails, the magic value and header layout y
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-viewer-pull-model-review-fixes-directive |
 | Base branch | directive/pokeagent-viewer-pull-model-directive |
 | Base commit | d4eb21e656c76fdc1c31416779ebe1a610ec405d |
+| Head commit | 3bb985b3b5b932c6f8cf52c108d7581d4de1ec22 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 22:01 · robert-claude-laptop · none → Queued — Review fixes for PR #167 (Sonnet: frame-slot layout guard, telemetry tests, web frames, logged fallbacks, real grade column); approve with base_branch = the PR branch
 - 2026-11-07 22:01 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; starts from the PR branch because the sandbox refuses git merge
 - 2026-11-07 22:02 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WHPF4V6WT6VR566NF3FSV0
 - 2026-11-07 22:06 · dispatcher · launched pid=19608; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-viewer-pull-model-review-fixes-directive; provisioned: uv sync --frozen
+- 2026-11-07 22:14 · devin · In progress → Review — Head 3bb985b (pushed). DIFF: 12 files, +711/-44. wc -l: telemetry.py 217, swarm_rows.py 208, model.py 175, web.py 116, swarm_page.py 65, all viewer/world files <300. MAGIC: SLOT_MAGIC=0x504B4147 u32 at offset 20 (was reserved); v2 header documented in telemetry.py docstring: 0..8 u64 seq (seqlock), 8..10 u16 w, 10..12 u16 h, 12..16 u32 pid, 16..20 u32 layout, 20..24 u32 magic, 24..32 f64 reader_ts; slot_layout returns 2 only when layout==2 AND magic matches, size kept as secondary guard (v1 attach-side page-rounding can fake the size). FINDINGS: (1) magic guard applied + publisher stamps it. (2) new tests/test_frame_slot_layout.py: v2 header round-trip, hand-built v1 slot with first pixels 02 00 00 00 read at offset 16, heartbeat v2-only byte-for-byte untouched elsewhere, stale(0.0)->fresh heartbeat via reader_ts/READER_LIVE_S=2.0. (3) KNOWLEDGE.md compat line: upgrade viewers before agents or restart World view (old viewer on new v2 reads frames 16 bytes late). (4) ViewerModel.want_frames(frames, ttl_s): second demand channel merged in _due (max rate wins, dead agents still skipped, lazy expiry); web.py declares CARD_FRAME_HZ per listed agent on /data and per id on /frame.png, WEB_WANT_S=5.0. (5) swarm_rows: central _seg_store() lazy tools/ shim (review/segments.py mechanism, no segments_io shim exists), warn-once module logging, excepts narrowed to (ImportError)/(OSError, ValueError, TypeError)/(KeyError, TypeError, AttributeError) - what the callees raise on torn/malformed docs. (6) grade column = scorecard flags via segment_grades.grade_all once per 1 Hz refresh, displayed as the review CLI's flag words (held(reason)/solved/optimized/stale/BROKEN/synth?). NOTE: PR #161's segment_grades.py + segment_par.py were absent from this branch's base (merged to main after branch cut); vendored verbatim from origin/main - identical blobs, merges clean. (7) swarm_page docstring SWARM_PANE->SWARM_PAGE; new world-view+stadium-hidden+unfocused empty-set test. TESTS: targeted 17 files: 158 passed, 1 skipped (ROM-gated test_world_view). FULL: 1936 passed, 40 skipped, 0 failed in 136.58s. One non-essential check command (git hash-object on the vendored files) was refused; verified content was verbatim from git show instead - no impact. [origin] spent: devin 8 min est. n/a
 <!-- queue:end -->
