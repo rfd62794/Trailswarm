@@ -168,23 +168,54 @@ def room_for(want: int, root: Path, **kw) -> tuple[int, str]:
     return n, why
 
 
-def _try_acquire(path: Path) -> bool:
+def _try_acquire(path: Path) -> str | None:
+    """Create the lock with its token already inside: write a sibling temp file, then os.link it onto path
+    (fails if path exists; on Windows also when the target is delete-pending). Returns the token, or None."""
+    token = f"{os.getpid()}:{uuid.uuid4().hex}"
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return False
-    os.write(fd, str(os.getpid()).encode())
-    os.close(fd)
-    return True
+        tmp.write_text(token, encoding="utf-8")
+        try:
+            os.link(tmp, path)
+        except OSError:  # FileExistsError: busy; PermissionError: delete-pending target on Windows
+            return None
+        return token
+    finally:
+        _unlink(tmp)
 
 
+def _lock_pid(text: str) -> int:
+    """Pid recorded in a lock file: the part before ':' (token form), or the whole content when there is no
+    colon, so old pid-only lock files from a running swarm still parse."""
+    text = text.strip()
+    if ":" in text:
+        text = text.split(":", 1)[0]
+    return int(text or 0)
+
+
+def _unlink(path: Path) -> None:
+    """Unlink a lock file while concurrent readers may still hold it open. Windows denies the delete
+    (PermissionError) for as long as another thread's read_text keeps a handle on it, so retry briefly -
+    read windows are microseconds. Other OSError (or a persistent failure) leaves the file for the
+    caller's retry loop."""
+    for _ in range(100):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.01)
+        except OSError:
+            return
 
 
 def _stale(path: Path) -> bool:
     try:
         if time.time() - path.stat().st_mtime > LOCK_STALE_S:
             return True
-        return process_state(int(path.read_text().strip() or 0)) == "gone"
+        content = path.read_text()
+        if not content:
+            return False  # a file mid-write by an old-format writer is live, not stale
+        return process_state(_lock_pid(content)) == "gone"
     except (OSError, ValueError):
         return True
 
@@ -194,20 +225,37 @@ def lock_held(root: Path) -> bool:
     return path.exists() and not _stale(path)
 
 
+TAKEOVER_STALE_S = 5.0
+
+
 def _take_over(path: Path) -> None:
-    """Atomically move a stale lock aside (rename succeeds for exactly one waiter), then discard it. If what we
-    moved turns out to be live (a rival re-created it between our check and the rename), put it back."""
-    tomb = path.with_name(f"{path.name}.stale.{os.getpid()}.{uuid.uuid4().hex}")
+    """Remove a stale lock exactly once: takers serialise on path + '.takeover' (O_EXCL), re-check staleness
+    inside, unlink, release. A crashed taker's side lock older than TAKEOVER_STALE_S is removed first."""
+    side = path.with_name(path.name + ".takeover")
     try:
-        os.rename(path, tomb)
+        if time.time() - side.stat().st_mtime > TAKEOVER_STALE_S:
+            side.unlink(missing_ok=True)
     except OSError:
-        return  # someone else got there first
-    if not _stale(tomb):
+        pass
+    try:
+        fd = os.open(side, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except OSError:
+        return  # another taker is inside; the caller loops and re-tries acquire
+    try:
+        os.close(fd)
         try:
-            os.link(tomb, path)
+            ident = (path.stat().st_ino, path.stat().st_mtime_ns)
         except OSError:
-            pass
-    tomb.unlink(missing_ok=True)
+            return  # the file vanished between the caller's check and ours: nothing left to remove
+        if _stale(path):
+            try:
+                same = (path.stat().st_ino, path.stat().st_mtime_ns) == ident
+            except OSError:
+                same = False  # vanished or replaced while we judged it: do not delete the new file
+            if same:
+                _unlink(path)
+    finally:
+        _unlink(side)
 
 
 @contextmanager
@@ -216,7 +264,7 @@ def spawn_lock(root: Path, wait_s: float = 0.0):
     _runs(root).mkdir(parents=True, exist_ok=True)
     path = _runs(root) / "spawn.lock"
     end = time.monotonic() + wait_s
-    while not _try_acquire(path):
+    while (token := _try_acquire(path)) is None:
         if _stale(path):
             _take_over(path)
             continue
@@ -227,7 +275,7 @@ def spawn_lock(root: Path, wait_s: float = 0.0):
         yield
     finally:
         try:  # a supervisor handoff may have re-pointed the lock at its successor: then it is not ours to release
-            if path.read_text().strip() == str(os.getpid()):
-                path.unlink(missing_ok=True)
+            if path.read_text().strip() == token:
+                _unlink(path)
         except OSError:
             pass
