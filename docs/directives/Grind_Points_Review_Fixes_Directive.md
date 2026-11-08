@@ -113,15 +113,18 @@ connections or only warps.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-grind-points-review-fixes-directive |
 | Base branch | directive/pokeagent-grind-points-directive |
 | Base commit | b1178e588de8da2d36554c7e574b21c7aedb5207 |
+| Head commit | df7cb3e09e38eef8fbad1f7bd7380fa1112a35f7 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 21:40 · robert-claude-laptop · none → Queued — Review fixes for PR #165 (Sonnet: 1 blocker restart thrash + 8 should-fixes); approve with base_branch = the PR branch once the fixer's main merge is pushed
 - 2026-11-07 21:49 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; starts from the PR branch (main merged at b1178e5) because the sandbox refuses git merge
 - 2026-11-07 21:49 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WGZZBSBJWA3D9SD90TDT6A
 - 2026-11-07 21:55 · dispatcher · launched pid=27836; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-grind-points-review-fixes-directive; provisioned: uv sync --frozen
+- 2026-11-07 22:10 · devin · In progress → Review — All 9 items applied + tested. Head df7cb3e. Diff: 21 files, +561/-124 (new grind/points_io.py, tests/test_train_route.py). wc -l: points 270, measure 113, atlas 104, grind_episode 271, grind_drill 96, frontier 151, train_route 83, context 299 - all under 300. Tests: targeted suite 106 passed 1 skipped; full suite 1988 passed 40 skipped 0 failed. Constants: EPISODE_COOLDOWN=300, MIN_EPISODE_STEPS=50, NO_POINT_RECHECK=200. Item highlights: (1) restart-thrash fixed - start gates check every _end_reason at start, cooldown after any end, aborted rows (<50 steps or 0 battles) logged but never folded; (2) applies() is a pure read (active() or under-level flag), start/finish moved to engine grind_episode.tick; (3) start gated on center_intent/goto/proc; (4) hunts (Learner/Team/Trainer) off during episodes, OutsideSet now covers warps + warp_cand one-sighting edges + recorded paths edges - a never-taken edge is still unknowable (limit noted in KNOWLEDGE.md); (5) all named silent excepts log once via module logger; (6) atlas.frames_per_step() is lru-cached + lazy, runs/ resolved from checkout root, scan capped to newest 20 names; (7) _finish uses measure.xp_gained_in_episode (levels.jsonl delta, exp_total fallback); (8) grind_episode.start(ctx, reason)->bool added; (9) tests/test_train_route.py added. OutsideSet covers edge connections recorded in memory (warps, warp_cand, paths) - not only warps. [origin] spent: devin 15 min est. n/a
 <!-- queue:end -->
