@@ -4,7 +4,7 @@ This is the old ``agent_step()`` closure's job, minus the window and the HTTP AP
 """
 from __future__ import annotations
 
-from pokeagent.explorer import grind_episode, loop_veto, party_log, trainer_ledger
+from pokeagent.explorer import grind_episode, loop_veto, party_log, retalk_memory, trainer_ledger
 from pokeagent.explorer.behaviours import default_behaviours
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -56,6 +56,7 @@ class Engine:
         self.last_decision = decision
         why_veto = veto(ctx, decision)
         if why_veto:  # the policy table says this talk teaches nothing: B instead of A (keeps the loop guards counting)
+            retalk_memory.note(ctx, decision)  # and the planner must not choose this talk again
             decision = Decision("B", "retalk_veto", why_veto, behaviour=decision.behaviour)
         why_toss = toss_veto(ctx.view.lines, decision)
         if why_toss:  # a toss screen is up: nothing may advance it, whichever behaviour pressed (B backs out, NO then A declines)
