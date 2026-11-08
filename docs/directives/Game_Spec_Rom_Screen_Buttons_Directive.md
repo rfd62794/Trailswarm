@@ -154,12 +154,14 @@ Diff stat, test tails, both grep outputs, the new files' line counts, which modu
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-game-spec-rom-screen-buttons-directive |
 | Base branch | - |
+| Base commit | 7c77bd14454c0e360efe5c75a2b8660a54d62404 |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude: plan phase 3; do not approve before Game_Spec_Package merged
 - 2026-11-08 17:55 · robert-claude-laptop · Queued → Approved
+- 2026-11-08 18:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-spec-rom-screen-buttons-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6YS01SP57K82E3R97Q4VVE7
 <!-- queue:end -->
