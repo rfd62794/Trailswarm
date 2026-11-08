@@ -85,3 +85,15 @@ def test_the_attempt_record_is_stable_across_presses(tmp_path, monkeypatch):
     s0 = first["step"]
     _choose(sel, ctx, ITEM_LIST)
     assert ctx.catch_attempt is first and first["step"] == s0     # the turn signature does not change per press
+
+
+def test_a_stale_attempt_from_an_earlier_battle_does_not_keep_a_list_open(tmp_path, monkeypatch):
+    ctx = _ctx(tmp_path, monkeypatch)
+    sel = Selector([Battle(), Catch()])
+    monkeypatch.setattr(catch_mod, "_policy_hint", lambda *a, **k: CatchStep("skip", why="x"))
+    # left behind by a battle that ended without Battle popping it (blackout / flee): fresh step, old battle number
+    ctx.catch_attempt = {"species": 36, "level": 5, "step": ctx.step, "dex": 16, "battle": ctx.battles - 1,
+                         "presses": 3, "last": ctx.step + 1, "hp_pct": 0.3}
+    ctx.catch_mode = True
+    d = _choose(sel, ctx, ITEM_LIST)
+    assert d is not None and d.rule == "item_list_close"

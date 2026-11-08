@@ -100,7 +100,8 @@ def catch_owns_bag(ctx: ExplorerContext) -> bool:
     CATCH_BAG_FRESH steps and catch_mode is on. Battle runs BEFORE Catch in the registry, so without this its
     "stray item list" close fired on the very list Catch had just opened (A/B alternation, 2026-11-07)."""
     ca = ctx.catch_attempt
-    return bool(ctx.catch_mode and ca and ctx.step - ca.get("last", -10**9) <= CATCH_BAG_FRESH)
+    return bool(ctx.catch_mode and ca and ca.get("battle") == ctx.battles   # a stale attempt (blackout/flee) owns nothing
+                and ctx.step - ca.get("last", -10**9) <= CATCH_BAG_FRESH)
 
 
 def close_unwanted_list(ctx: ExplorerContext, lines: list[str]) -> Decision | None:

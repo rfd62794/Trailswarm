@@ -26,7 +26,7 @@ from pokeagent.knowledge.party import our_party, species_row, trainer_mon
 from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
-CATCH_BAG_PRESSES = 60   # bag presses without a throw landing before the catch sequence is abandoned (a throw is ~8)
+CATCH_BAG_PRESSES = 60   # bag presses without a throw landing before the catch sequence is abandoned (a throw is about 4 presses plus the scroll depth)
 BALL_NAME = {"POKE": "POKe BALL", "GREAT": "GREAT BALL", "ULTRA": "ULTRA BALL", "MASTER": "MASTER BALL"}
 
 
