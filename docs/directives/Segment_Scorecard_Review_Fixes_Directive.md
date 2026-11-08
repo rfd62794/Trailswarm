@@ -84,3 +84,17 @@ Expected: each under 300.
 ## Report
 
 Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you could not do.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Review fixes for PR #161 (Sonnet CHANGES-NEEDED, five should-fixes); branch merges PR #161's branch first
+<!-- queue:end -->
