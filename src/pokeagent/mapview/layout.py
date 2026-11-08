@@ -20,6 +20,14 @@ class Layout:
     space_h: int
 
 
+DEFAULT_GAP = 32
+
+
+def gap_for(preset) -> int:
+    """The preset's own stacking gap, or ``DEFAULT_GAP`` for a preset that does not ask for one (0)."""
+    return int(getattr(preset, "area_gap_px", 0) or 0) or DEFAULT_GAP
+
+
 def place(areas: list[Area], max_row_width: int = 4096, gap: int = 32, label_h: int = LABEL_H) -> Layout:
     """Row height is the tallest area plus ``label_h`` plus ``gap``; an area wider than
     ``max_row_width`` gets a row to itself. Image offsets sit ``label_h`` below the row top."""

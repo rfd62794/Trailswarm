@@ -9,14 +9,13 @@ A record older than ``STALE_S`` counts as absent, so a stopped writer leaves no 
 from __future__ import annotations
 
 import json
-import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
-SCHEMA = 1
+from pokeagent.mapview.live_schema import SCHEMA, safe_name, valid as _valid
+
 STALE_S = 5.0                  # a record this old counts as gone (the writer stopped)
-MAX_COORD = 1e9                # same sanity bound the ghost reader uses
 
 
 @dataclass(frozen=True)
@@ -29,20 +28,8 @@ class LivePos:
     screen_x: int | None
     screen_y: int | None
     updated_at: float
-
-
-def _valid(rec) -> bool:
-    if not isinstance(rec, dict) or rec.get("schema") != SCHEMA:
-        return False
-    if not all(isinstance(rec.get(k), str) for k in ("agent", "run", "area")):
-        return False
-    if not all(type(rec.get(k)) in (int, float) and math.isfinite(rec[k]) and abs(rec[k]) < MAX_COORD
-               for k in ("x", "y")):
-        return False
-    t = rec.get("updated_at")
-    if type(t) not in (int, float) or not math.isfinite(t):
-        return False
-    return all(v is None or type(v) is int for v in (rec.get("screen_x"), rec.get("screen_y")))
+    screen_w: int | None = None   # the sprite's own tile box, when the writer knows it
+    screen_h: int | None = None
 
 
 def write_live(source: Path, record: dict) -> None:
@@ -51,7 +38,8 @@ def write_live(source: Path, record: dict) -> None:
     if not _valid(record):
         return
     live = Path(source) / "live"
-    path, tmp = live / f"{record['agent']}.json", live / f"{record['agent']}.json.tmp"
+    stem = safe_name(record["agent"])
+    path, tmp = live / f"{stem}.json", live / f"{stem}.json.tmp"
     try:
         live.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps(record), encoding="utf-8")
@@ -72,7 +60,7 @@ def read_live(path) -> LivePos | None:
     sx, sy = rec["screen_x"], rec["screen_y"]
     return LivePos(rec["agent"], rec["run"], rec["area"], float(rec["x"]), float(rec["y"]),
                    None if sx is None else int(sx), None if sy is None else int(sy),
-                   float(rec["updated_at"]))
+                   float(rec["updated_at"]), rec.get("screen_w"), rec.get("screen_h"))
 
 
 class LiveStore:
@@ -101,6 +89,10 @@ class LiveStore:
             try:
                 s = path.stat()
             except OSError:
+                if fname in self._files:                  # transient: keep the last good record
+                    live[fname] = self._files[fname]
+                    if fname in self._fresh and now - live[fname][1].updated_at <= STALE_S:
+                        fresh.add(fname)
                 continue
             stamp = (s.st_mtime_ns, s.st_size)
             rec = self._files.get(fname)
@@ -114,6 +106,8 @@ class LiveStore:
                     self._bad[fname] = stamp
                 else:
                     self._bad.pop(fname, None)
+            if pos is None and rec is not None:
+                pos = rec[1]                              # transient read failure: keep the last good one
             if pos is None:
                 continue
             live[fname] = (stamp, pos)

@@ -18,6 +18,7 @@ from pokeagent.mapview.compose import agent_rows, compose_base  # noqa: F401  (r
 from pokeagent.mapview.layout import LABEL_H, Layout, locate
 from pokeagent.mapview.presets import resolve
 from pokeagent.mapview.texcache import TexCache
+from pokeagent.mapview.smooth import Smoother
 from pokeagent.mapview.walk import LiveTracker
 from pokeagent.world.follow import Follow
 from pokeagent.world.pyramid import Pyramid
@@ -37,7 +38,7 @@ class MapWindow:
         self.trails, self.marks, self.follow_best = True, True, False
         self.follow_live = self._follow_touched = False
         self.preset, self.preset_note = resolve(), ""
-        self._live_pts, self._track = {}, None
+        self._live_pts, self._track, self._smooth = {}, None, Smoother()
         self.status, self.uploads, self.base_builds = "", 0, 0   # uploads/builds are test-visible
         self.base = self.pyr = self._snap = self._built_key = self._pending_tables = self._built_imgs = None
         self.tables = playback.tables((), (), fps)
@@ -60,7 +61,7 @@ class MapWindow:
         self.follow_live = self.preset.follow_default == "live"
         self.preset_note = "unknown preset" if self.preset.name.endswith("?") else ""
         if self._track is None or self._track.walk_frames != self.preset.walk_frames:
-            self._track = LiveTracker(self.preset.walk_frames)
+            self._track = LiveTracker(self.preset.walk_frames, hold=8)
         if self.follow_live and snap.live and not self.follow.active and not self._follow_touched:
             self._set_follow_best(True)                     # follow live is the preset default
         # Pixels and layout only: a ``seen``-only change redraws the label, not the base.
@@ -155,7 +156,7 @@ class MapWindow:
             self._use_pending()
         self.frame = playback.positions(self.tables, self.clock.t)
         self.best = best_index(self.tables.ghosts, self.tables.area_names)
-        self._live_pts = self._live_points()
+        self._live_pts = self._smooth.step(self._live_points(), dt)
         self._follow_tick(now, dt)
         self.overlay_img = overlay.render(self.frame, self.tables, self.layout, self.vp.visible(),
                                           self.vp.zoom, trails=self.trails,

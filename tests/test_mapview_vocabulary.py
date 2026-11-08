@@ -9,7 +9,8 @@ EXEMPT = {"presets.py"}
 LIMITS = {"__init__.py": 40, "areas.py": 150, "layout.py": 120, "ghosts.py": 150,
           "playback.py": 200, "overlay.py": 200, "best.py": 60, "view.py": 280, "app.py": 150,
           "texcache.py": 80, "compose.py": 60, "live.py": 130, "presets.py": 120, "edges.py": 90,
-          "avatars.py": 150, "avatar_rom.py": 70, "walk.py": 70, "controls.py": 120}
+          "avatars.py": 150, "avatar_rom.py": 70, "walk.py": 70, "controls.py": 120,
+          "ghost_avatars.py": 60, "live_schema.py": 40, "smooth.py": 40, "holder.py": 60, "fast_live.py": 60}
 
 
 def test_no_game_words_in_the_package():

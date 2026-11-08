@@ -11,6 +11,7 @@ import zlib
 
 import numpy as np
 
+from pokeagent.mapview.ghost_avatars import ghost_groups
 from pokeagent.mapview.playback import TRAIL_POINTS, Frame, Tables
 
 MAX_TRAIL_PIXELS = 20000   # trail points per frame; beyond this, trails are decimated evenly
@@ -140,43 +141,22 @@ def render(frame: Frame, tb: Tables, layout, rect, zoom, palette: np.ndarray = P
     if (count := len(tb.ghosts)) and tb.area_names:
         ox, oy, known = _offsets(tb, layout)
         if known.any():
-            colors = np.stack([palette[color_index(a, len(palette))] for a in tb.agents])
+            names, inv = np.unique(np.asarray(tb.agents), return_inverse=True)
+            colors = palette[[color_index(str(n), len(palette)) for n in names]][inv.ravel()]
             if trails: _trails(out, frame, tb, ox, oy, known, colors, x0, y0, zoom, w, h)
             ai = np.clip(frame.area.astype(np.intp), 0, len(known) - 1)
             ok = (frame.area >= 0) & (frame.area < len(known)) & known[ai]
             hx, hy = (ox[ai] + frame.xs - x0) * zoom, (oy[ai] + frame.ys - y0) * zoom
-            sel, have = np.array([k for k in range(count) if k != best and ok[k]], np.intp), np.zeros(count, bool)
-            if avatars is not None:
-                ct, groups = [tuple(int(c) for c in colors[k]) for k in range(count)], {}
-                pi, gi = np.clip(frame.idx.astype(np.intp) - 1, 0, None), np.arange(count)
-                ok_prev = (frame.idx > 0) & (tb.area_idx[gi, pi] == frame.area)
-                dx, dy = (np.where(ok_prev, frame.xs - tb.xs[gi, pi], 0.0),
-                          np.where(ok_prev, frame.ys - tb.ys[gi, pi], 0.0))
-                moved = (dx != 0) | (dy != 0)
-                facs = np.where(dx >= 0, "RIGHT", "LEFT")
-                phs = np.zeros(count, np.intp)
-                if walk_frames:
-                    facs = np.where(moved, np.where(np.abs(dx) >= np.abs(dy), facs,
-                                    np.where(dy >= 0, "DOWN", "UP")), "DOWN")
-                    phs = np.where(moved, frame.idx // 6 % 2 + 1, 0)
-                got = {}
-                for k in sel:
-                    if not (0 <= hx[k] < w and 0 <= hy[k] < h):
-                        continue                        # only heads inside the rectangle
-                    key = (tb.agents[k], facs[k], int(phs[k]))
-                    if key not in got:
-                        got[key] = avatars.get(tb.agents[k], facs[k], int(phs[k]), ct[k])
-                    if (img := got[key]) is not None:
-                        have[k] = True
-                        groups.setdefault(id(img), (img, []))[1].append(k)
-                for img, ks in groups.values():         # resample once per picture
-                    s = _zoom_img(img, zoom, avatar_size)
-                    if ((s[..., 3] > 0) & (s[..., 3] < 255)).any():
-                        for k in ks:                    # partial alpha: blend per head
-                            _stamp(out, s, hx[k], hy[k])
-                    else:
-                        _stamp_all(out, s, np.round(hx[ks] - s.shape[1] / 2).astype(np.intp),
-                                   np.round(hy[ks] - s.shape[0] / 2).astype(np.intp))
+            sel, have = np.flatnonzero(ok & (np.arange(count) != (-1 if best is None else best))), np.zeros(count, bool)
+            for img, ks in ghost_groups(avatars, frame, tb, sel, hx, hy, colors, w, h, walk_frames):
+                have[ks] = True
+                s = _zoom_img(img, zoom, avatar_size)           # resample once per picture
+                if ((s[..., 3] > 0) & (s[..., 3] < 255)).any():
+                    for k in ks:                                # partial alpha: blend per head
+                        _stamp(out, s, hx[k], hy[k])
+                else:
+                    _stamp_all(out, s, np.round(hx[ks] - s.shape[1] / 2).astype(np.intp),
+                               np.round(hy[ks] - s.shape[0] / 2).astype(np.intp))
             if len(sq := sel[~have[sel]]):
                 r = np.arange(side) - side // 2
                 px = np.broadcast_to(np.round(hx[sq]).astype(np.intp)[:, None, None] + r[None, :, None],
@@ -190,7 +170,7 @@ def render(frame: Frame, tb: Tables, layout, rect, zoom, palette: np.ndarray = P
                 _square(out, hx[best], hy[best], side + 2, BEST_EDGE)
                 _square(out, hx[best], hy[best], side, BEST_RGB)
             if show_marks:
-                dead = frame.finished & np.array([o in DEATH_OUTCOMES for o in tb.outcomes]) & ok
+                dead = frame.finished & np.isin(np.asarray(tb.outcomes), list(DEATH_OUTCOMES)) & ok
                 cx, cy = np.round(hx[dead]).astype(np.intp), np.round(hy[dead]).astype(np.intp)
                 arms, span = np.array([-2, -1, 0, 1, 2, 0, 0, 0, 0]), np.array([0, 0, 0, 0, 0, -2, -1, 1, 2])
                 mx, my = (cx[:, None] + arms).ravel(), (cy[:, None] + span).ravel()

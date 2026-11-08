@@ -35,8 +35,9 @@ def phase_from(index: int, moved: bool, walk_frames: bool) -> int:
 class LiveTracker:
     """(facing, phase) per agent across reads: the previous point plus a step counter."""
 
-    def __init__(self, walk_frames: bool) -> None:
-        self.walk_frames, self.prev, self.facing, self.steps = walk_frames, {}, {}, {}
+    def __init__(self, walk_frames: bool, hold: int = 0) -> None:
+        """``hold``: unchanged reads a walk phase survives after a move (a window reads faster than the writer moves)."""
+        self.walk_frames, self.hold, self.prev, self.facing, self.steps, self.idle = walk_frames, hold, {}, {}, {}, {}
 
     def update(self, agent: str, area: str, x: float, y: float) -> tuple[str, int]:
         last = self.prev.get(agent)
@@ -46,5 +47,6 @@ class LiveTracker:
         self.facing[agent] = face
         if moved:
             self.steps[agent] = self.steps.get(agent, 0) + 1
+        self.idle[agent] = 0 if moved else self.idle.get(agent, self.hold) + 1
         self.prev[agent] = (area, x, y)
-        return face, phase_from(self.steps.get(agent, 0), moved, self.walk_frames)
+        return face, phase_from(self.steps.get(agent, 0), self.idle[agent] <= self.hold, self.walk_frames)

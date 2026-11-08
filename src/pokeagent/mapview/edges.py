@@ -63,8 +63,9 @@ def draw_edges(base: np.ndarray, areas_layout, colours: dict[str, str], width: i
         except ValueError:
             continue
         x0, y0, x1, y1 = x - width, y - width, x + w + width, y + h + width
-        spans = ((y0, y0 + width, x0, x1), (y1 - width, y1, x0, x1),
-                 (y0 + width, y1 - width, x0, x0 + width), (y0 + width, y1 - width, x1 - width, x1))
+        lx, ty = max(x0, 0), max(y0, 0)         # an area at the very edge keeps its left/top line (on its pixels)
+        spans = ((ty, ty + width, x0, x1), (y1 - width, y1, x0, x1),
+                 (y0 + width, y1 - width, lx, lx + width), (y0 + width, y1 - width, x1 - width, x1))
         for ya, yb, xa, xb in spans:
             ya, yb, xa, xb = max(0, ya), min(H, yb), max(0, xa), min(W, xb)
             if ya < yb and xa < xb:

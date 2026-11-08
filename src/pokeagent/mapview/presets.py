@@ -27,7 +27,7 @@ class Preset:
     follow_default: str           # "live" | "best"
     status_fields: tuple[str, ...]
     walk_frames: bool             # facing + walk phase apply
-    area_gap_px: int              # world px between stacked areas (0 = none)
+    area_gap_px: int              # world px between stacked areas; 0 = the layout default
     edge_palette: tuple[str, ...] # hex colours; empty = no edge lines
 
 
@@ -37,7 +37,7 @@ GENRES = {
     "rpg-overworld": Preset("rpg-overworld", "rpg-overworld", "grid", "rom_sprite", 18, "dots", 90,
                             "live", ("segment",), True, 0, ()),
     "flip-screen": Preset("flip-screen", "flip-screen", "strip", "frame_crop", 16, "line", 90,
-                          "live", ("segment",), False, 8, EDGE_PALETTE),
+                          "live", ("segment",), False, 0, EDGE_PALETTE),
 }
 
 GAMES = {

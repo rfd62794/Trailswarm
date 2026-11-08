@@ -10,51 +10,21 @@ import argparse
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from pokeagent.mapview import playback
 from pokeagent.mapview.areas import AreaStore
 from pokeagent.mapview.avatars import AvatarCache, AvatarSource, feed
+from pokeagent.mapview.fast_live import live_loop
 from pokeagent.mapview.ghosts import GhostStore
-from pokeagent.mapview.layout import Layout, place
+from pokeagent.mapview.holder import Holder, Snapshot  # noqa: F401  (re-exported for callers)
+from pokeagent.mapview.layout import gap_for, place
 from pokeagent.mapview.live import LiveStore
 from pokeagent.mapview.presets import Preset, resolve
 from pokeagent.mapview.view import MapWindow
 from pokeagent.mapview.walk import LiveTracker
 
 REFRESH_S = 2.0
-
-
-@dataclass(frozen=True)
-class Snapshot:
-    """One immutable view of the source dir passed to the window."""
-
-    source: Path
-    found: bool
-    areas: tuple
-    images: dict
-    layout: Layout
-    tables: playback.Tables
-    live: dict = field(default_factory=dict)
-    preset: Preset = field(default_factory=resolve)
-    agent_status: object = None              # a host-supplied snapshot for the status line
-
-
-class Holder:
-    """The latest snapshot, swapped whole under a lock; the UI thread only calls ``get``."""
-
-    def __init__(self, snap: Snapshot) -> None:
-        self._lock = threading.Lock()
-        self._snap = snap
-
-    def get(self) -> Snapshot:
-        with self._lock:
-            return self._snap
-
-    def set(self, snap: Snapshot) -> None:
-        with self._lock:
-            self._snap = snap
 
 
 def snapshot_once(source: Path, areas: AreaStore, ghosts: GhostStore, fps: int = playback.FPS,
@@ -67,7 +37,7 @@ def snapshot_once(source: Path, areas: AreaStore, ghosts: GhostStore, fps: int =
     if live is not None:
         changed = live.refresh(source, time.time()) or changed
     snap = Snapshot(Path(source), Path(source).exists(), tuple(areas.areas), dict(areas.images),
-                    place(areas.areas, gap=preset.area_gap_px),
+                    place(areas.areas, gap=gap_for(preset)),
                     playback.tables(ghosts.ghosts, ghosts.area_names, fps),
                     live.positions() if live else {}, preset)
     return snap, changed
@@ -106,8 +76,10 @@ def run(source, fps: int = playback.FPS, refresh: float = REFRESH_S, game=None, 
     holder = Holder(snap)
     stop = threading.Event()
     threading.Thread(target=poll_loop, daemon=True, name="mapview-refresh",
-                     args=(source, holder, areas, ghosts, live, cache, frame_for, preset,
+                     args=(source, holder, areas, ghosts, live, cache, None, preset,
                            fps, refresh, stop)).start()
+    threading.Thread(target=live_loop, daemon=True, name="mapview-live",
+                     args=(source, holder, cache, frame_for, preset, stop)).start()
     dpg.create_context()
     win = MapWindow(holder.get(), fps=fps, avatars=AvatarSource(cache, preset, provider))
     win.build()
