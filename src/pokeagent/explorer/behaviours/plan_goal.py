@@ -138,9 +138,18 @@ class PlanGoal(BehaviourBase):
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp_now, mx_now)  # no planner target: go to the grass
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
-        if nv is not None and not nv.ready and gym is not None:
-            self._leader_avoid(ctx, m, gym)
-            if m == gym or self._enters(ctx, m, x, y, planned, gym):
+        hold = nv is not None and not nv.ready and gym is not None
+        if hold and st.get("gate_lifted") is not None:
+            hold = False  # the grind budget is spent: the hold must not lock the run out of the gym forever
+            if st.get("gate_skip_logged") != ctx.stage_goal:
+                st["gate_skip_logged"] = ctx.stage_goal
+                ctx.log(f"[team gate: grind budget spent ({ctx.grind.reason(st['gate_lifted'])}); "
+                        f"gym hold lifted for {ctx.stage_goal}]", "res")
+        if hold:
+            self._leader_avoid(ctx, m, x, y, gym)
+            if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
+                planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, hp_now, mx_now)
+            elif self._enters(ctx, m, x, y, planned, gym):
                 planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)
         elif st.get("grinding") and need > 0:
             grind = self._grind_step(ctx, m, x, y, hp_now, mx_now)
@@ -196,7 +205,7 @@ class PlanGoal(BehaviourBase):
         return bool(dest) and dest[0] == gym
 
     @staticmethod
-    def _leader_avoid(ctx: ExplorerContext, m: int, gym: int) -> None:
+    def _leader_avoid(ctx: ExplorerContext, m: int, x: int, y: int, gym: int) -> None:
         """On the gym map while not ready: keep the leader's (and gym trainers') sight lines temp-blocked
         for routing (trainer_route.block_sight, PR #158) so frontier cannot walk into them."""
         if m != gym:
@@ -229,6 +238,17 @@ class PlanGoal(BehaviourBase):
         return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx)
 
     @staticmethod
+    def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):
+        """Inside the gym while not ready: the first press of the learned route off the map (the
+        heal_walk BFS shape), before anything else - frontier would explore toward the leader and
+        ``_leader_avoid``'s block_sight is the only guard. None when the learned graph knows no exit."""
+        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
+        found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
+        if not found or not found[1]:
+            return None
+        return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")
+
+    @staticmethod
     def _team_ready_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
         """Settle the team_ready goal early when the gate is closed or lifted so the stage has nothing to do."""
         gained = level is not None and level > getattr(ctx, "team_ready_idle_level", 0)
@@ -241,8 +261,11 @@ class PlanGoal(BehaviourBase):
 
     @staticmethod
     def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
-        """The training level, or 0 (gate lifted) once the grind budget for this goal is spent."""
+        """The training level, or 0 (gate lifted) once the grind budget for this goal is spent. The
+        lifted goal is published on the team-plan state so the gym hold stands down with the gate."""
+        st = team_plan.of(ctx)
         stage, level = stage_goal(goals), lead_level(ctx.emu)
+        st["gate_lifted"] = None
         if stage is None:
             return need
         tr = next((g for g in GOALS if not goals.get(g)), None) == "team_ready"
@@ -253,4 +276,7 @@ class PlanGoal(BehaviourBase):
                                max_battles=GRIND_BATTLES_GYARADOS if tr else GRIND_BATTLES)
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
-        return 0 if ctx.grind.lifted(goal) else need
+        if ctx.grind.lifted(goal):
+            st["gate_lifted"] = goal
+            return 0
+        return need

@@ -55,3 +55,37 @@ def test_box_prompt_yes_only_with_a_pending_release():
     assert yesno_answer(q, release_pending=True)[0] == "YES"
     assert yesno_answer(q, release_pending=False)[0] == "NO"   # the default policy still refuses
     assert yesno_answer("Want to nickname it? YES/NO", release_pending=True)[0] == "NO"
+
+
+def test_the_pending_mark_only_lifts_a_deposit_pokemon_prompt():
+    # UNVERIFIED wording (none is recorded): the match is narrow - a prompt about something else,
+    # even one naming a box, keeps its own answer while the mark is pending.
+    assert yesno_answer("Want to deposit ITEMS? YES/NO", release_pending=True)[0] == "NO"
+    assert yesno_answer("The BOX is full! Want to release POKeMON? YES/NO", release_pending=True)[0] == "NO"
+
+
+def test_release_pending_lives_for_one_battle_only(tmp_path):
+    """set -> the deposit prompt gets YES during the fight -> cleared when it ends (and a stale mark
+    is dropped at the next battle's start); a later 'box' prompt is back to its own answer."""
+    from pokeagent.emulator import FakeEmulator
+    from pokeagent.explorer.behaviours.battle import Battle
+    from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+    from pokeagent.explorer.memory import MapMemory
+    from pokeagent.knowledge import team_plan
+    emu = FakeEmulator({0xD35E: 0x28, 0xD362: 5, 0xD361: 6, 0xD057: 1, 0xD163: 6})
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(),
+                          run_dir=tmp_path, stable_frames=10)
+    ctx.refresh()
+    Battle().step(ctx)                                          # battle 1 opens
+    st = team_plan.of(ctx)
+    st["release_pending"] = {"species": "PIDGEY", "slot": 5, "battle": ctx.battles}
+    pending = lambda: bool(team_plan.of(ctx).get("release_pending"))
+    assert yesno_answer("Want to deposit POKeMON? YES/NO", release_pending=pending())[0] == "YES"
+    emu.set(0xD057, 0); ctx.refresh()
+    Battle().step(ctx)                                          # the catch resolved: the mark is spent
+    assert team_plan.of(ctx).get("release_pending") is None
+    st["release_pending"] = {"species": "X", "slot": 0, "battle": ctx.battles}  # a mark left over somehow
+    emu.set(0xD057, 1); ctx.refresh()
+    Battle().step(ctx)                                          # the next battle clears it too
+    assert team_plan.of(ctx).get("release_pending") is None
+    assert yesno_answer("Want to deposit POKeMON? YES/NO", release_pending=pending())[0] == "NO"

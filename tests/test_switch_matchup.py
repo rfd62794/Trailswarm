@@ -83,3 +83,61 @@ def test_matchup_pick_none_when_nobody_is_better(monkeypatch):
     ctx = _ctx([_mon("CHARMELEON", 15), _mon("WEEDLE", 9)])
     _patch(monkeypatch, ctx)
     assert so_mod.matchup_pick(ctx) is None
+
+
+def test_matchup_pick_is_computed_once_per_step(monkeypatch):
+    calls = []
+    ctx = _ctx([_mon("CHARMELEON", 15), _mon("ODDISH", 16)])
+    _patch(monkeypatch, ctx)
+    ctx.step = 7
+    monkeypatch.setattr(team_plan, "switch_choice", lambda *a, **k: calls.append(1) or 1)
+    assert so_mod.matchup_pick(ctx)[0] == 1
+    assert so_mod.matchup_pick(ctx)[0] == 1 and calls == [1]   # applies() + step() share the one sim
+    ctx.step = 8
+    so_mod.matchup_pick(ctx)
+    assert calls == [1, 1]                                     # a new step asks again
+
+
+# --- _matchup_step: the PKMN -> member -> SWITCH press flow, its cap and the battle-record count --------------------
+
+def _step_ctx(tmp_path, monkeypatch):
+    """A trainer-battle ctx SwitchOut._matchup_step can walk a menu on (draw_framed battle menu)."""
+    from pokeagent.emulator import FakeEmulator
+    from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+    from pokeagent.explorer.memory import MapMemory
+    from test_magikarp import party_mem
+    emu = FakeEmulator({0xD35E: 0x28, 0xD362: 5, 0xD361: 6, 0xD057: 2,
+                        **party_mem([(0xB1, 18, 51, 51), (0x85, 5, 17, 17)])})   # two members, slot 1 is the target
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(),
+                          run_dir=tmp_path, battles=3, stable_frames=10)
+    ctx.refresh()
+    ctx.battle_log = {"kind": 2}
+    monkeypatch.setattr(so_mod, "trainee_slot_for", lambda *a: None)
+    monkeypatch.setattr(so_mod, "matchup_pick", lambda c: (1, "thin: foe hits 30x2 vs 20 HP"))
+    return ctx
+
+
+def test_matchup_step_press_flow_cap_and_landed_count(tmp_path, monkeypatch):
+    from test_magikarp import draw_framed
+    ctx = _step_ctx(tmp_path, monkeypatch)
+    draw_framed(ctx.emu, [">FIGHT PKMN", "ITEM RUN"])
+    st = team_plan.of(ctx)
+    for _ in range(so_mod.MAX_PRESSES):
+        d = so_mod.SwitchOut()._matchup_step(ctx)
+        assert d.button == "RIGHT" and d.rule.startswith("switch_matchup:")
+        assert d.why.endswith(f"(press {st['matchup']['presses']})")
+    d = so_mod.SwitchOut()._matchup_step(ctx)                  # one too many: the menus are not what we think
+    assert (d.button, d.rule) == ("B", "switch_matchup_failed")
+    assert ctx.switch_gave_up == ctx.battles and "matchup" not in st
+
+
+def test_matchup_step_counts_the_landed_switch_on_the_battle_record(tmp_path, monkeypatch):
+    from test_magikarp import draw_framed
+    ctx = _step_ctx(tmp_path, monkeypatch)
+    draw_framed(ctx.emu, [">FIGHT PKMN", "ITEM RUN"])
+    d = so_mod.SwitchOut()._matchup_step(ctx)                  # press 1: RIGHT toward PKMN
+    assert d.button == "RIGHT"
+    ctx.emu.set(0xD017, 1)                                     # the swap landed: slot 1 is out now
+    assert so_mod.SwitchOut()._matchup_step(ctx) is None
+    assert ctx.battle_log["matchup_switches"] == 1
+    assert "matchup" not in team_plan.of(ctx)

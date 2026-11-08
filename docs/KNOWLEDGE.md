@@ -142,8 +142,10 @@ party (ROM base stats, DV 8, learnset moves) and `TRAIN_LEVEL_BY_GOAL` is only t
 Team management (`knowledge/team_plan.py`, pure): the training gate judges the WHOLE party - `boss_need` runs the same
 best-switch fight, then asks what level EACH slot alone would need to pass, so the verdict names "raise slot k to L" whichever
 slot the strong mon sits in (the marathon run fought Misty with a weak L12 in slot 0 and a L23 Charmeleon in slot 3). While the
-verdict is "not ready" the planner never enters a gym map (`trainers.GYM_BOSSES` ids) and the leader's guessed sight line is
-temp-blocked so frontier cannot walk into it. The lead is chosen by matchup before a known boss or an unbeaten trainer target
+verdict is "not ready" the planner never enters a gym map (`trainers.GYM_BOSSES` covers only beat_brock's 0x36 and
+beat_misty's 0x41 today - later gyms are not gated yet) and the leader's guessed sight line is
+temp-blocked so frontier cannot walk into it; inside the gym the route off the map is walked before anything else. The
+hold stands down once the stage's GrindBudget is spent (the gate lifts: grind exhausted must not lock the boss out). The lead is chosen by matchup before a known boss or an unbeaten trainer target
 (`choose_lead`: best first-turn damage ratio, then HP fraction, then level); on a grind the lowest band breaker leads instead -
 `level_band` asks the lead for the boss level and others within `BAND_BELOW` (4) of it, so the breaker is sent out first and
 swapped on turn one for the Gen 1 shared exp, exactly like the Magikarp trainee (same `trainee_slot_for` mechanism, generalised).
@@ -153,8 +155,10 @@ its damage ratio by `SWITCH_GAIN` = 1.5 - max `MAX_SWITCHES_PER_BATTLE` = 2 swit
 one knob `plan_goal` reads for WHEN grinding outranks the plan: band breakers over team size + level gap + recent blackouts +
 a proximity bonus as the boss nears; above `GRIND_PRESSURE_START` (0.5) a grind episode is latched (Grind_Points owns WHERE;
 `train_route` until it lands), below `GRIND_PRESSURE_STOP` (0.2) it releases. At a full party a wanted catch is thrown only
-when a `release_candidate` exists (lowest-value member, never the trainee or a needed HM learner); the box prompt then answers
-YES and the mark lands in the catch record.
+when a `release_candidate` exists (lowest-value member, never the trainee or a needed HM learner). In Gen 1 a full party
+sends the caught mon to the PC box automatically, so the policy mostly decides whether to THROW at all when every member
+is protected; the `release_pending` mark answers YES only to a deposit-a-POKeMON prompt (UNVERIFIED wording - none is
+recorded), only during the battle it was set in, and lands in the catch record.
 
 ## Poke Mart, text speed, text prompt (ROM-verified 2026-11-05)
 

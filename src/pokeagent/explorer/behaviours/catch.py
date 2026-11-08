@@ -36,7 +36,8 @@ BALL_NAME = {"POKE": "POKe BALL", "GREAT": "GREAT BALL", "ULTRA": "ULTRA BALL", 
 def full_party_slot(ctx: ExplorerContext, party) -> int | None:
     """The member a full party marks for deposit when a wanted catch lands, else None: the lowest-value
     member (its level when no member scoring is at hand), never the trainee, never a learner the run
-    still needs. The caught mon goes to the PC box; the mark is what a later deposit prompt answers."""
+    still needs. The caught mon goes to the PC box; the mark is what the deposit prompt answers
+    while this battle lasts (``release_pending`` is cleared when the fight ends)."""
     if len(party or ()) < TEAM_SIZE:
         return None
     from pokeagent.explorer.catch_list import HM_MOVE, hm_table, upcoming_needs
@@ -125,17 +126,24 @@ class Catch(BehaviourBase):
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
-        # Party full: throw only when the plan marks a member for deposit (the box prompt answers YES,
-        # the mark is recorded on the catch attempt); otherwise the catch is skipped with "party full".
+        # Party full: throw only when the plan marks a member for deposit (a live release_pending
+        # makes the deposit prompt answer YES); otherwise the catch is skipped with "party full".
         release_slot = None
         if want and len(read_party(ctx.emu)) >= TEAM_SIZE:
-            release_slot = full_party_slot(ctx, our_party(ctx.emu))
+            st = team_plan.of(ctx)
+            marked = st.get("release_mark")   # settled once per battle: the party read is not free
+            if marked and marked[0] == ctx.battles:
+                release_slot = marked[1]
+            else:
+                release_slot = full_party_slot(ctx, our_party(ctx.emu))
+                st["release_mark"] = (ctx.battles, release_slot)
             if release_slot is None:
                 if ctx.catch_skip_logged != ctx.catch_want[0]:
                     ctx.catch_skip_logged = ctx.catch_want[0]
                     ctx.log(f"[catch: skipping {sp_name}: party full]", "res")
+                ctx.catch_mode, ctx.catch_hint = False, None   # a stale weaken-only mode must not outlive this battle
                 return None
-            team_plan.of(ctx)["release_pending"] = {"species": sp_name, "slot": release_slot}
+            st["release_pending"] = {"species": sp_name, "slot": release_slot, "battle": ctx.battles}
             ctx.log(f"[catch: party full - slot {release_slot + 1} marked for deposit for {sp_name}]", "res")
         gave_up = ctx.catch_switch[0] == ctx.catch_want[0] and ctx.catch_switch[1] > MAX_PRESSES
         if gave_up or not (want and balls and dex_no and e_max and may_throw_ctx(ctx)

@@ -50,7 +50,18 @@ def _foe(ctx: ExplorerContext):
 def matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
     """(slot, why) of team_plan.switch_choice for this TRAINER battle, or None: the active member is
     "thin" (the foe's best hit over SWITCH_HP_TURNS turns meets or beats its HP, or its best move does
-    <= WEAK_RATIO of the foe's HP) and a healthy member beats its damage ratio by SWITCH_GAIN."""
+    <= WEAK_RATIO of the foe's HP) and a healthy member beats its damage ratio by SWITCH_GAIN.
+    Cached on (step, battle): applies() and _matchup_step ask the same question twice a step and the
+    our_party + best_move sims are not free."""
+    st = team_plan.of(ctx)
+    key = (getattr(ctx, "step", -1), getattr(ctx, "battles", -1))
+    if st.get("mu_pick_key") != key:
+        st["mu_pick_key"], st["mu_pick"] = key, _matchup_pick(ctx)
+    return st["mu_pick"]
+
+
+def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
+    """The uncached pick for this step (see matchup_pick)."""
     bv = ctx.bv
     if bv is None or getattr(bv, "kind", None) != 2:  # a wild battle (1), or a view stub without a kind
         return None

@@ -51,7 +51,10 @@ def yesno_answer(question: str, starter: str = "any", buy_magikarp: bool = False
                  release_pending: bool = False) -> tuple[str, str]:
     q = " " + "".join(ch for ch in question.lower() if ch.isalnum() or ch == " ") + " "
     pitch = " " + "".join(ch for ch in (offer_text or question).lower() if ch.isalnum() or ch == " ") + " "
-    if release_pending and (" deposit " in q or " box " in q):
+    # UNVERIFIED prompt wording: KNOWLEDGE.md records no deposit YES/NO text (a full party boxes the
+    # catch on its own); matched narrowly so an unrelated "change BOX"/"the BOX is full" prompt keeps
+    # its default answer - only a deposit-a-POKeMON question gets the pending mark's YES.
+    if release_pending and " deposit " in q and " pok" in q:
         return "YES", "a party-full catch marked a member for deposit"  # never "release": that deletes the mon
     if "magikarp" in pitch and " for just " in pitch and "nickname" not in pitch and not magikarp_offer(pitch):
         return "NO", "a MAGIKARP pitch, but not the 500 offer"
