@@ -185,11 +185,12 @@ Real-window checklist (Robert, not Devin; the Claude verify lane cannot open a w
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: game-agnostic Map view (plan V3); needs PR #169 on main
+- 2026-11-08 12:19 · robert-claude-laptop · Queued → Approved — lint override: False positives: the four tests/test_mapview_*.py files are created by this run, and maps/index.json is generated run output under the source directory argument, not a repo path.
 <!-- queue:end -->
