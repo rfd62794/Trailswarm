@@ -183,3 +183,17 @@ Expected: each under 300.
 
 Diff stat, test tails, wc -l line, constants chosen and why, and the controller validation list (a headless run from
 `baselines/` Cerulean state must not enter the gym with the marathon party; a Pidgey-vs-Water fixture switch).
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 20:37 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert: team management must exploit the growing team; gate judges slot 0 only (marathon entered Misty's gym with the strong mon in slot 3)
+<!-- queue:end -->
