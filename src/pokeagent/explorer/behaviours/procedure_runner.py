@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.procedures.state import of
 from pokeagent.explorer.world import DIRS, WorldGraph
 from pokeagent.goals import GOALS, party_full
 from pokeagent.procedures import predicates, store
@@ -29,9 +30,9 @@ class ProcedureRunner(BehaviourBase):
     def applies(self, ctx: ExplorerContext) -> bool:
         if ctx.view.battling or ctx.in_battle or ctx.view.box or ctx.proc is not None or ctx.goto:
             return False
-        if ctx.proc_steps >= RUNNER_STEP_CAP:
+        if of(ctx)["steps"] >= RUNNER_STEP_CAP:
             return False
-        if ctx.procedure_run is not None:
+        if of(ctx)["run"] is not None:
             return not self._paused(ctx)
         return self._acquire(ctx) is not None
 
@@ -60,9 +61,9 @@ class ProcedureRunner(BehaviourBase):
                 continue
             if j == 1 and st["map"] not in predicates.proc_maps(proc):
                 continue  # the just-met goal's procedure resumes only inside its own maps
-            ctx.procedure_run = {"proc": proc, "goal": goal, "i": proc.steps.index(step),
+            of(ctx)["run"] = {"proc": proc, "goal": goal, "i": proc.steps.index(step),
                                  "presses": 0, "frames": 0, "pre_lost": 0, "wins0": ctx.battles_won,
-                                 "p0": ctx.proc_steps, "f0": ctx.frame, "pause_at": None, "queue": None}
+                                 "p0": of(ctx)["steps"], "f0": ctx.frame, "pause_at": None, "queue": None}
             ctx.log(f"[procedure {goal}: start ({len(proc.steps)} steps, {proc.source})]", "res")
             return proc
         return None
@@ -70,8 +71,8 @@ class ProcedureRunner(BehaviourBase):
     def _paused(self, ctx) -> bool:
         """An after_victory heal/potion pauses the pending step until the party is healed or HEAL_PAUSE_MAX
         passes; a push resumes; continue does nothing special."""
-        run = ctx.procedure_run
-        av = ctx.after_victory
+        run = of(ctx)["run"]
+        av = of(ctx)["victory"]
         action = getattr(av, "action", None)
         if action in ("heal", "potion") and run.get("av_done") is not av:
             if run["pause_at"] is None:
@@ -86,7 +87,7 @@ class ProcedureRunner(BehaviourBase):
 
     # --- one press per call ------------------------------------------------------------------------------
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        run = ctx.procedure_run
+        run = of(ctx)["run"]
         if run is None or self._paused(ctx):
             return None
         proc, st = run["proc"], predicates.read_state(ctx)
@@ -104,11 +105,11 @@ class ProcedureRunner(BehaviourBase):
                 continue
             break
         if run["i"] >= len(proc.steps):
-            presses, frames = ctx.proc_steps - run["p0"], ctx.frame - run["f0"]
+            presses, frames = of(ctx)["steps"] - run["p0"], ctx.frame - run["f0"]
             store.grade(proc, None, True, presses, frames)
             store.save(proc, self._root(ctx))
             ctx.log(f"[procedure {run['goal']}: done in {presses} presses / {frames} frames]", "res")
-            ctx.procedure_run = None
+            of(ctx)["run"] = None
             return no_press("procedure_done")
         step = proc.steps[run["i"]]
         run["frames"] += ctx.opts.frames_per_step
@@ -125,7 +126,7 @@ class ProcedureRunner(BehaviourBase):
         dec = self._act(ctx, run, step, st)
         if dec is not None and dec.button:
             run["presses"] += 1
-            ctx.proc_steps += 1
+            of(ctx)["steps"] += 1
         return dec
 
     @staticmethod
@@ -141,7 +142,7 @@ class ProcedureRunner(BehaviourBase):
         store.grade(proc, None, False)
         store.save(proc, self._root(ctx))
         ctx.log(f"[procedure {run['goal']}: step {step.id} failed ({why}) - exploring]", "res")
-        ctx.procedure_run = None
+        of(ctx)["run"] = None
         return None
 
     def _act(self, ctx, run, step, st) -> Decision | None:

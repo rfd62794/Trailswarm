@@ -1,6 +1,7 @@
 """procedure_runner: precondition gating, bounded steps, abort-to-exploration, cap, and pause-on-heal."""
 from __future__ import annotations
 
+from pokeagent.explorer.procedures.state import of
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
 from pokeagent.explorer.memory import MapMemory
@@ -60,7 +61,7 @@ def test_a_goto_step_walks_and_completes_the_procedure(tmp_path):
     ctx.emu.set(PY, 4)
     ctx.refresh()
     r.step(ctx)  # the effect is met: the attempt is graded and saved
-    assert ctx.procedure_run is None
+    assert of(ctx)["run"] is None
     saved = store.load("potion", ctx.run_dir.parent / "procedures")
     assert (saved.attempts, saved.successes) == (1, 1)
 
@@ -72,7 +73,7 @@ def test_a_step_failing_its_bounds_aborts_to_exploration(tmp_path):
     _save(ctx, _proc(steps=[step]))
     r = ProcedureRunner()
     assert r.applies(ctx)
-    assert r.step(ctx) is None and ctx.procedure_run is None  # over budget: failed, state cleared
+    assert r.step(ctx) is None and of(ctx)["run"] is None  # over budget: failed, state cleared
     saved = store.load("potion", ctx.run_dir.parent / "procedures")
     assert saved.attempts == 1 and saved.fail_streak == 1 and saved.steps[0].fail == 1
 
@@ -88,7 +89,8 @@ def test_a_downgraded_step_and_a_disabled_procedure_are_skipped(tmp_path):
 
 
 def test_the_run_cap_stops_the_runner(tmp_path):
-    ctx = make_ctx(tmp_path, proc_steps=RUNNER_STEP_CAP)
+    ctx = make_ctx(tmp_path)
+    of(ctx)["steps"] = RUNNER_STEP_CAP
     _save(ctx, _proc(steps=[_buttons_step()]))
     assert not ProcedureRunner().applies(ctx)
 
@@ -98,7 +100,7 @@ def test_a_heal_decision_pauses_the_pending_step(tmp_path):
     _save(ctx, _proc(steps=[_buttons_step()]))
     r = ProcedureRunner()
     assert r.applies(ctx)
-    ctx.after_victory = VictoryDecision("heal", "", None, 0.4, 0.2, 2, "heal")
+    of(ctx)["victory"] = VictoryDecision("heal", "", None, 0.4, 0.2, 2, "heal")
     assert not r.applies(ctx)      # paused: the heal walk belongs to the planner
     assert r.step(ctx) is None
     ctx.step += HEAL_PAUSE_MAX
@@ -110,7 +112,7 @@ def test_a_push_decision_resumes_immediately(tmp_path):
     _save(ctx, _proc(steps=[_buttons_step()]))
     r = ProcedureRunner()
     assert r.applies(ctx)
-    ctx.after_victory = VictoryDecision("push", "", 0.5, 0.9, 0.9, 2, "push")
+    of(ctx)["victory"] = VictoryDecision("push", "", 0.5, 0.9, 0.9, 2, "push")
     assert r.applies(ctx) and r.step(ctx).button == "UP"
 
 
@@ -122,4 +124,4 @@ def test_the_segment_goal_just_entered_keeps_its_procedure_live(tmp_path):
     _save(ctx, _proc(goal="left_house", steps=[_buttons_step()]))
     r = ProcedureRunner()
     assert r.applies(ctx)
-    assert ctx.procedure_run["goal"] == "left_house"
+    assert of(ctx)["run"]["goal"] == "left_house"

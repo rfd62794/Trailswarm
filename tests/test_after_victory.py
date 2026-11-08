@@ -5,6 +5,7 @@ from dataclasses import replace
 
 import pytest
 
+from pokeagent.explorer.procedures.state import of
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
 from pokeagent.explorer.memory import MapMemory
@@ -102,7 +103,8 @@ def test_applies_once_per_win_and_never_while_battling_or_boxed(tmp_path):
     ctx = make_ctx(tmp_path, battles_won=1)
     ctx.view = replace(ctx.view, battling=True)
     assert not b.applies(ctx)
-    ctx = make_ctx(tmp_path, battles_won=1, after_victory_seen=1)
+    ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["seen"] = 1
     assert not b.applies(ctx)
 
 
@@ -118,8 +120,8 @@ def test_step_sets_the_heal_intent_and_stores_the_decision(tmp_path, monkeypatch
     monkeypatch.setattr(mod, "decide", lambda party, rem, bag, walk, kb=None:
                         av.decide(party, rem, bag, walk, SYN))
     d = AfterVictory().step(ctx)
-    assert ctx.after_victory_seen == 1 and ctx.center_intent == "heal"
-    assert ctx.after_victory is not None and d is not None
+    assert of(ctx)["seen"] == 1 and ctx.center_intent == "heal"
+    assert of(ctx)["victory"] is not None and d is not None
 
 
 def test_step_primes_the_field_potion_cache(tmp_path, monkeypatch):

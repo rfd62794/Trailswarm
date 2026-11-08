@@ -4,7 +4,7 @@ Registered right after the battle behaviours; it never presses anything in battl
 choice. It only DECIDES (procedures.after_victory_rules.decide), logs one line, and sets an intent the
 existing behaviours already honour: ``potion`` primes the ledger's field-potion cache that
 ``outside_use.field_wants`` / CaveTopUp read; ``heal`` sets ``ctx.center_intent`` so the planner keeps us in
-the center until healed. The decision is also stored on ``ctx.after_victory`` for the ProcedureRunner and
+the center until healed. The decision is also stored on ``of(ctx)["victory"]`` for the ProcedureRunner and
 appended (without any ROM data) to runs/after_victory.jsonl.
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.economy import ledger, outside_use
+from pokeagent.explorer.procedures.state import of
 from pokeagent.goals import bag_contents
 from pokeagent.knowledge import trainers
 from pokeagent.knowledge.kb import table
@@ -39,16 +40,16 @@ class AfterVictory(BehaviourBase):
     name = "after_victory"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        return (ctx.battles_won > ctx.after_victory_seen and not ctx.view.battling and not ctx.in_battle
+        return (ctx.battles_won > of(ctx)["seen"] and not ctx.view.battling and not ctx.in_battle
                 and not ctx.view.box and ctx.proc is None)
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        ctx.after_victory_seen = ctx.battles_won
+        of(ctx)["seen"] = ctx.battles_won
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
         beaten = beaten_trainers(ctx)
         rows = [r for r in trainers.trainers_on(m) if r.get("mons") and (m, r.get("x"), r.get("y")) not in beaten]
         order = {}
-        run = ctx.procedure_run
+        run = of(ctx)["run"]
         if run is not None:  # remaining trainers in the active procedure's step order when one exists
             for i, s in enumerate(run["proc"].steps):
                 a = s.action or {}
@@ -60,7 +61,7 @@ class AfterVictory(BehaviourBase):
             walk = outside_use.walk_to_center(ctx)
         except Exception:  # noqa: BLE001 - a routing failure must not break the decision
             walk = None
-        dec = ctx.after_victory = decide(_party_now(ctx.emu), [r["mons"] for r in rows],
+        dec = of(ctx)["victory"] = decide(_party_now(ctx.emu), [r["mons"] for r in rows],
                                          bag_contents(ctx.emu), walk)
         if dec.action == "potion":
             led = ledger.of(ctx)  # the field-potion verdict CaveTopUp/outside_use.field_wants already honours

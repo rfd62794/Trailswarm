@@ -244,10 +244,6 @@ class ExplorerContext:
     trainer_ledger: Any = None       # explorer.trainer_ledger.TrainerLedger: per-run beaten state, made lazily
     trainer_target: tuple | None = None  # (map, x, y) approach tile trainer_route.next_target named; goto may read it
     trainer_hunt_steps: int = 0      # steps trainer_hunt has spent walking this run (TRAINER_HUNT_STEP_CAP)
-    after_victory_seen: int = 0  # ctx.battles_won value AfterVictory last made a decision for
-    after_victory: Any = None    # the last VictoryDecision (procedures.after_victory_rules), for the runner's pause
-    proc_steps: int = 0          # presses spent inside goal procedures this run (RUNNER_STEP_CAP)
-    procedure_run: Any = None    # the procedure runner's in-flight state (NOT ctx.proc: that is the menu-task one)
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
