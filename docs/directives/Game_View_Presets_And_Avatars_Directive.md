@@ -196,7 +196,7 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-game-view-presets-and-avatars-directive |
 | Base branch | - |
@@ -212,4 +212,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 - 2026-11-08 13:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6Y8104YFMMP4QBDW1MBE7MG
 - 2026-11-08 13:55 · dispatcher · launched pid=4152; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; provisioned: uv sync --frozen
 - 2026-11-08 14:25 · devin · In progress → Review — [origin] spent: devin 29 min est. n/a
+- 2026-11-08 17:39 · robert-claude-laptop · Review → Done — note: PR #173 merged as 6cad496. Review approved at e8d1301; verify at e8d1301: 2240 passed, 0 failed, known 41 skips.
 <!-- queue:end -->
