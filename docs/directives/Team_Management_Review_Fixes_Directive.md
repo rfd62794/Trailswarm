@@ -104,4 +104,5 @@ Head sha, diff stat, wc -l line, test tails, the exact deposit prompt you matche
 - 2026-11-07 21:37 · robert-claude-laptop · none → Queued — Review fixes for PR #166 (Sonnet: 2 blockers + 3 should-fixes); approve with base_branch = the PR branch once the fixer's main merge is pushed
 - 2026-11-07 21:47 · robert-claude-laptop · Queued → Approved
 - 2026-11-07 21:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WGWQD8D3QK0TCMD7KW7TY6
+- 2026-11-07 21:55 · dispatcher · launched pid=27076; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-review-fixes-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
