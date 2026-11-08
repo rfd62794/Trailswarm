@@ -208,4 +208,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 - 2026-11-08 13:36 · robert-claude-laptop · Draft → Queued — Requeued with area gap and edge lines requirement
 - 2026-11-08 13:51 · robert-claude-laptop · Queued → Approved
 - 2026-11-08 13:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6Y8104YFMMP4QBDW1MBE7MG
+- 2026-11-08 13:55 · dispatcher · launched pid=4152; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-game-view-presets-and-avatars-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
