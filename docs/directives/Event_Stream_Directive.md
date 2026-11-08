@@ -143,3 +143,17 @@ Expected: each under 300.
 ## Report
 
 Diff stat, test tails, wc -l line, the reader-switch list (module -> view), anything you could not switch and why.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:27 · robert-claude-laptop · none → Queued — Robert approved the efficiency program 2026-11-07; approve only after Perf_Baseline and Agent_Footprint merge
+<!-- queue:end -->
