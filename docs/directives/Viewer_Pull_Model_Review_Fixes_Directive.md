@@ -88,3 +88,17 @@ Expected: each under 300.
 ## Report
 
 Head sha, diff stat, wc -l line, test tails, the magic value and header layout you documented.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 22:01 · robert-claude-laptop · none → Queued — Review fixes for PR #167 (Sonnet: frame-slot layout guard, telemetry tests, web frames, logged fallbacks, real grade column); approve with base_branch = the PR branch
+<!-- queue:end -->
