@@ -163,6 +163,49 @@ def diff_text(d: dict) -> str:
     return "\n".join(lines)
 
 
+def _f(v, spec="{:.0%}", dash="-"):
+    return dash if v is None else spec.format(v)
+
+
+def _flags(r: dict) -> str:
+    f = []
+    if r["held"]:
+        f.append(f"held({r['held']})")
+    if r["solved"]:
+        f.append("solved")
+    if r["optimized"]:
+        f.append("optimized")
+    if r["stale"]:
+        f.append("stale")
+    if r["broken"]:
+        f.append("BROKEN")
+    if r["synthetic_only"]:
+        f.append("synth?")
+    return ",".join(f) or "-"
+
+
+def segments_text(s: dict) -> str:
+    lines = [f"segments scorecard  root={s['root']}" + (f"  suite={s['suite']}" if s.get("suite") else "")]
+    lines.append(f"{'segment':<22}{'tries':>6}{'rate':>6}{'flags':<22}{'best':>8}{'par':>8}{'expected':>9}"
+                 f"{'health':>7}{'blk%':>6}{'stl%':>6}{'loop%':>6}{'start':>10}{'share':>7}  cut_hints")
+    for r in s["rows"]:
+        hints = ";".join(f"{h['kind']}@{h['map']}#{h['step']}" for h in r["cut_hints"]) or "-"
+        lines.append(f"{r['segment']:<22}{r['tries']:>6}{_f(r['rate']):>6}{_flags(r):<22}"
+                     f"{_f(r['best'], '{:.0f}'):>8}{_f(r['par'], '{:.0f}'):>8}{_f(r['expected'], '{:.0f}'):>9}"
+                     f"{_f(r['health'], '{:.0%}'):>7}{_f(r['blackout_rate']):>6}{_f(r['stall_rate']):>6}"
+                     f"{_f(r['loop_rate']):>6}{r['start'][-9:]:>10}{r['share']:>6.0%}  {hints}")
+    sh = s["shares"]
+    lines.append(f"shares: unsolved={sh.get('unsolved', 0):.0%} frontier={sh.get('frontier', 0):.0%} "
+                 f"polish={sh.get('polish', 0):.0%}" + (f" rejoin={sh.get('rejoin', 0):.0%}" if "rejoin" in sh else ""))
+    lines.append(f"frontier: {s['frontier'] or '-'}  health={_f(s['frontier_health'], '{:.2f}')} "
+                 f"explore_rate={_f(s['explore_rate'], '{:.2f}')}")
+    if s["rejoin_candidates"]:
+        lines.append("rejoin candidates: " + ", ".join(s["rejoin_candidates"]))
+    if s["broken"]:
+        lines.append("BROKEN segments present (exit 1)")
+    return "\n".join(lines)
+
+
 def replay_text(r: dict) -> str:
     lines = [f"replay {r['run']} steps={r['steps']}: {r['status']}"]
     if r.get("warning"):

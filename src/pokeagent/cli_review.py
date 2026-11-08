@@ -67,6 +67,19 @@ def _cmd_replay(args) -> int:
     return {"identical": 0, "diverged": 1}.get(rep.status, 2)
 
 
+def _cmd_segments(args) -> int:
+    root = Path(args.root)
+    if not root.is_dir() or not (root / "runs").is_dir():
+        return render.error(f"unreadable root: {root}", args.json)
+    from pokeagent.review import segments as rseg
+    try:
+        s = rseg.summarise(root, suite=args.suite, do_ingest=not args.no_ingest)
+    except ValueError as e:
+        return render.error(str(e), args.json)
+    render.emit(s, args.json, render.segments_text(s))
+    return 1 if s["broken"] else 0
+
+
 def _add_commands(rsub) -> None:
     """Attach every review subcommand to a subparsers object."""
     r = rsub.add_parser("run", help="compressed event timeline for one run")
@@ -100,6 +113,13 @@ def _add_commands(rsub) -> None:
     p.add_argument("--runs-dir", default="runs", metavar="DIR")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_replay)
+
+    g = rsub.add_parser("segments", help="segment scorecard: grades, effective shares, rejoin candidates")
+    g.add_argument("--root", default=".", metavar="DIR", help="checkout root holding runs/ (default: cwd)")
+    g.add_argument("--suite", default=None, metavar="NAME", help="only this suite's segments (runs/segment_sets.json)")
+    g.add_argument("--no-ingest", action="store_true", help="read runs/segments.json as it is; do not scan run folders")
+    g.add_argument("--json", action="store_true")
+    g.set_defaults(func=_cmd_segments)
 
 
 def register(sub) -> None:
