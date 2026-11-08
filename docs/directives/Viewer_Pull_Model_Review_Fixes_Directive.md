@@ -94,11 +94,12 @@ Head sha, diff stat, wc -l line, test tails, the magic value and header layout y
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
-| Base branch | - |
+| Base branch | directive/pokeagent-viewer-pull-model-directive |
 
 **Status log**
 - 2026-11-07 22:01 · robert-claude-laptop · none → Queued — Review fixes for PR #167 (Sonnet: frame-slot layout guard, telemetry tests, web frames, logged fallbacks, real grade column); approve with base_branch = the PR branch
+- 2026-11-07 22:01 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; starts from the PR branch because the sandbox refuses git merge
 <!-- queue:end -->
