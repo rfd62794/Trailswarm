@@ -18,7 +18,8 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from pokeagent.grind.atlas import BLACKOUT_STEPS, PRIOR_BLACKOUT, STEPS_PER_MIN
+from pokeagent.grind import atlas
+from pokeagent.grind.points_io import band_of, patch_of, points_of, species_of
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class GrindPoint:
     n_measured: int = 0
     center_map: int | None = None                        # nearest Pokecenter map
     center_cost_frames: float = 0.0
-    blackout_rate: float = PRIOR_BLACKOUT                # blackouts per episode (prior until measured)
+    blackout_rate: float = atlas.PRIOR_BLACKOUT          # blackouts per episode (prior until measured)
     provenance: str = "organic"                          # worst provenance of the data behind the point
     updated: str = ""
     episodes: dict = field(default_factory=dict)         # {"run@step": [xp_per_min, blackouts, provenance]}
@@ -87,7 +88,7 @@ def _recompute(p: GrindPoint) -> None:
 
 def episode_result(p: GrindPoint, xp_gained: float, steps: int, blackouts: int,
                    provenance: str = "organic", ep_id: str | None = None, now: str | None = None) -> GrindPoint:
-    rate = xp_gained / (steps / STEPS_PER_MIN) if steps > 0 else 0.0  # fold one episode in by episode id
+    rate = xp_gained / (steps / atlas.STEPS_PER_MIN) if steps > 0 else 0.0  # fold one episode in by episode id
     prov = provenance if provenance in PROVENANCES else "unknown"
     p.episodes[ep_id or f"e{len(p.episodes) + 1}"] = [rate, blackouts, prov]
     _recompute(p)
@@ -129,25 +130,6 @@ def merge_point(d: dict | None, s: dict) -> dict:
     a.center_cost_frames = min((a.center_cost_frames, b.center_cost_frames), key=lambda c: c <= 0 and 1e18 or c)
     a.updated = max(a.updated, b.updated)
     return a.to_dict()
-
-
-def patch_of(maps: dict, map_id: int) -> list:  # [[x, y]] grass tiles: encounters keys with count >= 1
-    enc = (maps.get(str(map_id)) or {}).get("encounters") or {}
-    return sorted(([int(x) for x in k.split(",")] for k, n in enc.items() if n >= 1), key=lambda t: (t[1], t[0]))
-
-
-def species_of(kb: dict | None, map_id: int) -> list:  # [[species, min, max]] from the ROM wild table
-    row = ((kb or {}).get("wild_by_map") or {}).get(str(map_id)) or (kb or {}).get("wild_by_map", {}).get(map_id) or {}
-    res: dict = {}
-    for lv, spname in row.get("grass") or []:
-        cur = res.setdefault(spname, [spname, lv, lv])
-        cur[1], cur[2] = min(cur[1], lv), max(cur[2], lv)
-    return sorted(res.values())
-
-
-def band_of(species: list) -> tuple:  # default band: top wild level -2..+6 (DEFAULT_BAND when unknown)
-    hi = max((t[2] for t in species), default=None)
-    return (hi + BAND_LO, hi + BAND_HI) if hi is not None else DEFAULT_BAND
 
 
 def _maps_of(mem) -> dict:
@@ -200,21 +182,11 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
             continue
         xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None) \
             else p.xp_per_min_prior
-        score = xp - travel_steps(maps, current_map, p.map_id) / STEPS_PER_MIN - p.blackout_rate * BLACKOUT_STEPS
+        score = xp - travel_steps(maps, current_map, p.map_id) / atlas.STEPS_PER_MIN - p.blackout_rate * atlas.BLACKOUT_STEPS
         key = (-score, p.map_id)
         if best is None or key < best[0]:
             best = (key, p)
     return best[1] if best else None
-
-
-def _points_of(rows: dict) -> dict:  # {map id: GrindPoint} from a serialized table; malformed skipped
-    pts = {}
-    for k, v in (rows or {}).items():
-        try:
-            pts[int(k)] = GrindPoint.from_dict(v)
-        except (KeyError, TypeError, ValueError):
-            continue
-    return pts
 
 
 class GrindLedger:  # the point table plus its run-local file; ``points``: {map_id: GrindPoint}
@@ -232,7 +204,7 @@ class GrindLedger:  # the point table plus its run-local file; ``points``: {map_
             rows = doc.get("points") if isinstance(doc, dict) else None
             if not isinstance(rows, dict):
                 raise ValueError("no points table")
-            pts = _points_of(rows)
+            pts = points_of(rows)
         except (OSError, ValueError) as e:
             if path.exists():
                 log.info("grind points: ignoring unreadable %s (%r); starting empty", path, e)
@@ -255,7 +227,7 @@ class GrindLedger:  # the point table plus its run-local file; ``points``: {map_
     @classmethod
     def from_table(cls, table: dict, path: Path | str | None = None) -> "GrindLedger":
         rows = (table or {}).get("points", table) if isinstance(table, dict) else {}
-        return cls(_points_of(rows), path)
+        return cls(points_of(rows), path)
 
     def upsert(self, point: GrindPoint) -> None:
         self.points[int(point.map_id)] = point

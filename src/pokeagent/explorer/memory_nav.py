@@ -48,8 +48,12 @@ class NavMixin:
             if (map_id, x + tdx, y + tdy) in self.temp_blocked and n not in tried:
                 tried.append(n)
         for n in list(DIRS):  # do not take a connection/warp back to a map we are deliberately done with
-            w = d["warps"].get(f"{x},{y},{n}")
-            if w and avoid_maps and w[0] in avoid_maps and n not in tried:
+            key = f"{x},{y},{n}"
+            w = d["warps"].get(key)
+            if avoid_maps and n not in tried and (
+                    (w is not None and w[0] in avoid_maps)
+                    or (w is None and getattr(avoid_maps, "leads_out", None) is not None
+                        and avoid_maps.leads_out(map_id, key))):  # one-sighting/recorded edge off the set
                 tried.append(n)
         # Something blocks the way we face and we never talked to it: that is an interaction point candidate.
         fdx, fdy = DIRS.get(facing, (0, 0))

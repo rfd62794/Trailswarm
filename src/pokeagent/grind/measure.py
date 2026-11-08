@@ -17,20 +17,31 @@ log = logging.getLogger(__name__)
 FRAMES_PER_STEP_DEFAULT = 16.0   # the old atlas ASSUMPTION, kept as the fallback when no runs are readable
 LAST_RUNS = 20                   # calibration window: the newest run directories
 AGENT = "agent"
-_warned = False
+RUNS_ROOT = Path(__file__).resolve().parents[3] / "runs"  # the checkout's runs dir (explore_demo/the swarm's), never the cwd
+_warned: set = set()
 
 
-def _jsonl(path: Path):
+def _warn_once(key: str, msg: str, *args) -> None:
+    if key not in _warned:
+        _warned.add(key)
+        log.info(msg, *args)
+
+
+def read_jsonl(path: Path):
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             try:
                 r = json.loads(line)
-            except ValueError:
+            except ValueError as e:
+                _warn_once(f"jsonl:{path.name}", "grind measure: skipping a bad line in %s (%r)", path, e)
                 continue
             if isinstance(r, dict):
                 yield r
     except OSError:
         return
+
+
+_jsonl = read_jsonl  # private name kept for the PR #165 callers
 
 
 def _pair_rates(rows) -> list[float]:
@@ -58,30 +69,31 @@ def run_frames_per_step(run_dir: Path) -> float | None:
     return frames_per_step(list(_jsonl(run_dir / "transitions.jsonl")), list(_jsonl(run_dir / "levels.jsonl")))
 
 
-def calibration(runs_dir: str | Path = "runs", last: int = LAST_RUNS) -> tuple[float | None, int]:
+def calibration(runs_dir: str | Path = RUNS_ROOT, last: int = LAST_RUNS) -> tuple[float | None, int]:
     """(median frames/step, runs sampled) over the newest ``last`` run directories that have a press log."""
     runs = Path(runs_dir)
     if not runs.is_dir():
         return None, 0
-    dirs = sorted(p for p in runs.iterdir() if p.is_dir() and (p / "transitions.jsonl").exists())
+    # One directory listing (names embed the timestamp), then stat ONLY the newest ``last`` names:
+    # the live checkout's runs/ holds 4,700+ run dirs (PR #165 review - never stat them all).
+    dirs = [p for n in sorted(d.name for d in runs.iterdir())[-last:]
+            if (p := runs / n).is_dir() and (p / "transitions.jsonl").exists()]
     rates: list[float] = []
-    for d in dirs[-last:]:
+    for d in dirs:
         fps = run_frames_per_step(d)
         if fps is not None:
             rates.append(fps)
     return (float(median(rates)), len(rates)) if rates else (None, 0)
 
 
-def frames_per_step_or_default(runs_dir: str | Path = "runs", default: float = FRAMES_PER_STEP_DEFAULT,
+def frames_per_step_or_default(runs_dir: str | Path = RUNS_ROOT, default: float = FRAMES_PER_STEP_DEFAULT,
                                last: int = LAST_RUNS) -> float:
     """The calibrated frames/step, else ``default`` (logged once: the caller cannot tell a quiet 16 apart
     from a measured one otherwise)."""
-    global _warned
     fps, n = calibration(runs_dir, last)
     if fps is None:
-        if not _warned:
-            _warned = True
-            log.info("grind measure: no run records under %s; assuming %g frames/step", runs_dir, default)
+        _warn_once("fps-default", "grind measure: no run records under %s; assuming %g frames/step",
+                   runs_dir, default)
         return default
     return fps
 

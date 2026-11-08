@@ -108,6 +108,15 @@ def test_choose_travel_and_blackout_penalties():
     assert 0.5 * BLACKOUT_STEPS > gp.HOP_STEPS / STEPS_PER_MIN  # the direction came from the penalty sizes
 
 
+def test_malformed_rows_are_skipped_with_one_log(caplog):
+    import logging
+    from pokeagent.grind.points_io import points_of
+    with caplog.at_level(logging.INFO, "pokeagent.grind.points_io"):
+        assert points_of({"1": {"map_id": 1}, "x": None})[1].map_id == 1   # bad rows skipped, good kept
+        assert points_of({"y": "junk"}) == {}
+    assert sum("malformed" in r.getMessage() for r in caplog.records) == 1  # logged once, not per row
+
+
 def test_seed_from_atlas_priors_and_defaults():
     doc = {"atlas": {"BULBASAUR": {"beat_misty": {"12": [
         {"map_id": 35, "name": "ROUTE_24", "xp_per_min": 268.5},

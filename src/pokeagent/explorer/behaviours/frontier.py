@@ -144,7 +144,7 @@ class Frontier(BehaviourBase):
         ep = grind_episode.active(ctx)
         allowed = frozenset(ep["maps"] | {m}) if ep else None
         name, why = _memory_step(ctx, m, x, y,
-                                 avoid_maps=train_route.stay_on_route(m, ctx.train_route_live, ep) or
+                                 avoid_maps=train_route.stay_on_route(m, ctx.train_route_live, ep, ctx.mem.data["maps"]) or
                                  ({0x00} if (training and m == 0x0C) else None),
                                  allowed=allowed,
                                  grass="seek" if training else "avoid" if weak else "neutral")

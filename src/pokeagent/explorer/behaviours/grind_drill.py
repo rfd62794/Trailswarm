@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import grind_episode, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
-from pokeagent.explorer.perceive import party_hp
+from pokeagent.explorer.perceive import lead_level, party_hp
 from pokeagent.explorer.trainee_gate import trainee_check
 from pokeagent.legs.grass import pace_button, to_grass
 
@@ -36,12 +36,17 @@ class GrindDrill(BehaviourBase):
                     and trainee_check(ctx).ok)   # a drill never starts with a fainted trainee (pure read; StatusCare acts)
         if ctx.view.box or ctx.view.battling:
             return False
-        return trainee_check(ctx).ok and grind_episode.update(ctx) is not None   # same gate on the self-started path
+        # Pure read (PR #165 review): the episode's start/finish/save work lives in the engine tick
+        # (grind_episode.update), never in applies() - here we only look: an episode is live, or the
+        # cheap under-level flag says one could start this step.
+        return (grind_episode.active(ctx) is not None
+                or 0 < lead_level(ctx.emu) < getattr(ctx, "train_need", 0))
 
     def step(self, ctx) -> Decision | None:
         ep = grind_episode.active(ctx)
-        if ep is not None and getattr(ctx.opts, "drill_grind", None) is None:
-            return self._episode_step(ctx, ep)
+        if getattr(ctx.opts, "drill_grind", None) is None:
+            return self._episode_step(ctx, ep) if ep is not None else None  # under-level but no live
+            # episode (cooldown, no point, gated): pass through to the rest of the selector
         g = self._grid(ctx, ctx.view.m)
         if g is None:
             return None

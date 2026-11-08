@@ -41,6 +41,22 @@ def test_calibration_and_default(tmp_path):
     assert measure.frames_per_step_or_default(tmp_path / "missing") == measure.FRAMES_PER_STEP_DEFAULT
 
 
+def test_calibration_scans_only_the_newest_runs(tmp_path, monkeypatch):
+    """The runs/ cap (PR #165): only the ``last`` newest names are stat'ed - the live checkout has 4,700+ dirs."""
+    from pathlib import Path
+    for i in range(30):
+        d = tmp_path / f"explore-2026{i:04d}"
+        d.mkdir()
+        (d / "transitions.jsonl").write_text(
+            json.dumps(_t(1, 0)) + "\n" + json.dumps(_t(2, i + 1)) + "\n", encoding="utf-8")
+    seen = []
+    orig = Path.exists
+    monkeypatch.setattr(Path, "exists", lambda self: seen.append(self) or orig(self))
+    fps, n = measure.calibration(tmp_path, last=20)
+    assert n == 20 and fps == 20.5        # runs 10..29: fps 11..30, median 20.5 (all 30 would give 16)
+    assert len(seen) == 20                # the ten oldest run dirs were never stat'ed
+
+
 def test_xp_gained_in_episode():
     rows = [{"step": 1, "party": [[1, 5, 100, 10, 10]]},
             {"step": 5, "party": [[1, 5, 140, 10, 10], [2, 9, 30, 8, 8]]},

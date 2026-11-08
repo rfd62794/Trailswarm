@@ -9,6 +9,7 @@ When the Poke Ball count is 0 nothing new happens - the existing restock logic b
 """
 from __future__ import annotations
 
+from pokeagent.explorer import grind_episode
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.catch_list import catch_target_map, hm_table
 from pokeagent.explorer.context import ExplorerContext
@@ -26,7 +27,8 @@ class LearnerHunt(BehaviourBase):
         ctx.hunt_grass = False  # re-armed in step on the target map; self-heals the step the goal settles
         g = ctx.goals()
         return bool(g.get("hm01_cut")) and not g.get("cut_learner") and not ctx.cut_learner_skipped \
-            and not ctx.view.battling and not ctx.view.box and ctx.proc is None
+            and not ctx.view.battling and not ctx.view.box and ctx.proc is None \
+            and grind_episode.active(ctx) is None   # a live episode pins the run to its map set
 
     def _graph_dist(self, ctx: ExplorerContext, target_map: int) -> float:
         """Graph-path length from where we stand to any tile of ``target_map`` (pick_target's distance)."""

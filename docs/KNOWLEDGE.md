@@ -259,3 +259,16 @@ and BOTH plan_goal and frontier honour it (frontier's BFS and the warp-avoid che
 Nugget Bridge fix: plan_goal walked UP onto Route 24 while frontier walked DOWN into Cerulean, 358 crossings in the
 marathon run. `tools/grind_report.py --points` prints the ledger (measured vs prior) and the pick per
 (starter, next boss, trainee level).
+
+Restart discipline (PR #165 review): episodes are driven by the engine's per-step `grind_episode.tick`
+(`applies()` only reads `active()`/the under-level flag). A start passes the same `_end_reason` checks an
+episode would face next step plus `not center_intent and not goto and proc is None`; after any end
+`EPISODE_COOLDOWN = 300` steps must pass; an episode under `MIN_EPISODE_STEPS = 50` or with zero battles
+lands in the drill log as an `aborted` row and never folds into the ledger's mean; `grind_episode.start(ctx)`
+is the explicit entry point (PR #166 calls it via getattr). The measured xp is the levels.jsonl exp delta
+(`measure.xp_gained_in_episode`), and `atlas.frames_per_step()`/`STEPS_PER_MIN` are lazy now - importing
+`grind.atlas` touches nothing; the calibration runs once, capped at the newest 20 run dirs under the
+checkout's runs/. Boundary limit: `OutsideSet` covers learned warps AND the edges memory keeps short of a
+warp (`warp_cand` one-sighting changes, `paths` edges where recorded), but an edge the agent has never
+taken even once is not in memory anywhere and cannot be guarded - the hunts (LearnerHunt/TeamHunt/
+TrainerHunt) are simply switched off while an episode lives instead.

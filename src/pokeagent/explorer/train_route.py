@@ -17,13 +17,36 @@ MIN_HP_FRACTION = 0.5  # weaker than this the heal behaviours decide where to go
 
 class OutsideSet:
     """``avoid_maps`` that contains every map NOT in ``allowed``: an active grind episode pins the
-    agent to the point's map plus its Pokecenter map (the Nugget Bridge 3<->35 ping-pong fix)."""
+    agent to the point's map plus its Pokecenter map (the Nugget Bridge 3<->35 ping-pong fix).
+    ``exits`` adds the recorded map-edge presses that leave ``allowed``: confirmed ``warps`` plus
+    the edges memory keeps short of a warp (``warp_cand``: a map change seen once; ``paths`` edges
+    where a run recorded them) - a one-sighting edge cannot slip the boundary either."""
 
-    def __init__(self, allowed) -> None:
+    def __init__(self, allowed, maps=None) -> None:
         self.allowed = frozenset(m for m in allowed if m is not None)
+        self.exits: set = set()  # (map_id, "x,y,DIR") presses known to leave the set
+        for mid, d in (maps or {}).items():
+            try:
+                mid = int(mid)
+            except (TypeError, ValueError):
+                continue
+            if mid not in self.allowed:
+                continue
+            for key, dest in (d.get("warps") or {}).items():
+                if dest and dest[0] not in self.allowed:
+                    self.exits.add((mid, key))
+            for key in (d.get("warp_cand") or {}):
+                self.exits.add((mid, key))   # changed the map once: it may leave the set again
+            for key, e in (d.get("paths") or {}).items():
+                to = (e or {}).get("to") or []
+                if to and to[0] not in self.allowed:
+                    self.exits.add((mid, key))
 
     def __contains__(self, m) -> bool:
         return m not in self.allowed
+
+    def leads_out(self, map_id: int, key: str) -> bool:  # key = "x,y,DIR"
+        return (map_id, key) in self.exits
 
 
 def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE24, patch=None) -> tuple[str, str] | None:
@@ -49,11 +72,12 @@ def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE2
     return (p[0], f"goal team_ready: {len(p)} steps to {what}'s grass to train the trainee") if p else None
 
 
-def stay_on_route(map_id: int, training_live: bool, episode=None) -> set | None:
+def stay_on_route(map_id: int, training_live: bool, episode=None, maps=None) -> set | None:
     """Maps frontier must not walk into. While training on Route 24: Cerulean (with every Route 24 tile already seen, the
     least-visited exit is the Cerulean connection, and step() then sends it straight back - Route 24 <-> Cerulean, 1,200
     steps, 2026-11-07). While a grind episode runs: everything outside the episode's map set (its point plus its
-    Pokecenter), so no behaviour can ping-pong across a map edge mid-grind."""
+    Pokecenter), so no behaviour can ping-pong across a map edge mid-grind. ``maps`` (the learned map table) feeds
+    OutsideSet's edge exits."""
     if episode is not None:
-        return OutsideSet(episode.get("maps") or ())
+        return OutsideSet(episode.get("maps") or (), maps)
     return {CERULEAN} if training_live and map_id == ROUTE24 else None

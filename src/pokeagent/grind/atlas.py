@@ -3,6 +3,7 @@ and the amortised Pokecenter round trip. Time unit is the explorer step (one pre
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 
 from pokeagent.grind import measure
 from pokeagent.grind.observed import Obs, band, pooled
@@ -13,8 +14,23 @@ def steps_per_min(fps: float) -> float:
     return 3600 / fps
 
 
-FRAMES_PER_STEP = measure.frames_per_step_or_default()  # median of the last runs (was an assumed 16)
-STEPS_PER_MIN = steps_per_min(FRAMES_PER_STEP)
+@lru_cache(maxsize=4)
+def frames_per_step(runs_dir=None) -> float:
+    """Median frames/step calibrated from the newest run dirs - LAZY and cached: importing this module
+    (every explorer process and the test suite does) must not scan runs/ (PR #165 review blocker)."""
+    return measure.frames_per_step_or_default(measure.RUNS_ROOT if runs_dir is None else runs_dir)
+
+
+def __getattr__(name: str):
+    # FRAMES_PER_STEP / STEPS_PER_MIN stay importable for the callers that already use them; the runs/
+    # calibration now runs on first USE (cached), never at import.
+    if name == "FRAMES_PER_STEP":
+        return frames_per_step()
+    if name == "STEPS_PER_MIN":
+        return steps_per_min(frames_per_step())
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 SHRINK_K = 10             # observed battles that outweigh the prior 50:50
 SESSION_BATTLES = 25      # one grind session between heals (explorer.grind.GRIND_BATTLES)
 BLACKOUT_STEPS = 2000     # steps a blackout costs (warp home, walk back, lose the money)
@@ -57,6 +73,8 @@ def rank_spots(starter: str, level: int, need_level: int | None, tables: dict, s
                growth: str = "MEDIUM_SLOW", candidates=None, top: int = 3, names=None) -> list[Spot]:
     """Best grind spots, best first. ``tables`` = {"wild": {map: row}, "base_exp": {species: n}}; ``stats`` from observed.fold;
     ``center_cost`` = {map: frames to the nearest Pokecenter} (unknown = very far). ``need_level`` None = no goal gap."""
+    fps = frames_per_step()
+    spm = steps_per_min(fps)
     pool = [o for (s, b, _m, _g), o in stats.items() if s is None and b == band(level)]
     allp = Obs()
     for o in pool:
@@ -78,9 +96,9 @@ def rank_spots(starter: str, level: int, need_level: int | None, tables: dict, s
         bsteps = blend(avg_steps, o.presses / n if n else None, n)
         p = row["grass_rate"] / 256
         xp_b = blend(prior_xp(row, tables["base_exp"]) * win, o.xp_sum / o.xp_n if o.xp_n else None, o.xp_n)
-        travel = 2 * center_cost.get(m, FAR) / FRAMES_PER_STEP / SESSION_BATTLES
+        travel = 2 * center_cost.get(m, FAR) / fps / SESSION_BATTLES
         per_step = xp_b / (1 / p + bsteps + travel + blk * BLACKOUT_STEPS)
         out.append(Spot(m, (names or {}).get(m, f"0x{m:02X}"), xp_b, p, n, win, blk, hp, bsteps, travel, per_step,
-                        per_step * STEPS_PER_MIN, need_xp / per_step if need_xp and per_step > 0 else None,
+                        per_step * spm, need_xp / per_step if need_xp and per_step > 0 else None,
                         "" if n else "prior only"))
     return sorted(out, key=lambda s: -s.xp_per_step)[:top]

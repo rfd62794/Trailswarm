@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from pokeagent.explorer.trainer_ledger import TrainerEntry, TrainerLedger
 from pokeagent.explorer.trainer_route import fight_margin
-from pokeagent.grind.atlas import PRIOR_BATTLE_STEPS, STEPS_PER_MIN
+from pokeagent.grind import atlas
 from pokeagent.grind.xpmath import xp_gain
 from pokeagent.knowledge import items_catalog, readiness
 
@@ -38,7 +38,7 @@ def spot_xp_per_step(s) -> float:
     without ``xp_per_step`` (only ``xp_per_min``) is converted with atlas.STEPS_PER_MIN (225)."""
     if isinstance(s, dict):
         v = s.get("xp_per_step")
-        return float(v) if v is not None else float(s.get("xp_per_min") or 0.0) / STEPS_PER_MIN
+        return float(v) if v is not None else float(s.get("xp_per_min") or 0.0) / atlas.STEPS_PER_MIN
     return float(s.xp_per_step)
 
 
@@ -68,7 +68,7 @@ def rank_trainer_grinds(ledger: TrainerLedger, map_id: int, party_now, base_exp:
             continue
         xp = trainer_xp(e.mons, base_exp)
         prize = items_catalog.trainer_prize(cat, e.cls, e.party) if cat else None
-        steps = PRIOR_BATTLE_STEPS + _travel(spots, e.x, e.y)
+        steps = atlas.PRIOR_BATTLE_STEPS + _travel(spots, e.x, e.y)
         value = xp + (prize or 0) * YEN_PER_XP
         out.append(TrainerGrind(e, xp, prize, steps, value / steps if steps else 0.0, margin, value))
     return sorted(out, key=lambda g: -g.xp_per_step)[:top]
