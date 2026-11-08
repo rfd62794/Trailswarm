@@ -23,7 +23,7 @@ Switch training (Magikarp, or any `ctx.train_member` from `team_for`) only pays 
 
 ## 3. Scope (one PR, in order)
 
-1. `explorer/status_care.py` (pure): `status_kinds`, `steps_to_faint`, the care decision table, `poisoners_on`.
+1. `src/pokeagent/explorer/status_care.py` (pure): `status_kinds`, `steps_to_faint`, the care decision table, `poisoners_on`.
 2. Item use: a `StatusCare` behaviour that carries the decision out with the existing item-use machinery (Antidote on the poisoned slot, a Potion, or `ctx.center_intent`).
 3. Shopping: Antidote joins the heal-item source of truth with a floor of 1 when the route ahead has poison.
 4. EXP eligibility: a gate before training; heal first; log "trainee fainted: no exp"; no-progress accounting.
