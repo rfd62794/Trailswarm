@@ -3,10 +3,12 @@
 Registered between the planner and exploration (after PlanGoal/LearnerHunt/TeamHunt, before Frontier). It runs
 while the NEXT UNMET goal (or the segment goal just entered, inside its own maps) owns a procedure file; every
 step is bounded by presses and frames, a downgraded step is skipped, a failing step hands control back to
-exploration, and an after_victory heal/potion decision pauses a pending step until healed (or HEAL_PAUSE_MAX).
+exploration, and a heal walk pauses a pending step for as long as the request lives (a potion decision gets the
+old bounded pause, HEAL_PAUSE_MAX).
 """
 from __future__ import annotations
 
+from pokeagent.explorer import heal_walk, trainer_hooks
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.procedures.state import of
@@ -17,7 +19,7 @@ from pokeagent.procedures import predicates, store
 RELOAD_EVERY = 200      # steps a cached procedure file is kept before re-reading (untuned first value)
 PRE_LOST_STEPS = 5      # consecutive calls a step's precondition may be false before the step fails (untuned)
 RUNNER_STEP_CAP = 4000  # presses spent inside procedures per run; then the runner stops for the run (untuned)
-HEAL_PAUSE_MAX = 600    # steps an after_victory heal/potion decision pauses a pending step (untuned)
+HEAL_PAUSE_MAX = 600    # steps an after_victory potion decision pauses a pending step (untuned)
 
 
 class ProcedureRunner(BehaviourBase):
@@ -69,12 +71,15 @@ class ProcedureRunner(BehaviourBase):
         return None
 
     def _paused(self, ctx) -> bool:
-        """An after_victory heal/potion pauses the pending step until the party is healed or HEAL_PAUSE_MAX
-        passes; a push resumes; continue does nothing special."""
+        """A heal walk owns the road until it ends (healed or abandoned): the runner is paused while the
+        request lives, however it was raised. An after_victory ``potion`` keeps the old bounded pause (party
+        healed or HEAL_PAUSE_MAX); a push resumes; continue does nothing special."""
         run = of(ctx)["run"]
+        if heal_walk.active(ctx):
+            run["pause_at"] = None
+            return True
         av = of(ctx)["victory"]
-        action = getattr(av, "action", None)
-        if action in ("heal", "potion") and run.get("av_done") is not av:
+        if getattr(av, "action", None) == "potion" and run.get("av_done") is not av:
             if run["pause_at"] is None:
                 run["pause_at"] = ctx.step
             if party_full(ctx.emu) or ctx.step - run["pause_at"] >= HEAL_PAUSE_MAX:
@@ -166,8 +171,23 @@ class ProcedureRunner(BehaviourBase):
         if kind == "behaviour":
             if a.get("name") not in ("fight_trainer", "talk", "heal_here"):
                 return self._fail(ctx, run, step, f"unknown behaviour {a.get('name')}")
-            return self._npc(ctx, run, step, a.get("at"), st)
+            at = a.get("at")
+            if not (isinstance(at, (list, tuple)) and len(at) >= 3):
+                at = self._ledger_tile(ctx, st["map"])  # a null target resolves at run time (the S.S. Anne rival)
+            return self._npc(ctx, run, step, at, st)
         return self._fail(ctx, run, step, f"unknown action kind {kind}")
+
+    @staticmethod
+    def _ledger_tile(ctx, map_id):
+        """The first unbeaten trainer placement the ledger knows on this map, or None (the step may still
+        finish by the battle event: a scripted fight wins under wins0 without a walk target)."""
+        try:
+            for e in trainer_hooks.ledger_for(ctx).entries(map_id):
+                if e.state != "beaten":
+                    return (e.map, e.x, e.y)
+        except Exception as exc:  # noqa: BLE001 - no ROM table / no ledger: the battle event path still applies
+            ctx.log(f"[procedure_runner: ledger tile lookup skipped: {exc!r}]", "res")
+        return None
 
     def _goto(self, ctx, run, step, m, ax, ay, st) -> Decision | None:
         pos = (st["map"], st["x"], st["y"])

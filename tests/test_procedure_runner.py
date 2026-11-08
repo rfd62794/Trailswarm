@@ -95,16 +95,20 @@ def test_the_run_cap_stops_the_runner(tmp_path):
     assert not ProcedureRunner().applies(ctx)
 
 
-def test_a_heal_decision_pauses_the_pending_step(tmp_path):
+def test_a_heal_walk_pauses_the_pending_step_until_it_ends(tmp_path):
+    from pokeagent.explorer import heal_walk
+    from pokeagent.explorer.status_care import of as care_of
     ctx = make_ctx(tmp_path)
     _save(ctx, _proc(steps=[_buttons_step()]))
     r = ProcedureRunner()
     assert r.applies(ctx)
     of(ctx)["victory"] = VictoryDecision("heal", "", None, 0.4, 0.2, 2, "heal")
-    assert not r.applies(ctx)      # paused: the heal walk belongs to the planner
+    assert r.applies(ctx)                       # a decision alone does not pause: the walk does
+    assert heal_walk.start(ctx, "after_victory")
+    assert not r.applies(ctx)                   # paused while the request lives
     assert r.step(ctx) is None
-    ctx.step += HEAL_PAUSE_MAX
-    assert r.applies(ctx) and r.step(ctx).button == "UP"  # timed out: resumed
+    care_of(ctx).pop("walk")                    # the walk ended (healed or abandoned)
+    assert r.applies(ctx) and r.step(ctx).button == "UP"
 
 
 def test_a_push_decision_resumes_immediately(tmp_path):

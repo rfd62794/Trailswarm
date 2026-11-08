@@ -53,6 +53,7 @@ def test_predicates_cover_the_vocabulary():
     assert predicates.check({"badge": 1}, s) and not predicates.check({"badge": 2}, s)
     assert predicates.check({"has_item": 0x14}, s) and not predicates.check({"has_item": 0x13}, s)
     assert predicates.check({"trainer_beaten": [35, 11, 31]}, s) and not predicates.check({"trainer_beaten": [35, 11, 30]}, s)
+    assert predicates.check({"trainer_beaten": [35]}, s) and not predicates.check({"trainer_beaten": [36]}, s)  # map-scoped
     assert predicates.check({"party_size_min": 3}, s) and not predicates.check({"party_size_min": 4}, s)
     assert predicates.check({"all": [{"map": 35}, {"hp_frac_min": 0.5}]}, s)
     assert predicates.check({"any": [{"map": 36}, {"map": 35}]}, s)
@@ -66,6 +67,24 @@ def test_unknown_predicate_key_is_false_and_logged_once():
     assert not predicates.check({"bogus_key": 1}, _state(), log)
     assert not predicates.check({"bogus_key": 1}, _state(), log)
     assert len(seen) == 1 and "bogus_key" in seen[0]
+
+
+def test_beaten_trainers_delegates_to_the_ledger_and_a_walked_up_trainer_counts(tmp_path, monkeypatch):
+    """The ledger's placement match is the one source: an NPC fought one tile off its ROM tile still counts."""
+    from pokeagent.emulator import FakeEmulator
+    from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+    from pokeagent.explorer.memory import MapMemory
+    from pokeagent.explorer import trainer_hooks
+    from pokeagent.knowledge import trainers
+    row = {"class": "LASS", "party": 8, "x": 10, "y": 28, "mons": [(14, "PIDGEY")]}
+    monkeypatch.setattr(trainers, "trainers_on", lambda m, kb=None: [row] if m == 35 else [])
+    ctx = ExplorerContext(emu=FakeEmulator({}), mem=MapMemory(tmp_path / "m.json"),
+                          opts=ExplorerOptions(), run_dir=tmp_path)
+    led = trainer_hooks.ledger_for(ctx)
+    led.add_map(35, trainers.trainers_on(35))  # the ROM row the ledger registers on first sight of the map
+    idx = led.match(35, [(10, 29)])          # sighted and walked up: fought from one tile south
+    led.mark_beaten(35, idx, "battle_log", 7)
+    assert predicates.beaten_trainers(ctx) == {(35, 10, 28)}
 
 
 def test_grading_attempts_steps_and_disable():
@@ -136,7 +155,11 @@ def test_ss_anne_corridor_seed_shape_and_helper_output():
     gotos = [s for s in seed["steps"] if s["action"]["kind"] == "goto"]
     assert [(g["action"]["map"], g["action"]["x"], g["action"]["y"]) for g in gotos] == [(95, None, None), (96, None, None)]
     rival = next(s for s in seed["steps"] if s["action"].get("boss") == "rival_ss_anne")
-    assert rival["action"]["name"] == "fight_trainer" and rival["action"]["at"][0] == 96
+    assert rival["action"]["name"] == "fight_trainer" and rival["action"]["at"] is None
+    # no literal coordinates for the rival step anywhere (the suspect RIVAL1 row is never seeded)
+    flat = json.dumps(rival)
+    for tile in ([96, 36, 4], [96, 36], [36, 4]):
+        assert json.dumps(tile) not in flat
     rooms = [s for s in seed["steps"] if s["optional"]]
     assert rooms and all(s["action"]["kind"] == "behaviour" for s in rooms)
     assert {s["action"]["at"][0] for s in rooms} <= {99, 102, 103, 104}

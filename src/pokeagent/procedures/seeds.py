@@ -15,7 +15,8 @@ ENTRY_REGION_PAD = 2     # and this many tiles to either side (untuned)
 
 # S.S. Anne ROOM trainers (directive section 2): class, party #, map, x, y - optional gauntlet steps the seed
 # lists but never blocks on. The 1F/2F corridors hold no ROM trainer besides the suspect RIVAL1 row, which the
-# seed deliberately does NOT use (the rival comes from trainers.boss_party("rival_ss_anne")).
+# seed deliberately does NOT use (the rival comes from trainers.boss_party("rival_ss_anne") and its tile is
+# resolved at run time - never seeded as a coordinate).
 SHIP_ROOM_TRAINERS = [
     ("SAILOR", 1, 99, 4, 4), ("SAILOR", 2, 99, 10, 8),
     ("GENTLEMAN", 1, 102, 2, 3), ("GENTLEMAN", 2, 102, 11, 4), ("YOUNGSTER", 8, 102, 11, 14), ("LASS", 11, 102, 13, 11),
@@ -23,7 +24,7 @@ SHIP_ROOM_TRAINERS = [
     ("SAILOR", 3, 104, 0, 13), ("SAILOR", 4, 104, 2, 11), ("SAILOR", 5, 104, 12, 3), ("SAILOR", 6, 104, 22, 2),
     ("SAILOR", 7, 104, 0, 2), ("FISHERMAN", 2, 104, 0, 4),
 ]
-RIVAL_AT = [96, 36, 4]   # the 2F east end: the rival intercepts on the walk to the captain's door (ROM warp -> 0x65)
+RIVAL_MAP = 96   # SS_ANNE_2F: the rival boss's map (corridor); his tile is resolved at run time, never seeded
 
 
 def _fight_step(sid: str, map_id: int, x: int, y: int, *, optional: bool = False, **action_extra) -> dict:
@@ -67,11 +68,23 @@ def seed_gauntlet(map_id: int, trainers: list, order=None, optional=()) -> list:
     return steps
 
 
+def _rival_step(sid: str) -> dict:
+    """The rival boss step: no literal tile (the suspect RIVAL1 row's coordinates are never seeded). The
+    runner resolves ``at`` at run time - the trainer ledger's placement for the map, else the scripted
+    intercept itself (a trainer win under wins0). The map-scoped trainer_beaten predicate holds once the
+    ledger marks any placement on the map beaten."""
+    return {"id": sid, "optional": False,
+            "pre": {"all": [{"map": RIVAL_MAP}, {"not": {"trainer_beaten": [RIVAL_MAP]}}]},
+            "action": {"kind": "behaviour", "name": "fight_trainer", "at": None, "boss": "rival_ss_anne"},
+            "effect": {"all": [{"trainer_beaten": [RIVAL_MAP]}]},
+            "ok": 0, "fail": 0, "max_presses": FIGHT_MAX_PRESSES, "max_frames": FIGHT_MAX_FRAMES}
+
+
 def seed_ss_anne() -> list:
     """The S.S. Anne corridor/boss-path seed: waypoint steps through maps 95 -> 96 (x/y null: the learned maps
-    supply the warps at run time; a null tile is satisfied by arriving on the map), the rival boss fight at the
-    corridor's east end (party from trainers.boss_party("rival_ss_anne"), NOT the suspect RIVAL1 row), then the
-    room trainers of 99/102/103/104 as optional steps."""
+    supply the warps at run time; a null tile is satisfied by arriving on the map), the rival boss fight
+    (party from trainers.boss_party("rival_ss_anne"), NOT the suspect RIVAL1 row; the tile resolves at run
+    time), then the room trainers of 99/102/103/104 as optional steps."""
     steps = []
     for m, came in ((95, 94), (96, 95)):
         steps.append({"id": f"s{len(steps) + 1}", "optional": False,
@@ -79,7 +92,7 @@ def seed_ss_anne() -> list:
                       "action": {"kind": "goto", "map": m, "x": None, "y": None},
                       "effect": {"all": [{"map": m}]},
                       "ok": 0, "fail": 0, "max_presses": GOTO_MAX_PRESSES, "max_frames": GOTO_MAX_FRAMES})
-    steps.append(_fight_step(f"s{len(steps) + 1}", 96, RIVAL_AT[1], RIVAL_AT[2], boss="rival_ss_anne"))
+    steps.append(_rival_step(f"s{len(steps) + 1}"))
     for cls, pno, m, x, y in SHIP_ROOM_TRAINERS:
         steps.append(_fight_step(f"s{len(steps) + 1}", m, x, y, optional=True))
     return steps

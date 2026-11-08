@@ -5,13 +5,11 @@ from RAM and the run's own records. ``flags`` is a callable ``addr -> byte`` so 
 any address lazily; tests pass a plain dict instead (both are handled). Every predicate is a dict:
 ``{"map": 35}``, ``{"at": [m,x,y]}``, ``{"region": [m,x0,y0,x1,y1]}``, ``{"hp_frac_min": f}``,
 ``{"hp_frac_max": f}``, ``{"flag": [addr, bit]}``, ``{"badge": n}``, ``{"has_item": id}``,
-``{"trainer_beaten": [m,x,y]}``, ``{"party_size_min": n}``, and the combinators ``all`` / ``any`` / ``not``.
+``{"trainer_beaten": [m,x,y]}`` (or ``[m]``: any beaten placement on the map), ``{"party_size_min": n}``,
+and the combinators ``all`` / ``any`` / ``not``.
 An unknown key makes the predicate FALSE and is logged once - never raised, never treated as true.
 """
 from __future__ import annotations
-
-import json
-from pathlib import Path
 
 from pokeagent.goals import bag_contents
 from pokeagent.magikarp import fighter, trainee_slot
@@ -62,7 +60,8 @@ def _one(key: str, val, st: dict, log) -> bool:
             bag = st.get("bag") or {}
             return bool(bag.get(val, bag.get(int(val) if str(val).lstrip("0x").isalnum() else val, 0)))
         if key == "trainer_beaten":
-            return tuple(val) in st.get("beaten", set())
+            v, beaten = tuple(val), st.get("beaten", set())
+            return v in beaten if len(v) > 1 else any(t[:1] == v for t in beaten)
         if key == "party_size_min":
             return len(st.get("party") or ()) >= int(val)
     except (TypeError, ValueError, KeyError, IndexError):
@@ -84,25 +83,11 @@ def _party_hp(emu) -> tuple[int, int]:
 
 
 def beaten_trainers(ctx) -> set:
-    """{(map, x, y)} of trainers beaten IN THIS RUN. Beaten-trainer event flags are not verified, so the run's
-    own record is the source: npc entries battle.py marked 'beaten' (learned-frame x/y) plus this run's
-    runs/battles.jsonl 'trainer' rows. A verified flag address later adds a second source here."""
-    out = set()
-    for mid, d in ctx.mem.data.get("maps", {}).items():
-        for e in d.get("npcs", {}).values():
-            if e.get("trainer") and e.get("beaten") and e.get("last"):
-                out.add((int(mid), e["last"][0], e["last"][1]))
-    path = Path("runs") / "battles.jsonl"
-    if path.exists():
-        try:
-            for ln in path.read_text(encoding="utf-8").splitlines():
-                rec = json.loads(ln)
-                t = rec.get("trainer")
-                if rec.get("won") and rec.get("run") == ctx.run_dir.name and isinstance(t, dict) and "x" in t and "y" in t:
-                    out.add((t.get("map", 0), t["x"], t["y"]))
-        except (OSError, ValueError):
-            pass  # a truncated log is just a missing source
-    return out
+    """{(map, x, y)} of trainers beaten IN THIS RUN - the trainer ledger's ROM-placement records (PR #158),
+    the one beaten-trainers source. A walked-up trainer still counts: the ledger matches a placement to every
+    tile the NPC was seen on, not the battle tile alone."""
+    from pokeagent.explorer import trainer_hooks
+    return trainer_hooks.beaten_trainers(ctx)
 
 
 def read_state(ctx) -> dict:

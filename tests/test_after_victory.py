@@ -96,21 +96,79 @@ def make_ctx(tmp_path, **fields):
     return ctx
 
 
-def test_applies_once_per_win_and_never_while_battling_or_boxed(tmp_path):
-    ctx = make_ctx(tmp_path, battles_won=1)
+def test_applies_once_per_trainer_win_and_never_while_battling_or_boxed(tmp_path):
     b = AfterVictory()
+    ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["twins"] = 1
     assert b.applies(ctx)
     ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["twins"] = 1
     ctx.view = replace(ctx.view, battling=True)
     assert not b.applies(ctx)
-    ctx = make_ctx(tmp_path, battles_won=1)
-    of(ctx)["seen"] = 1
-    assert not b.applies(ctx)
 
 
-def test_step_sets_the_heal_intent_and_stores_the_decision(tmp_path, monkeypatch):
+def test_a_wild_win_never_decides(tmp_path, monkeypatch):
+    """battles_won counts wild wins too: with no trainer win recorded (twins == 0) the behaviour does not
+    apply, so no decision, no walk_to_center search, no log line, no after_victory.jsonl row."""
+    import pokeagent.explorer.behaviours.after_victory as mod
+    ctx = make_ctx(tmp_path, battles_won=5)
+    calls = []
+    monkeypatch.setattr(mod.outside_use, "walk_to_center", lambda c: calls.append(1))
+    ctx.log = lambda t, tag=None: calls.append(t)
+    assert not AfterVictory().applies(ctx)
+    assert calls == [] and not (ctx.run_dir / mod.LOG_NAME).exists()
+
+
+def test_a_trainer_win_is_recorded_and_written_to_the_run_dir(tmp_path, monkeypatch):
+    """battle bookkeeping bumps of(ctx)['twins'] on a won trainer fight (kind == 2 / beaten trainer_npc);
+    AfterVictory decides once and writes the row under the run dir."""
+    import pokeagent.explorer.behaviours.after_victory as mod
+    from pokeagent.explorer.behaviours.battle import Battle
+    ctx = make_ctx(tmp_path, battles=1, battles_won=0)
+    (tmp_path / "runs").mkdir(exist_ok=True)
+    monkeypatch.chdir(tmp_path)  # battle bookkeeping appends to runs/battles.jsonl relative to the run cwd
+    ctx.battle_pos, ctx.in_battle = (0x28, 5, 6), True
+    ctx.battle_log = {"start": 0, "kind": 2, "turns": []}
+    ctx.emu.set(0xD163, 1)  # one mon standing: a won trainer battle on the same map
+    monkeypatch.setattr(mod, "beaten_trainers", lambda c: set())
+    monkeypatch.setattr(mod.trainers, "trainers_on", lambda m, kb=None: [])
+    monkeypatch.setattr(mod.outside_use, "walk_to_center", lambda c: None)
+    monkeypatch.setattr(mod, "bag_contents", lambda emu: {})
+    monkeypatch.setattr(mod, "_party_now", lambda emu: STRONG)
+    Battle().step(ctx)                      # end-of-battle bookkeeping: trainer win recorded
+    assert of(ctx)["twins"] == 1 and ctx.battles_won == 1
+    assert AfterVictory().applies(ctx)
+    d = AfterVictory().step(ctx)
+    assert d is not None and of(ctx)["twins"] == 0
+    rows = (ctx.run_dir / mod.LOG_NAME).read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 1
+
+
+def test_the_walk_failure_is_logged_once_per_distinct_message(tmp_path, monkeypatch, caplog):
     import pokeagent.explorer.behaviours.after_victory as mod
     ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["twins"] = 1
+    monkeypatch.setattr(mod, "_party_now", lambda emu: STRONG)
+    monkeypatch.setattr(mod, "beaten_trainers", lambda c: set())
+    monkeypatch.setattr(mod.trainers, "trainers_on", lambda m, kb=None: [])
+    monkeypatch.setattr(mod, "bag_contents", lambda emu: {})
+    mod._walk_warned.clear()
+    def boom(c):
+        raise RuntimeError("no graph")
+    monkeypatch.setattr(mod.outside_use, "walk_to_center", boom)
+    with caplog.at_level("WARNING"):
+        AfterVictory().step(ctx)
+        of(ctx)["twins"] = 1
+        AfterVictory().step(ctx)
+    hits = [r for r in caplog.records if "walk_to_center failed" in r.message]
+    assert len(hits) == 1 and "no graph" in hits[0].message
+
+
+def test_step_requests_a_heal_walk_and_stores_the_decision(tmp_path, monkeypatch):
+    import pokeagent.explorer.behaviours.after_victory as mod
+    from pokeagent.explorer.status_care import of as care_of
+    ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["twins"] = 1
     monkeypatch.setattr(mod, "_party_now", lambda emu: [_mon("AQUAMON", 30, 0.2), STRONG[1]])
     monkeypatch.setattr(mod, "beaten_trainers", lambda c: set())
     row = {"class": "LASS", "party": 1, "x": 3, "y": 3, "mons": [(12, "PEBBLEMON")]}
@@ -120,13 +178,15 @@ def test_step_sets_the_heal_intent_and_stores_the_decision(tmp_path, monkeypatch
     monkeypatch.setattr(mod, "decide", lambda party, rem, bag, walk, kb=None:
                         av.decide(party, rem, bag, walk, SYN))
     d = AfterVictory().step(ctx)
-    assert of(ctx)["seen"] == 1 and ctx.center_intent == "heal"
+    assert of(ctx)["seen"] == 1 and ctx.center_intent is None
+    assert care_of(ctx)["walk"] is not None and care_of(ctx)["walk"]["why"] == "after_victory"
     assert of(ctx)["victory"] is not None and d is not None
 
 
 def test_step_primes_the_field_potion_cache(tmp_path, monkeypatch):
     import pokeagent.explorer.behaviours.after_victory as mod
     ctx = make_ctx(tmp_path, battles_won=1)
+    of(ctx)["twins"] = 1
     monkeypatch.setattr(mod, "_party_now", lambda emu: [_mon("AQUAMON", 30, 0.2), STRONG[1]])
     monkeypatch.setattr(mod, "beaten_trainers", lambda c: set())
     row = {"class": "LASS", "party": 1, "x": 3, "y": 3, "mons": [(12, "PEBBLEMON")]}
