@@ -165,9 +165,25 @@ def test_reorder_party_walks_start_member_switch_target():
 
 def party_ctx(tmp_path, mons) -> ExplorerContext:
     emu = FakeEmulator({MAP: 0x44, 0xD362: 5, 0xD361: 5, **party_mem(mons)})
-    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=20)
+    # train_need 99: the training gate is open (a lead under it is being trained), so the Magikarp's home rule applies.
+    # With the gate closed and a boss next, the matchup lead decides - and that reads kb/rom_tables.json when present.
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=20,
+                          train_need=99)
     ctx.refresh()
     return ctx
+
+
+def test_party_order_matchup_lead_outranks_the_trainee_home(tmp_path, monkeypatch):
+    # gate closed + a boss next: the good lead stays first and the Magikarp stays behind it (7a0363c, deliberate)
+    from pokeagent.explorer.behaviours import party_order
+    from pokeagent.knowledge import team_plan, trainers
+    monkeypatch.setattr(trainers, "boss_party", lambda goal, starter_names=None: [(12, "GEODUDE"), (14, "ONIX")])
+    monkeypatch.setattr(party_order, "our_party", lambda emu: ["ours"])  # the real ones read the ROM tables
+    monkeypatch.setattr(party_order, "trainer_mon", lambda name, lv: object())
+    monkeypatch.setattr(team_plan, "choose_lead", lambda party, theirs, hp: 0)
+    ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51), (MAGIKARP, 5, 17, 17)])
+    ctx.train_need = None
+    assert not PartyOrder().applies(ctx)
 
 
 def test_party_order_triggers_only_when_the_magikarp_is_not_first(tmp_path):
