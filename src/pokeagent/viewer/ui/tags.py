@@ -7,6 +7,7 @@ from __future__ import annotations
 
 MAIN_WINDOW = "viewer_main"      # the one fixed viewport-filling window (unchanged string)
 STADIUM_PANE = "stadium_pane"    # the toggleable top-level Stadium window (persisted by init_file)
+SWARM_PAGE = "swarm_page"        # the toggleable top-level Swarm page (persisted by init_file)
 
 # children of MAIN_WINDOW (kept as named constants; init_file does not persist these)
 GRID_AREA = "grid_area"
@@ -17,4 +18,4 @@ HEALTH_PANEL = "health_panel"    # the expandable health section inside WORLD_SI
 VIEWER_TEX = "viewer_tex"
 
 # every window dpg.add_window creates at populate time (the documented list the test enforces)
-TOP_LEVEL_WINDOWS = (MAIN_WINDOW, STADIUM_PANE)
+TOP_LEVEL_WINDOWS = (MAIN_WINDOW, STADIUM_PANE, SWARM_PAGE)

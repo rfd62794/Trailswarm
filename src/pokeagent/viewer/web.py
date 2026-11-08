@@ -10,8 +10,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from pokeagent.viewer.model import ViewerModel
+from pokeagent.viewer.model import CARD_FRAME_HZ, ViewerModel
 from pokeagent.viewer.panels import render as pres
+
+WEB_WANT_S = 5.0   # a web client's frame want outlives its last request by this much
 
 _PAGE = """<!doctype html><meta charset=utf-8><title>pokeagent view</title>
 <style>body{background:#1e1f24;color:#d8d8d8;font:13px Consolas,monospace;margin:12px}
@@ -87,9 +89,13 @@ def make_server(model: ViewerModel, port: int = 8899, host: str = "127.0.0.1") -
             if path == "/":
                 return self._send(200, "text/html; charset=utf-8", _PAGE.encode())
             if path == "/data":
+                # the page renders a card per listed agent, so each wants frames at the card cadence
+                model.want_frames({aid: CARD_FRAME_HZ for aid in model.ids()}, WEB_WANT_S)
                 return self._send(200, "application/json", _data(model))
             if path == "/frame.png":
                 aid = (q.get("id") or [""])[0]
+                if aid:  # a direct request wants that agent's frames too (off-screen or not)
+                    model.want_frames({aid: CARD_FRAME_HZ}, WEB_WANT_S)
                 fr = model.frame(aid)
                 if fr is None:
                     return self._send(404, "text/plain", b"no frame")

@@ -263,6 +263,34 @@ Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugge
 the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
 and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.
 
+## Viewer (pull model, 2026-11-07)
+
+- The poll thread pulls on a per-source cadence instead of polling everything every frame: snapshots
+  at `SNAPSHOT_HZ_IDLE = 2` Hz for unfocused agents / `SNAPSHOT_HZ_FOCUS = 10` Hz for the focused one;
+  world `/events` at `POLL_S_FOCUS = 0.2` s focused / `POLL_S_IDLE = 1.0` s for others; frames only for
+  the on-screen set the views declare via `visible_frame_set` (grid cards `CARD_FRAME_HZ = 10`, the
+  focus card `FOCUS_FRAME_HZ = 30`, Stadium slots `1/FRAME_S`). The render loop reads cached state
+  only. An in-flight source is skipped, never queued; a dead agent (`DEAD_AFTER = 5` failed
+  snapshots) retries at `DEAD_RETRY_S = 2` s and reads no frames. The old app.py `_Throttle` is gone:
+  cadences live in `ViewerModel`/`WorldModel`, demand in `set_wants`/`set_focus` (written by the UI
+  thread each tick).
+- Frame slot header is layout v2 (`telemetry.LAYOUT = 2`, 32-byte header: v1 fields + u32 layout +
+  u32 `SLOT_MAGIC` at offset 20 + f64 `reader_ts` at offset 24). Every shared-memory read stamps
+  the reader heartbeat — the field Agent_Footprint item 2 reads to render frames only while
+  watched; v1 slots are still read correctly (size is only a secondary guard — shared memory is
+  page-rounded on the attaching side, so v2 needs the layout AND magic u32s, not pixel bytes that
+  merely spell 2). Backwards compatibility runs ONE way only. A layout-2 buffer WITHOUT the magic (a
+  publisher started before this change) is read by a new viewer as v1: frames come 16 bytes late and the
+  reader heartbeat is skipped. An OLD viewer reading a NEW publisher also reads frames 16 bytes late.
+  Safe order: restart the agents (publishers) first, then the viewer; or restart both together. Never
+  attach a new viewer to agents that were already running before this change.
+- The Swarm page (View menu checkbox, top-level `SWARM_PAGE` window persisted by init_file) shows
+  one row per agent/slot: live/lost/dead, current segment + curriculum grade (the scorecard's
+  flag words, computed live via `segment_grades.grade_all`), next segment in the curriculum chain, steps/s + RSS from
+  `runs/swarm/agent_stats.jsonl` when the Agent_Footprint sampler writes it (blank otherwise), the
+  health state + reason, and the last goal landed. A row click focuses the agent. Rows assemble at
+  1 Hz on the poll thread (`viewer/swarm_rows.py`, pure); `ui/swarm_page.py` renders them.
+
 **Grind points (2026-11-07).** `src/pokeagent/grind/points.py` keeps one `GrindPoint` per map - grass `patch` (the
 encounter-proven tiles from `maps[m]["encounters"]`), `species` and the `level_band` they imply (top wild level -2..+6),
 an atlas `xp_per_min_prior`, and a measured `xp_per_min` folded from grind episodes (`episodes: {run@step: [rate,

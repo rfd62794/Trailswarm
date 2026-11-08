@@ -16,7 +16,8 @@ from pokeagent.world import events as ev
 
 TRAIL = 400
 FEED = 600
-POLL_S = 0.2
+POLL_S_FOCUS = 0.2     # the focused agent's /events cadence
+POLL_S_IDLE = 1.0      # everyone else (constants named, untuned)
 CLOSE_AFTER_S = 4.0
 
 
@@ -85,8 +86,15 @@ class WorldModel:
         self._polled: dict[str, float] = {}
         self._epoch: dict[str, str] = {}
         self._inflight: set[str] = set()
+        self._futures: set = set()
+        self._focused: str | None = None
         self._rev = 0                                 # bumps whenever the union of learnings changes
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="world-poll")
+
+    def set_focus(self, agent_id: str | None) -> None:
+        """The window's focused agent gets the fast /events cadence; everyone else idles."""
+        with self._lock:
+            self._focused = agent_id
 
     # -- ingest -----------------------------------------------------------------------
     def _read_one(self, src) -> None:
@@ -107,16 +115,31 @@ class WorldModel:
                 self._inflight.discard(aid)
 
     def poll(self, sources: Iterable) -> None:
-        """Hand each due agent to the pool and return at once: a hung agent only ever delays itself."""
+        """Hand each due agent to the pool and return at once: a hung agent only ever delays itself.
+        The focused agent polls at POLL_S_FOCUS, the rest at POLL_S_IDLE."""
         now = self._clock()
         for src in list(sources):
             aid = src.agent_id
             with self._lock:
-                if aid in self._inflight or now - self._polled.get(aid, -1e9) < POLL_S or not hasattr(src, "events"):
+                gap = POLL_S_FOCUS if aid == self._focused else POLL_S_IDLE
+                if aid in self._inflight or now - self._polled.get(aid, -1e9) < gap or not hasattr(src, "events"):
                     continue
                 self._inflight.add(aid)
                 self._polled[aid] = now
-            self._pool.submit(self._read_one, src)
+            f = self._pool.submit(self._read_one, src)
+            with self._lock:
+                self._futures.add(f)
+                f.add_done_callback(self._futures.discard)
+
+    def drain(self) -> None:
+        """Block until every submitted read landed (tests and shutdown; the poll loop never calls it)."""
+        from concurrent.futures import wait
+        while True:
+            with self._lock:
+                pending = [f for f in self._futures if not f.done()]
+            if not pending:
+                return
+            wait(pending)
 
     def ingest(self, agent_id: str, items: list[dict], epoch: str | None = None) -> None:
         now = self._clock()

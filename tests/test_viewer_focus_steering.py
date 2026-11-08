@@ -35,7 +35,7 @@ def win():
     from pokeagent.viewer.ui.window import ViewerWindow
     model = ViewerModel()
     srcs = {i: FakeSource(i, [snap(i)], [FRAME]) for i in ("a", "b")}
-    model.poll(list(srcs.values()))
+    model.poll(list(srcs.values())); model.drain()
     return ViewerWindow(model, srcs), srcs
 
 
