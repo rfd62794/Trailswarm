@@ -15,7 +15,6 @@ import json
 import logging
 import math
 from dataclasses import dataclass
-from pathlib import Path
 
 from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, HEAL_HP, POTION, REVIVE, SUPER_POTION, price
 from pokeagent.knowledge import encounters

@@ -186,3 +186,53 @@ def test_status_bits_come_from_catch_math_and_start_lineage_says_why(tmp_path, c
         assert cg.start_lineage(tmp_path / "none.state") == "unknown"
         assert cg.start_lineage(tmp_path / "none.state") == "unknown"
     assert sum("no readable fingerprint" in r.message for r in caplog.records) == 1
+
+
+def _walking_ctx(tmp_path, monkeypatch):
+    from pokeagent.explorer import heal_walk
+    ctx = poison_ctx(tmp_path)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: (16 * 100, 0, 0x40))
+    assert heal_walk.start(ctx, "test")
+    return ctx, heal_walk
+
+
+def test_heal_walk_in_center_sequence(tmp_path, monkeypatch):
+    ctx, hw = _walking_ctx(tmp_path, monkeypatch)
+    ctx.view.m, ctx.view.x, ctx.view.y, ctx.facing = 0x40, 5, 7, "DOWN"       # just inside the door, off the column
+    assert hw.step(ctx).button == "LEFT"
+    ctx.view.x = 1
+    assert hw.step(ctx).button == "RIGHT"
+    ctx.view.x = 3
+    assert hw.step(ctx).button == "UP" and ctx.center_intent == "status_care"  # up the column
+    ctx.view.y = 3                                                             # the counter row, still facing DOWN
+    assert hw.step(ctx).button == "UP"                                         # face the nurse
+    ctx.facing = "UP"
+    assert hw.step(ctx).button == "A"                                          # talk
+
+
+def test_heal_walk_cap_abandons_with_a_logged_reason(tmp_path, monkeypatch):
+    ctx, hw = _walking_ctx(tmp_path, monkeypatch)
+    lines = []
+    ctx.log = lambda t, tag=None: lines.append(t)
+    of(ctx)["walk"]["steps"] = hw.WALK_CAP
+    assert hw.step(ctx) is None and of(ctx).get("walk") is None
+    assert any("abandoned" in l and f"{hw.WALK_CAP} steps" in l for l in lines)
+    assert of(ctx)["walk_cool"] == ctx.step + hw.COOLDOWN
+
+
+def test_heal_walk_survives_a_battle_and_battle_steps_do_not_count(tmp_path, monkeypatch):
+    ctx, hw = _walking_ctx(tmp_path, monkeypatch)
+    ctx.view.m = 0x40
+    ctx.view.x, ctx.view.y = 5, 7
+    b = StatusCare()
+    b.step(ctx)
+    steps = of(ctx)["walk"]["steps"]
+    ctx.emu.set(BATTLE, 1)
+    ctx.refresh()
+    for _ in range(50):                                   # a long fight: the behaviour stands down, step never runs
+        assert not b.applies(ctx)
+    assert of(ctx)["walk"]["steps"] == steps              # request kept, cap not consumed
+    ctx.emu.set(BATTLE, 0)
+    ctx.refresh()
+    ctx.view.m, ctx.view.x, ctx.view.y = 0x40, 5, 7
+    assert b.applies(ctx) and b.step(ctx).button == "LEFT" and of(ctx)["walk"]["steps"] == steps + 1

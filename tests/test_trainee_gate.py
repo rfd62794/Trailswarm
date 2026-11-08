@@ -134,3 +134,20 @@ def test_plan_goal_stands_down_for_a_fainted_trainee_with_a_heal_walk(tmp_path, 
     ctx2 = karp_ctx(tmp_path / "b", hp=10)                               # a healthy trainee: no walk requested
     PlanGoal().step(ctx2)
     assert of(ctx2).get("walk") is None
+
+
+def test_no_path_search_while_a_heal_walk_cools_down_or_runs(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours.status_care import StatusCare
+    calls = []
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda ctx, get=None: calls.append(1) or None)
+    ctx = karp_ctx(tmp_path, hp=0)
+    of(ctx)["walk_cool"] = ctx.step + 300                                  # an abandoned walk is cooling down
+    b = StatusCare()
+    for _ in range(5):
+        assert b.applies(ctx)                                              # still ineligible, still cheap
+        assert b.step(ctx) is None
+        assert not trainee_check(ctx).ok and not trainee_ok(ctx).ok
+    assert calls == []                                                     # no BFS at all during the cooldown
+    of(ctx)["walk_cool"] = 0
+    trainee_check(ctx)
+    assert calls == [1]                                                    # once the cooldown is over it searches again

@@ -19,7 +19,7 @@ from pokeagent.explorer.behaviours.cave_escape import rope_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import heal_walk
 from pokeagent.explorer.economy import outside_use
-from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, HEAL_HP, REVIVE
+from pokeagent.explorer.economy.prices import HEAL_HP, REVIVE
 from pokeagent.explorer.status_care import (ITEM_NAME, MAX_TRIES, CareDecision, MonStatus, decide, of, record_row,
                                             status_kinds, steps_to_faint)
 from pokeagent.explorer.trainee_gate import trainee_check, trainee_ok

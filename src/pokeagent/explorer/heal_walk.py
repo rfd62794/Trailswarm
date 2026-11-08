@@ -21,6 +21,8 @@ from pokeagent.ramstructs import read_party
 
 WALK_CAP = 400       # steps one walk may take before it is abandoned (untuned first value)
 COOLDOWN = 300       # steps an abandoned walk waits before a new request may start (untuned first value)
+# The center layout (door (3,7), cross to x=3, nurse at (3,1), press A from (3,3) facing UP) is duplicated from
+# planner.py:44-50 because planner.py is off-limits here; a later shared helper should replace both copies.
 COUNTER_X, COUNTER_Y = 3, 3   # the nurse (3,1) answers across the counter row, standing at (3,3) facing UP
 
 

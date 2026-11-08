@@ -44,6 +44,10 @@ def trainee_check(ctx) -> Eligibility:
     mon = party[slot]
     if mon.hp > 0 and "poison" not in status_kinds(mon.status):
         return _FINE                      # the common case costs two reads, never a path search
+    st = of(ctx)
+    if st.get("walk") is not None or ctx.step < st.get("walk_cool", 0):
+        # a heal walk is running or just gave up: the verdict is known, so no path search (BFS) per step
+        return Eligibility(False, f"slot {slot} unfit: heal walk pending or cooling down", "center")
     rows = [MonStatus(i, p.hp, p.max_hp, status_kinds(p.status)) for i, p in enumerate(party)]
     bag = bag_contents(ctx.emu)
     walk = outside_use.walk_to_center(ctx)
