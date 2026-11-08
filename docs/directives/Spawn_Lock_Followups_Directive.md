@@ -152,7 +152,7 @@ In the Status row: diff stat, the 5x loop lines, the full-suite tail, and whethe
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -160,4 +160,5 @@ In the Status row: diff stat, the 5x loop lines, the full-suite tail, and whethe
 **Status log**
 - 2026-11-07 20:14 · robert-claude-laptop · none → Queued — Claude 2026-11-07: the four non-blocking review findings on PR #160, as a Devin follow-up
 - 2026-11-07 20:15 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; Devin slots are free
+- 2026-11-08 08:30 · robert-claude-laptop · Approved → Blocked — Held by Robert 2026-11-08: multi-ROM framework extension goes first; requeue after it lands (the queue has no Approved to Queued edge)
 <!-- queue:end -->
