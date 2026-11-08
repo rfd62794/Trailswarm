@@ -185,15 +185,18 @@ Real-window checklist (Robert, not Devin; the Claude verify lane cannot open a w
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-game-map-view-directive |
 | Base branch | - |
 | Base commit | 4b6b9da5a4621f24f6d73caf4557f36aac3da593 |
+| Head commit | 102573c3bd921e7a520022da70ecc8e3eea2d182 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: game-agnostic Map view (plan V3); needs PR #169 on main
 - 2026-11-08 12:19 · robert-claude-laptop · Queued → Approved — lint override: False positives: the four tests/test_mapview_*.py files are created by this run, and maps/index.json is generated run output under the source directory argument, not a repo path.
 - 2026-11-08 12:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-map-view-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6Y3NBNFS330M5C5HZAZEW25
 - 2026-11-08 12:41 · dispatcher · launched pid=17316; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-game-map-view-directive; provisioned: uv sync --frozen
+- 2026-11-08 13:12 · devin-overseer (delegated) · In progress → Review — Done: game-agnostic Map view built on branch directive/pokeagent-game-map-view-directive (commit 102573c). Diff stat: git diff --stat main -- src/pokeagent/world tools/mario_maps.py tools/watch_game.py -> empty. New files only + docs/KNOWLEDGE.md paragraph. Test tails: 37 mapview tests pass; world-view set 34 passed, 1 skipped (ROM-gated, unchanged); full suite 2133 passed, 40 skipped, no new failures. Line counts (limit): __init__.py 1, areas.py 109/150, layout.py 47/120, ghosts.py 120/150, playback.py 100/200, best.py 23/60, overlay.py 109/200, view.py 279/280, app.py 125/150, tools/map_view.py 12. Reused by import unchanged: world.view.Viewport, world.zoom SNAPS/step via Viewport.step_zoom_at, world.pyramid.Pyramid + to_gpu, world.follow.Follow. Nothing rewritten in mapview/. Constants: FPS=60, TRAIL_POINTS=90, MAX_TRAIL_PIXELS=20000, REFRESH_S=2.0, max_row_width=4096. Real-window checklist for Robert: run the Mario watcher so runs/mario-land/ fills, then `uv run python tools/map_view.py runs/mario-land`; check (1) every area appears once, labelled, pan/zoom readable; (2) all ghosts move together, frame rate flat as ghosts grow; (3) death crosses where attempts ended; (4) Follow best keeps camera on furthest ghost; (5) new ghosts/wider columns appear within seconds without a view jump.; under delegate.envelope [origin] spent: devin 0 min est. n/a
 <!-- queue:end -->
