@@ -132,11 +132,13 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-status-care-and-exp-eligibility-d-06cbc6 |
 | Base branch | - |
 | Base commit | 4e91a65d04b36c41df472298a68d9ac89978429f |
+| Head commit | 8419bfc5e3c5007f54206e62964fc2358650c2ea |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 16:20 · robert-claude-laptop · none → Draft — Claude 2026-11-07: poison care/Antidote, shopping floor, EXP eligibility gate
@@ -146,4 +148,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 19:07 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (same override as Team_Builder_V2 and Catch_Methods); Robert's 2026-11-07 direction queued this row
 - 2026-11-07 19:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-status-care-and-exp-eligibility-d-06cbc6; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7PJ1YKAG8PYTJQKD3SR1F
 - 2026-11-07 19:10 · dispatcher · launched pid=22368; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-status-care-and-exp-eligibility-d-06cbc6; provisioned: uv sync --frozen
+- 2026-11-07 19:23 · devin · In progress → Review — Done. New tests: 26 passed (tests/test_status_care.py, _shopping, _behaviour, test_trainee_gate.py). Full suite: 1692 passed / 40 skipped / 36 failed - ALL failures are test_review_*/test_cli_review missing-fixture errors (tests/fixtures/review/runs is gitignored and absent on this branch's base; main gained those fixtures after base 4e91a65), plus none from this diff; also the known env failure class noted in the directive. No forbidden file changed (planner*.py, ship_gate.py, planner_checkpoint.py, battle_moves.py untouched). Signatures: status_kinds(byte)->frozenset, steps_to_faint(hp,per_hp=4), decide(party,bag,steps_to_heal,kb)->CareDecision, poisoners_on(map_id,wild_by_map,learnsets,moves,kb), poison_ahead(goals,here_map,wild_by_map,kb), trainee_eligible(party,slot,revive_carried,steps_to_heal,antidote_carried=False)->Eligibility, trainee_ok(ctx). Constants: POISON_STEPS_PER_HP=4, CARE_MARGIN_STEPS=8, ANTIDOTE_FLOOR=1, POISON_LOOKAHEAD=3, TRAINEE_MIN_SAFE_STEPS=30, REVIVE_BEATS_WALK_STEPS=150, RECHECK_EVERY=10, VERIFY_STEPS=20, MAX_TRIES=2, MAX_PRESSES=60, FAINT_LOG_EVERY=100, prices FULL_HEAL=0x34/600, REVIVE=0x35/1500, heal_items.CURE_ITEMS/cure_count. Behaviour order: StatusCare sits after Restock() and before the second UseItems() in default_behaviours() (order test updated). Item machinery CAN target a party slot (rope_press/item_step party_target) - the Antidote/Potion/Revive sequences use it; no new menu code, so no fallback needed. Hooks: PlanGoal.step calls trainee_ok after train_member is computed (center_intent heal-first when ineligible, need untouched); GrindDrill.applies requires trainee_ok.ok. status_care.jsonl rows carry provenance via new checkpoint_goals.start_lineage (statefp wrapped, explorer layer-clean). UNVERIFIED (one place each): status bits in status_kinds, POISON_STEPS_PER_HP/POISON_BATTLE_FRACTION, the EXP rule in trainee_eligible's docstring. Caveat for controller validation: ctx.center_intent is a 'deliberate stop inside a center' marker (plan_goal clears it outside POKECENTER_MAPS); the low-HP planner rule is what actually walks to a nurse - the walk_to_center row requests through it exactly as written, but whether it alone starts a walk in an organic run is the thing to verify. [origin] spent: devin 13 min est. n/a
 <!-- queue:end -->
