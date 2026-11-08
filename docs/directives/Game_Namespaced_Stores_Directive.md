@@ -1,8 +1,19 @@
-# PokeAgent: namespace the shared stores by game, record the game in state sidecars, refuse a mismatched state load - Red keeps today's paths (plan phase 4)
+# PokeAgent: namespace the shared stores by memory family, record the game in state sidecars, refuse a mismatched state load - Red and Blue share the legacy root, Red keeps today's paths (plan phase 4)
 
 ## Why this exists
 
-Phase 4 of `docs/plans/Multi_Game_Framework_Plan.md` (branch `feat/watch-mario-land`, PR #169): "Namespace `runs/` and `kb/` by game, with Red on today's paths; game key in state sidecars; refuse a mismatched state load". The stop point is "safe for a second game to run". Rule that governs it: Pokemon Red behaviour stays byte-identical by default, Red's paths resolve to where they are today.
+Phase 4 of `docs/plans/Multi_Game_Framework_Plan.md` (branch `feat/watch-mario-land`, PR #169): "Namespace `runs/` and `kb/` by memory family, with Red on today's paths; game key in state sidecars; refuse a mismatched state load". The stop point is "safe for a second game to run". Rule that governs it: Pokemon Red behaviour stays byte-identical by default, Red's paths resolve to where they are today.
+
+**Direction change, settled 2026-11-08 (owner):** "we want to try to build a combined or shared memory for red and blue, we want the individuality minimal where possible, and plan for yellow after confirming cross compatibility." So the unit of namespacing is a memory FAMILY, not a game. Red and Blue are one family and share the legacy root. A game that is not in that family (Yellow, until it passes the compat check; every non-Pokemon game) gets its own family and its own namespace. Per-game paths are kept only for what is bound to one ROM or measured to differ.
+
+Measured 2026-11-08 by comparing Red's `runs/maps.json` with a Blue run's `maps.json` (15 maps, up to Viridian Forest; the Blue run had human interaction, so this is early evidence, not a verdict):
+
+- 2,170 of 2,203 Blue tiles were already known to Red. 21 warps in common, none different. 35 of 35 stationary NPCs in the same place.
+- 210 of 2,127 Red walls lie between two tiles Blue stood on (126 of them on Route 1, which has ledges). Likely one-way ledges or transient NPCs; the cause is UNCONFIRMED.
+- A kb built from the Blue copy matched Red's except wild encounters (34 of 57 maps differ) and unexplained differences in `map_trainers` at unused ids 105-117 and 231.
+- Blue's real RAM reads matched Red's map through the rival battle. Badges, wild battles and later maps are UNMEASURED.
+
+So most stores are shared by default; wild encounter tables and anything bound to one ROM are per game.
 
 **Depends on `Game_Spec_Rom_Screen_Buttons_Directive.md` being merged** (which depends on `Game_Spec_Package_Directive.md`). Start from a main containing `src/pokeagent/game/paths.py` and `GameSpec.default_rom`. If `git grep -n "def default_rom" -- src` finds nothing at the start, stop and write that in the Status row.
 
@@ -19,52 +30,78 @@ Measured on main 2026-11-08 (every store below is shared with no game key; map i
 
 Read first: `src/pokeagent/game/*.py`, `src/pokeagent/statemeta.py` (whole file, 150 lines), `src/pokeagent/emulator.py` lines 85-150 and 195-204, `src/pokeagent/bandit/store.py` and `src/pokeagent/novelty/store.py` (their path handling only), `tests/test_statemeta.py`.
 
+## Store classification (settled; every store this directive lists)
+
+Shared-by-default means the store is keyed by memory family. Per-game is kept only where a store is bound to one ROM or measured to differ. A later measurement can move a store from shared to per game; nothing moves the other way without a measurement.
+
+| Store | Scope | Reason |
+|---|---|---|
+| `runs/maps.json` | family | measured: tiles, warps and stationary NPCs agree between Red and Blue. Disagreements are handled by the overlay in `Family_Shared_Memory_Directive.md`, not by a split here |
+| `runs/bandit.json` | family | learned action statistics; nothing in it is tied to one ROM. UNVERIFIED for Blue (not measured) |
+| `runs/novelty.json` | family | feature counts per run; same status as bandit. UNVERIFIED for Blue |
+| `kb/hm_compat.json` | family | derived from the base-stats table; the Blue-built kb matched Red's |
+| `kb/items.json` (items catalog) | family | same measurement |
+| `kb/rom_tables.json` | family for the base, per game for the overlay | the Blue-built kb matched Red's except wild encounters (34 of 57 maps differ) and `map_trainers` at ids 105-117 and 231. This directive only routes the BASE file by family and exposes the per-game path; building the per-game overlay file is `Family_Shared_Memory_Directive.md` |
+| `runs/checkpoints` | per game | a save state is bound to one ROM, even when memory is shared |
+| `baselines/` | per game | a baseline trace is tied to one ROM. `baselines/` is outside `runs` and `kb`, so `store_path` does not route it and this directive does not move it. Red's stays where it is; a Blue baseline's location is decided by the clean-baseline step in the plan |
+
+Not classified here, not moved: `runs/legs/states` and the other items in the "not moved" list above. States there are ROM-bound, so they must never be family-shared; the state guard still protects them.
+
 ## Scope (in this order)
 
-1. `src/pokeagent/game/spec.py` and `src/pokeagent/game/pokemon_red.py` - one new field, `store_namespace`.
-2. `src/pokeagent/game/stores.py` <!-- new: src/pokeagent/game/stores.py --> - `store_path(...)`, the single place that maps a store path to a game's path. Under 70 lines.
+1. `src/pokeagent/game/spec.py` and `src/pokeagent/game/pokemon_red.py` - two new fields, `memory_family` and `owns_legacy_paths`, and the constant `LEGACY_FAMILY`.
+2. `src/pokeagent/game/stores.py` <!-- new: src/pokeagent/game/stores.py --> - `store_path(...)`, the single place that maps a store path to a path. Under 90 lines.
 3. `src/pokeagent/game/state_guard.py` <!-- new: src/pokeagent/game/state_guard.py --> - `check_state_game(path, game)` and `StateGameMismatch`. Under 70 lines.
 4. `src/pokeagent/statemeta.py` - `game_key` in `StateMeta`, written by `write_state`.
 5. `src/pokeagent/emulator.py` - both `load_state` methods call the guard first.
 6. The store call sites: `src/pokeagent/explorer/context.py`, `src/pokeagent/explorer/legacy.py`, `src/pokeagent/explorer/press_goals.py`, `src/pokeagent/explorer/press_track.py`, `src/pokeagent/cli_brain.py`, `src/pokeagent/mcp_server.py`, `src/pokeagent/navigation.py`, `src/pokeagent/observations.py`, `src/pokeagent/statemeta.py`, `src/pokeagent/statescmd.py`, `src/pokeagent/knowledge/hm_compat.py`, `src/pokeagent/knowledge/items_catalog.py`, `src/pokeagent/knowledge/kb.py`, `src/pokeagent/review/swarm.py`.
 7. Tests, listed in the completion criteria.
-8. `docs/KNOWLEDGE.md` - a paragraph on store namespaces and the state guard.
+8. `docs/KNOWLEDGE.md` - a paragraph on memory families, store scopes and the state guard.
 
 ## The work
 
-### store_namespace (spec.py, pokemon_red.py)
+### memory_family and owns_legacy_paths (spec.py, pokemon_red.py)
 
-Add `store_namespace: str | None` to `GameSpec` (no default). `None` means "the legacy root": the game's stores live exactly where they do today. RED sets `None`. Any other game would set its own key (for example `"pokemon-blue"`); validation: `None` or equal to `key`. Only RED exists after this phase, so no namespaced game is registered; tests build a fake spec (for example key `"test-game"`, namespace `"test-game"`) to exercise the namespaced branch.
+In `spec.py` add `LEGACY_FAMILY = "gen1-pokemon"` and two fields on `GameSpec` (no defaults):
+
+- `memory_family: str` - the family whose memory this game shares; every game declares it. The family is `gen1-pokemon` (the model is assumed compatible only with Generation 1 Pokemon: Red and Blue now, Yellow only if it passes the compat check); games such as Mario or Kirby are simply not in it. Same slug rule as `key`. `LEGACY_FAMILY` means "the legacy root": the family's family-scope stores live exactly where they do today.
+- `owns_legacy_paths: bool` - True for exactly one game, Red: its per-game stores also stay on today's paths. Validation: `owns_legacy_paths` requires `memory_family == LEGACY_FAMILY`.
+
+RED sets `memory_family=LEGACY_FAMILY, owns_legacy_paths=True`. Only RED exists after this phase and no second game is registered here. The Blue phase registers Blue with `memory_family=LEGACY_FAMILY, owns_legacy_paths=False`, which is how Blue joins Red's family; this directive builds and tests that case with a fake spec, it does not register Blue. Any game outside the family sets `memory_family` to its own key (for example `"test-game"`). A registry-level test asserts that at most one registered game has `owns_legacy_paths` and that no non-legacy `memory_family` equals a different game's `key`.
 
 ### stores.py
 
-`store_path(rel: str | Path, game: GameSpec | None = None, root: Path | None = None) -> Path`:
+`store_path(rel: str | Path, game: GameSpec | None = None, root: Path | None = None, scope: str = "family") -> Path`:
 
-- `rel` must start with `runs` or `kb` (a `ValueError` otherwise: the only two namespaced roots).
-- Legacy game (`store_namespace is None`): return `rel` unchanged (`Path(rel)`, or `root / rel` when `root` is given). Byte-identical for Red.
-- Namespaced game: insert the namespace as the second path component: `runs/maps.json` -> `runs/<ns>/maps.json`, `runs/checkpoints` -> `runs/<ns>/checkpoints`, `kb/items.json` -> `kb/<ns>/items.json`. Never create directories (callers already `mkdir(parents=True)` where they write).
+- `rel` must start with `runs` or `kb` (a `ValueError` otherwise: the only two namespaced roots). `scope` is `"family"` or `"game"` (a `ValueError` otherwise).
+- `scope="family"`: if `game.memory_family == LEGACY_FAMILY` return `rel` unchanged (`Path(rel)`, or `root / rel` when `root` is given). Byte-identical for Red and for Blue. Otherwise insert `memory_family` as the second path component: `runs/maps.json` -> `runs/<family>/maps.json`, `kb/items.json` -> `kb/<family>/items.json`.
+- `scope="game"`: if `game.owns_legacy_paths` return `rel` unchanged. Otherwise insert `game.key` as the second component: `runs/checkpoints` -> `runs/pokemon-blue/checkpoints`, and for a game in its own family `runs/test-game/checkpoints`. A game's family-scope and game-scope paths may share a directory; they never name the same file.
+- Never create directories (callers already `mkdir(parents=True)` where they write).
 - `game=None` resolves through `resolve_game(None)` so `POKEAGENT_GAME` is honoured.
 - `rel` may be given as `str` or `Path`, with `/` or `\`; return a `Path`. Where a call site stores the path as a `str` field (`explorer/context.py` fields `maps_path`, `bandit_path`, `novelty_path`; `cli_brain.MAPS_DEFAULT`), keep the field a `str` equal to `store_path(...).as_posix()` so the value for Red is the identical string `"runs/maps.json"`.
 
 ### state_guard.py and statemeta.py
 
+A save state is ROM-bound even when memory is shared, so the sidecar keeps the GAME key (not the family) and a mismatched load is still refused. A Red state never loads under Blue, and the reverse.
+
 - `StateMeta` gains `game_key: str | None = None` (last field, so older sidecars without it still load through `StateMeta(**data)`). `write_state` sets it from the emulator's game: `getattr(getattr(emu, "game", None), "key", None)`, falling back to `"pokemon-red"` ONLY when the emulator has no `game` attribute at all (the phase 3 emulators always have one; the fallback is for test doubles). Sidecars written for Red now carry `"game_key": "pokemon-red"`; that is the only change to Red's written bytes and the golden trace is not affected (it compares transitions, not sidecars).
 - `check_state_game(path: Path, game: GameSpec) -> None`: reads `statemeta.sidecar(path)` if it exists (use `json.loads` directly; do not import `statemeta` here if that creates a cycle: read the one key). Rules:
   - sidecar has `game_key` equal to `game.key`: pass.
-  - sidecar has a `game_key` that differs: raise `StateGameMismatch(path, found, expected)`; the message names both keys and the state path.
-  - no sidecar, an unreadable sidecar, or a sidecar without `game_key` (a state written before this change): this is an UNLABELED state. Unlabeled states are accepted when `game.store_namespace is None` (the legacy game: every state that exists today is Red's) and refused for any namespaced game with `StateGameMismatch(path, None, game.key)` whose message says the state is unlabeled and may belong to another game. This keeps every existing Red state loading exactly as before.
+  - sidecar has a `game_key` that differs: raise `StateGameMismatch(path, found, expected)`; the message names both keys and the state path. This applies between Red and Blue even though they share memory.
+  - no sidecar, an unreadable sidecar, or a sidecar without `game_key` (a state written before this change): this is an UNLABELED state. Unlabeled states are accepted when `game.owns_legacy_paths` (every state that exists today is Red's) and refused for every other game, family member or not, with `StateGameMismatch(path, None, game.key)` whose message says the state is unlabeled and may belong to another game. This keeps every existing Red state loading exactly as before.
 - Both `PyBoyEmulator.load_state` and `FakeEmulator.load_state` call `check_state_game(path, self.game)` BEFORE touching the emulator, so a refused load changes nothing. `StateGameMismatch` is a `ValueError` subclass (callers that already catch `ValueError` on bad states keep working; `cli.py:83,127` get the new refusal as a normal error exit, and you add the one-line handling there if they would otherwise show a traceback: `error: <message>`, exit 2).
 
 ### Store call sites
 
-Replace each literal in the fourteen listed modules with `store_path(...)`. Keep every module-level name that exists today (`MAPS_DEFAULT`, `MAPS_PATH`, `KB_PATH`, `DEFAULT_DIRS`, `_KB`); they are now assigned from `store_path`. Where the path is computed at import time and `POKEAGENT_GAME` would be read once at import, say so in a one-line comment; this is acceptable for a first step because a process runs one game. `kb/rom_tables.json` in `knowledge/kb.py` and `review/swarm.py`: namespace it the same way (`kb/<ns>/rom_tables.json` for a namespaced game). `explorer/context.py` must end at 299 lines or fewer: write the three defaults as `str(store_path("runs/maps.json"))`-style one-liners in place; if an import line would push it over, import `store_path` inside the existing import block by editing a line rather than adding one. `statemeta.tile_snapshot`'s default `maps_path` becomes a `None` default that resolves to `store_path("runs/maps.json")`, with the call result unchanged for Red.
+Replace each literal in the fourteen listed modules with `store_path(...)`, using the scope from the classification table: `scope="game"` for the checkpoint sites (`explorer/press_goals.py:62`, `explorer/press_track.py:53` and `:60`, `statescmd.py:16` `DEFAULT_DIRS`), the default `scope="family"` for every other site. Keep every module-level name that exists today (`MAPS_DEFAULT`, `MAPS_PATH`, `KB_PATH`, `DEFAULT_DIRS`, `_KB`); they are now assigned from `store_path`. Where the path is computed at import time and `POKEAGENT_GAME` would be read once at import, say so in a one-line comment; this is acceptable for a first step because a process runs one game. `kb/rom_tables.json` in `knowledge/kb.py` and `review/swarm.py`: family scope (the shared base; the per-game overlay is read by the family-memory directive, not here). `explorer/context.py` must end at 299 lines or fewer: write the three defaults as `str(store_path("runs/maps.json"))`-style one-liners in place; if an import line would push it over, import `store_path` inside the existing import block by editing a line rather than adding one. `statemeta.tile_snapshot`'s default `maps_path` becomes a `None` default that resolves to `store_path("runs/maps.json")`, with the call result unchanged for Red.
 
 ## What NOT to do
 
 - Do not touch `roms/`, `baselines/`, or any ROM data, and do not state where any game copy came from.
-- Do not move, rename or rewrite any existing file under `runs/` or `kb/`: Red's data stays where it is. This phase changes where NEW paths resolve for a namespaced game; no migration script, no copy.
+- Do not move, rename or rewrite any existing file under `runs/` or `kb/`: Red's data stays where it is. This phase changes where NEW paths resolve for a game outside the legacy family or for a game-scope store; no migration script, no copy.
 - Do not namespace `runs/agents`, `runs/explore-*`, `runs/swarm`, `runs/segments*`, `runs/legs` or `runs/anomalies*`; list them in the Report instead.
-- Do not register a second game or add real-time input; `press()` is untouched.
+- Do not register Blue or any second game, and do not add real-time input; `press()` is untouched.
+- Do not build overlays, provenance, a merge, or any read-through of a second file. That is `Family_Shared_Memory_Directive.md`; this directive only routes paths.
 - Do not change the schema of `maps.json`, `bandit.json`, `novelty.json` or checkpoint files, or add a game key inside them.
 - Do not change `tools/` scripts or existing tests except as the Report lists (an existing test that asserts the exact bytes of a Red sidecar may need `game_key` added; edit minimally and list it).
 - Every file stays under 300 lines; `explorer/context.py` and `explorer/memory.py` must not grow.
@@ -95,23 +132,23 @@ A Devin worktree has no ROM and no baselines (`roms/` and `baselines/` are gitig
 1. `uv run pytest -q tests/test_golden_red.py`. This is the gate: a changed hash means Red's store paths or state loading changed and the PR is rejected. It skips in a dispatch worktree because the ROM and baselines are absent; report it as NOT run, not as passed. Claude's ROM-present check runs it before merge. The recorded hash must not change (a deliberate change re-records it from a base-commit run in the same PR). The test reads `runs/explore-*` under its scratch dir, and Red stays on today's paths.
 2. Load every existing checkpoint under `runs/checkpoints` and `runs/legs/states` through a Red emulator (`uv run pokeagent states list` or the `statescmd` check the repo already has, with the ROM): all must still load (they are unlabeled, accepted for Red), none may raise `StateGameMismatch`.
 3. Write one new state with `write_state` under Red and confirm its sidecar has `"game_key": "pokemon-red"` and loads back.
-4. Negative check with the ROM: hand-edit a COPY of a sidecar (in a temp dir, not under `runs/`) to `"game_key": "other"` and confirm the load is refused with the message naming both keys and the emulator state is unchanged.
+4. Negative check with the ROM: hand-edit a COPY of a sidecar (in a temp dir, not under `runs/`) to `"game_key": "other"` and confirm the load is refused with the message naming both keys and the emulator state is unchanged. (The Red-versus-Blue refusal itself needs a Blue ROM and is checked in the Blue phase.)
 5. `uv run pytest -q` with the ROM present: passed and skipped counts equal base, in particular `tests/test_statemeta.py`, `tests/test_segment_determinism.py`, `tests/test_seeding.py`.
 
 ## Rules for this run
 
 - NON-INTERACTIVE: a tool call that needs confirmation ends the run. Never install, download or fetch. Never read outside the working directory. Do not search, glob or hunt: if a file named here is missing, stop and write that in the Status row.
 - Branch only (`directive/pokeagent-game-namespaced-stores-directive`); commit as you go; never commit to or push main; never merge.
-- Tests are headless and need no ROM: `FakeEmulator`, synthetic fake `GameSpec` instances (a namespaced one with key `test-game`), `tmp_path` for every store and state file, `monkeypatch.chdir(tmp_path)` where a path is relative. Nothing may open a window, and no test may write into the real `runs/` or `kb/`.
+- Tests are headless and need no ROM: `FakeEmulator`, synthetic fake `GameSpec` instances, `tmp_path` for every store and state file, `monkeypatch.chdir(tmp_path)` where a path is relative. Nothing may open a window, and no test may write into the real `runs/` or `kb/`. The fakes are `test-game` (its own family, `owns_legacy_paths=False`) and `test-sibling` (`memory_family=LEGACY_FAMILY`, `owns_legacy_paths=False`, standing in for Blue).
 - If blocked, stop and write why in the Status row. Status row done means `Review`, with the diff stat, test tails and both grep outputs in the Report.
 
 ## Completion criteria
 
-- [ ] `store_path` returns Red's paths unchanged for `runs/maps.json`, `runs/bandit.json`, `runs/novelty.json`, `runs/checkpoints`, `kb/items.json`, `kb/rom_tables.json`, with and without `root`; for a namespaced fake game it inserts the namespace as the second component; a path not under `runs` or `kb` raises `ValueError`; `POKEAGENT_GAME` is honoured when `game` is omitted. <!-- test: tests/test_game_stores.py --> <!-- new: tests/test_game_stores.py -->
-- [ ] `GameSpec.store_namespace` validates (`None` or equal to `key`) and RED is `None`. <!-- test: tests/test_game_spec.py -->
-- [ ] `check_state_game` passes a matching key, raises `StateGameMismatch` naming both keys for a different key, accepts unlabeled (no sidecar, no key, unreadable sidecar) for the legacy game, and refuses unlabeled for the namespaced fake game. <!-- test: tests/test_game_state_guard.py --> <!-- new: tests/test_game_state_guard.py -->
+- [ ] `store_path` with scope `family` returns Red's paths unchanged for `runs/maps.json`, `runs/bandit.json`, `runs/novelty.json`, `kb/items.json`, `kb/rom_tables.json`, with and without `root`; with scope `game` it returns `runs/checkpoints` unchanged for Red. For the sibling fake (`test-sibling`) the family-scope paths are identical to Red's and the game-scope path is `runs/test-sibling/checkpoints`. For the own-family fake (`test-game`) family scope inserts the family as the second component and game scope inserts the key. A path not under `runs` or `kb`, and an unknown scope, raise `ValueError`; `POKEAGENT_GAME` is honoured when `game` is omitted. <!-- test: tests/test_game_stores.py --> <!-- new: tests/test_game_stores.py -->
+- [ ] `GameSpec` validates `memory_family` and `owns_legacy_paths` (the latter requires the legacy family), RED has `LEGACY_FAMILY` and `True`, and the registry holds at most one game with `owns_legacy_paths`. <!-- test: tests/test_game_spec.py -->
+- [ ] `check_state_game` passes a matching key, raises `StateGameMismatch` naming both keys for a different key (including a sibling-family game loading the other's state), accepts unlabeled (no sidecar, no key, unreadable sidecar) for Red, and refuses unlabeled for both fakes. <!-- test: tests/test_game_state_guard.py --> <!-- new: tests/test_game_state_guard.py -->
 - [ ] `write_state` records `game_key`; `read_meta` still reads an old sidecar without the field (`game_key` is `None`); a Red `FakeEmulator` round-trips save then load; loading a state labeled for another game is refused BEFORE the emulator is touched (assert the fake's state is unchanged). <!-- test: tests/test_statemeta_game_key.py --> <!-- new: tests/test_statemeta_game_key.py -->
-- [ ] Every call site in the scope list resolves to the identical string or `Path` for Red as before (assert per site: the `ExplorerContext` defaults, `cli_brain.MAPS_DEFAULT`, `mcp_server.MAPS_PATH`, `navigation.load_memory` default, `observations` default, `statescmd.DEFAULT_DIRS`, `hm_compat.KB_PATH`, `items_catalog.KB_PATH`, `knowledge.kb._KB`), and for the namespaced fake game under `monkeypatch.setenv("POKEAGENT_GAME", ...)` is not required (a process runs one game); the test calls `store_path` with the fake spec directly. <!-- test: tests/test_store_callers.py --> <!-- new: tests/test_store_callers.py -->
+- [ ] Every call site in the scope list resolves to the identical string or `Path` for Red as before (assert per site: the `ExplorerContext` defaults, `cli_brain.MAPS_DEFAULT`, `mcp_server.MAPS_PATH`, `navigation.load_memory` default, `observations` default, `statescmd.DEFAULT_DIRS`, `hm_compat.KB_PATH`, `items_catalog.KB_PATH`, `knowledge.kb._KB`), and each site's scope matches the classification table (checkpoint sites game scope, the rest family scope); namespaced behaviour is tested by calling `store_path` with the fakes directly, not through `POKEAGENT_GAME` (a process runs one game). <!-- test: tests/test_store_callers.py --> <!-- new: tests/test_store_callers.py -->
 - [ ] The existing statemeta, CLI and emulator tests pass; any edit to an existing test is listed in the Report. <!-- test: tests/test_statemeta.py -->
 - [ ] `explorer/context.py` and `explorer/memory.py` are at or below 299 lines. <!-- test: tests/test_explorer_behaviours.py -->
 - [ ] The grep above is clean as stated, and `git diff --stat main` touches only the files in Scope plus tests and docs.
@@ -132,7 +169,7 @@ Diff stat, test tails, the grep output, the new files' line counts, the list of 
 ## Required from User
 
 - None for the run. The ROM-present checks above are Claude's verify lane, not Robert's.
-- Sequencing: do not approve this until `Game_Spec_Rom_Screen_Buttons_Directive.md` is merged. After it merges, the framework is safe for a second game to run (plan phase 4 stop point).
+- Sequencing: do not approve this until `Game_Spec_Rom_Screen_Buttons_Directive.md` is merged. After it merges, the framework is safe for a second game to run (plan phase 4 stop point). `Game_Compat_Check_Directive.md` and `Family_Shared_Memory_Directive.md` follow it.
 
 ## Sandbox needs
 
