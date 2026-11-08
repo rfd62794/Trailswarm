@@ -32,13 +32,14 @@ from pokeagent.explorer.behaviours.restock import Restock
 from pokeagent.explorer.behaviours.replay_beat import BeatStart, ReplayBeat, ReplayInterrupt
 from pokeagent.explorer.behaviours.switch_out import SwitchOut
 from pokeagent.explorer.behaviours.team_hunt import TeamHunt
+from pokeagent.explorer.behaviours.trainer_hunt import TrainerHunt
 from pokeagent.explorer.behaviours.use_items import UseItems
 
 __all__ = [
     "AdvanceDialog", "AfterVictory", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BattleYesNo", "AlreadyOutGuard", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
     "ExploreBurst", "Frontier", "GoalTalk", "Goto", "GrindDrill", "Heal", "LearnerHunt", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "ProcedureRunner", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "Restock", "SettleWait", "StallGuard", "SwitchOut",
-    "TeamHunt",
+    "TeamHunt", "TrainerHunt",
     "UseItems", "default_behaviours", "no_press",
 ]
 
@@ -56,5 +57,5 @@ def default_behaviours() -> list[Behaviour]:
         AlreadyOutGuard(), BattleYesNo(), BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), AfterVictory(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
         NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), UseItems(), GoalTalk(), GrindDrill(),
-        ExploreBurst(), Pickup(), PlanGoal(), LearnerHunt(), TeamHunt(), ProcedureRunner(), Frontier(),
+        ExploreBurst(), Pickup(), PlanGoal(), LearnerHunt(), TeamHunt(), TrainerHunt(), ProcedureRunner(), Frontier(),
     ]

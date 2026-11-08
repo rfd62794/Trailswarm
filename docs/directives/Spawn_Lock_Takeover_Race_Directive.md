@@ -216,11 +216,19 @@ and why.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Done |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-spawn-lock-takeover-race-directive |
 | Base branch | - |
+| Base commit | 1de12c26e621a3ec56eb63e658809712e0d56f83 |
+| Head commit | ed0f5fe5cc59901a05cac9a488ac22472a111732 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 19:28 · robert-claude-laptop · none → Queued — Claude 2026-11-07: diagnosis of the flaky test_lock_takeover_is_exclusive (empty-content window, rename/link-back resurrection, same-pid release); approve when a Devin slot frees
+- 2026-11-07 19:39 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; a Devin slot is free (Status_Care finished)
+- 2026-11-07 19:40 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-spawn-lock-takeover-race-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W9K5XGEVV5FYM50F05W5E3
+- 2026-11-07 19:46 · dispatcher · launched pid=3004; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-spawn-lock-takeover-race-directive; provisioned: uv sync --frozen
+- 2026-11-07 20:02 · devin · In progress → Review — Done. Before/after flake: the new stress test did NOT fail in 3 runs on the old code (passed 3/3, ~12.3s each) — proceeded per directive; 2 of 3 deterministic tests failed on old code as designed (empty file judged stale; .takeover side lock ignored). After the first fix iteration the NEW code exposed two Windows-specific races, both fixed: (a) unlink of a lock file open in another thread's read_text raises PermissionError (no delete-sharing), which the release finally swallowed leaving a live-pid lock -> whole-round LockBusy (worst=0); added _unlink() retry helper used at every unlink site; (b) _take_over could unlink a lock recreated between its inner _stale check and the unlink (worst=2); the taker now records (st_ino, st_mtime_ns) inside the side lock and unlinks only if identity is unchanged. tools/swarm_lock.py::lock_holder now returns the pid part before ':' so transfer_lock/adopt_lock/request_handoff parse 'pid:uuid' content (full-suite regression test_old_spawn_lock_exit_leaves_transferred_lock); tools/swarm.py untouched. 10x loop: 10/10 runs '2 passed' (~8.7-17.8s each). uv run pytest -q tests/test_resources.py: 21 passed. Full suite tail: 1825 passed, 40 skipped, 0 failed in 154.53s. Diff stat: src/pokeagent/resources.py +88/-21-ish, tests/test_resources.py +60, tools/swarm_lock.py +4/-1; 3 files, 131 insertions(+), 21 deletions(-); resources.py now 281 lines (<300). Choices differing from the directive: stress hold is 0.02s not 0.05s (12 threads x 20 rounds x 0.05s = ~12s serial, over the 10s budget); _unlink helper and the ino/mtime recheck inside _take_over added for the Windows races above; swarm_lock.py edited (not in Scope list but required by the token format and not in the NOT-do list). One refusal to disclose: 'uv run python .devin-scratch/stress_probe.py' was refused (diagnostic probe); verified via pytest instead; scratch file left under .devin-scratch/. [origin] spent: devin 16 min est. n/a
+- 2026-11-07 20:13 · robert-claude-laptop · Review → Done — note: PR #160 merged (merge commit 41208f8) after Sonnet APPROVE and a green verify record at ed0f5fe (1825 passed, 0 failed, lock test green). Non-blocking follow-ups noted by the reviewer: spawn_lock loop spins without sleep/deadline while the side lock is held (up to 5 s); stress test runs at the 10 s budget; non-FileExists os.link errors map to busy forever (log once); a crash between temp write and link can leave a .tmp file.
 <!-- queue:end -->

@@ -143,12 +143,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-trainer-ledger-and-battle-avoidan-996cc6 |
 | Base branch | - |
 | Base commit | 0e8aa6571457986e193ec7e1ad3b7171198f4d31 |
-| Head commit | 7fba5eda0b68a429a849b6532e048f548d3aaf8c |
+| Head commit | d7926e0f68ff69aeb6ac4f13c602fe921b55f67d |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -160,4 +160,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 19:05 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-trainer-ledger-and-battle-avoidan-996cc6; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W7JXG3SBDHA0C29DGGMWEV
 - 2026-11-07 19:08 · dispatcher · launched pid=8212; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-trainer-ledger-and-battle-avoidan-996cc6; provisioned: uv sync --frozen
 - 2026-11-07 19:29 · devin · In progress → Review — [origin] spent: devin 21 min est. n/a
+- 2026-11-07 20:23 · robert-claude-laptop · Review → Done — note: PR #158 merged (merge commit) after Sonnet CHANGES-NEEDED -> Sonnet fixes -> Haiku APPROVE and a green verify record at d7926e0 (1866 passed, 0 failed, 40 ROM-gated skips). Follow-ups: planner routes with neither goto nor frontier_target are not covered by avoidance (docstring note owed); sight tiles still SIGHT_GUESS=4 ignoring facing/range (Trainer_Sight_Tiles directive); trainer_flags.json still {}.
 <!-- queue:end -->

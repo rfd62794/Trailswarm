@@ -67,6 +67,8 @@ def shutdown(ctx: ExplorerContext):
         ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"]); ctx.inter = None
     from pokeagent.explorer.trainee import record_trainee
     record_trainee(ctx)
+    from pokeagent.explorer import trainer_ledger
+    trainer_ledger.save_run(ctx)  # the run's beaten-trainer ledger goes to <run dir>/trainers.json
     ctx.mem.save()
     if ctx.ram_diff is not None:
         ctx.ram_diff.close()

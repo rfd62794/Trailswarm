@@ -145,6 +145,66 @@ def test_lock_takeover_is_exclusive(tmp_path):
     assert not list((tmp_path / "runs").glob("spawn.lock*"))  # no tombstones left behind
 
 
+def test_lock_stress_many_threads_many_rounds(tmp_path):
+    import threading
+    import time as _t
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "spawn.lock").write_text("999999999", encoding="utf-8")  # stale, round 0 only
+    errs = []
+    for _ in range(20):
+        holders, worst = [0], [0]
+
+        def worker():
+            try:
+                with R.spawn_lock(tmp_path, wait_s=10):
+                    holders[0] += 1
+                    worst[0] = max(worst[0], holders[0])
+                    _t.sleep(0.02)  # shorter than the 0.05 of the base test so 20 rounds fit under 10 s
+                    holders[0] -= 1
+            except Exception as e:  # pragma: no cover
+                errs.append(e)
+        ts = [threading.Thread(target=worker) for _ in range(12)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        assert worst[0] == 1
+    assert not errs
+    assert not list((tmp_path / "runs").glob("spawn.lock*"))  # no .takeover or .tmp left behind
+
+
+def test_empty_lock_file_is_not_stale(tmp_path):
+    import time as _t
+    path = tmp_path / "runs" / "spawn.lock"
+    path.parent.mkdir()
+    path.write_text("", encoding="utf-8")  # a live lock mid-write by an old-format writer
+    assert R._stale(path) is False
+    old = _t.time() - R.LOCK_STALE_S - 1
+    os.utime(path, (old, old))
+    assert R._stale(path) is True
+
+
+def test_release_only_removes_own_token(tmp_path):
+    path = tmp_path / "runs" / "spawn.lock"
+    other = f"{os.getpid()}:deadbeef"  # a token this acquisition did not write
+    with R.spawn_lock(tmp_path):
+        path.write_text(other, encoding="utf-8")
+    assert path.read_text(encoding="utf-8") == other  # we did not release someone else's lock
+    path.unlink()
+
+
+def test_takeover_side_lock_is_cleared_when_stale(tmp_path):
+    import time as _t
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    side = runs / "spawn.lock.takeover"  # left by a crashed taker
+    side.write_text("", encoding="utf-8")
+    old = _t.time() - 10  # older than TAKEOVER_STALE_S
+    os.utime(side, (old, old))
+    (runs / "spawn.lock").write_text("999999999", encoding="utf-8")  # stale
+    with R.spawn_lock(tmp_path, wait_s=2):
+        pass
+    assert not list(runs.glob("spawn.lock*"))
+
+
 def test_lock_held(tmp_path):
     assert R.lock_held(tmp_path) is False
     with R.spawn_lock(tmp_path):

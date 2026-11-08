@@ -21,7 +21,7 @@ from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     HEAL_NAME, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer import party_log
+from pokeagent.explorer import party_log, trainer_ledger
 from pokeagent.explorer.economy import heal_items, ledger as economy_ledger
 from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_battle_step
 from pokeagent.explorer.kb import ROM_KB
@@ -229,7 +229,7 @@ class Battle(BehaviourBase):
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
                 dn = ca.get("dex") or 0
                 caught = bool(dn) and bool(ctx.emu.read(0xD2F7 + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
-                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k != "dex"}, "caught": caught}); del ctx.mem.data["catches"][:-100]
+                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k not in ("dex", "battle", "presses", "last")}, "caught": caught}); del ctx.mem.data["catches"][:-100]
                 ctx.log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
                 try:  # record-only: a decode failure must never end a run
                     rec = record_catch(ctx.mem.data, read_party(ctx.emu), ca["species"], ctx.step) if caught else None
@@ -251,6 +251,7 @@ class Battle(BehaviourBase):
             if won and ctx.trainer_npc is not None:
                 ctx.trainer_npc["beaten"] = True
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
+                trainer_ledger.note_battle_won(ctx, ctx.trainer_npc, battle_map)  # pin the win to a ROM placement
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
             record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
