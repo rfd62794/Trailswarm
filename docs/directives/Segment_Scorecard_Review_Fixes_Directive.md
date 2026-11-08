@@ -87,7 +87,7 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-segment-scorecard-review-fixes-directive |
 | Base branch | directive/pokeagent-segment-scorecard-directive |
@@ -101,4 +101,5 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 - 2026-11-07 20:49 · devin · In progress → Blocked — Refused required command: git merge origin/directive/pokeagent-segment-scorecard-directive (git merge is refused-on-purpose in this sandbox; all merge-equivalents are too). The directive's branch rule requires it as step one: PR #161 head 9abf2b1 is not an ancestor of HEAD and its files (e.g. src/pokeagent/segment_grades.py) are absent, so the five review fixes cannot be applied. Fix: merge PR #161's branch into directive/pokeagent-segment-scorecard-review-fixes-directive before dispatch, or allow git merge for this run, then requeue.
 - 2026-11-07 20:52 · robert-claude-laptop · Blocked → Queued — Requeue: the run needed git merge, which the sandbox refuses; directive rewritten so the run branch starts FROM PR #161's branch (approve with base_branch)
 - 2026-11-07 20:52 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; requeued with the PR branch as base because the sandbox refuses git merge
+- 2026-11-07 20:53 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WDR6413WC7980KAPXQ74BW
 <!-- queue:end -->
