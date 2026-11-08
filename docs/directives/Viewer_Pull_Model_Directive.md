@@ -138,3 +138,17 @@ Expected: every file under 300.
 ## Report
 
 Diff stat, test tails, wc -l line, constants chosen, what Robert should look at in the real window.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:26 · robert-claude-laptop · none → Queued — Robert approved the efficiency program 2026-11-07; viewer-only, independent of Perf_Baseline
+<!-- queue:end -->
