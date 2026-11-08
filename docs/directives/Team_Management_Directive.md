@@ -189,7 +189,7 @@ Diff stat, test tails, wc -l line, constants chosen and why, and the controller 
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-team-management-directive |
 | Base branch | - |
@@ -203,4 +203,5 @@ Diff stat, test tails, wc -l line, constants chosen and why, and the controller 
 - 2026-11-07 20:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WCY1B8X0SH90CS62PWX8YM
 - 2026-11-07 20:46 · dispatcher · launched pid=6388; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-team-management-directive; provisioned: uv sync --frozen
 - 2026-11-07 21:10 · devin · In progress → Review — head 7a0363c22d7eb77790d9530753a009692aa0166b. diff: 16 files, +1034/-52 (new src/pokeagent/knowledge/team_plan.py + 5 test files; touched training, plan_goal, party_order, switch_out, magikarp, catch, menu, dialog, grind_report, KNOWLEDGE.md). wc -l: team_plan.py 244, party_order.py 132, switch_out.py 197, plan_goal.py 251, training.py 152, context.py 299, memory.py 299 - all under 300. Tests: targeted 12-file set 116 passed; full suite 1892 passed, 40 skipped (ROM-gated), 0 failed. [origin] spent: devin 24 min est. n/a
+- 2026-11-08 12:08 · robert-claude-laptop · Review → Done — note: PR #166 merged (6641f35); verify 2068 passed at aef479f; Sonnet review then Haiku delta APPROVE.
 <!-- queue:end -->
