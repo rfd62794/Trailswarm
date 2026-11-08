@@ -263,6 +263,20 @@ Route 24 beaten trainer (2026-11-07): the Bug Catcher at (11,31), first on Nugge
 the deciding rule (`ctx.deciding_rule`), `blocked_cap` temp-blocks any tile+direction after 20 consecutive blocked presses (routing only, never saved), a person's tile is no longer a frontier side,
 and `train_route` walks to Route 24's known grass and keeps frontier from leaving for Cerulean.
 
+## Map view (game-agnostic, 2026-11-08)
+
+`uv run python tools/map_view.py <source>` (e.g. `runs/mario-land`) opens the stitched map replay.
+It reads only `<source>/maps/index.json` (`levels` or `areas` key: name -> `{width, height, seen,
+file}`) plus the area PNGs, and `<source>/ghosts/*.json` (schema 1: `{run, agent, outcome, every,
+points: [[area, x, y]]}`). Every area is laid out in one space (rows, wrapped at 4096 px) and every
+ghost track replays together on one clock - heads, fading trails, a cross where a `death`-family
+outcome ended, the furthest ghost in white. All ghosts rasterise into one overlay texture per frame,
+so the frame rate does not drop as ghosts grow. `--fps` is the recording frame rate `every` is
+measured in (default 60); `--refresh` the re-read cadence in seconds (default 2). Files are re-read
+live: new ghosts join at the next loop start, wider images recompose the base without moving the
+camera. Implementation: `src/pokeagent/mapview/` (pure readers/playback/overlay + a Dear PyGui
+window reusing `world.view`, `world.zoom`, `world.pyramid`, `world.follow`).
+
 ## Viewer (pull model, 2026-11-07)
 
 - The poll thread pulls on a per-source cadence instead of polling everything every frame: snapshots
