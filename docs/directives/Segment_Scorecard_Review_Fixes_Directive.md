@@ -102,4 +102,5 @@ Head sha, diff stat, wc -l line, targeted and full-suite tails, anything you cou
 - 2026-11-07 20:52 · robert-claude-laptop · Blocked → Queued — Requeue: the run needed git merge, which the sandbox refuses; directive rewritten so the run branch starts FROM PR #161's branch (approve with base_branch)
 - 2026-11-07 20:52 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; requeued with the PR branch as base because the sandbox refuses git merge
 - 2026-11-07 20:53 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6WDR6413WC7980KAPXQ74BW
+- 2026-11-07 20:58 · dispatcher · launched pid=13744; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-segment-scorecard-review-fixes-directive; resynced: merged directive/pokeagent-segment-scorecard-directive into directive/pokeagent-segment-scorecard-review-fixes-directive (1 commit(s), clean); provisioned: uv sync --frozen
 <!-- queue:end -->
