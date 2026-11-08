@@ -253,6 +253,7 @@ class ExplorerContext:
     bandit: Any = None  # pokeagent.bandit.driver.BanditDriver (None = bandit off: every hook answers as the Explorer would)
     novelty: Any = None  # pokeagent.novelty.tracker.NoveltyTracker (None = novelty off: nothing below changes)
     steps_since_progress: int = 0  # presses since the last progress signal (explorer.progress; mirrors the tracker)
+    talk_vetoed: dict = field(default_factory=dict)  # (map, x, y) -> step: a planned talk the retalk veto refused (retalk_memory)
     loops: Any = None              # explorer.loop_veto.Loops, made on first use (loop memory + loops.jsonl)
     item_seq: dict | None = None  # behaviours/use_items.py: the item-use sequence in progress (item, kind, presses, before snapshot ...)
     item_next_check: int = 0  # step before which use_items does not re-evaluate its policies
