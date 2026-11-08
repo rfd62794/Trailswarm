@@ -179,7 +179,11 @@ def run_continuous(a) -> int:
     plan = None
     if a.plan == "curriculum":
         from seg_sched import Curriculum
-        plan = Curriculum(ROOT)
+        try:
+            plan = Curriculum(ROOT, suite=a.suite)
+        except ValueError as e:
+            print(f"not starting: {e}")
+            return 2
 
     def limit() -> int:  # machine cap minus agents we did not start (a viewer-spawned one counts against us)
         live = resources.live_agent_count(ROOT)
@@ -217,6 +221,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="--continuous: first control port to try (100 ports); default POKEAGENT_SWARM_PORT_BASE or 8800")
     ap.add_argument("--plan", choices=["curriculum"], default=None,
                     help="--continuous: curriculum = pick each slot's segment by need (tools/segments.py shows the table)")
+    ap.add_argument("--suite", default=None, metavar="NAME",
+                    help="--plan curriculum: restrict segment jobs to this suite (runs/segment_sets.json)")
     ap.add_argument("--segment", default=None,
                     help="re-run ONE segment: agents start from runs/checkpoints/<previous goal>.state and stop at this goal")
     ap.add_argument("--drills", type=float, default=0.0, metavar="F",

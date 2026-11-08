@@ -49,6 +49,7 @@ def render(doc: dict) -> list[str]:
         done = len(c["rows"]) - len(c["missing"])
         out.append(f"chained best so far: {c['total']:,} frames over {done} of {len(c['rows'])} segments "
                    f"(first gap: {c['missing'][0] if c['missing'] else '-'})")
+    out.append("scorecard (solved/optimized/stale/broken/held + shares): pokeagent review segments [--json]")
     return out
 
 
