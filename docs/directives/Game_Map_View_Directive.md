@@ -195,4 +195,5 @@ Real-window checklist (Robert, not Devin; the Claude verify lane cannot open a w
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: game-agnostic Map view (plan V3); needs PR #169 on main
 - 2026-11-08 12:19 · robert-claude-laptop · Queued → Approved — lint override: False positives: the four tests/test_mapview_*.py files are created by this run, and maps/index.json is generated run output under the source directory argument, not a repo path.
 - 2026-11-08 12:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-map-view-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6Y3NBNFS330M5C5HZAZEW25
+- 2026-11-08 12:41 · dispatcher · launched pid=17316; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-game-map-view-directive; provisioned: uv sync --frozen
 <!-- queue:end -->
