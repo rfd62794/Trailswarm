@@ -240,7 +240,7 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 | Branch | directive/pokeagent-goal-procedures-directive |
 | Base branch | - |
 | Base commit | dccf81faf6eb1ed42156ef2b7dbafb527a235423 |
-| Head commit | d8e701bbb01664235d8e95556737fc54c98915e6 |
+| Head commit | 36c4286e8366d952e72cccf7c7aa4927d984cc36 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**

@@ -194,7 +194,7 @@ Diff stat, test tails, wc -l line, constants chosen and why, and the controller 
 | Branch | directive/pokeagent-team-management-directive |
 | Base branch | - |
 | Base commit | d18e5b2b5db20bfac3dfdac7d14c85106640c60f |
-| Head commit | 7a0363c22d7eb77790d9530753a009692aa0166b |
+| Head commit | e6c8965f9ed7ecb5320571d392533febbe8f2dd6 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**

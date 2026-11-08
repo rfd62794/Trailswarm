@@ -203,7 +203,7 @@ frames/step, and a headless grind episode from `baselines/` that ends without a 
 | Branch | directive/pokeagent-grind-points-directive |
 | Base branch | - |
 | Base commit | 37fe0cdc4abbc77cad7acc78d4500ded33cb7d35 |
-| Head commit | 3e1770e0c7ff0253fff2b5eedee87deba1071455 |
+| Head commit | b1178e588de8da2d36554c7e574b21c7aedb5207 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
