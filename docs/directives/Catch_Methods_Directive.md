@@ -198,7 +198,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 | Branch | directive/pokeagent-catch-methods-directive |
 | Base branch | - |
 | Base commit | b522d546a11d6bbab3a4d09c08ee606e9cc4e781 |
-| Head commit | b568d8157d25418fc7b6ca47b537ff16e860d0a4 |
+| Head commit | 47d8eadfa8cb81c665c58e6af172b4fe1c9cfec7 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
