@@ -235,11 +235,13 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goal-procedures-directive |
 | Base branch | - |
 | Base commit | dccf81faf6eb1ed42156ef2b7dbafb527a235423 |
+| Head commit | 113769237a3824e2f283d40254957f44f051d204 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-07 15:27 · robert-claude-laptop · none → Draft — Claude 2026-11-07: goal procedures (learned, graded step scripts), AfterVictory decision, ProcedureRunner
@@ -247,4 +249,5 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 - 2026-11-07 19:34 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; dependency PR #154 (Loop_Memory) is merged
 - 2026-11-07 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W99FWZ4KE4HJ131S4BRZ07
 - 2026-11-07 19:42 · dispatcher · launched pid=11212; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-directive; provisioned: uv sync --frozen
+- 2026-11-07 20:03 · devin · In progress → Review — Goal procedures landed: procedures pkg (schema/predicates/store/seeds/mine + after_victory_rules), nugget_bridge + ss_anne_corridor seeds, tools/procedures_mine.py, AfterVictory + ProcedureRunner behaviours registered per spec. 1854 passed, 40 skipped on uv run pytest -q; pushed on directive/pokeagent-goal-procedures-directive. [origin] spent: devin 21 min est. n/a
 <!-- queue:end -->

@@ -14,8 +14,10 @@ def lock_path(root: Path) -> Path:
 
 
 def lock_holder(root: Path) -> str | None:
+    """The holder's pid as text. Lock content is 'pid:uuid' since the takeover-race fix; the part before ':'
+    is the pid, and old pid-only files still parse."""
     try:
-        return lock_path(root).read_text().strip()
+        return lock_path(root).read_text().strip().split(":", 1)[0]
     except OSError:
         return None
 

@@ -21,7 +21,7 @@ from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     HEAL_NAME, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer import party_log
+from pokeagent.explorer import party_log, trainer_ledger
 from pokeagent.explorer.economy import heal_items, ledger as economy_ledger
 from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_battle_step
 from pokeagent.explorer.kb import ROM_KB
@@ -251,6 +251,7 @@ class Battle(BehaviourBase):
             if won and ctx.trainer_npc is not None:
                 ctx.trainer_npc["beaten"] = True
                 ctx.log(f"[trainer beaten: NPC pic {ctx.trainer_npc['pic']}]", "res")
+                trainer_ledger.note_battle_won(ctx, ctx.trainer_npc, battle_map)  # pin the win to a ROM placement
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
             record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
