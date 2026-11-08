@@ -257,6 +257,9 @@ class Battle(BehaviourBase):
                 trainer_ledger.note_battle_won(ctx, ctx.trainer_npc, battle_map)  # pin the win to a ROM placement
             ctx.trainer_npc = None
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
+            if won and trainer:
+                from pokeagent.explorer.procedures.state import of as proc_state
+                proc_state(ctx)["twins"] += 1  # AfterVictory decides once per TRAINER win, never on a wild one
             record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
