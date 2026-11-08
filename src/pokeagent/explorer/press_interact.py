@@ -1,7 +1,7 @@
 """Interaction bookkeeping for one press (moved from the demo's do_press)."""
 from __future__ import annotations
 
-from pokeagent.explorer import blocked_cap
+from pokeagent.explorer import blocked_cap, trainer_ledger
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.interaction_record import close_interaction
 from pokeagent.explorer.items import is_item_ball, parse_item_text
@@ -65,6 +65,7 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
                 npc_in_front["text"] = text[:160]
             entry = npc_in_front.setdefault("results", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
             entry["count"] += 1
+            trainer_ledger.note_talk(ctx, before, npc_in_front, box_after)  # text with no battle = beaten trainer
         else:
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text if box_after else "")
         ctx.mem.recent_talk.add(f"{before[1]},{before[2]},{ctx.facing}")

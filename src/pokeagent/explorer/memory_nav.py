@@ -100,11 +100,33 @@ class NavMixin:
         return False
 
     def _person_tile(self, map_id: int, x: int, y: int) -> bool:
-        """A person is standing there now (temp_blocked) or a stationary NPC was last seen there."""
+        """A person is standing there now (temp_blocked), a stationary NPC was last seen there, or the
+        tile is a beaten trainer's ROM placement still held by its NPC."""
         if (map_id, x, y) in self.temp_blocked:
             return True
         npc = self.npc_at(map_id, x, y)
-        return npc is not None and npc.get("moves") is False
+        if npc is not None and npc.get("moves") is False:
+            return True
+        return self._beaten_trainer_tile(map_id, x, y)
+
+    def _beaten_trainer_tile(self, map_id: int, x: int, y: int) -> bool:
+        """A ROM placement the ledger calls beaten, with an NPC recorded on or next to it (the NPC may
+        have moved off the placement when it walked up to fight: check every recorded position, not last)."""
+        beaten = getattr(self, "beaten_tiles", None)
+        if beaten is None:
+            return False
+        tiles = beaten() if callable(beaten) else beaten
+        if (map_id, x, y) not in tiles:
+            return False
+        for e in self.m(map_id).get("npcs", {}).values():
+            for p in (e.get("positions") or {}):
+                try:
+                    px, py = (int(v) for v in str(p).split(","))
+                except ValueError:
+                    continue
+                if max(abs(px - x), abs(py - y)) <= 1:
+                    return True
+        return False
 
     def is_frontier(self, node: tuple) -> bool:
         """True while `node` (map, x, y) still has an unexplored side."""
