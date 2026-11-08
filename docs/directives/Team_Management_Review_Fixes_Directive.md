@@ -88,3 +88,17 @@ Expected: each under 300.
 ## Report
 
 Head sha, diff stat, wc -l line, test tails, the exact deposit prompt you matched and whether it is verified.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 21:37 · robert-claude-laptop · none → Queued — Review fixes for PR #166 (Sonnet: 2 blockers + 3 should-fixes); approve with base_branch = the PR branch once the fixer's main merge is pushed
+<!-- queue:end -->
