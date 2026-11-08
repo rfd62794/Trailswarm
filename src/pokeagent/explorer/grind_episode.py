@@ -47,7 +47,7 @@ _warned: set = set()
 def _warn_once(key: str, msg: str, *args) -> None:
     if key not in _warned:
         _warned.add(key)
-        log.info(msg, *args)
+        log.warning(msg, *args)
 
 
 def _state(ctx) -> dict:
@@ -104,8 +104,8 @@ def _trainee_ok(ctx) -> bool:
         from pokeagent.explorer.trainee_gate import trainee_check  # deferred: trainee_gate -> behaviours -> grind_drill -> this module
         return trainee_check(ctx).ok
     except Exception as e:  # noqa: BLE001
-        _warn_once("trainee", "grind episode: trainee check failed (%r); not gating on it", e)
-        return True
+        _warn_once("trainee", "grind episode: trainee check failed (%r); treating the trainee as not fit", e)
+        return False
 
 
 def _ledger(ctx, st: dict):
@@ -137,12 +137,8 @@ def update(ctx) -> dict | None:
         return st.get("episode")
     if getattr(getattr(ctx, "opts", None), "drill_grind", None) is not None:
         return None  # a --drill-grind run measures the map it was told: no self-started episodes
-    if ctx.step < st.get("no_point_until", 0):
-        return None  # 'no point fits' is cached for NO_POINT_RECHECK steps (choose() BFS-es per point)
-    if start(ctx, "the training gate"):
+    if start(ctx, "the training gate"):  # start() keeps the 'no point fits' cache (NO_POINT_RECHECK steps)
         return st["episode"]
-    if st.get("start_why") == "no grind point fits":
-        st["no_point_until"] = ctx.step + NO_POINT_RECHECK
     return None
 
 
@@ -159,8 +155,12 @@ def start(ctx, reason: str = "the training gate") -> bool:
     st = _state(ctx)
     if st.get("episode") is not None:
         return True
+    if ctx.step < st.get("no_point_until", 0):
+        return False  # 'no point fits' is cached for NO_POINT_RECHECK steps (choose() BFS-es per point)
     ep, why = _try_start(ctx, st)
     if ep is None:
+        if why == "no grind point fits":
+            st["no_point_until"] = ctx.step + NO_POINT_RECHECK
         if why != st.get("start_why"):
             ctx.log(f"[grind episode] not starting ({reason}): {why}", "res")
         st["start_why"] = why
@@ -241,6 +241,11 @@ def _xp_gained(ctx, ep: dict) -> int:
     return max(0, party_log.of(ctx).exp_total - ep["start_xp"])
 
 
+def _party_changed(ctx, ep: dict) -> bool:
+    rows = list(measure.read_jsonl(Path(ctx.run_dir) / "levels.jsonl"))
+    return measure.party_changed_in_episode(rows, ep["start_step"], ctx.step)
+
+
 def _finish(ctx, st: dict, ep: dict, why: str) -> None:
     st["episode"] = None
     st["cooldown_until"] = ctx.step + EPISODE_COOLDOWN
@@ -248,6 +253,8 @@ def _finish(ctx, st: dict, ep: dict, why: str) -> None:
     steps, battles = max(0, ctx.step - ep["start_step"]), max(0, ctx.battles - ep["battles0"])
     xp, blk = _xp_gained(ctx, ep), max(0, pl.blackouts - ep["blackouts0"])
     aborted = steps < MIN_EPISODE_STEPS or battles == 0
+    if not aborted and _party_changed(ctx, ep):  # a deposit/release mid-episode makes the exp-total delta meaningless
+        aborted, why = True, f"{why}; party membership changed mid-episode"
     pt = ep["point"]
     if not aborted:  # a real measurement: fold it into the ledger and the shared swarm table
         pt = gp.episode_result(pt, xp, max(1, steps), blk, provenance=ep["provenance"], ep_id=ep["id"])

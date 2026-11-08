@@ -24,7 +24,7 @@ _warned: set = set()
 def _warn_once(key: str, msg: str, *args) -> None:
     if key not in _warned:
         _warned.add(key)
-        log.info(msg, *args)
+        log.warning(msg, *args)
 
 
 def read_jsonl(path: Path):
@@ -111,3 +111,14 @@ def xp_gained_in_episode(levels_rows, start_step: int, end_step: int) -> int:
     before = next((r for r in reversed(rows) if r["step"] <= start_step), rows[0])
     after = next((r for r in reversed(rows) if r["step"] <= end_step), rows[-1])
     return max(0, exp_of(after) - exp_of(before))
+
+
+def party_changed_in_episode(levels_rows, start_step: int, end_step: int) -> bool:
+    """Did the party's membership (species per slot) differ between the bounds? A deposit/release/swap
+    makes the exp-total delta unusable, so the caller aborts the episode rather than record a false row."""
+    rows = [r for r in levels_rows if isinstance(r.get("step"), (int, float)) and r.get("party")]
+    if not rows:
+        return False
+    before = next((r for r in reversed(rows) if r["step"] <= start_step), rows[0])
+    after = next((r for r in reversed(rows) if r["step"] <= end_step), rows[-1])
+    return [m[0] for m in before["party"]] != [m[0] for m in after["party"]]

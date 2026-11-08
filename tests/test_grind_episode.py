@@ -267,3 +267,57 @@ def test_patrol_fallback_never_leaves_the_episode_map_set(tmp_path):
     bounded = _memory_step(ctx, 35, 10, 35, allowed=frozenset({35, 64}))[0]
     assert free == "UP"                                   # no episode: the warp is the way on
     assert bounded != "UP"                                # the episode boundary holds for the patrol too
+
+
+def test_start_honours_the_no_point_cache(tmp_path, monkeypatch):
+    """start() (called every step by PR #166) must not re-run the per-point search inside the cache window."""
+    monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows.jsonl")
+    monkeypatch.setattr(grind_episode, "LEDGER", tmp_path / "gp.json")
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS), make_ledger())
+    calls = []
+    monkeypatch.setattr(gp, "choose", lambda *a, **k: calls.append(1))
+    assert not grind_episode.start(ctx) and len(calls) == 1
+    for s in range(2, 50):
+        ctx.step = s
+        assert not grind_episode.start(ctx)
+    assert len(calls) == 1
+    ctx.step = 1 + grind_episode.NO_POINT_RECHECK
+    grind_episode.start(ctx)
+    assert len(calls) == 2
+
+
+def test_membership_change_aborts_instead_of_a_false_measured_row(tmp_path, monkeypatch):
+    """A deposit mid-episode (species list changes) is an 'aborted' row, never folded into the ledger mean."""
+    led = make_ledger()
+    led.path = tmp_path / "gp.json"
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS), led)
+    _start_blocked_ctx(ctx, monkeypatch, tmp_path)
+    (tmp_path / "levels.jsonl").write_text(
+        json.dumps({"step": 1, "party": [[1, 10, 100, 20, 20], [2, 30, 5000, 50, 50]]}) + "\n"
+        + json.dumps({"step": 80, "party": [[1, 10, 250, 20, 20]]}) + "\n", encoding="utf-8")
+    assert grind_episode.update(ctx) is not None
+    ctx.step, ctx.battles = 80, 3
+    ctx.train_need = 0
+    grind_episode.update(ctx)
+    row = json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])
+    assert row["status"] == "aborted" and "membership" in row["reason"]
+    assert led.points[35].xp_per_min_measured in (None, 0) or not led.points[35].xp_per_min_measured
+
+
+def test_trainee_check_failure_fails_safe_and_warns(tmp_path, monkeypatch, caplog):
+    import pokeagent.explorer.trainee_gate as tg
+    monkeypatch.setattr(tg, "trainee_check", lambda c: (_ for _ in ()).throw(RuntimeError("boom")))
+    grind_episode._warned.discard("trainee")
+    ctx = make_ctx(tmp_path)
+    with caplog.at_level("WARNING"):
+        assert grind_episode._trainee_ok(ctx) is False
+    assert any(r.levelname == "WARNING" and "trainee check failed" in r.getMessage() for r in caplog.records)
+
+
+def test_warn_once_logs_at_warning(caplog):
+    from pokeagent.grind import measure
+    grind_episode._warned.discard("t-w"); measure._warned.discard("t-w")
+    with caplog.at_level("INFO"):
+        grind_episode._warn_once("t-w", "x %s", 1)
+        measure._warn_once("t-w", "y %s", 2)
+    assert [r.levelname for r in caplog.records if r.getMessage() in ("x 1", "y 2")] == ["WARNING", "WARNING"]
