@@ -26,6 +26,7 @@ Read first: `src/pokeagent/mapview/overlay.py`, `mapview/app.py`, `mapview/view.
 
 1. `src/pokeagent/mapview/live.py` <!-- new: src/pokeagent/mapview/live.py --> - the live position contract: atomic writer, tolerant reader, `LiveStore`. Under 130 lines.
 2. `src/pokeagent/mapview/presets.py` <!-- new: src/pokeagent/mapview/presets.py --> - the view preset registry, a plain data table plus `resolve`. Under 120 lines. The only mapview file allowed to name games.
+2b. `src/pokeagent/mapview/edges.py` <!-- new: src/pokeagent/mapview/edges.py --> - edge colours and edge lines for stacked areas. Pure numpy. Under 90 lines.
 3. `src/pokeagent/mapview/avatars.py` <!-- new: src/pokeagent/mapview/avatars.py --> - `frame_crop` avatars: crop, key out background, tint, in-memory cache. Pure numpy. Under 150 lines.
 4. `src/pokeagent/mapview/avatar_rom.py` <!-- new: src/pokeagent/mapview/avatar_rom.py --> - the `rom_sprite` source as an adapter over an injected sprite provider. Under 70 lines.
 5. `src/pokeagent/mapview/walk.py` <!-- new: src/pokeagent/mapview/walk.py --> - facing and walk phase from position change. Pure. Under 70 lines.
@@ -35,7 +36,7 @@ Read first: `src/pokeagent/mapview/overlay.py`, `mapview/app.py`, `mapview/view.
 9. `tools/mario_live.py` <!-- new: tools/mario_live.py --> - the Mario side of the contract: build and throttle the live record from the emulator. Under 90 lines.
 10. `tools/mario_display.py` - call the throttled live writer from the existing `watch` loop (edit, a few lines only).
 11. `tests/test_mapview_vocabulary.py` - exempt `presets.py` only (edit).
-12. Tests, all new: <!-- new: tests/test_mapview_live.py --> <!-- new: tests/test_mapview_presets.py --> <!-- new: tests/test_mapview_avatars.py --> <!-- new: tests/test_mapview_avatar_rom.py --> <!-- new: tests/test_mapview_walk.py --> <!-- new: tests/test_mapview_overlay_avatars.py --> <!-- new: tests/test_mario_live.py -->. Edited, existing from PR #172: `tests/test_mapview_window.py`, `tests/test_mapview_vocabulary.py`.
+12. Tests, all new: <!-- new: tests/test_mapview_live.py --> <!-- new: tests/test_mapview_presets.py --> <!-- new: tests/test_mapview_avatars.py --> <!-- new: tests/test_mapview_avatar_rom.py --> <!-- new: tests/test_mapview_walk.py --> <!-- new: tests/test_mapview_edges.py --> <!-- new: tests/test_mapview_overlay_avatars.py --> <!-- new: tests/test_mario_live.py -->. Edited, existing from PR #172: `tests/test_mapview_window.py`, `tests/test_mapview_vocabulary.py`.
 13. `docs/KNOWLEDGE.md` - a short paragraph: live file schema, presets, avatar sources.
 
 ## The work
@@ -61,7 +62,14 @@ File: `<source>/live/<agent>.json`, one per displayed agent, written atomically 
 - `GENRES` table: `platformer`, `rpg-overworld`, `flip-screen`, each a full `Preset` with sensible defaults (platformer: strip, frame_crop, side-on facing, trail line; rpg-overworld: grid, rom_sprite, walk_frames True, trail dots; flip-screen: strip, frame_crop).
 - `GAMES` table: `super-mario-land` (inherits `platformer`) and `pokemon-red` (inherits `rpg-overworld`), each given as `{"inherits": "<genre>", **overrides}`; `resolve` applies the override over the genre with `dataclasses.replace`. Status fields for Super Mario Land: `("segment", "progress", "box_text")`; for Pokemon Red: `("segment", "party", "money")`. Use only fields that exist on `AgentSnapshot` today; if a field name is not on `AgentSnapshot`, drop it and record the gap in the Report as a decision.
 - `resolve(game: str | None = None, preset: str | None = None, genre: str | None = None) -> Preset`: order of precedence `preset` name, then `game`, then `genre`, then `DEFAULT_GENRE = "platformer"`. An unknown name does not raise: it falls back to the genre default of the closest known genre (unknown game with a known genre uses that genre, otherwise `DEFAULT_GENRE`) and `Preset.name` says `"<requested>?"` so the window can show "unknown preset". Pure, no I/O.
+- Stacked areas with edge lines (Robert, 2026-11-08: "doing the stacked maps the way you're doing, just with a tiny boundary space between them, works perfect as the mario world view. Maybe 5-10px Edge Lines between each map, different colors, to make them easier to distinguish"). Two more `Preset` fields: `area_gap_px: int` (world pixels between stacked areas; `platformer` and `flip-screen` default 8; the value is clamped to 5..10 by `resolve`, so a table typo cannot produce a 40 px gap) and `edge_palette: tuple[str, ...]` (hex colours such as `"#e6194b"`, at least 4 distinct ones, defined in the table). `rpg-overworld` sets `area_gap_px` to 0 and an empty palette (no edges; the Kanto renderer ignores them).
 - This is a plain data table: no behaviour in the table values, so it can later be absorbed into the `GameSpec` of the Multi_Game_Framework plan unchanged. Say so in the module docstring.
+
+### edges.py and layout: tiny gap, coloured edge lines in the static base
+
+- The stacked-areas layout of #172 (`layout.place`, areas in rows) is kept. `app.py` passes `preset.area_gap_px` as `gap` to `layout.place`. Every offset, `layout.locate` result, ghost position, live position and click hit test already goes through the layout offsets, so the gap is accounted for with no second code path; the test below proves it.
+- `edge_colours(areas_layout, palette) -> dict[str, str]`: one colour per area, cycling the palette in index order, then fixed up so that no area shares a colour with the previous or next area in index order, nor with the area directly above or below it in the layout (compare offsets: same column span overlap, adjacent row). With a palette shorter than the area count it still keeps neighbours distinct by choosing the next palette colour that differs from every neighbour; with a palette of fewer than 3 distinct colours it may repeat but never between index neighbours. Pure, deterministic.
+- `draw_edges(base: np.ndarray, layout, colours: dict[str, str], width: int = 2) -> None`: draws a rectangle outline of `width` px in the area's colour around each area image inside the gap (outside the image bounds, so the map pixels are untouched), clipped to the base. Drawn into the static base image ONCE when the base is rebuilt (`mapview/compose.py` calls it; edit that file by a few lines), never per frame, so per-frame cost and the overlay are unchanged. With `area_gap_px` of 0 nothing is drawn.
 
 ### avatars.py: `frame_crop`
 
@@ -110,7 +118,7 @@ File: `<source>/live/<agent>.json`, one per displayed agent, written atomically 
 
 ```
 uv run python --version
-uv run pytest -q tests/test_mapview_live.py tests/test_mapview_presets.py tests/test_mapview_avatars.py tests/test_mapview_avatar_rom.py tests/test_mapview_walk.py tests/test_mapview_overlay_avatars.py tests/test_mario_live.py tests/test_mapview_vocabulary.py
+uv run pytest -q tests/test_mapview_live.py tests/test_mapview_presets.py tests/test_mapview_avatars.py tests/test_mapview_avatar_rom.py tests/test_mapview_walk.py tests/test_mapview_edges.py tests/test_mapview_overlay_avatars.py tests/test_mario_live.py tests/test_mapview_vocabulary.py
 ```
 Expected: all pass.
 
@@ -145,6 +153,7 @@ Expected: no new failures against main's tail; ROM-gated tests skip.
 ## Completion criteria
 
 - [ ] `write_live` writes the schema-1 record atomically (no `.tmp` left behind, `live/` created); `read_live` returns a `LivePos` for it and `None` (no raise) for truncated JSON, wrong schema, missing keys, non-finite numbers; `LiveStore.refresh` picks up a new file, drops a deleted one, re-parses only a changed one (assert the parse count), and treats a record older than `STALE_S` as absent; a failing write (read-only directory simulated by patching `os.replace` to raise) does not raise. <!-- test: tests/test_mapview_live.py -->
+- [ ] `edge_colours` gives different colours to index neighbours and to vertical neighbours in a fixed layout; with more areas than palette colours (for example 9 areas, 4 colours) neighbours are still distinct; `resolve` clamps `area_gap_px` to 5..10 (a table value of 40 comes back 10, of 1 comes back 5) while 0 is kept for `rpg-overworld`; `layout.place` called with the preset gap puts the second area exactly `gap` px (plus label height) after the first in the same row, `locate` returns positions shifted by that offset, and `draw_edges` colours pixels only inside the gap ring (area pixels unchanged, asserted on a synthetic base) and draws nothing for gap 0. <!-- test: tests/test_mapview_edges.py -->
 - [ ] `resolve` returns the genre default for each of `platformer`, `rpg-overworld`, `flip-screen`; `super-mario-land` inherits `platformer` with its overrides and `pokemon-red` inherits `rpg-overworld`; precedence is preset, game, genre, `DEFAULT_GENRE`; an unknown name falls back without raising and its `name` ends with `?`; the tables are plain data (a test asserts every value is a str, int, bool or tuple of str). <!-- test: tests/test_mapview_presets.py -->
 - [ ] `crop_avatar` cuts the known sprite box out of a synthetic frame with the background transparent, returns `None` when fully outside the frame, when nothing is keyed, and when over 90 percent is keyed; `tint` changes opaque pixels only and keeps alpha; `AvatarCache.get` is `None` before the first `offer`, then returns a crop for any colour, a better crop replaces a worse one, and the same tinted array is returned from cache on a second call; nothing is written to disk (patched `open`, `Path.write_bytes` and `PIL.Image.Image.save` raise and the test still passes). <!-- test: tests/test_mapview_avatars.py -->
 - [ ] `RomAvatars.get` returns the fake provider's array, returns `None` when the provider raises `ValueError`, `IndexError` or `KeyError`, and importing `pokeagent.mapview.avatar_rom` does not import `pokeagent.world.draw` (assert via `sys.modules` in a fresh subprocess-free check using `importlib` after removing the key). <!-- test: tests/test_mapview_avatar_rom.py -->
@@ -158,9 +167,9 @@ Expected: no new failures against main's tail; ROM-gated tests skip.
 
 ## Report
 
-Diff stat; test tails; line count of each new file against its limit; decisions made where this directive was silent (the `run` tag source, any status field dropped from a preset, any `mario_maps.py` function extraction); the constants chosen (`STALE_S`, `KEY_TOL`, live write rate); and the real-window checklist below.
+Diff stat; test tails; line count of each new file against its limit; decisions made where this directive was silent (the `run` tag source, the edge line width, any status field dropped from a preset, any `mario_maps.py` function extraction); the constants chosen (`STALE_S`, `KEY_TOL`, live write rate); and the real-window checklist below.
 
-Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with the Mario display running, find the player's tile ids from the OAM sprite table of the live emulator and fill `PLAYER_TILE_IDS` in `tools/mario_live.py` (a one-line change after the real-window check); (2) `uv run python tools/map_view.py runs/mario-land --game super-mario-land` shows a Mario-shaped avatar at the live position, not a dot, and the same picture tinted on every ghost; (3) the live avatar is on the same spot the Gameplay window shows (same area, within a few pixels); (4) the avatar faces the direction it moves; (5) stopping the display removes the live avatar within about 5 seconds; (6) a ghost count of 60 keeps the frame rate flat.
+Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with the Mario display running, find the player's tile ids from the OAM sprite table of the live emulator and fill `PLAYER_TILE_IDS` in `tools/mario_live.py` (a one-line change after the real-window check); (2) `uv run python tools/map_view.py runs/mario-land --game super-mario-land` shows a Mario-shaped avatar at the live position, not a dot, and the same picture tinted on every ghost; (3) the live avatar is on the same spot the Gameplay window shows (same area, within a few pixels); (4) the avatar faces the direction it moves; (5) the stacked areas show a thin gap with a differently coloured edge line around each map, easy to tell apart; (5b) stopping the display removes the live avatar within about 5 seconds; (6) a ghost count of 60 keeps the frame rate flat.
 
 ## Forbidden Actions
 
@@ -187,7 +196,7 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -195,4 +204,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 **Status log**
 - 2026-11-08 13:34 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: live position contract, view presets, avatars; needs PRs 171 and 172 on main
 - 2026-11-08 13:35 · robert-claude-laptop · Queued → Draft — Back to Draft to add area gap and edge lines requirement from Robert; will requeue
+- 2026-11-08 13:36 · robert-claude-laptop · Draft → Queued — Requeued with area gap and edge lines requirement
 <!-- queue:end -->
