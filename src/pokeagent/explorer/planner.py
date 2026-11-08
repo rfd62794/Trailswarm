@@ -234,6 +234,8 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         # northernmost first, but a tile this agent cannot reach (Route 2's far north half, known only from a
         # different entry) must not block the next one: that left agents in a ledge loop with no plan
         for tx, ty in sorted(tiles, key=lambda t: (t[1], abs(t[0] - pos[1])))[:8]:  # each try is a BFS: bound the cost
+            if (pos[0], tx, ty) in goals.get("_talk_vetoed", ()):
+                continue  # the retalk veto already refused the talk from here: not a candidate again (retalk_memory)
             if (pos[1], pos[2]) == (tx, ty):
                 if (tx, ty - 1) in g.static_npc_tiles(pos[0]):  # a person blocks the way (Brock at the top of the gym): talk
                     return ("A" if facing == "UP" else "UP"), "goal road north: a person stands ahead - facing and talking to them"
