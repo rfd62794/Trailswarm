@@ -160,7 +160,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 | Branch | directive/pokeagent-segment-scorecard-directive |
 | Base branch | - |
 | Base commit | 7d34deceb7239b0ba1f8c9bbce6ee63e418e8a03 |
-| Head commit | 9abf2b1bede7ac2cd9345f20f3908fe5df2cbb57 |
+| Head commit | c6f38d44fdabfa6724a4b7afd812725bc7cc6583 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
