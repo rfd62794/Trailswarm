@@ -98,3 +98,10 @@ def test_permanently_bad_file_is_parsed_once(tmp_path):
     (tmp_path / "ghosts" / "bad.json").write_text("{nope still", encoding="utf-8")
     store.refresh(tmp_path)
     assert store.parsed == n + 1
+
+
+def test_absurd_coordinates_reject_the_ghost_without_raising(tmp_path):
+    huge_int = int("1" + "0" * 400)
+    for bad in (huge_int, 1e39):
+        d = doc(points=[["a-1", bad, 3]])
+        assert load_ghost(write(tmp_path, "huge.json", d), ["a-1"]) is None

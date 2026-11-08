@@ -8,7 +8,6 @@ or -1 for an area not captured yet - such a ghost is simply not drawn until its 
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -24,6 +23,9 @@ class Ghost:
     area_idx: np.ndarray       # int16 per point: index into the store's area_names, -1 unknown
     xs: np.ndarray             # float32 per point
     ys: np.ndarray             # float32 per point
+
+
+MAX_COORD = 1e9   # no real map is this large; float32 stays exact enough and never overflows
 
 
 def _parse(path: Path, names: list[str] | None) -> tuple[Ghost | None, list[str]]:
@@ -46,7 +48,7 @@ def _parse(path: Path, names: list[str] | None) -> tuple[Ghost | None, list[str]
     for i, p in enumerate(points):
         if not (isinstance(p, (list, tuple)) and len(p) == 3 and isinstance(p[0], str)
                 and type(p[1]) in (int, float) and type(p[2]) in (int, float)
-                and math.isfinite(p[1]) and math.isfinite(p[2])):
+                and abs(p[1]) < MAX_COORD and abs(p[2]) < MAX_COORD):  # also False for NaN, inf and huge ints
             return None, []
         if names is None and p[0] not in lookup:
             lookup[p[0]] = len(lookup)
