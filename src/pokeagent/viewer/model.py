@@ -2,9 +2,10 @@
 
 Pull model: every source kind has its own cadence. Snapshots run at ``SNAPSHOT_HZ_IDLE`` for
 unfocused agents and ``SNAPSHOT_HZ_FOCUS`` for the focused one; frames are read only for the
-on-screen set the views declare via ``set_wants`` (``visible_frame_set`` on the window). The
-worker pool runs only sources DUE this tick; a source still in flight is skipped, not queued,
-so a slow agent never piles work up. The render path reads cached state only.
+on-screen set the views declare via ``set_wants`` (``visible_frame_set`` on the window), merged
+with the wants other consumers declare via ``want_frames`` (the web page). The worker pool runs
+only sources DUE this tick; a source still in flight is skipped, not queued, so a slow agent
+never piles work up. The render path reads cached state only.
 """
 from __future__ import annotations
 
@@ -44,6 +45,7 @@ class ViewerModel:
         self._futures: set = set()
         self._focused: str | None = None
         self._frame_hz: dict[str, float] = {}
+        self._extra_hz: dict[str, tuple[float, float]] = {}   # aid -> (hz, deadline): off-window wants
         self._pool = ThreadPoolExecutor(max_workers=POLL_WORKERS, thread_name_prefix="viewer-poll")
 
     # -- demand declared by the UI thread ----------------------------------------------
@@ -54,6 +56,15 @@ class ViewerModel:
             self._focused = focused
             if frames is not None:
                 self._frame_hz = dict(frames)
+
+    def want_frames(self, frames: dict[str, float], ttl_s: float) -> None:
+        """A second demand channel for consumers without a window (the web page): each declared
+        frame want stays live for ``ttl_s`` seconds after this call, merged with the window's set
+        at poll time (the higher rate wins). Callers re-declare on each request; expiry is lazy."""
+        now = self._clock()
+        with self._lock:
+            for aid, hz in frames.items():
+                self._extra_hz[aid] = (hz, now + ttl_s)
 
     # -- polling ------------------------------------------------------------------------
     def _read_one(self, src: AgentSource, want_snap: bool, want_frame: bool) -> None:
@@ -85,6 +96,12 @@ class ViewerModel:
             SNAPSHOT_HZ_FOCUS if agent_id == self._focused else SNAPSHOT_HZ_IDLE)
         snap_due = now - self._snap_at.get(agent_id, _NEVER) >= gap
         frame_hz = 0.0 if dead else self._frame_hz.get(agent_id, 0.0)
+        extra = self._extra_hz.get(agent_id)   # a web client's want merges in (dead agents read no frames)
+        if extra is not None:
+            if extra[1] > now and not dead:
+                frame_hz = max(frame_hz, extra[0])
+            elif extra[1] <= now:
+                self._extra_hz.pop(agent_id)   # the consumer stopped asking: the want expired
         frame_due = frame_hz > 0 and now - self._frame_at.get(agent_id, _NEVER) >= 1.0 / frame_hz
         return snap_due, frame_due
 
@@ -142,7 +159,7 @@ class ViewerModel:
     def forget(self, agent_id: str) -> None:
         with self._lock:
             for d in (self._snap, self._frame, self._last_ok, self._fails,
-                      self._snap_at, self._frame_at, self._frame_hz):
+                      self._snap_at, self._frame_at, self._frame_hz, self._extra_hz):
                 d.pop(agent_id, None)
             self._inflight.discard(agent_id)
             if self._focused == agent_id:

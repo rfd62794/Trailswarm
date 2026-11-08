@@ -254,12 +254,15 @@ and `train_route` walks to Route 24's known grass and keeps frontier from leavin
   cadences live in `ViewerModel`/`WorldModel`, demand in `set_wants`/`set_focus` (written by the UI
   thread each tick).
 - Frame slot header is layout v2 (`telemetry.LAYOUT = 2`, 32-byte header: v1 fields + u32 layout +
-  f64 `reader_ts` at offset 24). Every shared-memory read stamps the reader heartbeat — the field
-  Agent_Footprint item 2 reads to render frames only while watched; v1 slots are still read
-  correctly (size + layout stamp both checked).
+  u32 `SLOT_MAGIC` at offset 20 + f64 `reader_ts` at offset 24). Every shared-memory read stamps
+  the reader heartbeat — the field Agent_Footprint item 2 reads to render frames only while
+  watched; v1 slots are still read correctly (size is only a secondary guard — shared memory is
+  page-rounded on the attaching side, so v2 needs the layout AND magic u32s, not pixel bytes that
+  merely spell 2). An OLD viewer reading a NEW v2 publisher reads frames 16 bytes late: upgrade
+  viewers before agents, or restart the World view after this merge.
 - The Swarm page (View menu checkbox, top-level `SWARM_PAGE` window persisted by init_file) shows
-  one row per agent/slot: live/lost/dead, current segment + curriculum grade (`n/a` until the
-  scorecard writes one), next segment in the curriculum chain, steps/s + RSS from
+  one row per agent/slot: live/lost/dead, current segment + curriculum grade (the scorecard's
+  flag words, computed live via `segment_grades.grade_all`), next segment in the curriculum chain, steps/s + RSS from
   `runs/swarm/agent_stats.jsonl` when the Agent_Footprint sampler writes it (blank otherwise), the
   health state + reason, and the last goal landed. A row click focuses the agent. Rows assemble at
   1 Hz on the poll thread (`viewer/swarm_rows.py`, pure); `ui/swarm_page.py` renders them.

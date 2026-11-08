@@ -3,25 +3,23 @@
 Pure (no UI imports): small file readers + ``build_rows`` -> a list of row dicts for
 ``ui/swarm_page``. ``SwarmRowStore`` holds the last assembly; the poll thread refreshes it at
 1 Hz, the render thread only calls ``rows()``. File contents: ``runs/segments.json`` (the
-curriculum the supervisor writes, read-only via seg_store), ``runs/swarm/agent_stats.jsonl``
-(Agent_Footprint's per-agent RSS + steps/s; blanks while absent).
+curriculum the supervisor writes, read-only via seg_store; per-segment grades computed live
+through ``pokeagent.segment_grades``), ``runs/swarm/agent_stats.jsonl`` (Agent_Footprint's
+per-agent RSS + steps/s; blanks while absent).
 """
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import threading
+import time
 from pathlib import Path
 
 from pokeagent.viewer.health_classify import Health, OK
 
-_TOOLS = Path(__file__).resolve().parents[3] / "tools"
-if _TOOLS.is_dir() and str(_TOOLS) not in sys.path:
-    sys.path.insert(0, str(_TOOLS))
-try:
-    import seg_store as _ss          # the scorecard reader (tools/, not a package)
-except Exception:                    # pragma: no cover - tools dir absent: rows still assemble
-    _ss = None
+_log = logging.getLogger(__name__)
+_logged: set[str] = set()   # fallback messages already warned about: a 1 Hz caller must not spam
 
 NA = "n/a"
 STATS_TAIL = 400                     # jsonl lines scanned from the end of agent_stats.jsonl
@@ -29,19 +27,65 @@ ROW_KEYS = ("id", "state", "segment", "grade", "next", "steps_s", "rss", "health
 _OK = Health(OK, "")
 
 
-def _segments_doc(root: Path) -> dict:
+def _warn_once(msg: str) -> None:
+    """log.warning once per distinct message; rows still assemble but the blank is never silent."""
+    if msg not in _logged:
+        _logged.add(msg)
+        _log.warning(msg)
+
+
+def _seg_store():
+    """tools/seg_store.py, lazily - the same tools/-on-sys.path shim ``review/segments.py`` uses,
+    centralised in this one helper so the doc readers below AND ``segment_grades``' own lazy
+    ``import seg_store`` share it. None (warned once) when the tools dir/module is absent."""
+    d = Path(__file__).resolve().parents[3] / "tools"
+    if str(d) not in sys.path:
+        sys.path.insert(0, str(d))
     try:
-        return _ss.load(root) if _ss is not None else {}
-    except Exception:                # a torn write while the supervisor saves: blanks this tick
+        import seg_store
+    except ImportError as e:
+        _warn_once(f"swarm rows: seg_store unavailable ({e}); segment/next/grade columns blank")
+        return None
+    return seg_store
+
+
+def _segments_doc(root: Path) -> dict:
+    ss = _seg_store()
+    if ss is None:
+        return {}
+    try:
+        return ss.load(root)
+    except (OSError, ValueError, TypeError) as e:
+        # a torn read while the supervisor saves is a legitimate blank; the type spread is what
+        # seg_store.load raises on a missing/corrupt/non-object file - say so once, blank this tick
+        _warn_once(f"swarm rows: segments.json unreadable ({type(e).__name__}: {e}); blanks this tick")
         return {}
 
 
 def _layout_keys(doc: dict) -> list[str]:
     """The curriculum's leaf segments in chain order ([] when the store cannot be read)."""
-    try:
-        return [s.key for s in _ss.layout(doc)] if _ss is not None else []
-    except Exception:
+    ss = _seg_store()
+    if ss is None:
         return []
+    try:
+        return [s.key for s in ss.layout(doc)]
+    except (KeyError, TypeError, AttributeError) as e:   # what layout() raises on a malformed doc
+        _warn_once(f"swarm rows: segment layout unreadable ({type(e).__name__}: {e})")
+        return []
+
+
+def _grades(doc: dict, root: Path) -> dict:
+    """segment key -> scorecard ``Grade``: one ``grade_all`` per refresh (the 1 Hz cadence)."""
+    if _seg_store() is None:   # also primes sys.path for segment_grades' lazy seg_store import
+        return {}
+    try:
+        from pokeagent import segment_grades as sg
+        return {g.key: g for g in sg.grade_all(doc, root, time.time())}
+    except (ImportError, OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        # ImportError: the scorecard module/tools absent; the rest: malformed stats in a torn or
+        # foreign doc surface as these through seg_store's readers - never a crash, never silent
+        _warn_once(f"swarm rows: grade_all failed ({type(e).__name__}: {e}); grade column n/a")
+        return {}
 
 
 def next_segment(keys: list[str], current: str) -> str:
@@ -54,14 +98,30 @@ def next_segment(keys: list[str], current: str) -> str:
     return keys[i + 1] if 0 <= i < len(keys) - 1 else ""
 
 
-def _grade(doc: dict, segment: str) -> str:
-    """The scorecard's grade for the segment (``n/a`` until the scorecard lands one)."""
+def _grade_word(g) -> str:
+    """The grade cell for a scorecard Grade: the flag words ``pokeagent review segments`` prints."""
+    f = []
+    if g.held:
+        f.append(f"held({g.held})")
+    if g.solved:
+        f.append("solved")
+    if g.optimized:
+        f.append("optimized")
+    if g.stale:
+        f.append("stale")
+    if g.broken:
+        f.append("BROKEN")
+    if g.synthetic_only:
+        f.append("synth?")
+    return ",".join(f) or "-"
+
+
+def _grade(gmap: dict, segment: str) -> str:
+    """The scorecard's flags for the segment (``n/a`` while no grade can be computed)."""
     if not segment or segment == NA:
         return NA
-    stats = doc.get("stats") or {}
-    st = stats.get(segment) or stats.get(segment.split("@", 1)[0]) or {}
-    g = st.get("grade")
-    return NA if g is None else str(g)
+    g = gmap.get(segment) or gmap.get(segment.split("@", 1)[0])
+    return NA if g is None else _grade_word(g)
 
 
 def _agent_stats(root: Path) -> dict[str, dict]:
@@ -112,6 +172,7 @@ def build_rows(root: Path, ids: list[str], staleness, snapshot_for, entries: dic
     ``health_for`` are the model/HealthStore lookups (or test lambdas); files are read once per call."""
     doc = _segments_doc(root)
     keys = _layout_keys(doc)
+    gmap = _grades(doc, Path(root))
     stats = _agent_stats(root)
     id_set = set(ids)
     rows: list[dict] = []
@@ -122,7 +183,7 @@ def build_rows(root: Path, ids: list[str], staleness, snapshot_for, entries: dic
         ast = stats.get(aid) or stats.get(f"pid:{e.get('pid')}") or {}
         h = health_for(aid) or _OK
         rows.append({"id": aid, "state": _state(staleness(aid), bool(e) or aid in id_set),
-                     "segment": seg, "grade": _grade(doc, seg),
+                     "segment": seg, "grade": _grade(gmap, seg),
                      "next": next_segment(keys, seg) or NA,
                      "steps_s": _num(ast.get("steps_per_s")), "rss": _num(ast.get("rss_mb")),
                      "health": h.state, "reason": h.reason, "goal": _last_goal(snap)})

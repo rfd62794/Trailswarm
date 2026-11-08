@@ -17,7 +17,7 @@ COLUMNS = ("Agent", "State", "Segment", "Grade", "Next", "Steps/s", "RSS", "Heal
 
 
 class SwarmPage:
-    """The top-level ``SWARM_PANE`` window: a table of swarm rows plus the count line."""
+    """The top-level ``SWARM_PAGE`` window: a table of swarm rows plus the count line."""
 
     def __init__(self, on_focus, on_close=None) -> None:
         self._on_focus = on_focus

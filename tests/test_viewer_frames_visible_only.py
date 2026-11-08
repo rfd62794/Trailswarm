@@ -68,3 +68,15 @@ def test_window_visible_frame_set_matches_the_views():
     win.set_stadium_pref(True)
     win.focus.focus("c")                                   # focus + a stadium slot: max rate wins per agent
     assert win.visible_frame_set() == {"c": FOCUS_FRAME_HZ, "s": 1.0 / FRAME_S}
+
+
+def test_world_view_stadium_hidden_nothing_focused_wants_no_frames():
+    """World view + Stadium hidden + nothing focused => visible_frame_set() == {}."""
+    pytest.importorskip("dearpygui.dearpygui")
+    from pokeagent.viewer.ui.window import ViewerWindow
+    win = ViewerWindow(ViewerModel(), {})
+    win.focus.set_mode("world")
+    win._grid = SimpleNamespace(cards={"a": 0})            # grid cards exist but are not on screen
+    win._stadium = SimpleNamespace(slots=[SimpleNamespace(aid="s")])
+    win.set_stadium_pref(False)                            # the pane is hidden by choice
+    assert win.visible_frame_set() == {}

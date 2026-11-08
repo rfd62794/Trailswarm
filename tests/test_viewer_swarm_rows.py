@@ -1,7 +1,9 @@
-"""Swarm rows: assembly from fixture files (runs/segments.json via the scorecard reader,
-runs/swarm/agent_stats.jsonl) with blanks when files are absent, the live/lost/dead mapping,
-and the next curriculum segment per slot."""
+"""Swarm rows: assembly from fixture files (runs/segments.json via the scorecard reader +
+segment_grades, runs/swarm/agent_stats.jsonl) with blanks when files are absent, the
+live/lost/dead mapping, and the next curriculum segment per slot."""
 import json
+import logging
+import time
 
 from pokeagent.snapshot import AgentSnapshot, Goal, Segment
 from pokeagent.viewer import swarm_rows
@@ -14,10 +16,17 @@ def _snap(aid, seg="to_route1", done=("left_house",)):
 
 
 def _fixture(tmp_path):
+    """A solved+optimized to_route1: 20 solves in the window, the confirmed best first and 19
+    slower solves since (the plateau fallback grades it optimized without a par)."""
     (tmp_path / "runs" / "swarm").mkdir(parents=True)
+    now = time.time()
+    attempts = [{"solved": True, "frames": 1000, "steps": 95, "run": "r1", "ts": now}]
+    attempts += [{"solved": True, "frames": 1100, "steps": 105, "run": f"r{i}", "ts": now}
+                 for i in range(2, 21)]
     (tmp_path / "runs" / "segments.json").write_text(json.dumps(
-        {"version": 1, "stats": {"to_route1": {"grade": "B", "n": 4, "solves": 3,
-                                               "attempts": [], "best": None, "confirmed": None}}}))
+        {"version": 1, "stats": {"to_route1": {"n": 20, "solves": 20, "attempts": attempts,
+                                               "best": {"frames": 1000, "run": "r1"},
+                                               "confirmed": {"frames": 1000, "run": "r1"}}}}))
     (tmp_path / "runs" / "swarm" / "agent_stats.jsonl").write_text(
         "\n".join([json.dumps({"ts": 1, "agent": "a", "pid": 11, "rss_mb": 150.5, "steps_per_s": 42.3}),
                    json.dumps({"ts": 2, "agent": "b", "pid": 12, "rss_mb": 99, "steps_per_s": 25})]))
@@ -33,7 +42,8 @@ def test_rows_from_fixture_files(tmp_path):
     by = {r["id"]: r for r in rows}
     a = by["a"]
     assert a["state"] == "live" and a["segment"] == "to_route1"
-    assert a["grade"] == "B" and a["next"] == "to_viridian"   # the leaf after to_route1 in chain order
+    assert a["grade"] == "solved,optimized"                 # grade_all's flags, not a stored field
+    assert a["next"] == "to_viridian"                       # the leaf after to_route1 in chain order
     assert a["steps_s"] == "42.3" and a["rss"] == "150.5"
     assert a["health"] == STALLED and a["reason"] == "no new tiles"
     assert a["goal"] == "left_house"
@@ -42,12 +52,30 @@ def test_rows_from_fixture_files(tmp_path):
     assert b["steps_s"] == "25" and b["health"] == "ok" and b["goal"] == ""
 
 
+def test_unreadable_segments_json_warns_once(tmp_path, monkeypatch, caplog):
+    """A torn read during the supervisor's save blanks the columns but is logged (once), not silent."""
+    class Boom:
+        @staticmethod
+        def load(root): raise ValueError("torn json")
+        @staticmethod
+        def layout(doc): return []
+    swarm_rows._logged.clear()
+    monkeypatch.setattr(swarm_rows, "_seg_store", lambda: Boom)
+    with caplog.at_level(logging.WARNING, logger="pokeagent.viewer.swarm_rows"):
+        for _ in range(2):
+            rows = swarm_rows.build_rows(tmp_path, ["a"], lambda aid: "live",
+                                         lambda aid: None, {}, lambda aid: None)
+    warns = [r for r in caplog.records if "segments.json unreadable" in r.getMessage()]
+    assert len(warns) == 1 and rows[0]["next"] == "n/a"
+
+
 def test_missing_files_yield_blanks(tmp_path):
     snaps = {"a": _snap("a")}
     rows = swarm_rows.build_rows(tmp_path, ["a"], lambda aid: "live",
                                  snaps.get, {"a": {"pid": 5}}, lambda aid: None)
     r = rows[0]
-    assert r["grade"] == "n/a" and r["steps_s"] == "" and r["rss"] == "" and r["health"] == "ok"
+    # an empty doc still grades: a segment with no attempts is the scorecard's "stale"
+    assert r["grade"] == "stale" and r["steps_s"] == "" and r["rss"] == "" and r["health"] == "ok"
 
 
 def test_state_mapping():

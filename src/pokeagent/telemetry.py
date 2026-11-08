@@ -4,6 +4,17 @@ Layer rule: agents PUBLISH (explore_demo, RL envs, swarm workers), viewers
 SUBSCRIBE (tools/watch.py). "Headless" is a window choice, not a visibility
 choice — any agent can publish, and one or many viewers may attach by slot
 name without touching the emulator. No new dependencies (stdlib only).
+
+v2 slot header (offsets 0..32, little-endian; the frame's w*h*3 bytes follow):
+
+    0..8    u64 seq        seqlock: odd while a frame write is in flight
+    8..10   u16 width
+    10..12  u16 height
+    12..16  u32 owner pid
+    16..20  u32 layout     == LAYOUT on a v2 slot
+    20..24  u32 magic      == SLOT_MAGIC (the v1 header had no field here; on a v1
+                           slot both this and the layout word are pixel data)
+    24..32  f64 reader_ts  epoch seconds of the reader's last read (heartbeat)
 """
 from __future__ import annotations
 
@@ -17,8 +28,9 @@ from typing import Optional
 FRAME_W, FRAME_H = 160, 144
 LAYOUT = 2       # slot header layout version (bumped for the reader heartbeat; Agent_Footprint item 2)
 HEADER_V1 = 16   # v1: u64 seq | u16 w | u16 h | u32 owner pid (seqlock: odd seq = write in progress)
-HEADER = 32      # v2: v1 fields | u32 layout | u32 reserved | f64 reader_ts (epoch, reader's heartbeat)
-LAYOUT_OFF, READER_TS_OFF = 16, 24
+HEADER = 32      # v2: v1 fields | u32 layout | u32 magic | f64 reader_ts (epoch, reader's heartbeat)
+LAYOUT_OFF, MAGIC_OFF, READER_TS_OFF = 16, 20, 24
+SLOT_MAGIC = 0x504B4147
 SLOT_PREFIX = "pokeagent_frames_"
 
 
@@ -32,12 +44,15 @@ def slot_owner(buf) -> int:
 
 
 def slot_layout(buf) -> int:
-    """The slot's header layout: ``LAYOUT`` when the v2 fields are present, else 1.
+    """The slot's header layout: ``LAYOUT`` only when layout AND magic both match, else 1.
 
-    A v1 slot's layout bytes are pixel data; its smaller total size gives it away, so an old
-    agent's slot can never be mistaken for v2."""
+    Size alone cannot separate v1 from v2: shared memory is page-rounded on the attaching
+    side (a v1 slot can report a v2-size buffer). On a v1 slot bytes 16..23 are pixel data and
+    can spell ``LAYOUT`` by chance, so the magic u32 must match too - a false v2 then needs 8
+    exact leading pixel bytes."""
     if len(buf) >= HEADER + FRAME_W * FRAME_H * 3 and \
-            int.from_bytes(buf[LAYOUT_OFF:LAYOUT_OFF + 4], "little") == LAYOUT:
+            int.from_bytes(buf[LAYOUT_OFF:LAYOUT_OFF + 4], "little") == LAYOUT and \
+            int.from_bytes(buf[MAGIC_OFF:MAGIC_OFF + 4], "little") == SLOT_MAGIC:
         return LAYOUT
     return 1
 
@@ -99,6 +114,7 @@ class FramePublisher:
                 raise FileExistsError(f"frame slot {self.name} is held by a dead publisher's open handles") from None
         self.shm.buf[12:16] = os.getpid().to_bytes(4, "little")
         self.shm.buf[LAYOUT_OFF:LAYOUT_OFF + 4] = LAYOUT.to_bytes(4, "little")
+        self.shm.buf[MAGIC_OFF:MAGIC_OFF + 4] = SLOT_MAGIC.to_bytes(4, "little")
         w, h = self.dims()
         self.shm.buf[8:10] = w.to_bytes(2, "little")
         self.shm.buf[10:12] = h.to_bytes(2, "little")
