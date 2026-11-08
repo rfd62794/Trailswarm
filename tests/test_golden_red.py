@@ -9,7 +9,7 @@ Why not call golden_trace.py itself: it compares transitions.jsonl byte for byte
 potion pickup record embeds the run directory name ("item.run"), so it reports DIFFERS on
 every run; and it starts run A from empty map memory while run B inherits what A learned.
 So: one warm-up run builds maps.json, then two measured runs each start from a fresh copy
-of it, with the run name masked before hashing. Skips when the ROM or baselines are absent.
+of it, with the run name masked before hashing. Skips when the ROM, kb/rom_tables.json or baselines are absent.
 """
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-NEEDED = ["roms/Pokemon Red.gb", "baselines/bedroom.state"]
-OPTIONAL = ["kb/rom_tables.json", "baselines/bedroom.state.meta.json"]
+NEEDED = ["roms/Pokemon Red.gb", "baselines/bedroom.state", "kb/rom_tables.json"]
+OPTIONAL = ["baselines/bedroom.state.meta.json"]
 EXPECTED_SHA256 = "a9b5a8f86afd3614bd7a55c52d23b3b2e0f6bc0eab17d88b30f5ac3f4b575911"  # transitions.jsonl, run name masked, warm maps
 
 
@@ -43,7 +43,8 @@ def test_red_golden_trace(tmp_path):
     missing = [p for p in NEEDED if not (ROOT / p).exists()]
     if missing:
         pytest.skip(f"golden trace needs gitignored local files: {', '.join(missing)}")
-    shutil.copytree(ROOT / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+    for d in ("tools", "src"):  # src too: explore_demo and the kb lookups resolve relative to the scratch tree
+        shutil.copytree(ROOT / d, tmp_path / d, ignore=shutil.ignore_patterns("__pycache__"))
     for rel in NEEDED + OPTIONAL:
         if (ROOT / rel).exists():
             (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
