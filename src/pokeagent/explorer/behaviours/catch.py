@@ -26,6 +26,7 @@ from pokeagent.knowledge.party import our_party, species_row, trainer_mon
 from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
+CATCH_BAG_PRESSES = 60   # bag presses without a throw landing before the catch sequence is abandoned (a throw is ~8)
 BALL_NAME = {"POKE": "POKe BALL", "GREAT": "GREAT BALL", "ULTRA": "ULTRA BALL", "MASTER": "MASTER BALL"}
 
 
@@ -51,6 +52,31 @@ def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_ma
                   {(a, d): e for a, d, e in table(None, "type_chart")}, table(None, "moves"), turn=turn,
                   kind=ctx.bv.kind, trainer_npc=ctx.trainer_npc,
                   battle_log_kind=(ctx.battle_log or {}).get("kind"), lead=lead, party_hp=party_hp)
+
+
+def _attempt(ctx: ExplorerContext, species: int, e_lvl: int, ratio: float, dex_no: int, ball: str | None) -> dict:
+    """The one catch_attempt record per (battle, species): refreshed in place so its ``step`` (the turn signature's
+    input) stays put, and carrying the bag-press count the cap and Battle's item_list_close yield read."""
+    ca = ctx.catch_attempt
+    if not ca or ca.get("battle") != ctx.battles or ca.get("species") != species:
+        ca = ctx.catch_attempt = {"species": species, "level": e_lvl, "step": ctx.step, "dex": dex_no,
+                                  "battle": ctx.battles, "presses": 0, "last": ctx.step}
+    ca["hp_pct"] = round(ratio, 2)
+    if ball is not None:
+        ca["ball"] = ball
+    return ca
+
+
+def _bag_press(ctx: ExplorerContext, ca: dict, dec: Decision, key, sp_name) -> Decision:
+    """Count a bag press; a throw landing resets the count; too many presses without one abandons the sequence."""
+    ca["last"] = ctx.step
+    ca["presses"] = 0 if dec.rule == "item_use" else ca["presses"] + 1
+    if ca["presses"] > CATCH_BAG_PRESSES:
+        ctx.catch_switch = (key, 10**6)   # the existing give-up marker: no new hint for the rest of this battle
+        ctx.catch_mode, ctx.catch_hint = False, None
+        ctx.log(f"[catch: bag sequence gave up after {CATCH_BAG_PRESSES} presses without a throw on {sp_name}; fighting on]", "res")
+        return Decision("B", "catch_bag_failed", "catch bag sequence abandoned: backing out of the menu")
+    return dec
 
 
 class Catch(BehaviourBase):
@@ -108,8 +134,7 @@ class Catch(BehaviourBase):
                 return None
             ball_id = BALLS.get(hint.ball, POKE_BALL)           # unknown names fall back to the Poke Ball
             ball_name = BALL_NAME.get(hint.ball, "POKe BALL")
-            ctx.catch_attempt = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2),
-                                 "step": ctx.step, "dex": dex_no, "ball": hint.ball}
+            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, hint.ball)
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
             dec = item_step(ctx, lines_now, cur_c, ball_id, ball_name,
                             f"CATCH {hint.ball or 'POKE'} at {ratio:.0%} HP (p={hint.p:.2f})")
@@ -118,7 +143,7 @@ class Catch(BehaviourBase):
                     n = ctx.cave_catch_balls.get(species, 0) + 1
                     ctx.cave_catch_balls[species] = n
                     ctx.log(f"[catch: throwing {ball_name} {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
-                return dec
+                return _bag_press(ctx, ca, dec, key, sp_name)
             return None
         if hint is not None and hint.kind == "switch":
             btn = switch_press(frame_lines(ctx.view.tm), screen_lines(ctx.view.tm),
@@ -135,7 +160,7 @@ class Catch(BehaviourBase):
         if hint is None and ratio <= 0.35 and (run_line is not None or item_list_open(lines_now)):
             # No ROM data for the policy (catch_hint is None): the original rule - a POKE BALL at <=35% HP.
             # A ball throw never opens a party prompt.
-            ctx.catch_attempt = {"species": species, "level": e_lvl, "hp_pct": round(ratio, 2), "step": ctx.step, "dex": dex_no}
+            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, None)
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
             dec = item_step(ctx, lines_now, cur_c, POKE_BALL, "POKe BALL", f"CATCH at {ratio:.0%} HP")
             if dec is not None:
@@ -143,5 +168,5 @@ class Catch(BehaviourBase):
                     n = ctx.cave_catch_balls.get(species, 0) + 1
                     ctx.cave_catch_balls[species] = n
                     ctx.log(f"[catch: throwing ball {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
-                return dec
+                return _bag_press(ctx, ca, dec, key, sp_name)
         return None

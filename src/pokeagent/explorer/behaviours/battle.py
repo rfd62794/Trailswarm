@@ -229,7 +229,7 @@ class Battle(BehaviourBase):
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
                 dn = ca.get("dex") or 0
                 caught = bool(dn) and bool(ctx.emu.read(0xD2F7 + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
-                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k != "dex"}, "caught": caught}); del ctx.mem.data["catches"][:-100]
+                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k not in ("dex", "battle", "presses", "last")}, "caught": caught}); del ctx.mem.data["catches"][:-100]
                 ctx.log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
                 try:  # record-only: a decode failure must never end a run
                     rec = record_catch(ctx.mem.data, read_party(ctx.emu), ca["species"], ctx.step) if caught else None

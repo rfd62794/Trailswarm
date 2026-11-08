@@ -92,8 +92,19 @@ def item_step(ctx: ExplorerContext, lines: list[str], cur_line: str, item_id: in
     return None
 
 
+CATCH_BAG_FRESH = 3  # steps a catch bag press stays "recent": a menu-walking press every step keeps ownership
+
+
+def catch_owns_bag(ctx: ExplorerContext) -> bool:
+    """True while the Catch behaviour is mid item-sequence (ITEM -> ball -> USE): its own press landed within
+    CATCH_BAG_FRESH steps and catch_mode is on. Battle runs BEFORE Catch in the registry, so without this its
+    "stray item list" close fired on the very list Catch had just opened (A/B alternation, 2026-11-07)."""
+    ca = ctx.catch_attempt
+    return bool(ctx.catch_mode and ca and ctx.step - ca.get("last", -10**9) <= CATCH_BAG_FRESH)
+
+
 def close_unwanted_list(ctx: ExplorerContext, lines: list[str]) -> Decision | None:
     """An item list is open but no item is wanted (blocked, healed, or never needed): back out, never confirm."""
-    if item_list_open(lines):
+    if item_list_open(lines) and not catch_owns_bag(ctx):
         return Decision("B", "item_list_close", "item list open with nothing to use: closing it")
     return None
