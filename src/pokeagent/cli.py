@@ -2,11 +2,11 @@
 
 Usage::
 
-    pokeagent run [--rom PATH] [--backend stub|claude] [--model haiku]
+    pokeagent run [--game KEY] [--rom PATH] [--backend stub|claude] [--model haiku]
                   [--steps N] [--headless] [--state PATH] [--runs-dir runs]
-    pokeagent check-rom [--rom PATH]
-    pokeagent state [--rom PATH] [--state PATH]
-    pokeagent mcp [--rom PATH] [--state PATH] [--headless] [--idle-fps 60]
+    pokeagent check-rom [--game KEY] [--rom PATH]
+    pokeagent state [--game KEY] [--rom PATH] [--state PATH]
+    pokeagent mcp [--game KEY] [--rom PATH] [--state PATH] [--headless] [--idle-fps 60]
 
 The ROM path comes from ``--rom``, else ``$POKEAGENT_ROM``, else
 ``roms/Pokemon Red.gb``. A real backend requires an explicit ``--steps`` so a
@@ -25,10 +25,10 @@ from pokeagent import cli_brain, cli_hex, cli_review
 from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
+from pokeagent.game import GameSpec, UnknownGame, add_game_argument, resolve_game
 from pokeagent.ram import read_state
 from pokeagent.runlog import RunLog
 
-EXPECTED_SHA1 = "EA9BCAE617FDF159B045185467AE58B2E4A48B9A"
 DEFAULT_ROM = Path("roms/Pokemon Red.gb")
 STEPS_DEFAULT_STUB = 20
 BOOT_FRAMES = 60
@@ -45,6 +45,15 @@ def _rom_path(args: argparse.Namespace) -> Path:
     return DEFAULT_ROM
 
 
+def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
+    """The selected game's spec; prints the error and returns None on an unknown key."""
+    try:
+        return resolve_game(args.game)
+    except UnknownGame as e:
+        print(f"error: {e}")
+        return None
+
+
 def _build_emulator(args: argparse.Namespace) -> Emulator:
     """One place that turns args into an Emulator; tests patch this to inject FakeEmulator."""
     return PyBoyEmulator(_rom_path(args), headless=getattr(args, "headless", True))
@@ -57,6 +66,8 @@ def _build_backend(args: argparse.Namespace, log: RunLog):
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    if _resolve_game(args) is None:
+        return 2
     steps = args.steps
     if steps is None:
         if args.backend == "claude":
@@ -90,6 +101,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_check_rom(args: argparse.Namespace) -> int:
+    spec = _resolve_game(args)
+    if spec is None:
+        return 2
     rom = _rom_path(args)
     if not rom.is_file():
         print(f"ROM not found: {rom}")
@@ -98,8 +112,8 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
     sha1 = hashlib.sha1(data).hexdigest().upper()
     print(f"size: {len(data)} bytes")
     print(f"sha1: {sha1}")
-    match = sha1 == EXPECTED_SHA1
-    print("match" if match else f"mismatch (expected {EXPECTED_SHA1})")
+    match = sha1 in spec.rom_sha1
+    print("match" if match else f"mismatch (expected {spec.rom_sha1[0]})")
     try:
         emu = _build_emulator(args)
     except (FileNotFoundError, BackendError) as e:
@@ -117,6 +131,8 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
 
 
 def _cmd_state(args: argparse.Namespace) -> int:
+    if _resolve_game(args) is None:
+        return 2
     try:
         emu = _build_emulator(args)
     except (FileNotFoundError, BackendError) as e:
@@ -143,6 +159,8 @@ def _cmd_view(args: argparse.Namespace) -> int:
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
+    if _resolve_game(args) is None:
+        return 2
     # Imported lazily so cli.py (and its tests) never pay for the mcp import.
     from pokeagent.mcp_server import serve
 
@@ -172,15 +190,18 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
     run.add_argument("--runs-dir", default="runs", metavar="DIR",
                      help="where run directories are created")
+    add_game_argument(run)
     run.set_defaults(func=_cmd_run)
 
     check = sub.add_parser("check-rom", help="verify the ROM's SHA-1 and that it boots")
     check.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    add_game_argument(check)
     check.set_defaults(func=_cmd_check_rom)
 
     state = sub.add_parser("state", help="boot headless and print the RAM state summary")
     state.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
     state.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
+    add_game_argument(state)
     state.set_defaults(func=_cmd_state)
 
     mcp = sub.add_parser("mcp", help="serve the emulator as MCP tools over stdio")
@@ -190,6 +211,7 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="no SDL2 window, full emulation speed")
     mcp.add_argument("--idle-fps", type=int, default=60, metavar="N",
                      help="idle tick rate between tool calls (0 = no idle ticking)")
+    add_game_argument(mcp)
     mcp.set_defaults(func=_cmd_mcp)
 
     view = sub.add_parser("view", help="Dear PyGui viewer for registered agents")

@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,6 +7,7 @@ import pytest
 
 from pokeagent import cli
 from pokeagent.emulator import FakeEmulator
+from pokeagent.game import GAMES, RED
 
 
 def test_run_claude_without_steps_refuses(tmp_path, capsys):
@@ -83,7 +85,7 @@ def test_check_rom_match_returns_zero(tmp_path, monkeypatch, capsys):
     rom = tmp_path / "fake.gb"
     data = b"pretend this is the real rom"
     rom.write_bytes(data)
-    monkeypatch.setattr(cli, "EXPECTED_SHA1", hashlib.sha1(data).hexdigest().upper())
+    monkeypatch.setitem(GAMES, "pokemon-red", dataclasses.replace(RED, rom_sha1=(hashlib.sha1(data).hexdigest().upper(),)))
     monkeypatch.setattr(cli, "_build_emulator", lambda args: FakeEmulator())
     rc = cli.main(["check-rom", "--rom", str(rom)])
     out = capsys.readouterr().out
