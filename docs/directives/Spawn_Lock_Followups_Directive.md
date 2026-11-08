@@ -146,3 +146,17 @@ Expected tail at main 41208f8 or later: about 1825+ passed, 40 skipped (ROM-gate
 ## Report
 
 In the Status row: diff stat, the 5x loop lines, the full-suite tail, and whether `lockfiles.py` was needed.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-07 20:14 · robert-claude-laptop · none → Queued — Claude 2026-11-07: the four non-blocking review findings on PR #160, as a Devin follow-up
+<!-- queue:end -->
