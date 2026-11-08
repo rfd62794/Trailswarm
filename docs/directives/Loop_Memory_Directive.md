@@ -155,7 +155,7 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 | Branch | directive/pokeagent-loop-memory-directive |
 | Base branch | - |
 | Base commit | e37ee66bc3e910a45b8fb9f129b8a84b844705bd |
-| Head commit | bfce37814396f52c7febfddef9f75cdfe9cc5d21 |
+| Head commit | 875efd0c37f31a3226cb2d8e9ac9872dc556dfae |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
