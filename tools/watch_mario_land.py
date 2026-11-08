@@ -32,6 +32,7 @@ PROBE = 240
 RETIRE_AFTER = 40            # consecutive deaths from one save point before it stops being tried
 OFF_SCREEN_Y = 165           # Mario sprite y once he has fallen below the screen
 DEATH_SAMPLE = 15
+CLIP_LEAD, CLIP_TAIL = 150, 90
 LEVELS = [(w, l) for w in range(1, 5) for l in range(1, 4)]
 AGENT = "mario-land"
 DIR = Path("runs") / "mario-land"
@@ -127,7 +128,10 @@ class Worker:
     def retired(self, key):
         return self.cells[key].get("fails", 0) >= RETIRE_AFTER
 
-    def survives(self, lives):
+    def survives(self, lives, new_level):
+        """Reaching a new level is always kept: standing idle at its start would let the first enemy reject it."""
+        if new_level:
+            return True
         self.tick(PROBE)
         return self.w.lives_left >= lives and self.py.memory[0xC201] < OFF_SCREEN_Y
 
@@ -173,7 +177,7 @@ class Worker:
             replacing = k in self.cells and self.retired(k)
             if k > pick and (k not in self.cells or replacing):
                 blob = self.save()
-                alive = self.survives(cell["lives"])
+                alive = self.survives(cell["lives"], k[0] != pick[0])
                 self.load(blob)
                 if alive:
                     self.cells[k] = {"state": blob, "seq": list(seq), "lives": self.w.lives_left}
@@ -212,6 +216,7 @@ class Display:
         self.workers = workers
         self.step = 0
         self.best = None
+        self.shown = set()
         self.events = collections.deque(maxlen=20)
         self.think = Thinking(driver="explorer", want="show the best run found so far")
         self.snap = None
@@ -255,6 +260,41 @@ class Display:
         self.boot.seek(0)
         self.py.load_state(self.boot)
 
+    def play_highlight(self):
+        """Fast-forward to the best moment not shown yet and play it at normal speed."""
+        doc = read_json(DIR / "moments.json")
+        fresh = [m for m in (doc or {}).get("moments", []) if m["key"] not in self.shown and m["kills"] > 0]
+        if not fresh:
+            return
+        moment = fresh[0]
+        self.shown.add(moment["key"])
+        start, stop = moment["frame"] - CLIP_LEAD, moment["end_frame"] + CLIP_TAIL
+        self.think.plan = f"highlight in {moment['area']}: {moment['why']}"
+        self.think.result = moment["agent"]
+        self.events.append((self.step, f"highlight in {moment['area']}: {moment['why']}"))
+        self.restart()
+        self.py.set_emulation_speed(0)
+        frame = 0
+
+        def tick(n):
+            nonlocal frame
+            for _ in range(n):
+                if frame == start:
+                    self.py.set_emulation_speed(1)
+                if frame >= start:
+                    self.watch(1)
+                else:
+                    self.py.tick(1, False)
+                frame += 1
+
+        for m in moment["seq"]:
+            press_macro(self.py, m, tick)
+            self.step += 1
+            self.refresh()
+            if frame > stop:
+                break
+        self.watch(45)
+
     def play_best(self):
         doc = read_json(BEST)
         if doc is None:
@@ -278,6 +318,7 @@ class Display:
         self.events.append((self.step, f"replay ended at {self.w.world[0]}-{self.w.world[1]}, progress {self.w.level_progress}"))
         self.watch(120)
         self.refresh()
+        self.play_highlight()
 
 
 def main():

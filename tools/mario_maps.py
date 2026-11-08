@@ -17,6 +17,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from mario_moments import MomentBook, classify
+
 DIR = Path("runs") / "mario-land"
 INBOX = DIR / "inbox"
 MAPS = DIR / "maps"
@@ -72,8 +74,10 @@ class Cartographer:
         self.py = PyBoy(glob.glob("roms/Super Mario Land*.gb")[0], window="null")
         self.py.set_emulation_speed(0)
         self.w = self.py.game_wrapper
+        self.w.game_area_mapping(self.w.mapping_minimal, 0)
         self.w.start_game()
         self.boot = self.snapshot()
+        self.book = MomentBook()
         self.levels = {}
         self.ghost_count = 0
 
@@ -87,12 +91,19 @@ class Cartographer:
         import io
         self.py.load_state(io.BytesIO(self.boot))
         lives, world, settle, frame, points = self.w.lives_left, self.w.world, 0, 0, []
+        score, coins, timer, move, events = self.w.score, self.w.coins, self.w.time_left, 0, []
 
         def tick(n):
-            nonlocal world, settle, frame
+            nonlocal world, settle, frame, score, coins, timer
             for _ in range(n):
                 self.py.tick(1, frame % SAMPLE_EVERY == 0)
                 frame += 1
+                gained, coins_rose, timer_dropped = self.w.score - score, self.w.coins > coins, self.w.time_left < timer
+                score, coins, timer = self.w.score, self.w.coins, self.w.time_left
+                if gained > 0 and not settle:
+                    kind = classify(gained, coins_rose, timer_dropped, self.w.game_area())
+                    events.append({"frame": frame, "move": move, "area": area_name(world), "x": self.w.level_progress,
+                                   "y": int(self.py.memory[ADDR_MARIO_Y]) - SPRITE_Y - HUD, "kind": kind, "points": gained})
                 if self.w.world != world:
                     world, settle = self.w.world, SETTLE_FRAMES
                 if settle:
@@ -106,7 +117,7 @@ class Cartographer:
                     a = np.asarray(self.py.screen.image.convert("L"))[HUD:]
                     update_columns(self.levels.setdefault(area_name(world), {}), cam, a)
 
-        for m in doc["seq"]:
+        for move, m in enumerate(doc["seq"]):
             _, buttons, frames = self.macros[m]
             for b in buttons:
                 self.py.button_press(b)
@@ -116,6 +127,7 @@ class Cartographer:
             tick(1)
             if self.w.lives_left < lives:
                 break
+        self.book.add(events, doc)
         return points
 
     def write_ghost(self, doc, points):
@@ -136,6 +148,12 @@ class Cartographer:
             index[area] = {"width": int(img.shape[1]), "height": HEIGHT, "seen": round(seen, 3),
                            "file": f"level_{area}.png"}
         write_atomic(MAPS / "index.json", lambda p: p.write_text(json.dumps({"schema": 1, "levels": index}), encoding="utf-8"))
+
+    def save_moments(self):
+        if self.book.dirty:
+            self.book.dirty = False
+            doc = {"schema": 1, "game": "mario-land", "moments": self.book.ranked()}
+            write_atomic(DIR / "moments.json", lambda p: p.write_text(json.dumps(doc), encoding="utf-8"))
 
     def next_doc(self):
         files = sorted(INBOX.glob("*.json"), key=lambda p: p.stat().st_mtime)
@@ -165,6 +183,7 @@ def cartographer_main(end, macros):
             time.sleep(0.25)
         else:
             c.write_ghost(doc, c.replay(doc))
+            c.save_moments()
         if c.levels and time.time() - last_save > SAVE_EVERY_S:
             last_save = time.time()
             c.save_maps()

@@ -70,7 +70,7 @@ replayed together at normal speed. Display cost stays flat however many are show
 | V1 | Search stops retrying save points that keep dying | Claude, needs ROM | built in `tools/watch_mario_land.py` |
 | V2 | Per-level map building and ghost tracks | Claude, needs ROM | built in `tools/mario_maps.py` |
 | V3 | Position contract on `GameSpec`, Map tab in the viewer | Devin, after phases 2 to 4 | not started |
-| V4 | Scored moments: per-attempt events such as kills and score jumps, kept for the video plan | Claude or Devin | proposed |
+| V4 | Scored moments: per-attempt score events ranked into a replayable highlights list, kept for the video plan | Claude, needs ROM | built in `tools/mario_moments.py` |
 | V5 | Pokemon moves onto the same contract last | Devin | not started |
 
 Check first: `world/model.py` looks event-driven and may be reusable, but `world/` was surveyed as Kanto-specific.
