@@ -257,6 +257,10 @@ def _edit_main(tmp_path, monkeypatch):
     src = tmp_path / "in.state"
     world().save_state(src)
     monkeypatch.setattr(state_edit, "make_emulator", lambda rom: FakeEmulator())
+    # hermetic: the fixture party has made-up stats, so the checker must not see this machine's ROM tables or runs/
+    monkeypatch.setattr(state_edit, "_legality_inputs", lambda: (None, None, None))
+    monkeypatch.setattr(state_edit, "_growth", lambda: None)
+    monkeypatch.setattr(state_edit, "_respawns_seen", lambda: set())
     return src
 
 
