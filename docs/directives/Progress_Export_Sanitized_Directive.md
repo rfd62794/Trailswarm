@@ -4,7 +4,7 @@
 
 ## 1. Why this exists
 
-The agents' shared memory, `runs/maps.json`, is the project's main learned asset: which tiles can be walked, which edges are blocked, where the doors go. It also holds text read from the game screen (NPC and sign dialogue, menu text, item text). Nobody can publish or share it today without hand-cleaning, and a deny-list would leak the next field someone adds.
+The agents' shared memory, `runs/maps.json` (gitignored, so missing in a fresh worktree), is the project's main learned asset: which tiles can be walked, which edges are blocked, where the doors go. It also holds text read from the game screen (NPC and sign dialogue, menu text, item text). Nobody can publish or share it today without hand-cleaning, and a deny-list would leak the next field someone adds.
 
 Measured on 2026-11-08 from the real `runs/maps.json` (key names only; no text was read): 32 top-level keys and 70 map entries, with 16 distinct per-map keys. Most of them carry text or per-run state. This directive builds a function and a standalone tool that write a small shareable file by ALLOW-LIST: only fields named in the code are written, and every other field, known or future, is dropped by default.
 

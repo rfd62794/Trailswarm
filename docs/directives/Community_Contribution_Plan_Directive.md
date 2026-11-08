@@ -13,10 +13,11 @@ This directive writes those two documents. It writes no code, no data and no tes
 
 ## 2. Scope
 
-Exactly two new files. Nothing else is created or edited.
+Exactly three new files. Nothing else is created or edited.
 
 1. `docs/SHARING.md` <!-- new: docs/SHARING.md --> - the inventory. Structure in section 3.
 2. `docs/plans/Community_Contribution_Plan.md` <!-- new: docs/plans/Community_Contribution_Plan.md --> - the ranked plan. Structure in section 3.
+3. `tests/test_sharing_docs.py` <!-- new: tests/test_sharing_docs.py --> - the checks on those two documents, given in full in section 5. Under 80 lines.
 
 ## 3. The work
 
@@ -50,10 +51,10 @@ Write in plain, direct language. No marketing words ("revolutionary", "cutting-e
 |---|---|---|
 | Source code, tests, docs | `src/`, `tests/`, `docs/`, `tools/` | MIT |
 | RAM labels and addresses | `src/pokeagent/data/ram_map.json` (2792 entries, 107 flagged verified) | derived from `pokered.sym`; credited in LEGAL.md |
-| ROM-derived tables | `kb/rom_tables.json`, `kb/items.json`, `kb/hm_compat.json` | gitignored |
+| ROM-derived tables | `kb/rom_tables.json`, `kb/items.json`, `kb/hm_compat.json` | gitignored, so missing in a fresh worktree |
 | ROM images | `roms/` | gitignored |
 | Start-of-game and checkpoint save states | `baselines/*.state`, `runs/checkpoints/*.state` | gitignored today |
-| Agent shared memory (learned maps, plus text read from the screen) | `runs/maps.json` | gitignored; holds dialogue and menu text |
+| Agent shared memory (learned maps, plus text read from the screen) | `runs/maps.json` | gitignored, so missing in a fresh worktree; holds dialogue and menu text |
 | Run logs and frames | `runs/` | gitignored |
 | Sprite and tile crop datasets | `runs/vision/<game>/` | extracted game art; gitignored |
 | Trained model weights | local models directory (planned) | none published |
@@ -67,7 +68,7 @@ Write in plain, direct language. No marketing words ("revolutionary", "cutting-e
 
 - **"The authoritative sources are the disassembly, not the wikis"**: the pret/pokered disassembly is the authoritative WRAM label source.
 - **"What agent projects actually read, and the standards worth adopting"**: community RL projects converged on a small address set (PokemonRedExperiments, MIT, reads map, X, Y, party species, HP, level, badges, money, event flags, opponent levels). pokemonred_puffer has a named-event table but shows no licence: design reference, not code to copy. stable-retro `data.json` convention: name, `address`, and a struct-like `type` string (endianness, then `i`/`u`/`d`/`n` for signed, unsigned, BCD, nibble-BCD, then byte count, for example `|u1`, `>u2`, `>d2`); Game Boy is supported there. "No existing JSON/YAML schema specific to Pokemon Red RAM, and no tool that auto-verifies an address table against the disassembly, was found in the research notes, so the project would be filling a real gap rather than duplicating one."
-- **"NPC reading and the shared world map have a ready template"**: pokerl-map-viz (MIT) needs only `[x, y, mapId]` per agent over WebSocket JSON, and converts with an `assets/map_data.json` offset table. Interior placement in any world map is a heuristic, not in game data; a hand-corrected `map_id -> (x, y)` table is "the realistic approach". NPCs can share the same transform as agents. NPC tables hold only the current map, so a shared NPC map must be accumulated across runs. "No ready-made stitched full-world PNG with a known licence was found other than the community map used by pokerl-map-viz." The contents of `map_data.json` were not read.
+- **"NPC reading and the shared world map have a ready template"**: pokerl-map-viz (MIT) needs only `[x, y, mapId]` per agent over WebSocket JSON, and converts with an offset table in that project's own `assets` folder (an external file, missing from this repo). Interior placement in any world map is a heuristic, not in game data; a hand-corrected `map_id -> (x, y)` table is "the realistic approach". NPCs can share the same transform as agents. NPC tables hold only the current map, so a shared NPC map must be accumulated across runs. "No ready-made stitched full-world PNG with a known licence was found other than the community map used by pokerl-map-viz." The contents of `map_data.json` were not read.
 - **"Writing is the frontier: link battles, trades and opponent injection"**: PyBoy ships an experimental two-instance serial cable example, demonstrated for Gen 1 trading only. "No published project automates a Gen 1 Colosseum battle between two emulated agents." Whether the Colosseum path works over the same serial layer is "a reasonable inference but untested". Save states are unsupported on linked instances, which rules out rollback for linked pairs. Which PyBoy release introduced serial support was not confirmed. The Gen 1 link RNG is documented (Smogon RBY link RNG thread); exact master/slave handshake bytes and the on-wire party layout were not found, and `home/serial.asm` in pret/pokered is the entry point to read. Opponent injection has precedent in technique (a RAM-randomiser project rewrites enemy trainer data every frame) but not in a PyBoy recipe; `read_trainer_party.asm` zeroes the enemy party count first, so injected data must be written after that routine runs; a `hook_register` on the symbol after the party load is the natural PyBoy equivalent, and it is unproven.
 - **"Recommended module shape and open risks"**: licences: pokemonred_puffer none visible; pret/pokered's text was not retrieved (ROM data and assets are Nintendo/Game Freak IP regardless); Data Crystal is GNU FDL 1.2; Continual Harness is CC BY-NC-SA 4.0; treat these as reference, not code sources. Version drift: which pokered revision the `.sym` matches the ROM is unstated, and sprite field names changed in 2024. Unproven: Colosseum over PyBoy serial, injection timing, and `symbols=` loading of pokered `.sym`. Unread: Bulbapedia structures, pokecrystal, the `map_data.json` contents, `home/serial.asm`, Cheat Engine tables, tracker and overlay ecosystems beyond those found.
 - **"Conclusion"**: "the novel work is not reading RAM ... but unifying three things that currently live in separate ecosystems": typed variable files (stable-retro), disassembly-derived labels (RGBDS `.sym`), and live multi-agent visualisation (pokerl-map-viz). The write side "deserves a time-boxed spike before design commitments", deciding three questions: whether PyBoy's serial cable can enter the Colosseum, whether a symbol-addressed hook reliably overwrites the enemy party after the trainer load, and whether pkmn/engine should carry search and training while PyBoy demonstrates on the real cartridge.
@@ -144,38 +145,73 @@ uv run python --version
 ```
 Expected: `Python 3.12.x`.
 
-Required headings and entry labels:
+The checks that were four inline scripts are one test file, `tests/test_sharing_docs.py`, which you write exactly as below (copy it; change nothing but formatting). It reads the two documents you write, so it fails until they are right.
+
+```python
+"""Checks on docs/SHARING.md and docs/plans/Community_Contribution_Plan.md."""
+import os
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SHARING = ROOT / "docs" / "SHARING.md"
+PLAN = ROOT / "docs" / "plans" / "Community_Contribution_Plan.md"
+FILES = (SHARING, PLAN)
+SHARING_HEADS = ["# What this project can share", "## Status words", "## Fixed rules", "## Inventory", "## Before publishing anything"]
+PLAN_HEADS = ["# Community contribution plan", "## How the entries are ranked", "## What the research report flags as unverified",
+              "### 1. Measured Red and Blue address table and typed variable file", "### 2. Shared world-map format",
+              "### 3. The writing side: link cable and opponent injection", "### 4. Cold versus seeded run comparison, as a measured demo",
+              "### 5. Vision-model code and recipe", "## Not on this list"]
+LABELS = ["**What exists publicly:**", "**The gap:**", "**What Trailswarm would contribute:**", "**Effort:**", "**Verify first:**", "**Who decides:**"]
+FORBIDDEN = re.compile(r"employer|day job|dialer|contact.center|\bclient\b|torrent|romhub|archive\.org|dumped|ripped|downloaded|purchased|bought|\bRFD\b|Dugger", re.I)
+STATUS_OK = {"OK now", "needs cleaning", "private", "owner's decision"}
+PRIVATE_MARKS = ("roms/", "kb/rom_tables.json", "kb/items.json", "kb/hm_compat.json", "pokered.sym", "runs/vision", "runs/maps.json")
+
+
+def _has_heading(text, heading):
+    return re.search("^" + re.escape(heading) + r"\s*$", text, re.M) is not None
+
+
+def test_required_headings_and_entry_labels():
+    sharing, plan = SHARING.read_text(encoding="utf-8"), PLAN.read_text(encoding="utf-8")
+    missing = [h for h in SHARING_HEADS if not _has_heading(sharing, h)] + [h for h in PLAN_HEADS if not _has_heading(plan, h)]
+    assert missing == []
+    assert [lab for lab in LABELS if plan.count(lab) != 5] == []
+
+
+def test_no_forbidden_words():
+    hits = [(f.name, i + 1) for f in FILES for i, line in enumerate(f.read_text(encoding="utf-8").splitlines()) if FORBIDDEN.search(line)]
+    assert hits == []
+
+
+def test_inventory_rows_use_the_four_status_words_and_keep_private_things_private():
+    lines = SHARING.read_text(encoding="utf-8").splitlines()
+    rows = [ln.split("|") for ln in lines if ln.startswith("|") and not set(ln.strip()) <= set("|- ")]
+    rows = [r for r in rows if r[1].strip() != "Item"]
+    assert len(rows) >= 12
+    assert [r[1].strip() for r in rows if r[3].strip() not in STATUS_OK] == []
+    assert [r[1].strip() for r in rows if any(p in r[2] for p in PRIVATE_MARKS) and r[3].strip() != "private"] == []
+
+
+def test_links_resolve_and_files_stay_short():
+    broken = []
+    for f in FILES:
+        for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", f.read_text(encoding="utf-8")):
+            if not target.startswith("http") and not os.path.exists(os.path.normpath(os.path.join(f.parent, target.replace("%20", " ")))):
+                broken.append((f.name, target))
+    assert broken == []
+    assert max(len(f.read_text(encoding="utf-8").splitlines()) for f in FILES) <= 600
+```
 
 ```
-uv run python -c "import re,sys; s=open('docs/SHARING.md',encoding='utf-8').read(); p=open('docs/plans/Community_Contribution_Plan.md',encoding='utf-8').read(); hs=['# What this project can share','## Status words','## Fixed rules','## Inventory','## Before publishing anything']; hp=['# Community contribution plan','## How the entries are ranked','## What the research report flags as unverified','### 1. Measured Red and Blue address table and typed variable file','### 2. Shared world-map format','### 3. The writing side: link cable and opponent injection','### 4. Cold versus seeded run comparison, as a measured demo','### 5. Vision-model code and recipe','## Not on this list']; miss=[h for h in hs if not re.search('^'+re.escape(h)+r'\s*$',s,re.M)]+[h for h in hp if not re.search('^'+re.escape(h)+r'\s*$',p,re.M)]; labs=['**What exists publicly:**','**The gap:**','**What Trailswarm would contribute:**','**Effort:**','**Verify first:**','**Who decides:**']; bad=[l for l in labs if p.count(l)!=5]; print('missing',miss,'label-count-wrong',bad); sys.exit(1 if miss or bad else 0)"
+uv run pytest -q tests/test_sharing_docs.py
 ```
-Expected: `missing [] label-count-wrong []`, exit 0.
-
-Forbidden words (no employer or workplace hints, no game-copy provenance wording):
-
-```
-uv run python -c "import re,sys; pat=re.compile(r'employer|day job|dialer|contact.center|\bclient\b|torrent|romhub|archive\.org|dumped|ripped|downloaded|purchased|bought|\bRFD\b|Dugger',re.I); hits=[(f,i+1,l.strip()[:80]) for f in ('docs/SHARING.md','docs/plans/Community_Contribution_Plan.md') for i,l in enumerate(open(f,encoding='utf-8')) if pat.search(l)]; print(hits); sys.exit(1 if hits else 0)"
-```
-Expected: `[]`, exit 0.
-
-Inventory rows use only the four status words, and nothing forbidden is marked shared:
-
-```
-uv run python -c "import sys; ok={'OK now','needs cleaning','private','owner\x27s decision'}; rows=[l.split('|') for l in open('docs/SHARING.md',encoding='utf-8') if l.startswith('|') and not set(l.strip())<=set('|- ')]; rows=[r for r in rows if r[1].strip()!='Item']; priv=('roms/','kb/rom_tables.json','kb/items.json','kb/hm_compat.json','pokered.sym','runs/vision','runs/maps.json'); badstatus=[r[1].strip() for r in rows if r[3].strip() not in ok]; badpriv=[r[1].strip() for r in rows if any(p in r[2] for p in priv) and r[3].strip()!='private']; print(len(rows),'rows','badstatus',badstatus,'badpriv',badpriv); sys.exit(1 if badstatus or badpriv or len(rows)<12 else 0)"
-```
-Expected: `14 rows badstatus [] badpriv []` (13 to 16 rows is fine), exit 0.
-
-Links resolve, and the files stay short:
-
-```
-uv run python -c "import re,os,sys; bad=[]; [bad.append((f,t)) for f in ('docs/SHARING.md','docs/plans/Community_Contribution_Plan.md') for t in re.findall(r'\]\(([^)#]+)(?:#[^)]*)?\)',open(f,encoding='utf-8').read()) if not t.startswith('http') and not os.path.exists(os.path.normpath(os.path.join(os.path.dirname(f),t.replace('%20',' '))))]; n=[len(open(f,encoding='utf-8').read().splitlines()) for f in ('docs/SHARING.md','docs/plans/Community_Contribution_Plan.md')]; print('broken',bad,'lines',n); sys.exit(1 if bad or max(n)>600 else 0)"
-```
-Expected: `broken [] lines [..]`, exit 0.
+Expected: `4 passed`.
 
 ```
 git status --short
 ```
-Expected: only the two new files (plus nothing else).
+Expected: only the three new files (plus nothing else).
 
 ## 6. Rules for this run
 
@@ -215,7 +251,9 @@ Nothing during the run. After review, the owner decides whether the status words
 - Read(docs/research/reports/RAM ROM tooling for game agents.md)
 - Write(docs/SHARING.md)
 - Write(docs/plans/Community_Contribution_Plan.md)
+- Write(tests/test_sharing_docs.py)
 - Exec(uv run python --version)
+- Exec(uv run pytest)
 - Exec(git status)
 
 <!-- queue:start -->

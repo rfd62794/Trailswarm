@@ -26,7 +26,7 @@ New files only. Each is a small single-purpose module; no file over 600 lines (a
 6. `tests/test_ramlab_address_table.py` <!-- new: tests/test_ramlab_address_table.py --> - observations, table and CLI tests.
 7. `tests/test_ramlab_retro_vars.py` <!-- new: tests/test_ramlab_retro_vars.py --> - type string and `data.json` tests.
 
-Do NOT create `docs/data/gen1_ram_addresses.json` or any `data.json`. See section 4.
+Do NOT create the table data file `docs/data/gen1_ram_addresses.json` (it must stay missing) or any `data.json`. See section 4.
 
 ## 3. The work
 
@@ -238,7 +238,7 @@ Findings first: any rule you had to interpret, anything in the `data.json` wrapp
 
 ## Required from User
 
-The real observation run needs a game copy and an emulator, which a dispatch does not have. Claude does it after this merges: run a scripted session per game key, write observation files in the format above, run `uv run python tools/ram_address_table.py ...`, review the result, then commit `docs/data/gen1_ram_addresses.json`. Until Claude does that, the table does not exist, and nothing in the repo should say Red and Blue addresses are measured.
+The real observation run needs a game copy and an emulator, which a dispatch does not have. Claude does it after this merges: run a scripted session per game key, write observation files in the format above, run the table tool from the CLI section above, review the result, then commit `docs/data/gen1_ram_addresses.json`. Until Claude does that, the table does not exist, and nothing in the repo should say Red and Blue addresses are measured.
 
 ## Forbidden Actions
 

@@ -6,7 +6,7 @@ Phase 4 of `docs/plans/Multi_Game_Framework_Plan.md` (branch `feat/watch-mario-l
 
 **Direction change, settled 2026-11-08 (owner):** "we want to try to build a combined or shared memory for red and blue, we want the individuality minimal where possible, and plan for yellow after confirming cross compatibility." So the unit of namespacing is a memory FAMILY, not a game. Red and Blue are one family and share the legacy root. A game that is not in that family (Yellow, until it passes the compat check; every non-Pokemon game) gets its own family and its own namespace. Per-game paths are kept only for what is bound to one ROM or measured to differ.
 
-Measured 2026-11-08 by comparing Red's `runs/maps.json` with a Blue run's `maps.json` (15 maps, up to Viridian Forest; the Blue run had human interaction, so this is early evidence, not a verdict):
+Measured 2026-11-08 by comparing Red's `runs/maps.json` (gitignored, so missing in a fresh worktree) with a Blue run's `maps.json` (15 maps, up to Viridian Forest; the Blue run had human interaction, so this is early evidence, not a verdict):
 
 - 2,170 of 2,203 Blue tiles were already known to Red. 21 warps in common, none different. 35 of 35 stationary NPCs in the same place.
 - 210 of 2,127 Red walls lie between two tiles Blue stood on (126 of them on Route 1, which has ledges). Likely one-way ledges or transient NPCs; the cause is UNCONFIRMED.
@@ -15,15 +15,15 @@ Measured 2026-11-08 by comparing Red's `runs/maps.json` with a Blue run's `maps.
 
 So most stores are shared by default; wild encounter tables and anything bound to one ROM are per game.
 
-**Depends on `Game_Spec_Rom_Screen_Buttons_Directive.md` being merged** (which depends on `Game_Spec_Package_Directive.md`). Start from a main containing `src/pokeagent/game/paths.py` and `GameSpec.default_rom`. If `git grep -n "def default_rom" -- src` finds nothing at the start, stop and write that in the Status row.
+**Depends on `Game_Spec_Rom_Screen_Buttons_Directive.md` being merged** (which depends on `Game_Spec_Package_Directive.md`). Start from a main where the earlier phase has added `src/pokeagent/game/paths.py` (missing on main until that phase merges) and `GameSpec.default_rom`. If `git grep -n "def default_rom" -- src` finds nothing at the start, stop and write that in the Status row.
 
 Measured on main 2026-11-08 (every store below is shared with no game key; map ids are bare integers, so a second game would silently merge into Red's data):
 
 - `runs/maps.json`: `src/pokeagent/explorer/context.py:33` (`maps_path`), `explorer/legacy.py:26`, `cli_brain.py:22` (`MAPS_DEFAULT`), `mcp_server.py:28` (`MAPS_PATH`), `navigation.py:17` (`load_memory`), `observations.py:33`, `statemeta.py:71` (`tile_snapshot`).
-- `runs/bandit.json`: `explorer/context.py:37` (`bandit_path`); the store is `src/pokeagent/bandit/store.py`.
-- `runs/novelty.json`: `explorer/context.py:41` (`novelty_path`); the store is `src/pokeagent/novelty/store.py`.
+- `runs/bandit.json`: `explorer/context.py:37` (`bandit_path`); the store is `src/pokeagent/bandit/store.py`; `runs/` is gitignored, so these data files are missing in a fresh worktree.
+- `runs/novelty.json`: `explorer/context.py:41` (`novelty_path`); the store is `src/pokeagent/novelty/store.py`; also missing in a fresh worktree.
 - `runs/checkpoints`: `explorer/press_goals.py:62`, `explorer/press_track.py:53` and `:60`, `statescmd.py:16` (`DEFAULT_DIRS`).
-- `kb/*`: `knowledge/hm_compat.py:14`, `knowledge/items_catalog.py:24`, `knowledge/kb.py:7` (`_KB` = `kb/rom_tables.json`), `statescmd.py:31`, `review/swarm.py:111`.
+- `kb/*`: `knowledge/hm_compat.py:14`, `knowledge/items_catalog.py:24`, `knowledge/kb.py:7` (`_KB` = `kb/rom_tables.json`), `statescmd.py:31`, `review/swarm.py:111`. The `kb/` data files are gitignored, so missing in a fresh worktree.
 - `explorer/context.py` and `explorer/memory.py` are at 299 lines (ceiling 300, enforced by `tests/test_explorer_behaviours.py::test_explorer_package_layering_and_size`): the edits there must not add a line.
 - State sidecars: `src/pokeagent/statemeta.py` `StateMeta` (:20-33) has `game: dict` (a RAM snapshot: map_id, x, y, ...) but NO game key. `write_state` (:94) writes it; `read_meta` (:130) reads `StateMeta(**json)`; `load_state` (:125) loads then reads the meta. A Red state would load silently under any other game. `PyBoyEmulator.load_state` is `emulator.py:146`, `FakeEmulator.load_state` is `:200`; callers include `cli.py:83,127`, `cli_hex.py:43`, `mcp_server.py:154,217`, `invariants/states.py:74`, `adapters/explorer_snapshot.py:181`.
 - `runs/agents/` (the agent registry), `runs/explore-*` (per-run directories), `runs/swarm`, `runs/segments*` and `runs/legs` are not in the plan's list; they are NOT moved by this directive (the Report lists what a grep finds so a later phase can decide).
@@ -39,8 +39,8 @@ Shared-by-default means the store is keyed by memory family. Per-game is kept on
 | `runs/maps.json` | family | measured: tiles, warps and stationary NPCs agree between Red and Blue. Disagreements are handled by the overlay in `Family_Shared_Memory_Directive.md`, not by a split here |
 | `runs/bandit.json` | family | learned action statistics; nothing in it is tied to one ROM. UNVERIFIED for Blue (not measured) |
 | `runs/novelty.json` | family | feature counts per run; same status as bandit. UNVERIFIED for Blue |
-| `kb/hm_compat.json` | family | derived from the base-stats table; the Blue-built kb matched Red's |
-| `kb/items.json` (items catalog) | family | same measurement |
+| `kb/hm_compat.json` | family | gitignored, missing in a fresh worktree; derived from the base-stats table; the Blue-built kb matched Red's |
+| `kb/items.json` (items catalog) | family | gitignored, missing in a fresh worktree; same measurement |
 | `kb/rom_tables.json` | family for the base, per game for the overlay | the Blue-built kb matched Red's except wild encounters (34 of 57 maps differ) and `map_trainers` at ids 105-117 and 231. This directive only routes the BASE file by family and exposes the per-game path; building the per-game overlay file is `Family_Shared_Memory_Directive.md` |
 | `runs/checkpoints` | per game | a save state is bound to one ROM, even when memory is shared |
 | `baselines/` | per game | a baseline trace is tied to one ROM. `baselines/` is outside `runs` and `kb`, so `store_path` does not route it and this directive does not move it. Red's stays where it is; a Blue baseline's location is decided by the clean-baseline step in the plan |
@@ -98,12 +98,13 @@ Replace each literal in the fourteen listed modules with `store_path(...)`, usin
 ## What NOT to do
 
 - Do not touch `roms/`, `baselines/`, or any ROM data, and do not state where any game copy came from.
+- Existing tests that build a `GameSpec(...)` directly (for example `tests/test_game_spec.py` and `tests/test_emulator_game.py`) break when `memory_family` and `owns_legacy_paths` are added without defaults. You may make the minimal edit to each such test: pass the two new arguments (or use `dataclasses.replace(RED, ...)`), and change no assertion. List every such test and its lines in the Report. This is the only permitted edit to existing tests apart from the sidecar-bytes case named below.
 - Do not move, rename or rewrite any existing file under `runs/` or `kb/`: Red's data stays where it is. This phase changes where NEW paths resolve for a game outside the legacy family or for a game-scope store; no migration script, no copy.
 - Do not namespace `runs/agents`, `runs/explore-*`, `runs/swarm`, `runs/segments*`, `runs/legs` or `runs/anomalies*`; list them in the Report instead.
 - Do not register Blue or any second game, and do not add real-time input; `press()` is untouched.
 - Do not build overlays, provenance, a merge, or any read-through of a second file. That is `Family_Shared_Memory_Directive.md`; this directive only routes paths.
 - Do not change the schema of `maps.json`, `bandit.json`, `novelty.json` or checkpoint files, or add a game key inside them.
-- Do not change `tools/` scripts or existing tests except as the Report lists (an existing test that asserts the exact bytes of a Red sidecar may need `game_key` added; edit minimally and list it).
+- Do not change `tools/` scripts or existing tests except as permitted above and as the Report lists (an existing test that asserts the exact bytes of a Red sidecar may need `game_key` added; edit minimally and list it).
 - Every file stays under 300 lines; `explorer/context.py` and `explorer/memory.py` must not grow.
 - No new dependency, no scratch or debug files outside `.devin-scratch/`.
 
@@ -116,9 +117,9 @@ uv run pytest -q tests/test_statemeta.py tests/test_cli.py tests/test_emulator.p
 Expected: all pass (the one `test_explorer_package_layering_and_size` case is the 300-line ceiling).
 
 ```
-git grep -nE "\"runs/(maps|bandit|novelty)\.json\"|'runs/maps\.json'|Path\(\"runs/checkpoints\"\)|/ \"kb\" /" -- src
+git grep -n -F -e '"runs/maps.json"' -e '"runs/bandit.json"' -e '"runs/novelty.json"' -e 'Path("runs/checkpoints")' -e '/ "kb" /' -- src
 ```
-Expected: hits only in `src/pokeagent/game/stores.py` (doc/example strings) and docstrings; no executable use of those literals outside `game/stores.py`. List any remaining executable hit in the Report with the reason it was left.
+Expected: hits only in `src/pokeagent/game/stores.py` (doc/example strings) and docstrings; no executable use of those literals outside that file. List any remaining executable hit in the Report with the reason it was left.
 
 ```
 uv run pytest -q

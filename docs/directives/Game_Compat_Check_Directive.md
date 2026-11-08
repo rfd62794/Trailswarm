@@ -6,7 +6,7 @@ No dependency on the other Multi_Game directives: this reads files and needs no 
 
 ## 1. Why this exists
 
-On 2026-11-08 Red's `runs/maps.json` was compared by hand with a Blue run's `maps.json` (15 maps up to Viridian Forest; the Blue run had human interaction, so the numbers are early evidence, not a verdict). The result decided the direction "share memory between Red and Blue, plan Yellow after confirming cross compatibility":
+On 2026-11-08 Red's `runs/maps.json` (gitignored, so missing in a fresh worktree) was compared by hand with a Blue run's `maps.json` (15 maps up to Viridian Forest; the Blue run had human interaction, so the numbers are early evidence, not a verdict). The result decided the direction "share memory between Red and Blue, plan Yellow after confirming cross compatibility":
 
 - 2,170 of 2,203 Blue tiles already known to Red.
 - 21 warps in common, none different.

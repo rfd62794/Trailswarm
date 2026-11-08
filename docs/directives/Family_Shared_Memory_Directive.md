@@ -2,7 +2,7 @@
 
 **Size:** M. **Assignee:** devin.
 
-**Depends on the amended `Game_Namespaced_Stores_Directive.md` (plan phase 4) being merged, and on `Game_Compat_Check_Directive.md` being merged** (this directive imports its ledge classifier, `src/pokeagent/compat/ledges.py`). Start from a main containing `src/pokeagent/game/stores.py` with `store_path(..., scope=...)` and `LEGACY_FAMILY`. If `git grep -n "def store_path" -- src` or `git grep -n "def classify_wall" -- src` finds nothing at the start, stop and write that in the Status row.
+**Depends on the amended `Game_Namespaced_Stores_Directive.md` (plan phase 4) being merged, and on `Game_Compat_Check_Directive.md` being merged** (this directive imports its ledge classifier, the module `ledges.py` in the `compat` package, missing on main until that directive merges). Start from a main where the amended phase 4 has added the `stores.py` module of the `game` package (missing before it merges) with `store_path(..., scope=...)` and `LEGACY_FAMILY`. If `git grep -n -e "def store_path" -e "def classify_wall" -- src` finds fewer than two lines at the start, stop and write that in the Status row.
 
 ## 1. Why this exists
 
@@ -79,16 +79,16 @@ New package `src/pokeagent/family/` (each module single-purpose, under 150 lines
 
 ### Files and shapes (decided)
 
-All paths come from `store_path` (never a literal):
+Every file below is located relative to the `shared` path the merge was called with (`shared.parent`), never relative to the working directory and never through a `store_path` call made inside these modules, so a test that passes a `tmp_path` shared file writes only under `tmp_path`. In production `shared` is the real shared maps file, which `store_path` already resolved for the family at the call site:
 
-- Shared doc: `store_path("runs/maps.json")`, the existing file, unchanged schema.
-- Provenance: `store_path("runs/family_provenance.json")`, family scope. Shape: `{"version": 1, "facts": {"<map_id>/<section>/<key>": ["pokemon-blue", ...]}}` where section is one of `visited, warps, blocked, jumps, npcs`. The list is the games that OBSERVED the fact. A fact with NO entry is attributed to the founding game `pokemon-red` (everything that predates this directive). Adding an observer to an absent entry yields `["pokemon-red", "<game>"]` only when the fact was already in the shared doc before this fold; a fact new to the shared doc gets just the observing game.
-- Overlay: `store_path("runs/overlay/<game.key>/maps.json")`, family scope. Same schema as `maps.json`, holding ONLY the facts that game disagrees on, plus one extra list per map, `blocked_not`: edges the shared doc calls blocked that this game has proof are open. Created on first disagreement, never otherwise.
-- Disagreement report: `store_path("runs/family_disagreements.jsonl")`, one JSON object per line: `{"ts", "game", "map", "section", "key", "shared": <value>, "overlay": <value>, "kind": "<kind>"}`.
+- Shared doc: the `shared` argument itself (the existing maps file, unchanged schema; gitignored, so missing in a fresh worktree).
+- Provenance: `family_provenance.json` in `shared.parent` (a data file the run creates, missing until the first non-founder fold). Shape: `{"version": 1, "facts": {"<map_id>/<section>/<key>": ["pokemon-blue", ...]}}` where section is one of `visited, warps, blocked, jumps, npcs`. The list is the games that OBSERVED the fact. A fact with NO entry is attributed to the founding game `pokemon-red` (everything that predates this directive). Adding an observer to an absent entry yields `["pokemon-red", "<game>"]` only when the fact was already in the shared doc before this fold; a fact new to the shared doc gets just the observing game.
+- Overlay: `overlay/<game.key>/maps.json` under `shared.parent`. Same schema as `maps.json`, holding ONLY the facts that game disagrees on, plus one extra list per map, `blocked_not`: edges the shared doc calls blocked that this game has proof are open. Created on first disagreement, never otherwise.
+- Disagreement report: `family_disagreements.jsonl` in `shared.parent` (also created by the run), one JSON object per line: `{"ts", "game", "map", "section", "key", "shared": <value>, "overlay": <value>, "kind": "<kind>"}`.
 
 ### When the family code runs: Red-only stays unchanged
 
-`family_active(game, shared_path)` is True iff `game.memory_family == LEGACY_FAMILY` AND (`game.owns_legacy_paths` is False OR `store_path("runs/family_provenance.json")` already exists). So a Red-only repo never creates a provenance, overlay or report file, `merge_file_into` takes the exact old code path, and the bytes of `runs/maps.json` are identical to today's: `tests/test_golden_red.py` hash must not change. The first time any other game folds, the provenance file is created and from then on Red folds also record provenance. A game whose family is not `gen1-pokemon` never touches any of this (it has its own family root).
+`family_active(game, shared_path)` is True iff `game.memory_family == LEGACY_FAMILY` AND (`game.owns_legacy_paths` is False OR the provenance file in `shared.parent` already exists). So a Red-only repo never creates a provenance, overlay or report file, `merge_file_into` takes the exact old code path, and the bytes of `runs/maps.json` are identical to today's: `tests/test_golden_red.py` hash must not change. The first time any other game folds, the provenance file is created and from then on Red folds also record provenance. A game whose family is not `gen1-pokemon` never touches any of this (it has its own family root).
 
 ### Disagreement rules, per section (decided)
 
@@ -106,7 +106,7 @@ Everything that is not a disagreement is passed to the existing `merge_memory(ds
 
 ### Ledge and one-way walls (decided; how the code can tell, and where it cannot)
 
-A wall edge `"x,y,BUTTON"` in the shared doc that the agent's file does not carry is NOT a disagreement just because both end tiles are walkable. The classifier in `src/pokeagent/compat/ledges.py` (from `Game_Compat_Check_Directive.md`) labels each blocked edge of one map document, in this order:
+A wall edge `"x,y,BUTTON"` in the shared doc that the agent's file does not carry is NOT a disagreement just because both end tiles are walkable. The classifier in the `ledges.py` module of the `compat` package (from `Game_Compat_Check_Directive.md`) labels each blocked edge of one map document, in this order:
 
 1. `ledge_exact`: the edge equals the derived back-edge of a recorded jump: for each `"x0,y0,B"` in `jumps` with landing `[x1,y1]`, the edge `f"{x1},{y1},{opposite(B)}"`. This is certain: it is the same rule `learn()` uses to create it.
 2. `ledge_row`: the edge's direction is the opposite of a recorded jump's direction `B` and its source tile lies on the same row (for UP/DOWN jumps) or column (for LEFT/RIGHT) as that jump's landing, in the same map. This is a HEURISTIC (it covers the unjumped columns of a ledge row, such as `9,28,UP` beside `5,28`). It can be wrong on a map with two different ledges in one row. It is labelled as a heuristic everywhere it appears.
@@ -128,7 +128,7 @@ Learning from Blue flows into the same shared store as Red: both games' agents g
 
 ### kb overlay
 
-`kb_overlay.build_overlay(base: dict, game_kb: dict) -> dict` returns only the top-level keys of `game_kb` that differ from `base` and, for dict-valued keys, only the entries that differ (so a wild-encounter table stores only the maps that differ). `kb_overlay.read(base, overlay)` returns the base with the overlay applied (overlay entries replace base entries). Path: `store_path("kb/overlay/<game.key>/rom_tables.json")`, family scope. This module is key-agnostic on purpose: the key names for wild encounters and `map_trainers` are NOT pasted here because they were not verified in this repo, so do not hard-code them; tests use synthetic dicts. It also writes `kb/overlay/<key>/disagreements.json` listing the changed top-level keys and entry counts, so the `map_trainers` ids 105-117 and 231 differences are visible and not silently adopted. Wiring `knowledge/kb.py` to read the overlay at import is NOT part of this directive (`ROM_KB` is gitignored data produced from a local ROM and the Blue phase generates the Blue table); the module and its tests are the deliverable.
+`kb_overlay.build_overlay(base: dict, game_kb: dict) -> dict` returns only the top-level keys of `game_kb` that differ from `base` and, for dict-valued keys, only the entries that differ (so a wild-encounter table stores only the maps that differ). `kb_overlay.read(base, overlay)` returns the base with the overlay applied (overlay entries replace base entries). Path: `overlay/<game.key>/rom_tables.json` under the directory of the base kb file passed in (an explicit `base_path` argument, never a `store_path` call). This module is key-agnostic on purpose: the key names for wild encounters and `map_trainers` are NOT pasted here because they were not verified in this repo, so do not hard-code them; tests use synthetic dicts. It also writes `kb/overlay/<key>/disagreements.json` listing the changed top-level keys and entry counts, so the `map_trainers` ids 105-117 and 231 differences are visible and not silently adopted. Two rules follow. (a) A Blue kb rebuild writes ONLY to the overlay path above; no code in this directive or the Blue phase may write the shared base kb file, and a test asserts that `build_overlay` plus its writer leave a synthetic base file byte-identical. (b) Wiring `knowledge/kb.py` to read the overlay is DEFERRED to full Blue support (plan phase 7): `ROM_KB` is gitignored data produced from a local ROM, and `knowledge/kb.py` is a 3-line module read at import. Until phase 7 lands, a Blue process reads the shared base tables, so its wild-encounter and `map_trainers` data are Red's, which the 2026-11-08 comparison showed differ (34 of 57 maps for wild encounters). Say this in the Report and in `docs/KNOWLEDGE.md`; the module and its tests are the deliverable here.
 
 ## 4. What NOT to do
 
@@ -146,7 +146,7 @@ Learning from Blue flows into the same shared store as Red: both games' agents g
 
 ```
 uv run python --version
-uv run pytest -q tests/test_family_active.py tests/test_family_provenance.py tests/test_family_disagree.py tests/test_family_overlay.py tests/test_family_fold.py tests/test_family_kb_overlay.py tests/test_swarm_merge.py
+uv run pytest -q tests/test_family_active.py tests/test_family_provenance.py tests/test_family_disagree.py tests/test_family_overlay.py tests/test_family_fold.py tests/test_family_kb_overlay.py tests/test_swarm_merge_loops.py tests/test_swarm_merge_trainers.py
 ```
 Expected: `Python 3.12.x`; all pass. If `tests/test_swarm_merge.py` does not exist, say so in the Report and run the swarm tests that `git grep -l "merge_memory" -- tests` names.
 
@@ -180,7 +180,7 @@ Claude's verify lane (ROM present, fresh worktree of the PR head with `roms/` an
 - [ ] Wall handling: a `ledge_exact` edge and a `ledge_row` edge are never moved and never reported as suspects; a `plain` wall with a `paths` crossing goes to `blocked_not` with kind `wall_open`; a `plain` wall with both ends visited and no crossing stays shared and is reported as `wall_suspect`; a `plain` wall with an end not visited is not reported. <!-- test: tests/test_family_disagree.py -->
 - [ ] `effective_memory` applies warps, jumps, npcs and `blocked_not`; with no overlay it equals the shared doc. Reads check the overlay first, then shared. <!-- test: tests/test_family_overlay.py --> <!-- new: tests/test_family_overlay.py -->
 - [ ] Both ways: a Blue fold then a Red fold into one shared doc leaves both games' new facts present with correct provenance, and folding the same file twice changes nothing. <!-- test: tests/test_family_fold.py -->
-- [ ] `build_overlay` keeps only differing entries and `read` reapplies them; a synthetic base and game kb differing in one map's entries and one unrelated key round-trip. <!-- test: tests/test_family_kb_overlay.py --> <!-- new: tests/test_family_kb_overlay.py -->
+- [ ] `build_overlay` keeps only differing entries and `read` reapplies them; a synthetic base and game kb differing in one map's entries and one unrelated key round-trip, and writing the overlay leaves a synthetic base kb file byte-identical. <!-- test: tests/test_family_kb_overlay.py --> <!-- new: tests/test_family_kb_overlay.py -->
 - [ ] The two hooks add at most 12 and 6 lines, behave as before when the family is inactive, and `git diff --stat main` shows no change under `src/pokeagent/explorer/`. <!-- test: tests/test_swarm_merge.py -->
 - [ ] No file over 600 lines.
 
@@ -203,3 +203,4 @@ Findings first: the observed split of `ledge_exact`, `ledge_row`, `plain` wall c
 - Exec(uv run pytest)
 - Exec(git diff)
 - Exec(git grep)
+- Exec(wc)

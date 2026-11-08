@@ -4,7 +4,7 @@
 
 ## 1. Why this exists
 
-Measured on 2026-11-08 from the verify log of head f59002a: 40 tests skip in the clean verify copy, 6 of them only because `kb/rom_tables.json` is absent. That file is generated from a local ROM and gitignored, and it must never be committed.
+Measured on 2026-11-08 from the verify log of head f59002a: 40 tests skip in the clean verify copy, 6 of them only because `kb/rom_tables.json` is missing (gitignored, so missing in a fresh worktree). That file is generated from a local ROM and gitignored, and it must never be committed.
 
 Of those 6, only 2 test our own behaviour. The other 4 assert facts about the real generated table, so a made-up table would make them pass without proving anything. They stay as they are:
 

@@ -87,7 +87,7 @@ git grep -n "Pokemon Red.gb" -- src
 Expected: exactly one hit, in `src/pokeagent/game/pokemon_red.py`.
 
 ```
-git grep -nE "\b160\b.{0,12}\b144\b|\b144\b.{0,12}\b160\b|_SCREEN_SIZE" -- src
+git grep -nE -e "\b160\b.{0,12}\b144\b" -e "\b144\b.{0,12}\b160\b" -e "_SCREEN_SIZE" -- src
 ```
 Expected: the hits are only in `src/pokeagent/game/pokemon_red.py` (and unrelated 160 uses such as text slices `[:160]` or `_BOX_WAIT = 160`, which are not screen sizes and stay).
 
