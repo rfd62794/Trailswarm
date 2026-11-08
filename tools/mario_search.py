@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from mario_moments import classify
-from mario_value import add_event, best_order, carried_fails, should_replace
+from mario_value import add_event, best_order, carried_fails, is_tally, should_replace
 
 R, B, A, L = "right", "b", "a", "left"
 MACROS = [("run", [R, B], 12), ("run far", [R, B], 24), ("short hop", [R, B, A], 10), ("jump", [R, B, A], 20),
@@ -29,7 +29,7 @@ PROBE = 240
 RETIRE_AFTER = 40            # consecutive deaths from one save point before it stops being tried
 OFF_SCREEN_Y = 165           # Mario sprite y once he has fallen below the screen
 DEATH_SAMPLE = 15
-TIMER_REFRESH = 4            # frames between timer baseline refreshes; a stale baseline would make every kill a bonus
+COIN_REFRESH = 4             # frames between coin baseline refreshes
 DIR = Path("runs") / "mario-land"
 INBOX = DIR / "inbox"
 BEST_GLOB = "best-*.json"
@@ -134,23 +134,26 @@ class Worker:
     def start_meter(self, value):
         self.value = value
         self.score, self.coins, self.timer = self.w.score, self.w.coins, self.w.time_left
+        self.timer_dropped = False
         self.frame = 0
 
     def tick(self, n):
-        """Advance n frames, adding style value. Only the score is read each frame; coins and the timer are read
-        when the score rose (and the timer baseline every TIMER_REFRESH frames), the grid only on a rise."""
+        """Advance n frames, adding style value. The score and timer are read every frame; coins and the grid
+        only on a frame where the score rose. A timer drop counts as the level-end tally only when the frame
+        before it dropped too (measured: the tally drops on consecutive frames, ordinary ticks are isolated)."""
         for _ in range(n):
             self.py.tick(1, False)
             self.frame += 1
-            score = self.w.score
-            if score != self.score:
-                gained, coins, timer = score - self.score, self.w.coins, self.w.time_left
-                if gained > 0:
-                    kind = classify(gained, coins > self.coins, timer < self.timer, self.w.game_area())
-                    self.value = add_event(self.value, kind, gained)
-                self.score, self.coins, self.timer = score, coins, timer
-            elif self.frame % TIMER_REFRESH == 0:
-                self.coins, self.timer = self.w.coins, self.w.time_left
+            score, timer = self.w.score, self.w.time_left
+            dropped = timer < self.timer
+            if score > self.score:
+                tally = is_tally(dropped, self.timer_dropped)
+                kind = classify(score - self.score, self.w.coins > self.coins, tally, self.w.game_area())
+                self.value = add_event(self.value, kind, score - self.score)
+                self.coins = self.w.coins
+            elif self.frame % COIN_REFRESH == 0:
+                self.coins = self.w.coins
+            self.score, self.timer, self.timer_dropped = score, timer, dropped
 
     def send(self, seq, outcome):
         """Hand an attempt to the cartographer, at most one every two seconds."""

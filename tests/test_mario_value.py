@@ -54,7 +54,16 @@ def test_replacement_does_not_regress_position():
     assert not V.should_replace(100, 3, 200, 3, old_progress=10, new_progress=9)
 
 
-def test_fails_carry_unless_progress_rises():
-    assert V.carried_fails(30, 10, 10) == 30      # value-only growth keeps the death count
-    assert V.carried_fails(30, 10, 9) == 30
-    assert V.carried_fails(30, 10, 11) == 0       # further along resets it
+def test_fails_carry_unless_a_bucket_further():
+    n = V.PROGRESS_STEP
+    assert V.carried_fails(30, 10, 10) == 30          # value-only growth keeps the death count
+    assert V.carried_fails(30, 10, 11) == 30          # a one-pixel gain does not reset it
+    assert V.carried_fails(30, 10, 10 + n - 1) == 30
+    assert V.carried_fails(30, 10, 10 + n) == 0       # a full bucket further resets it
+
+
+def test_tally_needs_consecutive_drops():
+    assert not V.is_tally(True, False)    # isolated drop: an ordinary tick
+    assert not V.is_tally(False, True)
+    assert not V.is_tally(False, False)
+    assert V.is_tally(True, True)         # consecutive drops: the level-end tally
