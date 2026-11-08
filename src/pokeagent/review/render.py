@@ -1,10 +1,22 @@
 """Text renderers: one function per review tool, plus the shared emit/error helpers.
 
 Every renderer consumes the same dict ``--json`` prints, so the two outputs always agree.
+
+Top-level ``--json`` keys per subcommand (all keys sorted in the output):
+  run     run, start_time, skipped_rows, header, events, events_omitted, event_counts, loops,
+          long_loops, rules, unclassified_rules, levels, end, breaks
+  swarm   runs_dir, since, until, runs, segments, top_stall_causes, top_rules, new_checkpoints,
+          breaks, broken, skipped_rows
+  diff    a, b, warnings, divergence, prefix_only, goals, segment, event_counts, rule_deltas,
+          exp, end
+  replay  status, run, steps, reason (when set), warning (when set), command (when set),
+          divergence (when set)
 """
 from __future__ import annotations
 
 import json
+
+from pokeagent.review.loops import LONG_LOOP_ROWS
 
 
 def dumps(obj) -> str:
@@ -41,7 +53,8 @@ def _fmt_event(e: dict) -> str:
     if k == "stall":
         return f"stall {e.get('likely_cause')} [{e.get('signature_key')}]"
     if k == "loop":
-        return f"loop {e.get('loop_kind')} presses={e.get('presses')} rule={e.get('rule')} key={e.get('key')}"
+        return (f"loop {e.get('loop_kind')} x{e.get('count')} presses={e.get('presses')}"
+                f" max={e.get('max_presses')} rule={e.get('rule')} key={e.get('key')}")
     if k == "level":
         ch = ", ".join(f"#{c['species']} L{c['level_from']}->{c['level_to']} (+{c['exp_gain']}xp)"
                        for c in e.get("changes", []))
@@ -65,10 +78,11 @@ def run_text(s: dict) -> str:
     if s.get("events_omitted"):
         lines.append(f"  ... {s['events_omitted']} more events omitted by --max-events")
     if s["loops"]:
-        lines.append("loops:")
+        lines.append(f"loops (collapsed; {s['long_loops']} episodes >= {LONG_LOOP_ROWS} rows):")
         for e in s["loops"]:
-            lines.append(f"  {e['kind']} steps {e['step']}..{e['end_step']} presses={e['presses']}"
-                         f" rule={e['rule']} key={e['key']}")
+            lines.append(f"  {e['kind']} x{e['count']} steps {e['step']}..{e['end_step']}"
+                         f" presses={e['total_presses']} max={e['max_presses']}"
+                         f"{' LONG' if e['long'] else ''} rule={e['rule']} key={e['key']}")
     lines.append("decisions by rule:")
     for r in s["rules"]:
         lines.append(f"  {r['rule']} ({r['behaviour']}) presses={r['presses']} share={r['share']:.0%}")
@@ -93,11 +107,12 @@ def swarm_text(s: dict) -> str:
     lines.append(f"runs: {r['count']}  segment_runs={r['segment_runs']}  watched={r['watched']}")
     if s["segments"]:
         lines.append(f"{'segment':<22}{'tries':>6}{'solves':>7}{'rate':>6}{'best':>8}{'median':>8}"
-                     f"{'presses':>8}{'stall':>6}{'blackout':>9}{'loops':>6}")
+                     f"{'presses':>8}{'stall':>6}{'blackout':>9}{'loops':>6}{'long':>6}")
         for seg, v in s["segments"].items():
             lines.append(f"{seg:<22}{v['attempts']:>6}{v['solves']:>7}{v['solve_rate']:>6.0%}"
                          f"{str(v['frames_best']):>8}{str(v['frames_median']):>8}{v['presses']:>8}"
-                         f"{v['stall_rate']:>6.0%}{v['blackout_rate']:>9.0%}{v['loop_episodes']:>6}")
+                         f"{v['stall_rate']:>6.0%}{v['blackout_rate']:>9.0%}{v['loop_episodes']:>6}"
+                         f"{v['long_loops']:>6}")
         for seg, v in s["segments"].items():
             if v["failing"]:
                 lines.append(f"  {seg} failing: {', '.join(v['failing'])}")

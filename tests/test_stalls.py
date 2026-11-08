@@ -134,6 +134,30 @@ def test_supervisor_hook_swallows_errors(tmp_path, monkeypatch):
     sc.write_stall_dossier(None, None, 1, 7, "r")              # garbage
 
 
+def test_dossier_carries_top_vetoed_and_since_progress(tmp_path):
+    r = make_run(tmp_path, "explore-a")
+    _jl(r / "loops.jsonl", [
+        {"step": 1, "kind": "veto", "map": 35, "x": 5, "y": 20, "facing": "UP", "text": 7, "button": "A", "rule": "talk_wanderer"},
+        {"step": 2, "kind": "veto", "map": 35, "x": 5, "y": 20, "facing": "UP", "text": 7, "button": "A", "rule": "talk_wanderer"},
+        {"step": 3, "kind": "veto_exhausted", "map": 35, "x": 5, "y": 20, "facing": "UP", "text": 7, "button": "A", "rule": "talk_wanderer"},
+        {"step": 4, "kind": "veto", "map": 35, "x": 9, "y": 9, "facing": "LEFT", "text": 1, "button": "B", "rule": "menu_back"},
+        {"step": 5, "kind": "probe", "map": 35, "x": 5, "y": 20, "facing": "UP", "button": "A"},
+    ])
+    _jl(r / "progress.jsonl", [{"step": 1, "reasons": ["tile"], "since": 0},
+                               {"step": 99, "reasons": [], "since": 42}])
+    d = stalls.build_dossier(tmp_path, "explore-a")
+    assert d["top_vetoed"][0] == {"map": 35, "x": 5, "y": 20, "facing": "UP", "button": "A",
+                                "rule": "talk_wanderer", "count": 3}
+    assert d["top_vetoed"][1]["button"] == "B" and d["top_vetoed"][1]["count"] == 1
+    assert d["since_progress"] == 42
+
+
+def test_dossier_without_loop_files_lacks_nothing(tmp_path):
+    make_run(tmp_path, "explore-b")
+    d = stalls.build_dossier(tmp_path, "explore-b")
+    assert d["top_vetoed"] == [] and d["since_progress"] is None
+
+
 def test_replay_args_and_compare(tmp_path):
     rs = _tool("replay_stall")
     d = {"presses": 1000, "seed": 7, "starter": "charmander", "signature": {"a": 1}, "signature_key": "k",

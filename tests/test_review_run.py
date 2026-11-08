@@ -73,13 +73,16 @@ def test_rules_top_and_unclassified():
     assert rules[0]["rule"] == "frontier" and rules[0]["presses"] == 23
     assert [r["rule"] for r in rules] == ["frontier", "battle_fight", "heal_use", "restock_buy"]
     assert rules[1]["behaviour"] == "battle" and rules[1]["share"] == 7 / 35
-    assert [r["rule"] for r in s["unclassified_rules"]] == ["frontier", "battle_fight"]
+    # frontier is over 5% of presses and battle_fight is not heal/buy-adjacent: neither is a gap
+    assert s["unclassified_rules"] == []
 
 
 def test_blocked_loop_episode_and_break():
     s = summary(RUN_STALL)
-    assert s["loops"] == [{"kind": "blocked_loop", "step": 21, "end_step": 60, "presses": 40,
+    assert s["loops"] == [{"kind": "blocked_loop", "step": 21, "end_step": 60, "count": 1,
+                           "total_presses": 40, "max_presses": 40, "long": True,
                            "key": {"button": "UP", "map": 35, "x": 10, "y": 8}, "rule": "frontier"}]
+    assert s["long_loops"] == 1
     loop_event = next(e for e in s["events"] if e["kind"] == "loop")
     assert (loop_event["loop_kind"], loop_event["presses"]) == ("blocked_loop", 40)
     stall = next(e for e in s["events"] if e["kind"] == "stall")
@@ -93,7 +96,7 @@ def test_already_out_episode_under_break_rows_is_clean():
     s = summary(RUN_ALREADY)
     assert len(s["loops"]) == 1   # the 5-row blocked repeat (steps 3-7) is NOT an episode
     ep = s["loops"][0]
-    assert (ep["kind"], ep["step"], ep["presses"], ep["rule"]) == ("already_out", 10, 12, "bring_out")
+    assert (ep["kind"], ep["step"], ep["total_presses"], ep["rule"]) == ("already_out", 10, 12, "bring_out")
     assert ep["key"] == {"button": "B", "text": "bulbasaur is already out!"}
     assert s["end"]["reason"] == "solved"
     assert s["breaks"] == []

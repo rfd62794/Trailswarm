@@ -14,17 +14,21 @@ from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
-from pokeagent.viewer import commands, modes, steering, ui_scale
+from pokeagent.viewer import commands, layout_file, modes, steering, ui_scale
+from pokeagent.viewer.health import ANOMALY, HealthStore
 from pokeagent.viewer.layout import FocusState
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.viewer.panels import BG
 from pokeagent.viewer.screen_fit import open_viewport
-from pokeagent.viewer.ui import keys, theme
+from pokeagent.viewer.ui import keys, menu, tags, theme
 from pokeagent.viewer.ui.card import CardView
 from pokeagent.viewer.ui.control_bar import BAR_TAG, ControlBar
 from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
+from pokeagent.viewer.ui.stadium_pane import StadiumPane
+from pokeagent.viewer.ui.window_health import HealthLayoutMixin
+from pokeagent.viewer.ui.window_host import CommandHostMixin
 from pokeagent.viewer.ui.world_host import WorldHost
 from pokeagent.world.model import WorldModel
 
@@ -32,19 +36,24 @@ log = logging.getLogger(__name__)
 _BAR_H = 145  # reserved height for the four control-bar rows (status line + three)
 
 
-class ViewerWindow:
+class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
     """Builds and runs the DPG context. ``hold_s_for(agent_id)`` may return the human-hold
     countdown when the agent exposes one (HTTP agents do not -> bare "YOU HAVE IT")."""
 
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
-                 root: Path | None = None, world: WorldModel | None = None) -> None:
+                 root: Path | None = None, world: WorldModel | None = None,
+                 health: HealthStore | None = None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
         self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
         self.world = WorldHost(self, world)
+        self.health = health or HealthStore()
+        self.entries: dict = {}                # agent_id -> registry entry; app.run() assigns before run()
+        self._stadium_pref: bool | None = None  # user toggle; None = follow the mode
+        self._layout_path: Path | None = None
         self.selected: str | None = None
         self.scope = "all"
         self._speed = 1
@@ -55,7 +64,8 @@ class ViewerWindow:
         self._grid: GridView | None = None
         self._focus_view: FocusView | None = None
         self._bar: ControlBar | None = None
-        self._win = "viewer_main"
+        self._stadium: StadiumPane | None = None
+        self._win = tags.MAIN_WINDOW
         self._last_size: tuple[int, int] = (0, 0)
         self._outbox: queue.Queue = queue.Queue()  # sends run on a worker so the UI never waits on HTTP
         threading.Thread(target=self._send_loop, daemon=True, name="viewer-send").start()
@@ -73,82 +83,6 @@ class ViewerWindow:
     def flush_sends(self) -> None:
         """Block until queued commands were sent (tests; never call from the render loop)."""
         self._outbox.join()
-
-    # -- host API for control_bar / keys ----------------------------------------
-    def set_scope(self, scope: str) -> None:
-        self.scope = scope
-
-    def selected_id(self) -> str | None:
-        return self.selected
-
-    def speed(self) -> int:
-        return self._speed
-
-    def paused(self) -> bool:
-        return self._paused
-
-    def cycle_speed(self) -> None:
-        self._speed = commands.next_speed(self._speed)
-        self.send_to_targets("speed", n=self._speed)
-
-    def toggle_pause(self) -> None:
-        self._paused = not self._paused
-        self.send_to_targets("pause" if self._paused else "resume")
-
-    def steering(self) -> bool:
-        """Read-only: keyboard steering is on exactly while an agent is focused."""
-        return self.focus.focused is not None
-
-    def target_snaps(self):
-        return [s for aid in self._target_ids() if (s := self.model.snapshot(aid)) is not None]
-
-    def hand_to(self, driver: str) -> None:
-        self.send_to_targets("hand_to", driver=driver)
-
-    def save_state(self, name: str) -> None:
-        self.send_to_targets("save_state", name=name or "slot")
-
-    def load_state(self, name: str) -> None:
-        self.send_to_targets("load_state", name=name or "slot")
-
-    def at_agent_cap(self) -> bool:
-        """Cached (refreshed off the UI thread every 2 s): True when spawning is disabled."""
-        self._spawn.refresh()
-        return self._spawn.capped
-
-    @property
-    def spawn_msg(self) -> str:
-        return self._spawn.message
-
-    def spawn_agent(self, kind: str, args: str) -> None:
-        self._spawn.spawn(kind, args)
-
-    def stop_targets(self) -> None:
-        if self.supervisor is not None:
-            for aid in self._target_ids():
-                pid = self._pid_for(aid)
-                if pid is not None:
-                    self.supervisor.stop(pid)
-
-    def send_to_targets(self, cmd: str, **args) -> None:
-        for aid in self._target_ids():
-            src = self.sources.get(aid)
-            if src is not None:
-                self._outbox.put((src, cmd, args))
-
-    def key_button(self, key_name: str) -> None:
-        """Game key: reaches only the focused agent (never in grid view), <=1 press / 120 ms / key."""
-        hit = steering.press_target(key_name, self.focus.focused, self._throttle)
-        if hit is not None:
-            self._send_one(hit[0], "press", button=hit[1], source="human")
-
-    def hotkey(self, name: str) -> None:
-        """P / T: transport hotkeys, focus view only, one toggle per physical press."""
-        if self.focus.focused is not None and self._gate.allow(name):
-            self.toggle_pause() if name == "pause" else self.cycle_speed()
-
-    def escape(self) -> None:
-        self.leave_focus()
 
     # -- focus / selection --------------------------------------------------------
     def _send_one(self, aid: str, cmd: str, **args) -> None:
@@ -176,6 +110,9 @@ class ViewerWindow:
     def _on_select(self, agent_id: str) -> None:
         """The one selection, shared by Tiles (highlight + page pin) and World (follow)."""
         self.selected = agent_id
+        h = self._health_for(agent_id)
+        if h.state == ANOMALY and h.anomaly is not None:
+            self.open_anomaly(h.anomaly)   # clicking an anomaly card's header opens it in the side panel
 
     # -- Tiles | World ----------------------------------------------------------
     def set_view_mode(self, mode: str) -> None:
@@ -222,22 +159,28 @@ class ViewerWindow:
     # -- build --------------------------------------------------------------------
     def _card_factory(self, parent, agent_id, w, h, on_focus, on_select, big=False):
         return CardView(parent, agent_id, w, h, on_focus, on_select, big=big,
-                        on_follow=None if big else self.follow_agent)
+                        on_follow=None if big else self.follow_agent,
+                        health_for=self._health_for)
 
     def _build(self) -> None:
         """Context + viewport only - safe without a display (the smoke test stops here)."""
-        open_viewport(self._bg())  # DPI awareness, then a viewport sized in physical px
+        if self.root is not None:  # layout persistence: seed runs/viewer/layout.ini from the default once
+            self._layout_path = layout_file.ensure_layout(
+                layout_file.DEFAULT, Path(self.root) / "runs" / "viewer" / "layout.ini")
+        open_viewport(self._bg(), init_file=self._layout_path)  # DPI awareness, then a viewport sized in physical px
 
     def _populate(self) -> None:
         """All widgets. Needs setup_dearpygui first: groups/fonts resolve at setup time."""
         dpg.add_window(tag=self._win, no_collapse=True, no_move=True, no_resize=True,
                        no_title_bar=True, no_scrollbar=True, width=10, height=10)
-        dpg.add_texture_registry(tag="viewer_tex", show=False)
+        dpg.add_texture_registry(tag=tags.VIEWER_TEX, show=False)
         self._grid = GridView(self._win, self.model, self._card_factory,
                               self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
         self.world.build()
+        self._stadium = StadiumPane(self.toggle_focus, on_close=self.on_stadium_close)
+        menu.build(self)
         self._bar = ControlBar(self._win, self)
         keys.install(self)
         self._fit()
@@ -262,7 +205,7 @@ class ViewerWindow:
                 view.area = dpg.add_child_window(parent=self._win, before=BAR_TAG, width=vw - 8,
                                                  height=avail, border=False, no_scrollbar=True,
                                                  show=self.area_visible(is_grid),
-                                                 tag="grid_area" if is_grid else "focus_area")
+                                                 tag=tags.GRID_AREA if is_grid else tags.FOCUS_AREA)
                 view.cards = {}
                 view.card = None
                 view._sig = None
@@ -287,6 +230,13 @@ class ViewerWindow:
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
         self.world.tick()
+        if self._stadium is not None:
+            vis = self.stadium_visible()
+            self._stadium.set_visible(vis)
+            if dpg.does_item_exist(menu.MENU_STADIUM):
+                dpg.set_value(menu.MENU_STADIUM, vis)
+            if vis:
+                self._stadium.update(self.world.model, self.model)
         if self._grid is not None:
             dpg.configure_item(self._grid.area, show=self.focus.view == "grid")
         if self._focus_view is not None and dpg.does_item_exist(self._focus_view.area):

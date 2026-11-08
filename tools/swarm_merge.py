@@ -11,6 +11,38 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+def merge_loops(dst: dict, src: dict, now: float | None = None) -> None:
+    """Fold an agent's ``loops`` dead-action table into the shared doc (see explorer/loop_memory.py).
+
+    Never sums: ``runs`` is the union of both lists (dst first, order preserved, capped to the newest
+    LOOP_RUNS_KEPT), ``last`` and ``clear`` are maxed. Entries stale past LOOP_TTL_DAYS, malformed, or
+    cleared while they never reached LOOP_PROMOTE_RUNS are dropped. Idempotent: merging the same src
+    twice changes nothing. A malformed ``loops`` value is ignored, never raised over."""
+    from pokeagent.explorer.loop_memory import LOOP_PROMOTE_RUNS, LOOP_RUNS_KEPT, LOOP_TTL_DAYS, clean_table, valid_entry
+    now = time.time() if now is None else now
+    dloops = dst.get("loops")
+    if not isinstance(dloops, dict):
+        if dloops is not None:
+            dst.pop("loops")
+        dloops = None
+    sloops = clean_table(src.get("loops"))
+    if sloops and dloops is None:
+        dloops = dst["loops"] = {}
+    if dloops is None:
+        return
+    for key, s in sloops.items():
+        d = dloops.get(key)
+        if not valid_entry(d):
+            d = dloops[key] = {"runs": [], "last": 0, "clear": 0}
+        d["runs"] = (d["runs"] + [r for r in s["runs"] if r not in d["runs"]])[-LOOP_RUNS_KEPT:]
+        d["last"], d["clear"] = max(d["last"], s["last"]), max(d["clear"], s["clear"])
+    for key, e in list(dloops.items()):
+        if not valid_entry(e):
+            del dloops[key]
+        elif now - e["last"] >= LOOP_TTL_DAYS * 86400 or (e["clear"] >= e["last"] and len(e["runs"]) < LOOP_PROMOTE_RUNS):
+            del dloops[key]
+
+
 def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
     for mid, s in src.get("maps", {}).items():
         d = dst.setdefault("maps", {}).setdefault(mid, {"visited": {}, "blocked": [], "warps": {}, "last_seen": 0})
@@ -150,6 +182,7 @@ def merge_memory(dst: dict, src: dict, edits: list | None = None) -> dict:
         merge_trainers(dst, src)  # shared per-ROM trainer knowledge (never per-save 'beaten')
     from pokeagent.knowledge import blackout_tax
     blackout_tax.merge_max(dst, src)  # learned blackout margins: per goal, max of steps (never summed)
+    merge_loops(dst, src)  # recurring dead (tile, button) actions: union/max, decays with TTL
     dst["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     if edits:  # brain-tools surgery: the journal is folded in AFTER merging so no agent copy can resurrect an edit
         from pokeagent.explorer.edits import apply as apply_edits

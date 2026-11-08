@@ -150,12 +150,12 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-loop-memory-directive |
 | Base branch | - |
 | Base commit | e37ee66bc3e910a45b8fb9f129b8a84b844705bd |
-| Head commit | bfce37814396f52c7febfddef9f75cdfe9cc5d21 |
+| Head commit | 875efd0c37f31a3226cb2d8e9ac9872dc556dfae |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -165,4 +165,5 @@ Findings first: test tails (before/after), `git diff --stat`, the final signatur
 - 2026-11-07 16:11 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-loop-memory-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6VXMJ5HCPSC7GB4XVR23B53
 - 2026-11-07 16:16 · dispatcher · launched pid=832; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-loop-memory-directive; provisioned: uv sync --frozen
 - 2026-11-07 16:29 · devin · In progress → Review — Done + verified. Tail before: 1550 passed, 40 skipped; after: 1592 passed, 40 skipped (full suite, 119s); targeted run: 80 passed. diff --stat vs base e37ee66: 17 files, +1205/-8; the extra entries in `git diff --stat main` are main's own drift since base (legality/lineage/envelope deletions), not this branch. New: explorer/progress.py (progress_reasons REASONS tile/map/flag/xp/level/goal/money/item/battle/hp, ProgressTracker.steps_since -> ctx.steps_since_progress, ProgressLog -> progress.jsonl, PROGRESS_LOG_EVERY=100), explorer/loop_memory.py (Situation, sha256-text hash truncated to 8 bytes, LoopLedger, shared-table helpers; LOOP_NO_PROGRESS_N=3, LOOP_VETO_STEPS=60, MAX_RECHOOSE=3, LEDGER_MAX=2000, ENTRY_IDLE_DROP=240, PROMOTE_FLUSH_STEPS=500, LOOP_RUNS_KEPT=10, LOOP_PROMOTE_RUNS=3, LOOP_TTL_DAYS=7, PROBE_EVERY=200 — all untuned first values), explorer/loop_veto.py (Loops facade on ctx.loops, check/record/fold/finish, loops.jsonl). Seams in Engine.step: loop_veto.check right after choose + before retalk/toss vetoes; _note_progress right after _note_novelty (reuses ctx.novelty.prev snapshot when present, else one read_snapshot per press — never two); loop_veto.finish inside `if ctx.done` before mem.save. NEVER_VETO = {battle, battle_moves, battle_text_wait, catch, switch_out, party_order, settle_wait} — repeated presses there are legitimate (battle menus/party ops/waits); battle flag in Situation also blocks vetoes entirely. Selector.choose gained skip: frozenset (accumulates over vetoed alternatives; empty-button/no-press alternatives accepted, None => veto_exhausted). loops.jsonl kinds: veto/veto_exhausted/probe/promote/expire/ledger. merge_loops (doc-level dst/src) called from merge_memory just before dst['updated']; union of runs capped to newest 10, max last/clear, drops stale/cleared-underpromoted/malformed, idempotent. Dossier gained top_vetoed + since_progress (LOOPS_ROWS=5000 scan). Existing tests touched: tests/test_explorer_behaviours.py only — 'training_progress' added to the layering allowed-set (progress.py imports it); test_stalls.py got additive cases only. Notes: Snapshot gained `hp` (party total HP) — the only way the directive's `hp` reason is computable from snapshots; it is the coordinator-added reason since a nurse heal has no other trace. Shared entries probe once per PROBE_EVERY window before vetoing (spec's probe rule), so 'dead on sight' = probe first, veto inside the window. Forbidden files untouched: planner*.py, ship_gate.py, swarm_watch.py, blocked_cap.py, guard thresholds, bandit code — verified in the diff. Controller ROM validation (Route 24 headless segment) still owed by the controller as the directive specifies. [origin] spent: devin 13 min est. n/a
+- 2026-11-07 19:34 · robert-claude-laptop · Review → Done — note: PR #154 merged (merge commit) after Sonnet APPROVE and a green verify record at 875efd0 (1751 passed, 0 failed, 40 ROM-gated skips)
 <!-- queue:end -->

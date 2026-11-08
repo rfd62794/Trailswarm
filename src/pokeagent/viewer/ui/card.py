@@ -14,11 +14,14 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from pokeagent.snapshot import AgentSnapshot
+from pokeagent.viewer.health import OK
 from pokeagent.viewer.panels import BG, DIM, PANE, TEXT, driver_color, plain, span
 from pokeagent.viewer.panels import render as pres
 from pokeagent.viewer.panels import registry
 from pokeagent.viewer.panels.noframe import hint_texture
 from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
+from pokeagent.viewer.ui import tags
+from pokeagent.viewer.ui.card_tint import apply_header_tint
 
 _PAD = 5
 _HEADER_H = 15
@@ -38,7 +41,7 @@ class _Tex:
         if self.tag is None or self.w != w or self.h != h:
             if self.tag is not None:
                 dpg.delete_item(self.tag)
-            self.tag = dpg.add_raw_texture(w, h, data, parent="viewer_tex")
+            self.tag = dpg.add_raw_texture(w, h, data, parent=tags.VIEWER_TEX)
             self.w, self.h, self._key = w, h, None
         return self.tag
 
@@ -94,11 +97,15 @@ class CardView:
 
     def __init__(self, parent, agent_id: str, card_w: int, card_h: int, on_focus: Callable[[str], None],
                  on_select: Callable[[str], None], big: bool = False,
-                 on_follow: Callable[[str], None] | None = None) -> None:
+                 on_follow: Callable[[str], None] | None = None,
+                 health_for: Callable[[str], object] | None = None) -> None:
         self.agent_id = agent_id
         self._on_follow = on_follow
         self.big = big
         self._on_focus, self._on_select = on_focus, on_select
+        self._health_for = health_for  # aid -> Health | None (HealthStore lookups; no I/O)
+        self._health_state = OK
+        self._tip_text = None
         self.card_w, self.card_h = card_w, card_h
         self._sizes: dict[str, tuple[int, int]] = {}
         self._tex: dict[str, _Tex] = {}
@@ -126,11 +133,21 @@ class CardView:
         if getattr(self, "_sel", None) == on:
             return
         self._sel = on
-        for name, tint in (("top", (255, 255, 255, 255) if on else (170, 170, 170, 255)),
-                           ("header", (120, 220, 255, 255) if on else (255, 255, 255, 255))):
-            tag = self._img.get(name)
-            if tag is not None and dpg.does_item_exist(tag):
-                dpg.configure_item(tag, tint_color=tint)
+        tag = self._img.get("top")
+        if tag is not None and dpg.does_item_exist(tag):
+            dpg.configure_item(tag, tint_color=(255, 255, 255, 255) if on else (170, 170, 170, 255))
+        apply_header_tint(self)
+
+    def set_health(self, state: str, reason: str = "") -> None:
+        """Health-state header tint + one-line reason tooltip; re-themes only when the value changes."""
+        key = (state, reason)
+        if self._memo.get("health") == key:
+            return
+        self._memo["health"] = key
+        self._health_state = state
+        apply_header_tint(self)
+        if self._tip_text is not None and dpg.does_item_exist(self._tip_text):
+            dpg.set_value(self._tip_text, reason)
 
     # -- layout -----------------------------------------------------------------
     def _geom(self) -> dict[str, tuple[int, int]]:
@@ -178,6 +195,8 @@ class CardView:
         self._sizes = dict(g)
         p = self._parent
         self._img["header"] = self._place("header", g["header"])
+        tip = dpg.add_tooltip(self._img["header"])   # shows the health reason, set only on state change
+        self._tip_text = dpg.add_text("", parent=tip, wrap=400)
         self._img["top"] = self._place("top", g["top"])
         self._img["thinking"] = self._place("thinking", g["thinking"])
         self._img["progress"] = self._place("progress", g["progress"])
@@ -190,7 +209,7 @@ class CardView:
     def _place(self, name: str, size: tuple[int, int]):
         tex = self._tex.setdefault(name, _Tex(*size))
         if tex.tag is None:  # 1x1 placeholder until the first update uploads real pixels
-            tex.tag = dpg.add_raw_texture(1, 1, [0.0] * 4, parent="viewer_tex")
+            tex.tag = dpg.add_raw_texture(1, 1, [0.0] * 4, parent=tags.VIEWER_TEX)
         img = dpg.add_image_button(tex.tag, parent=self._parent, width=size[0], height=size[1],
                                    background_color=(0, 0, 0, 0),
                                    callback=lambda s, a, u: self._clicked())
@@ -198,6 +217,11 @@ class CardView:
 
     # -- update -----------------------------------------------------------------
     def update(self, snap: AgentSnapshot | None, frame, staleness: str, hold_s: float | None = None) -> None:
+        health_for = getattr(self, "_health_for", None)  # absent on test stubs made with __new__
+        if health_for is not None:           # dict lookups only; the store is fed off the render thread
+            h = health_for(self.agent_id)
+            if h is not None:
+                self.set_health(h.state, h.reason)
         g = self._sizes
         dim = staleness != "live" or (snap is not None and snap.state in ("stopped", "done"))
         # top strip: render frame (left) | sees text (right) in one texture, at 2x

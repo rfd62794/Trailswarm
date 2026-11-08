@@ -15,7 +15,7 @@ import math
 from dataclasses import dataclass, replace
 
 from pokeagent.grind.xpmath import xp_needed
-from pokeagent.knowledge.damage import AVG_ROLL, PHYSICAL, expected_damage, type_mult
+from pokeagent.knowledge.catcher import CATCHER_BAND, qualifies as _catcher_qualifies
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import Combatant, species_row, trainer_mon
 from pokeagent.knowledge.readiness import LEAD_HURT, MAX_LEVEL, fight, team_readiness
@@ -39,9 +39,7 @@ MAGIKARP_START_LEVEL = 5       # ASSUMPTION (not verified): used only when no Ma
 DEX_GATES = (10, 30, 50)       # owned-count thresholds that unlock items (Oak's aides); ONLY 10 is recorded in campaign.json - the rest are to verify on the ROM
 DEX_GATE_VALUE = 1.0           # value of reaching the next gate, in boss-contribution units, spread over the species still missing; untuned
 DEX_FLOOR_VALUE = 0.05         # a new species with no gate in sight still counts a little (variety); untuned
-CATCHER_BAND = 6               # a "catcher" is a member at least this many levels below the lead (the wild-exploit option); untuned
 CATCHER_VALUE = 0.15           # value of adding a catcher when the party has none; untuned
-MIN_ROLL = (217 / 255) / AVG_ROLL  # scales expected_damage (which uses the average roll) down to the minimum roll
 GROWTHS = ("MEDIUM_FAST", "MEDIUM_SLOW", "FAST", "SLOW")
 
 
@@ -97,36 +95,16 @@ def pokedex_value(species: str, owned_count: int, owned_species=frozenset(), gat
     return DEX_FLOOR_VALUE + (DEX_GATE_VALUE / (nxt - owned_count) if nxt is not None else 0.0)
 
 
-def _move_row(name: str, moves_tbl: dict) -> dict | None:
-    return next((m for m in moves_tbl.values() if m.get("name") == name), None)
-
-
-def _safe_hit(c: Combatant, foe: Combatant, chart: dict, moves_tbl: dict) -> bool:
-    """``c`` has a damaging move (power > 1) whose MIN-roll damage is > 0 and < foe.hp: it can poke, not wipe."""
-    for name in c.moves:
-        mv = _move_row(name, moves_tbl)
-        if not mv or int(mv.get("power", 0)) <= 1:
-            continue
-        eff = type_mult(chart, mv["type"], list(foe.types))
-        if eff <= 0:
-            continue
-        phys = mv["type"] in PHYSICAL
-        d = expected_damage(c.level, mv["power"], c.stats[0] if phys else c.stats[3],
-                            foe.stats[1] if phys else foe.stats[3], stab=mv["type"] in c.types, eff=eff) * MIN_ROLL
-        if 0 < d < foe.hp:
-            return True
-    return False
-
-
 def qualifies_catcher(c: Combatant, lead_level: int, wild, kb=None) -> bool:
-    """``c`` fills the catcher role: at least CATCHER_BAND below the lead AND able to damage some wild species
-    of the planned map (``wild`` = [(level, species)]) without KOing it at the min roll. A Splash-only Magikarp
-    or a status-only move set does not count (the catch METHODS are a later directive; this only scores the role)."""
+    """``c`` fills the catcher role: at least CATCHER_BAND below the lead AND able to damage every wild species
+    of the planned map (``wild`` = [(level, species)]) without KOing it at the min roll (knowledge.catcher's
+    HARD RULE: a Splash-only Magikarp or a status-only move set does not count)."""
     moves_tbl = table(kb, "moves")
     if c.level > lead_level - CATCHER_BAND or not wild or not moves_tbl:
         return False
     chart = {(a, d): e for a, d, e in table(kb, "type_chart")}
-    return any((foe := trainer_mon(sp, lv, kb)) is not None and _safe_hit(c, foe, chart, moves_tbl) for lv, sp in wild)
+    wild_mons = [m for lv, sp in wild if (m := trainer_mon(sp, lv, kb)) is not None]
+    return _catcher_qualifies(c, wild_mons, chart, moves_tbl)
 
 
 def catcher_value(party: list, lead_level: int, wild=None, kb=None) -> float:

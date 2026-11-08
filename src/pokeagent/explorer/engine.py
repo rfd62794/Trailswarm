@@ -4,7 +4,7 @@ This is the old ``agent_step()`` closure's job, minus the window and the HTTP AP
 """
 from __future__ import annotations
 
-from pokeagent.explorer import party_log, trainer_ledger
+from pokeagent.explorer import loop_veto, party_log, trainer_ledger
 from pokeagent.explorer.behaviours import default_behaviours
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -12,9 +12,11 @@ from pokeagent.explorer.decisions import DecisionLog, classify_outcome, goal_sta
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.explorer.press import Presser
 from pokeagent.explorer.press_goals import seed_initial_goals
+from pokeagent.explorer.progress import PROGRESS_LOG_EVERY, ProgressLog, ProgressTracker
 from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
+from pokeagent.novelty.features import Snapshot, read_snapshot
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
 
@@ -34,6 +36,9 @@ class Engine:
         self._prev_from = None  # `from` position of the last press that moved the player
         self._pending_outcomes: list[dict] = []  # decision records since the last goal event
         self.last_decision: Decision | None = None  # most recent choose() result (viewer adapter reads it)
+        self._progress = ProgressTracker()  # presses since the last progress (explorer.progress)
+        self._prog_snap: Snapshot | None = None  # the game-state snapshot of the previous press
+        self._prog_log: ProgressLog | None = None  # progress.jsonl, opened on first write
 
     def step(self) -> Decision | None:
         ctx = self.ctx
@@ -46,6 +51,8 @@ class Engine:
         self.last_decision = decision
         if decision is None or not decision.button:
             return decision  # nothing to do, or a wait: the step is used without a press
+        decision = loop_veto.check(ctx, self.selector, decision)  # a dead (situation, button) is skipped, not re-pressed
+        self.last_decision = decision
         why_veto = veto(ctx, decision)
         if why_veto:  # the policy table says this talk teaches nothing: B instead of A (keeps the loop guards counting)
             decision = Decision("B", "retalk_veto", why_veto, behaviour=decision.behaviour)
@@ -84,6 +91,8 @@ class Engine:
         if self.decision_log is not None and _tossed(ctx) > tossed_before:  # an item was thrown away: the bandit reward counts this line
             self.decision_log.write({**rec, "event": "item_tossed", "outcome": "item_tossed"})
         self._note_novelty()
+        reasons = self._note_progress(goals_reached, after)
+        loop_veto.record(ctx, decision, reasons)
         self._pending_outcomes.append(rec)
         del self._pending_outcomes[:-MAX_PENDING]  # no goal for a long time: keep only the most recent
         if len(ctx.goal_steps) > goals_reached:
@@ -91,6 +100,7 @@ class Engine:
         elif ctx.done:
             self._flush_outcomes(None)
         if ctx.done:
+            loop_veto.finish(ctx)  # fold this run's dead actions into the shared memory, write the ledger row
             ctx.mem.save()  # shutdown() already saved inside the press, before the outcomes were back-filled
         return decision
 
@@ -105,6 +115,38 @@ class Engine:
                 ctx.bandit.add_novelty(gain)
         except Exception as exc:  # noqa: BLE001  novelty is an add-on: it must never stop a run
             ctx.log(f"[novelty skipped: {exc!r}]", "res")
+
+    def _progress_snapshot(self) -> Snapshot:
+        """One game-state snapshot per press. When novelty is on it already read this press's: reuse its
+        ``prev`` (the current one after observe) rather than read the same RAM twice."""
+        snap = getattr(self.ctx.novelty, "prev", None) if self.ctx.novelty is not None else None
+        return snap if isinstance(snap, Snapshot) else read_snapshot(self.ctx.emu)
+
+    def _progress_log(self, ctx) -> ProgressLog:
+        if self._prog_log is None:
+            self._prog_log = ProgressLog(ctx.run_dir / "progress.jsonl", ctx.log)
+        return self._prog_log
+
+    def _note_progress(self, goals_before: int, after: tuple) -> list[str]:
+        """The per-step progress signal: did this press change anything worth changing (progress.py) and how
+        long it has been since something did. The returned reasons feed the loop ledger's fruitless count."""
+        ctx = self.ctx
+        try:
+            cur = self._progress_snapshot()
+            prev, self._prog_snap = self._prog_snap, cur
+            new_tile = ctx.mem.m(after[0])["visited"].get(f"{after[1]},{after[2]}", 0) <= 1  # count 1 = this press's visit
+            gap = self._progress.steps_since  # presses since the last progress, before this press
+            battle_ended = prev is not None and prev.in_battle and not cur.in_battle
+            reasons = self._progress.observe(ctx.step, prev, cur, new_tile, goals_before, len(ctx.goal_steps), battle_ended)
+            ctx.steps_since_progress = self._progress.steps_since
+            if reasons:
+                self._progress_log(ctx).event(ctx.step, ctx.frame, reasons, gap)
+            elif ctx.step % PROGRESS_LOG_EVERY == 0:
+                self._progress_log(ctx).heartbeat(ctx.step, self._progress.steps_since)
+            return reasons
+        except Exception as exc:  # noqa: BLE001  like novelty: an observer must never stop a run
+            ctx.log(f"[progress skipped: {exc!r}]", "res")
+            return []
 
     def _flush_outcomes(self, goal_step: int | None) -> None:
         """Back-fill goal-keyed tile outcomes for a finished goal segment: every pending press gets

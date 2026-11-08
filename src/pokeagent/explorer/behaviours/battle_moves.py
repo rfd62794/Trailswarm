@@ -107,8 +107,14 @@ class BattleMoves(BehaviourBase):
                 def kscore(mv):
                     base = known.get(norm0(mv), (0, ""))[0]
                     return base * (1.3 if base > 0 and mv not in tried else 1.0)
-                if ctx.catch_mode:  # a sleep / paralyse move first (it raises the catch rate), else the weakest damaging hit
-                    target, ctx.move_reason = pick_catch_move(pool, tags, kscore, norm0)
+                if ctx.catch_mode:  # the catch policy's move wins when it named one; else the old heuristic
+                    hint = getattr(ctx, "catch_hint", None)
+                    named = next((mv for mv in pool if hint is not None and hint.kind in ("status_move", "damage_move")
+                                  and norm0(mv) == norm0(hint.move)), None)
+                    if named is not None:
+                        target, ctx.move_reason = named, f"catch policy: {hint.why}"
+                    else:
+                        target, ctx.move_reason = pick_catch_move(pool, tags, kscore, norm0)
                 else:
                     target = max(pool, key=lambda mv: (kscore(mv), score(mv)[1]))
                     ctx.move_reason = "" if target in tried else "first try"

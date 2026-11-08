@@ -235,12 +235,15 @@ the order assumption for the bridge, the S.S. Anne RIVAL1 row discrepancy, and a
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-goal-procedures-directive |
 | Base branch | - |
+| Base commit | dccf81faf6eb1ed42156ef2b7dbafb527a235423 |
 
 **Status log**
 - 2026-11-07 15:27 · robert-claude-laptop · none → Draft — Claude 2026-11-07: goal procedures (learned, graded step scripts), AfterVictory decision, ProcedureRunner
 - 2026-11-07 15:27 · robert-claude-laptop · Draft → Queued — Claude 2026-11-07; lint_override: dispatch-path-missing on greenfield modules/tests and gitignored kb/runs paths
+- 2026-11-07 19:34 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; dependency PR #154 (Loop_Memory) is merged
+- 2026-11-07 19:35 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goal-procedures-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6W99FWZ4KE4HJ131S4BRZ07
 <!-- queue:end -->

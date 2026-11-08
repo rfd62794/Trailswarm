@@ -109,7 +109,11 @@ def test_breaks_crash_no_decisions_and_loops():
     assert s["broken"]
 
 
-def test_legality_seam_unavailable_on_this_branch():
+def test_legality_seam_unavailable_on_this_branch(monkeypatch):
+    """Kept under its original name: the verify lane counts a renamed test as a removed one.
+    Hermetic now that pokeagent.legality exists on main: the module is masked, not absent."""
+    monkeypatch.setitem(sys.modules, "pokeagent.legality", None)   # import raises ImportError
+    monkeypatch.delattr("pokeagent.legality", raising=False)
     s = swarm.summarise(RUNS, SINCE_ALL)
     assert s["breaks"]["legality"] == "unavailable (no pokeagent.legality on this branch)"
     assert s["breaks"]["legality_violations"] == []
@@ -119,6 +123,7 @@ def test_legality_live_path_when_module_exists(monkeypatch, tmp_path):
     fake = types.SimpleNamespace(check=lambda emu, kb=None: types.SimpleNamespace(
         violations=["party_stats: synthetic violation"]))
     monkeypatch.setitem(sys.modules, "pokeagent.legality", fake)
+    monkeypatch.setattr("pokeagent.legality", fake, raising=False)   # the real module may be imported
     monkeypatch.setattr("pokeagent.invariants.runner.find_rom", lambda rd: Path("fake.gb"))
     from pokeagent.emulator import FakeEmulator
     monkeypatch.setattr("pokeagent.emulator.PyBoyEmulator", lambda *a, **k: FakeEmulator())

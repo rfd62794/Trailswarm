@@ -3,13 +3,15 @@
 Event ``kind`` values: goal, map, map_bounce, battle, wild_battles (a collapse added by
 ``timeline.summarise`` when --max-events is tight), blackout, heal, buy, stall, loop,
 level, after_victory. Each carries ``step`` (None last) plus the fields its kind needs.
+A ``loop`` event is one collapsed group (see ``loops.collapse_loops``): ``count`` episodes,
+``presses`` = total presses across them, ``max_presses`` the longest single episode.
 """
 from __future__ import annotations
 
 from collections import Counter
 
 from pokeagent.review.load import RunData
-from pokeagent.review.loops import find_loops
+from pokeagent.review.loops import BREAK_LOOP_ROWS, collapse_loops, find_loops
 
 HEAL_RULES = ("heal", "potion", "nurse", "cave_topup")   # named heal-class rule/behaviour substrings
 BUY_RULES = ("restock", "buy", "shop")                  # named buy-class rule/behaviour substrings
@@ -131,6 +133,13 @@ def _level_events(levels: list[dict]) -> list[dict]:
     return out
 
 
+def is_reserved(e: dict) -> bool:
+    """Events that --max-events truncation must never drop: stalls, blackouts, and loops long
+    enough to be a break (``BREAK_LOOP_ROWS``)."""
+    return e["kind"] in ("stall", "blackout") or (
+        e["kind"] == "loop" and (e.get("max_presses") or 0) >= BREAK_LOOP_ROWS)
+
+
 def build_events(data: RunData, episodes: list[dict] | None = None) -> list[dict]:
     """All timeline events for one run, ordered by step (kind second for stable order)."""
     eps = episodes if episodes is not None else find_loops(data.transitions, data.decisions)
@@ -140,8 +149,9 @@ def build_events(data: RunData, episodes: list[dict] | None = None) -> list[dict
         + _battle_events(data.battles)
         + _block_events(data.decisions)
         + _stall_event(data)
-        + [{"kind": "loop", "loop_kind": e["kind"], "step": e["step"], "presses": e["presses"],
-            "key": e["key"], "rule": e["rule"]} for e in eps]
+        + [{"kind": "loop", "loop_kind": g["kind"], "step": g["step"], "end_step": g["end_step"],
+            "presses": g["total_presses"], "count": g["count"], "max_presses": g["max_presses"],
+            "key": g["key"], "rule": g["rule"]} for g in collapse_loops(eps)]
         + _level_events(data.levels)
         + [{"kind": "after_victory", **r} for r in data.after_victory]
     )

@@ -8,6 +8,7 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.viewer.layout import grid
 from pokeagent.viewer.model import ViewerModel
+from pokeagent.viewer.ui import tags
 from pokeagent.viewer.view_cap import page_ids, view_max
 
 
@@ -20,7 +21,7 @@ class GridView:
         self.model, self._factory = model, card_factory
         self._on_focus, self._on_select = on_focus, on_select
         self.area = dpg.add_child_window(parent=parent, width=10, height=10, border=False,
-                                         no_scrollbar=True, tag="grid_area")
+                                         no_scrollbar=True, tag=tags.GRID_AREA)
         self.cards: dict[str, object] = {}
         self._sig: tuple | None = None
         self._rr = 0

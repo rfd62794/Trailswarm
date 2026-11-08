@@ -15,7 +15,7 @@ from pathlib import Path
 
 from pokeagent import stalls, statefp
 from pokeagent.review.load import jsonl, load_json, run_start
-from pokeagent.review.loops import BREAK_LOOP_ROWS, find_loops
+from pokeagent.review.loops import BREAK_LOOP_ROWS, LONG_LOOP_ROWS, collapse_loops, find_loops
 
 EST_FRAMES_PER_STEP = 10.5  # seg_store.FRAMES_PER_STEP restated: only used when seg_ingest cannot load
 
@@ -137,11 +137,14 @@ def summarise(runs_dir: Path, since: datetime, until: datetime | None = None,
     milestones = load_json(runs_dir / "milestones.json")
     names, rows = set(), []
     for d in sorted(p for p in runs_dir.glob("explore-*") if p.is_dir()):
+        # time first, from the dir name (no I/O); meta.json/mtime only for names that do not match
+        t = run_start(d.name)
+        if t is None:
+            t = run_start(d.name, d)
+        if t is None or t < since or (until is not None and t > until):
+            continue
         meta = load_json(d / "meta.json")
         if not meta:
-            continue
-        t = run_start(d.name, d)
-        if t is None or t < since or (until is not None and t > until):
             continue
         stop = meta.get("stop_at_goal")
         if stop is None and meta.get("stop_at_map") is not None:
@@ -156,7 +159,7 @@ def summarise(runs_dir: Path, since: datetime, until: datetime | None = None,
                      "decisions": decisions, "transitions": transitions,
                      "watched": bool(meta.get("window")) or any(s != "agent" for s in sources),
                      "attempt": _attempt(d, meta, stop, milestones) if stop else None,
-                     "loops": find_loops(transitions, decisions),
+                     "episodes": find_loops(transitions, decisions),
                      "blackouts": sum(1 for b in battles_by_run.get(d.name, [])
                                     if b.get("outcome") == "blackout"),
                      "crashed": (d / "error.txt").exists() or (d / "crash.json").exists(),
@@ -171,6 +174,9 @@ def summarise(runs_dir: Path, since: datetime, until: datetime | None = None,
     for d in dossiers:
         if d.get("run") in by_name:
             by_name[d["run"]]["dossier"] = d
+    for r in rows:  # collapsed groups for the loops column; raw episodes stay for the breaks
+        r["loops"] = collapse_loops(r["episodes"])
+        r["long_loops"] = sum(1 for e in r["episodes"] if e["presses"] >= LONG_LOOP_ROWS)
     segments: dict[str, dict] = {}
     groups: dict[str, list] = defaultdict(list)
     for r in rows:
@@ -188,6 +194,7 @@ def summarise(runs_dir: Path, since: datetime, until: datetime | None = None,
                          "stall_rate": sum(1 for r in recs if r.get("dossier")) / len(recs),
                          "blackout_rate": sum(r["blackouts"] for r in recs) / len(recs),
                          "loop_episodes": sum(len(r["loops"]) for r in recs),
+                         "long_loops": sum(r["long_loops"] for r in recs),
                          "failing": [r["name"] for r in recs if not r["attempt"]["solved"]]}
     clusters = stalls.cluster(dossiers)
     top_stalls = [{"cause": c["likely_cause"], "count": c["count"],
@@ -217,7 +224,7 @@ def summarise(runs_dir: Path, since: datetime, until: datetime | None = None,
     crashed = [r["name"] for r in rows if r["crashed"]]
     no_decisions = [r["name"] for r in rows if r["no_decisions"]]
     loop_breaks = [{"run": r["name"], "kind": e["kind"], "step": e["step"], "presses": e["presses"]}
-                   for r in rows for e in r["loops"]
+                   for r in rows for e in r["episodes"]
                    if e["kind"] in ("already_out", "blocked_loop") and e["presses"] >= BREAK_LOOP_ROWS]
     breaks = {"invariants": inv_status, "invariant_errors": inv_errors,
               "invariant_warns": inv_warns if invariants_verbose else len(inv_warns),
