@@ -201,7 +201,7 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): (1) with t
 | Branch | directive/pokeagent-game-view-presets-and-avatars-directive |
 | Base branch | - |
 | Base commit | 155bf84a62d8a207881ed41d00cf91f83285fb3f |
-| Head commit | 0a5c59122cc6fecbfe02a0b03b5c65be142184da |
+| Head commit | e8d13015d912ccb54bb4bd8b16de3770c046b572 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
