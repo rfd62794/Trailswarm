@@ -33,7 +33,7 @@ Binding hard rules for this PR: **no changes to steering** (the rules in the 202
 ## 3. Scope (one PR, in order)
 
 1. Layout persistence: stable tags on every window/pane, `init_file`, a committed read-only default layout, a "Save layout" menu item.
-2. Stall/break state: `viewer/health.py` (pure classification + readers), polled at <= 1 Hz on the existing poll thread; card header colour ok / slow / stalled / anomaly; a World-view badge (anomaly + invariant counts); clicking opens the anomaly image / state path in the side panel.
+2. Stall/break state: `src/pokeagent/viewer/health.py` (pure classification + readers), polled at <= 1 Hz on the existing poll thread; card header colour ok / slow / stalled / anomaly; a World-view badge (anomaly + invariant counts); clicking opens the anomaly image / state path in the side panel.
 3. Stadium as a toggleable pane (depends on the opponent fix; stop-and-report if absent).
 4. Tests (pure functions first; Dear PyGui logic under `create_context` without a viewport).
 
