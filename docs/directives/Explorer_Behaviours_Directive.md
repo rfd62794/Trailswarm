@@ -109,3 +109,17 @@ behaviour cleanly, keep it in the closest behaviour and note it in the Report - 
 
 Test tail; line counts per new module and for `explore_demo.py`; a table mapping each part of the old
 `agent_step` (by line range) to its behaviour; anything that did not fit cleanly.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 00:51 · agentflow-tick · none → Queued — suggested by heartbeat: Work appears already shipped; Claude to verify on main and close out. Do not dispatch a rebuild.
+<!-- queue:end -->
