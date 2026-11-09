@@ -138,7 +138,7 @@ Nothing before the run. Afterwards Claude runs the ROM-present check (including 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-interaction-text-capture-fix-directive |
 | Base branch | - |
@@ -149,4 +149,5 @@ Nothing before the run. Afterwards Claude runs the ROM-present check (including 
 - 2026-11-08 19:54 · robert-claude-laptop · Queued → Approved
 - 2026-11-08 19:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-interaction-text-capture-fix-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6YWT1D1B41711T6TTTACA8A
 - 2026-11-08 20:11 · dispatcher · In progress → Approved — dispatch rolled back: stale dispatch marker (stage provision)
+- 2026-11-08 20:36 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-interaction-text-capture-fix-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M6YZ5FYQDH7T4PK4YKNPH49P
 <!-- queue:end -->
