@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import blocked_cap, trainer_ledger
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.interaction_gate import battling, is_dialogue_state
 from pokeagent.explorer.interaction_record import close_interaction
 from pokeagent.explorer.items import is_item_ball, parse_item_text
 from pokeagent.explorer.perceive import DIRS, box_text, effects, EFFECT_WINDOW, frame_lines, is_menu, npc_positions, sprite_snapshot
@@ -18,23 +19,32 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
     name, before, after, tm, tm2, box_before, box_after, text, extra, snap_pre = fr.name, fr.before, fr.after, fr.tm, fr.tm2, fr.box_before, fr.box_after, fr.text, fr.extra, fr.snap_pre
     inter = ctx.inter
     if box_before:
+        sealed = False
         if inter:
             inter["presses"] += 1
-            # The first capture happens while the text is still printing ("So! Y"): keep the fullest dialog seen.
-            full = " / ".join(ctx.dialog)[:400]
-            if len(full) > len(inter["entry"].get("text", "")):
-                inter["entry"]["text"] = full
-            if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
-                chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
-                yn = ctx.pop("yesno")
-                if yn and chosen.endswith(yn["answer"]):
-                    chosen = f"YES/NO '{yn['question']}' -> {yn['answer']}"
-                if chosen:
-                    inter["choices"].append(chosen)
-            if box_after and is_menu(tm2):
-                menu = box_text(tm2)
-                if menu not in inter["menus"]:
-                    inter["menus"].append(menu)
+            if battling(ctx):
+                # The talk ran into the battle intro: seal the note with the dialogue it already holds;
+                # nothing the battle prints may extend it.
+                ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
+                ctx.inter = inter = None
+                sealed = True
+            else:
+                if is_dialogue_state(ctx, tm2):  # a battle or menu screen never extends the note's text
+                    # The first capture happens while the text is still printing ("So! Y"): keep the fullest dialog seen.
+                    full = " / ".join(ctx.dialog)[:400]
+                    if len(full) > len(inter["entry"].get("text", "")):
+                        inter["entry"]["text"] = full
+                if is_menu(tm) and name == "A":  # a choice was made on a menu: remember which line the cursor was on
+                    chosen = next((ln for ln in frame_lines(tm) if ">" in ln), "").replace(">", "").strip()
+                    yn = ctx.pop("yesno")
+                    if yn and chosen.endswith(yn["answer"]):
+                        chosen = f"YES/NO '{yn['question']}' -> {yn['answer']}"
+                    if chosen:
+                        inter["choices"].append(chosen)
+                if box_after and is_menu(tm2):
+                    menu = box_text(tm2)
+                    if menu not in inter["menus"]:
+                        inter["menus"].append(menu)
         if not box_after and inter:
             ctx.mem.finish_interaction(inter["entry"], inter["presses"], inter["menus"], inter["choices"])
             if inter.get("ball") is not None:  # the dialog is complete: record the fullest text + parsed item
@@ -50,6 +60,8 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             result = (f"interaction closed after {inter['presses']} presses; menus seen: {len(inter['menus'])}, "
                       f"choices: {inter['choices'] or 'none'}; effects: {fx}")
             ctx.inter = None
+        elif sealed:
+            result = "battle began during the talk: the interaction note keeps its dialogue only"
         else:
             result = f"text box: advanced ({'menu' if is_menu(tm2) else 'dialog'})"
     elif name == "A":
@@ -66,15 +78,19 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             entry = npc_in_front.setdefault("results", {"count": 0, "text": "", "presses": [], "menus": [], "choices": []})
             entry["count"] += 1
             trainer_ledger.note_talk(ctx, before, npc_in_front, box_after)  # text with no battle = beaten trainer
+        elif box_after and not is_dialogue_state(ctx, tm2):
+            entry = None  # a battle intro or a menu opened by A leaves no interaction note on the tile
         else:
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text if box_after else "")
         ctx.mem.recent_talk.add(f"{before[1]},{before[2]},{ctx.facing}")
-        if box_after:
-            ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
+        if box_after and is_dialogue_state(ctx, tm2):
+            ctx.inter = {"entry": entry, "presses": 1, "menus": [],
                            "choices": [], "snap": snap_pre, "ball": ball, "pos": before, "solid": npc_in_front is None}
             extra["sprites"] = sprite_snapshot(ctx.emu)
         result = (f"INTERACTION at ({before[1]},{before[2]}) facing {ctx.facing}: \"{text[:60]}\""
-                  if box_after else f"nothing to interact with facing {ctx.facing} (remembered)")
+                  if box_after and is_dialogue_state(ctx, tm2)
+                  else f"nothing to interact with facing {ctx.facing} (remembered)" if not box_after
+                  else f"a menu or battle screen is not an interaction: \"{text[:50]}\"")
     else:
         fail_key = (before, name)
         confirmed = ctx.last_fail == fail_key
@@ -102,9 +118,11 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
         ctx.last_fail = fail_key if (name in DIRS and after == before) else None
         if after[0] != before[0]:
             ctx.settle = 30  # fade already waited out; a short pause so the watcher sees the arrival
-        if box_after and not ctx.inter and ctx.proc is None:  # (a procedure's own menu is not an interaction) walked into an NPC, or a scripted event fired (Oak!)
+        if box_after and not ctx.inter and ctx.proc is None and is_dialogue_state(ctx, tm2):
+            # (a procedure's own menu is not an interaction; a battle intro or a menu is not one either)
+            # walked into an NPC, or a scripted event fired (Oak!)
             entry = ctx.mem.interact(before[0], before[1], before[2], ctx.facing, text)
-            ctx.inter = {"entry": entry, "presses": 1, "menus": [box_text(tm2)] if is_menu(tm2) else [],
+            ctx.inter = {"entry": entry, "presses": 1, "menus": [],
                            "choices": [], "snap": snap_pre, "pos": before}
             extra["sprites"] = sprite_snapshot(ctx.emu)
             extra["trigger"] = True  # a box with no A press is a contact/scripted event, not an interaction
