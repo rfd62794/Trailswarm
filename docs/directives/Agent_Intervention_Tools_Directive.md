@@ -82,3 +82,17 @@ laptop is shared overnight: one ROM run at a time, plain pytest.
 ## 8. Report
 
 The `agentctl ls` output against the scratch agent, the nudge before/after, test tail, and anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 00:48 · agentflow-tick · none → Queued — suggested by heartbeat: Code appears built; verify merge state, run the ROM nudge check, resolve journal name, then close. Do not rebuild.
+<!-- queue:end -->
