@@ -70,3 +70,17 @@ area). Named constants for every quirk with a docstring citing the mechanic.
 ## 8. Report
 
 Mechanics covered, harness table, test tail, gaps found.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 00:49 · agentflow-tick · none → Queued — suggested by heartbeat: Needs laptop ROM, kb and checkpoints for the 20-battle sim-to-real gate; confirm Game Knowledge is on main first.
+<!-- queue:end -->
