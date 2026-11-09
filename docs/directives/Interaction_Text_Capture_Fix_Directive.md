@@ -138,12 +138,14 @@ Nothing before the run. Afterwards Claude runs the ROM-present check (including 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-interaction-text-capture-fix-directive |
 | Base branch | - |
+| Base commit | cbabcf8f19b18c66ea7eb66910be453ca30f87e8 |
 
 **Status log**
 - 2026-11-08 18:57 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert 2026-11-08: notes collect battle and menu text; prove the path with failing tests, then fix; typed PC lookup
 - 2026-11-08 19:54 · robert-claude-laptop · Queued → Approved
+- 2026-11-08 19:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-interaction-text-capture-fix-directive; lane=default; model=swe-2-high; persona=steady-builder; agent_id=01M6YWT1D1B41711T6TTTACA8A
 <!-- queue:end -->
