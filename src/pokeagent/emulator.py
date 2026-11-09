@@ -10,7 +10,8 @@ from typing import Protocol, runtime_checkable
 from PIL import Image
 from pyboy import PyBoy
 
-_SCREEN_SIZE = (160, 144)
+from pokeagent.game.pokemon_red import RED
+from pokeagent.game.spec import GameSpec
 
 
 class Button(StrEnum):
@@ -52,7 +53,7 @@ class Emulator(Protocol):
         ...
 
     def screenshot(self) -> Image.Image:
-        """Current screen as a 160x144 RGB PIL image."""
+        """Current screen as the game's RGB PIL image."""
         ...
 
     def tick_rendered(self, frames: int) -> None:
@@ -75,10 +76,11 @@ class Emulator(Protocol):
 class PyBoyEmulator:
     """Real emulator driven through PyBoy; visible window unless headless."""
 
-    def __init__(self, rom_path: Path, *, headless: bool = True) -> None:
+    def __init__(self, rom_path: Path, *, headless: bool = True, game: GameSpec = RED) -> None:
         rom_path = Path(rom_path)
         if not rom_path.is_file():
             raise FileNotFoundError(f"ROM not found: {rom_path}")
+        self.game = game
         self._headless = headless
         self._pyboy = PyBoy(str(rom_path), window="null" if headless else "SDL2")
         self._pyboy.set_emulation_speed(0 if headless else 1)
@@ -90,7 +92,14 @@ class PyBoyEmulator:
         """Frames emulated since boot (monotonic; includes screenshot renders)."""
         return self._pyboy.frame_count
 
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        """The game's (width, height) in pixels."""
+        return self.game.screen
+
     def press(self, button: Button, hold_frames: int = 8, settle_frames: int = 16) -> None:
+        if button is not Button.NONE and button.value not in self.game.buttons:
+            raise ValueError(f"{button.value!r} is not a button of {self.game.key}")
         if self.on_press is not None:
             self.on_press(button, hold_frames, settle_frames)
         if button is Button.NONE:
@@ -133,7 +142,7 @@ class PyBoyEmulator:
         return getattr(self._pyboy, 'game_wrapper', None)
 
     def frame_rgb(self) -> bytes:
-        """Current screen as 144*160*3 RGB bytes (valid right after a rendered tick)."""
+        """Current screen as w*h*3 RGB bytes (valid right after a rendered tick)."""
         try:
             return self._pyboy.screen.ndarray[:, :, :3].tobytes()
         except Exception:
@@ -156,11 +165,17 @@ class PyBoyEmulator:
 class FakeEmulator:
     """In-memory emulator for tests; records presses and frame counts."""
 
-    def __init__(self, memory: dict[int, int] | None = None) -> None:
+    def __init__(self, memory: dict[int, int] | None = None, *, game: GameSpec = RED) -> None:
+        self.game = game
         self.memory: dict[int, int] = dict(memory or {})
         self.presses: list[Button] = []
         self.frames: int = 0
         self.closed: bool = False
+
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        """The game's (width, height) in pixels."""
+        return self.game.screen
 
     def set(self, addr: int, value: int) -> None:
         self.memory[addr] = value
@@ -169,6 +184,8 @@ class FakeEmulator:
         self.set(addr, value)
 
     def press(self, button: Button, hold_frames: int = 8, settle_frames: int = 16) -> None:
+        if button is not Button.NONE and button.value not in self.game.buttons:
+            raise ValueError(f"{button.value!r} is not a button of {self.game.key}")
         if button is not Button.NONE:
             self.presses.append(button)
         self.frames += hold_frames + settle_frames
@@ -183,13 +200,14 @@ class FakeEmulator:
         return bytes(self.memory.get(start + i, 0) for i in range(length))
 
     def screenshot(self) -> Image.Image:
-        return Image.new("RGB", _SCREEN_SIZE)
+        return Image.new("RGB", self.screen_size)
 
     def tick_rendered(self, frames: int) -> None:
         self.frames += frames
 
     def frame_rgb(self) -> bytes:
-        return bytes(_SCREEN_SIZE[0] * _SCREEN_SIZE[1] * 3)
+        w, h = self.screen_size
+        return bytes(w * h * 3)
 
     def set_speed(self, speed: int) -> None:
         self.speed = speed

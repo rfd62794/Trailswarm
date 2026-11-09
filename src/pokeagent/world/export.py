@@ -16,11 +16,15 @@ from pokeagent.atlas.stretch import stretch_image, stretch_layout, stretch_warp
 from pokeagent.atlas.rom_maps import MapHeader, all_headers, load
 from pokeagent.atlas.world import WorldLayout, build_layout
 from pokeagent.atlas.world_render import render_world
+from pokeagent.game.pokemon_red import RED
 from pokeagent.world.draw import SpriteBook, render_state
 from pokeagent.world.model import Track
 
 Image.MAX_IMAGE_PIXELS = None
 CACHE = Path("runs") / "atlas" / "world.png"
+
+# str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
+_DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
 
 
 @dataclass
@@ -34,7 +38,7 @@ class World:
     source: "World | None" = None          # the full-grid world this one was derived from (to go back to inset mode)
 
 
-def load_world(rom_path: str | Path = "roms/Pokemon Red.gb", cache: Path | None = CACHE, base: str | Path | None = None) -> World:
+def load_world(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None) -> World:
     """Decode the ROM and stitch Kanto. ``base`` / ``cache`` name a previously rendered world.png (skips the slow render);
     a fresh render is written to ``cache`` (runs/ is git-ignored: never commit it, it is ROM-derived)."""
     rom = load(rom_path)
@@ -64,7 +68,7 @@ def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track
     return out
 
 
-def load_for_view(rom_path: str | Path = "roms/Pokemon Red.gb", cache: Path | None = CACHE, base: str | Path | None = None) -> World:
+def load_for_view(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None) -> World:
     """What the viewer opens with: the full inset world, unless the saved Interiors choice is an in-place mode (then compact)."""
     from pokeagent.atlas.inplace import DEFAULT_MODE
     w, ov = load_world(rom_path, cache, base), Overrides.load()

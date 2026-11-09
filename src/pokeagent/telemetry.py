@@ -25,7 +25,9 @@ from pathlib import Path
 from multiprocessing import shared_memory
 from typing import Optional
 
-FRAME_W, FRAME_H = 160, 144
+from pokeagent.game.pokemon_red import RED
+
+FRAME_W, FRAME_H = RED.screen  # module defaults; a publisher sizes its slot from its emulator's screen_size
 LAYOUT = 2       # slot header layout version (bumped for the reader heartbeat; Agent_Footprint item 2)
 HEADER_V1 = 16   # v1: u64 seq | u16 w | u16 h | u32 owner pid (seqlock: odd seq = write in progress)
 HEADER = 32      # v2: v1 fields | u32 layout | u32 magic | f64 reader_ts (epoch, reader's heartbeat)
@@ -50,7 +52,11 @@ def slot_layout(buf) -> int:
     side (a v1 slot can report a v2-size buffer). On a v1 slot bytes 16..23 are pixel data and
     can spell ``LAYOUT`` by chance, so the magic u32 must match too - a false v2 then needs 8
     exact leading pixel bytes."""
-    if len(buf) >= HEADER + FRAME_W * FRAME_H * 3 and \
+    if len(buf) < HEADER:
+        return 1
+    w = int.from_bytes(buf[8:10], "little")
+    h = int.from_bytes(buf[10:12], "little")
+    if len(buf) >= HEADER + w * h * 3 and \
             int.from_bytes(buf[LAYOUT_OFF:LAYOUT_OFF + 4], "little") == LAYOUT and \
             int.from_bytes(buf[MAGIC_OFF:MAGIC_OFF + 4], "little") == SLOT_MAGIC:
         return LAYOUT
@@ -100,9 +106,10 @@ class FramePublisher:
     def __init__(self, agent_id: int | str, emu, half_res: bool = False) -> None:
         self.emu = emu
         self.half_res = half_res
+        self.w, self.h = getattr(emu, "screen_size", (FRAME_W, FRAME_H))
         self.seq = 0
         self.name = slot_name(agent_id)
-        size = HEADER + FRAME_W * FRAME_H * 3
+        size = HEADER + self.w * self.h * 3
         try:
             self.shm = shared_memory.SharedMemory(name=self.name, create=True, size=size)
         except FileExistsError:  # never attach to a live slot: two writers make a viewer card flip games
@@ -120,7 +127,7 @@ class FramePublisher:
         self.shm.buf[10:12] = h.to_bytes(2, "little")
 
     def dims(self) -> tuple[int, int]:
-        return (80, 72) if self.half_res else (FRAME_W, FRAME_H)
+        return (self.w // 2, self.h // 2) if self.half_res else (self.w, self.h)
 
     def publish(self, advance: bool = True) -> None:
         if advance:
@@ -128,9 +135,9 @@ class FramePublisher:
         data = self.emu.frame_rgb()
         if self.half_res:  # decimate: every other pixel, every other row (~4x cheaper)
             out = bytearray()
-            for y in range(0, FRAME_H, 2):
-                row = data[y * FRAME_W * 3:(y + 1) * FRAME_W * 3]
-                for x in range(0, FRAME_W, 2):
+            for y in range(0, self.h, 2):
+                row = data[y * self.w * 3:(y + 1) * self.w * 3]
+                for x in range(0, self.w, 2):
                     out += row[x * 3:x * 3 + 3]
             data = bytes(out)
         self.seq += 1

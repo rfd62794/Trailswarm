@@ -17,6 +17,10 @@ import numpy as np
 from pokeagent.atlas import rom_maps
 from pokeagent.atlas.collision import tile_pairs, walkable_ids
 from pokeagent.atlas.tiles import load_tileset
+from pokeagent.game.pokemon_red import RED
+
+# str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
+_DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 
@@ -79,7 +83,7 @@ def bfs(grid: np.ndarray, start: tuple, goals: set, obstacles: set, walls: set, 
     return None
 
 
-def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
+def rom_planner(rom_path: str = _DEFAULT_ROM):
     """``plan(map_id, start, goals, walls=(), blocked=(), jumps=None) -> [buttons] | None``; None when the ROM is unreadable
     or no route exists. ``start`` and ``goals`` are (x, y) cells; ``blocked`` are temporarily occupied (x, y) cells."""
     try:
@@ -113,7 +117,7 @@ def rom_planner(rom_path: str = "roms/Pokemon Red.gb"):
     return plan
 
 
-def rom_cave_planner(rom_path: str = "roms/Pokemon Red.gb", maps=frozenset({0x3B, 0x3C, 0x3D})):
+def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0x3D})):
     """A multi-floor planner over the ROM grids of ``maps`` (a dungeon): walking is a grid step, stepping on a warp tile
     arrives on the header's destination warp tile of the destination floor. ``plan(start, goals, walls=None, blocked=None)``:
     ``start`` is (map, x, y), ``hard`` maps a floor to "x,y,DIR" edges that stay blocked in every pass; ``goals`` a set of (map, x, y) cells (stepping onto one ends the route, so an exit warp can be a

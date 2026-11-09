@@ -7,6 +7,10 @@ matches every tile the agent ever learned as walkable there.
 from __future__ import annotations
 
 from pokeagent.atlas import rom_maps
+from pokeagent.game.pokemon_red import RED
+
+# str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
+_DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
 
 TILESET_TABLE, ENTRY, NUM_TILESETS = 0xC7BE, 12, 24
 PAIRS_LAND = 0xC7E  # TilePairCollisionsLand: (tileset, tileA, tileB) triples ended by 0xFF; ROM-verified 2026-11-06
@@ -23,7 +27,7 @@ def tile_pairs(rom: bytes, tileset: int, start: int = PAIRS_LAND) -> frozenset:
     return frozenset(out)
 
 
-def rom_tile_pairs(rom_path: str = "roms/Pokemon Red.gb"):
+def rom_tile_pairs(rom_path: str = _DEFAULT_ROM):
     """``tileset -> frozenset of (a, b) pairs`` (both orders); None when the ROM is unreadable."""
     try:
         rom = rom_maps.load(rom_path)
@@ -48,7 +52,7 @@ def walkable_ids(rom: bytes, tileset: int) -> frozenset:
     return frozenset(ids)
 
 
-def rom_walkable_ids(rom_path: str = "roms/Pokemon Red.gb"):
+def rom_walkable_ids(rom_path: str = _DEFAULT_ROM):
     """``tileset -> frozenset of walkable tile ids`` (empty set for an unknown tileset); None when the ROM is unreadable."""
     try:
         rom = rom_maps.load(rom_path)

@@ -12,11 +12,12 @@ from pathlib import Path
 
 from pokeagent import checkpoint_goals as cg
 from pokeagent import statefp, statelog
+from pokeagent.game.paths import default_rom
 
 DEFAULT_DIRS = (Path("runs/checkpoints"), Path("runs/legs/states"))
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ROM = ROOT / "roms" / "Pokemon Red.gb"
+DEFAULT_ROM = default_rom(root=ROOT)
 
 
 def make_emulator(rom):

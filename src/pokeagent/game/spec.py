@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 _KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _SHA1_RE = re.compile(r"^[0-9A-F]{40}$")
+KNOWN_BUTTONS = frozenset({"up", "down", "left", "right", "a", "b", "start", "select"})
 
 
 @dataclass(frozen=True)
@@ -14,6 +16,9 @@ class GameSpec:
     key: str                       # "pokemon-red": the stable name used by --game, POKEAGENT_GAME and later by store paths
     title: str                     # "Pokemon Red"
     rom_sha1: tuple[str, ...]      # accepted ROM hashes, uppercase hex, at least one
+    default_rom: Path              # relative to the repo root, forward slashes, e.g. Path("roms/<game>.gb")
+    screen: tuple[int, int]        # (width, height) in pixels
+    buttons: tuple[str, ...]       # lowercase names of the buttons the game uses, in this order
 
     def __post_init__(self) -> None:
         if not _KEY_RE.fullmatch(self.key):
@@ -25,3 +30,19 @@ class GameSpec:
                 raise ValueError(
                     f"{self.key}: bad rom_sha1 entry (40 uppercase hex): {entry!r}"
                 )
+        rom = Path(self.default_rom)
+        if rom.is_absolute() or rom.drive or str(rom).startswith(("/", "\\")) or not rom.suffix:
+            raise ValueError(
+                f"{self.key}: default_rom must be a relative path with a suffix: {self.default_rom!r}"
+            )
+        if (not isinstance(self.screen, tuple) or len(self.screen) != 2
+                or not all(type(v) is int and v > 0 for v in self.screen)):
+            raise ValueError(f"{self.key}: screen must be two positive ints: {self.screen!r}")
+        if not self.buttons or len(set(self.buttons)) != len(self.buttons):
+            raise ValueError(f"{self.key}: buttons must be non-empty and unique: {self.buttons!r}")
+        bad = [b for b in self.buttons
+               if not isinstance(b, str) or b != b.lower() or b not in KNOWN_BUTTONS]
+        if bad:
+            raise ValueError(
+                f"{self.key}: unknown buttons {bad!r} (this pad: {', '.join(sorted(KNOWN_BUTTONS))})"
+            )

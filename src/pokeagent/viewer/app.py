@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from pokeagent.agent_registry import list_agents
+from pokeagent.game.pokemon_red import RED
 from pokeagent.snapshot import AgentSnapshot, Goal, Screen, Sees, Segment, Thinking
 from pokeagent.viewer import health as health_mod
 from pokeagent.viewer import modes, swarm_rows
@@ -69,7 +70,7 @@ class _AnimatedFake:
 
     def frame(self):
         t = self._t
-        w, h = 160, 144
+        w, h = RED.screen
         y, x = np.mgrid[0:h, 0:w]
         px = np.stack([(x * 3 + t) % 256, (y * 5 + t * 2) % 256, ((x + y) * 2 + t) % 256], axis=-1)
         return px.astype(np.uint8).tobytes(), w, h

@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 from pokeagent.atlas import rom_maps
+from pokeagent.game.pokemon_red import RED
+
+# str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
+_DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
 
 LAST_MAP = 0xFF  # a warp's destination byte for "the map we came from" (a cave mouth)
 ROUTE4 = 0x0F    # asking for Route 4 also matches the "back outside" warps
 
 
-def rom_ladders(rom_path: str = "roms/Pokemon Red.gb"):
+def rom_ladders(rom_path: str = _DEFAULT_ROM):
     """A ``(map_id, dest_map) -> [(x, y)]`` lookup over the ROM's map headers; None when the ROM is unreadable."""
     try:
         rom = rom_maps.load(rom_path)
