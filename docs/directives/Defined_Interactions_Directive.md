@@ -91,3 +91,17 @@ pacing is a small learner with explicit bounds. Keep the existing beats/procedur
 ## 8. Report
 
 Verified addresses/tiles, test tail, before/after numbers, and the type counts the ROM run produced.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 00:45 · agentflow-tick · none → Queued — suggested by heartbeat: Close-out audit, not a rebuild: code appears present; needs tests and ROM evidence from section 5.
+<!-- queue:end -->
