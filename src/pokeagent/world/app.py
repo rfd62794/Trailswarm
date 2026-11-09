@@ -5,6 +5,7 @@ import argparse
 import time
 from pathlib import Path
 
+from pokeagent.game.pokemon_red import RED
 from pokeagent.world.model import WorldModel
 
 
@@ -43,7 +44,7 @@ def add_parser(sub) -> None:
     p.add_argument("--root", default=".", metavar="DIR", help="agent registry root (default: cwd)")
     p.add_argument("--fake", type=int, default=0, metavar="N", help="N animated fake agents")
     p.add_argument("--png", metavar="OUT", help="render the world state to a PNG (headless) instead of opening a window")
-    p.add_argument("--rom", default="roms/Pokemon Red.gb")
+    p.add_argument("--rom", default=str(RED.default_rom).replace("\\", "/"))
     p.add_argument("--base", metavar="PNG", help="a previously rendered world.png (skips the ROM render)")
     p.add_argument("--layers", default="", help="comma list of learning layers for --png (heat,walls,warps,disagree,...)")
     p.add_argument("--scale", type=float, default=1.0, help="output scale for --png")

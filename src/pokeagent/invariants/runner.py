@@ -9,8 +9,9 @@ CHECKS = ("warps", "milestones", "states", "segments", "tables")
 
 
 def find_rom(runs_dir: Path) -> Path | None:
+    from pokeagent.game.paths import default_rom
     from pokeagent.legs.grid import rom_path
-    return rom_path(runs_dir.parent / "roms" / "Pokemon Red.gb")
+    return rom_path(default_rom(root=runs_dir.parent))
 
 
 def run_all(runs_dir: Path, load_states: bool = False, rom: Path | None = None) -> list[Finding]:

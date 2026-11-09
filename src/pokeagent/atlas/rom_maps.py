@@ -14,13 +14,18 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pokeagent.game.pokemon_red import RED
+
+# str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
+_DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
+
 PTRS, BANKS, NUM_MAPS = 0x01AE, 0xC23D, 248
 BANK = 0x4000
 DIRS = (("N", 8), ("S", 4), ("W", 2), ("E", 1))
 _NAMES_PATH = Path(__file__).with_name("map_names.json")
 
 
-def load(rom: str | Path = "roms/Pokemon Red.gb") -> bytes:
+def load(rom: str | Path = _DEFAULT_ROM) -> bytes:
     return Path(rom).read_bytes()
 
 
@@ -116,7 +121,7 @@ def all_headers(d: bytes) -> dict[int, MapHeader]:
     return out
 
 
-def valid_map_ids(rom: str | Path = "roms/Pokemon Red.gb") -> frozenset[int] | None:
+def valid_map_ids(rom: str | Path = _DEFAULT_ROM) -> frozenset[int] | None:
     """Map ids that have a sane header in the ROM table; None when the ROM cannot be read."""
     try:
         return frozenset(all_headers(load(rom)))

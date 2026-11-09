@@ -20,8 +20,10 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+from pokeagent.game.paths import default_rom
+
 ROOT = Path(__file__).resolve().parents[3]
-KB_PATH, ROM_PATH = ROOT / "kb" / "items.json", ROOT / "roms" / "Pokemon Red.gb"
+KB_PATH, ROM_PATH = ROOT / "kb" / "items.json", default_rom(root=ROOT)
 ITEM_USE_TABLE, ITEM_PRICES, TRAINER_MONEY = 0xD5E1, 0x01 * 0x4000 + (0x4608 - 0x4000), 0x0E * 0x4000 + (0x5914 - 0x4000)
 N_ITEMS, HM01, TM01, N_TM, N_HM = 83, 0xC4, 0xC9, 50, 5
 MART_ORDER = (42, 56, 67, 91, 150)  # Viridian Pewter Cerulean Vermilion Lavender: the first five stock lists in the ROM

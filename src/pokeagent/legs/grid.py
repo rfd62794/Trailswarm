@@ -13,6 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
+from pokeagent.game.paths import default_rom
+
 FRAME_WALK, FRAME_BIKE = 16, 8
 ENCOUNTER_RATE, BATTLE_FRAMES = 0.10, 600
 GRASS_PENALTY = ENCOUNTER_RATE * BATTLE_FRAMES
@@ -72,9 +74,9 @@ def from_rom(rom: bytes, hd) -> Grid:
 
 
 def rom_path(path: str | Path | None = None) -> Path | None:
-    """The ROM: ``path``, else roms/Pokemon Red.gb in this checkout or under C:/Github/PokeAgent; None if absent."""
+    """The ROM: ``path``, else the selected game's default ROM in this checkout or under C:/Github/PokeAgent; None if absent."""
     here = Path(__file__).resolve().parents[3]
-    for p in ([Path(path)] if path else []) + [here / "roms" / "Pokemon Red.gb", Path("C:/Github/PokeAgent/roms/Pokemon Red.gb")]:
+    for p in ([Path(path)] if path else []) + [default_rom(root=here), default_rom(root=Path("C:/Github/PokeAgent"))]:
         if p.exists():
             return p
     return None

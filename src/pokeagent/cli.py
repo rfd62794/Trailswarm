@@ -9,8 +9,8 @@ Usage::
     pokeagent mcp [--game KEY] [--rom PATH] [--state PATH] [--headless] [--idle-fps 60]
 
 The ROM path comes from ``--rom``, else ``$POKEAGENT_ROM``, else
-``roms/Pokemon Red.gb``. A real backend requires an explicit ``--steps`` so a
-run can never burn model calls unbounded.
+the selected game's ``default_rom``. A real backend requires an explicit
+``--steps`` so a run can never burn model calls unbounded.
 """
 
 from __future__ import annotations
@@ -26,23 +26,24 @@ from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
 from pokeagent.game import GameSpec, UnknownGame, add_game_argument, resolve_game
+from pokeagent.game.paths import default_rom
 from pokeagent.ram import read_state
 from pokeagent.runlog import RunLog
 
-DEFAULT_ROM = Path("roms/Pokemon Red.gb")
+DEFAULT_ROM = default_rom()
 STEPS_DEFAULT_STUB = 20
 BOOT_FRAMES = 60
 EXIT_CODES = {"max_steps": 0, "backend_failures": 2, "interrupted": 130}
 
 
 def _rom_path(args: argparse.Namespace) -> Path:
-    """ROM from --rom, else $POKEAGENT_ROM, else the default path."""
+    """ROM from --rom, else $POKEAGENT_ROM, else the selected game's default."""
     if args.rom:
         return Path(args.rom)
     env = os.environ.get("POKEAGENT_ROM")
     if env:
         return Path(env)
-    return DEFAULT_ROM
+    return default_rom()
 
 
 def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
@@ -180,7 +181,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run the agent loop")
-    run.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    run.add_argument("--rom", metavar="PATH", help="path to the game's ROM")
     run.add_argument("--backend", choices=["stub", "claude"], default="stub")
     run.add_argument("--model", default="haiku", help="model for the claude backend")
     run.add_argument("--steps", type=int, default=None, metavar="N",
@@ -194,18 +195,18 @@ def _build_parser() -> argparse.ArgumentParser:
     run.set_defaults(func=_cmd_run)
 
     check = sub.add_parser("check-rom", help="verify the ROM's SHA-1 and that it boots")
-    check.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    check.add_argument("--rom", metavar="PATH", help="path to the game's ROM")
     add_game_argument(check)
     check.set_defaults(func=_cmd_check_rom)
 
     state = sub.add_parser("state", help="boot headless and print the RAM state summary")
-    state.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    state.add_argument("--rom", metavar="PATH", help="path to the game's ROM")
     state.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
     add_game_argument(state)
     state.set_defaults(func=_cmd_state)
 
     mcp = sub.add_parser("mcp", help="serve the emulator as MCP tools over stdio")
-    mcp.add_argument("--rom", metavar="PATH", help="path to the Pokemon Red ROM")
+    mcp.add_argument("--rom", metavar="PATH", help="path to the game's ROM")
     mcp.add_argument("--state", metavar="PATH", help="snapshot to load after boot")
     mcp.add_argument("--headless", action="store_true",
                      help="no SDL2 window, full emulation speed")

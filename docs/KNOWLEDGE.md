@@ -355,7 +355,12 @@ TrainerHunt) are simply switched off while an episode lives instead.
 ## Game selection (2026-11-08)
 
 `src/pokeagent/game/` is the game seam. A `GameSpec` is one supported game: a stable `key` ("pokemon-red"),
-a `title`, and the accepted ROM SHA-1 hashes (`rom_sha1`, uppercase hex). `game/registry.py` holds `GAMES`
+a `title`, the accepted ROM SHA-1 hashes (`rom_sha1`, uppercase hex), the repo-relative `default_rom`
+path, the `screen` size in (w, h) pixels, and the `buttons` the game uses (lowercase names, a subset of
+the pad the emulator layer knows). `game/paths.py`'s `default_rom(game=None, root=None)` turns the
+selected game into that ROM path (honouring `$POKEAGENT_GAME`); `cli._rom_path` still puts `--rom` and
+`$POKEAGENT_ROM` ahead of it. The emulators take a `game=` keyword (default `RED`), report
+`screen_size`, and reject presses of buttons the game does not have. `game/registry.py` holds `GAMES`
 (key -> spec, edited by hand; only Red today) and `DEFAULT_GAME`. Selection: `--game KEY` on `run`,
 `check-rom`, `state` and `mcp` wins, else `$POKEAGENT_GAME`, else the default `pokemon-red`; an unknown key
 fails the command with exit code 2 listing the known keys. Red behaviour is byte-identical by default.

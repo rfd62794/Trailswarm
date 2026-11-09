@@ -10,8 +10,10 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+from pokeagent.game.paths import default_rom
+
 ROOT = Path(__file__).resolve().parents[3]
-KB_PATH, ROM_PATH = ROOT / "kb" / "hm_compat.json", ROOT / "roms" / "Pokemon Red.gb"
+KB_PATH, ROM_PATH = ROOT / "kb" / "hm_compat.json", default_rom(root=ROOT)
 BASE_STATS, REC, TMHM_AT = 0x0E * 0x4000 + (0x43DE - 0x4000), 28, 20
 HM_BITS = {"cut": 50, "fly": 51, "surf": 52, "strength": 53, "flash": 54}
 

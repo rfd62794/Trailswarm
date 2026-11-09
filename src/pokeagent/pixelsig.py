@@ -9,15 +9,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pokeagent.game.pokemon_red import RED
+
 REFS = Path(__file__).with_name('pixelrefs.json')
-# region: (x0, y0, x1, y1) in the 160x144 frame
+SCREEN_W, SCREEN_H = RED.screen
+# region: (x0, y0, x1, y1) in the game's frame
 REGIONS = {'dialog_box': (8, 96, 152, 140), 'yesno_box': (96, 32, 156, 84)}
 
 
-def _ink(rgb: bytes, box, width: int = 160, stride: int = 4):
+def _ink(rgb: bytes, box, width: int = SCREEN_W, stride: int = 4):
     """Binary ink mask of a region at 2x2 downsample -> hex signature (flat RGBA bytes)."""
     x0, y0, x1, y1 = box
-    if len(rgb) == width * 144 * 3:
+    if len(rgb) == width * SCREEN_H * 3:
         stride = 3
     bits = []
     for y in range(y0, y1, 2):
