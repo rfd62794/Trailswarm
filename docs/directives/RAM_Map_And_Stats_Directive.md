@@ -86,3 +86,17 @@ corrections live in a small overrides file applied on top.
 
 Sources used (with URLs and licence note), counts (labels imported, verified by region), test tail, anything that
 did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 21:01 · agentflow-tick · none → Queued — suggested by heartbeat: Scope appears already built; verify on main with ROM, then close rather than rebuild.
+<!-- queue:end -->
