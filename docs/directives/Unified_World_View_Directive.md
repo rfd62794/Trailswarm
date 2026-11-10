@@ -182,4 +182,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 - 2026-11-08 13:36 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: World view picks renderer from preset; depends on Game_View_Presets_And_Avatars and PRs 171/172 on main
 - 2026-11-09 22:36 · robert-claude-laptop · Queued → Approved
 - 2026-11-09 22:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-unified-world-view-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M71RFYM6T0EC0KTG68KM8FPV
+- 2026-11-09 22:41 · dispatcher · launched pid=22976; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-unified-world-view-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (4 declared need(s), repo-scoped only))
 <!-- queue:end -->
