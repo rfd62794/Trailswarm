@@ -172,7 +172,7 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-unified-world-view-directive |
 | Base branch | - |
@@ -190,4 +190,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 - 2026-11-10 07:13 · robert-claude-laptop · Blocked → Review — Head re-resolved to 8e58b84 after review fixes; independent re-review APPROVE on PR #186. [origin] spent: devin 55 min est. n/a
 - 2026-11-10 07:19 · robert-claude-laptop · Review → Blocked — Row head 8e58b84 is stale; branch head is 1454c6e after merging main and one test scope fix. Re-resolving the head.
 - 2026-11-10 07:19 · robert-claude-laptop · Blocked → Review — Head re-resolved to 1454c6e; review of the merge and test scope change recorded on PR #186. [origin] spent: devin 55 min est. n/a
+- 2026-11-10 07:22 · robert-claude-laptop · Review → Done — note: PR #186 merged; independent review APPROVE; full verify at 1454c6e 2323 passed, 0 failed, 41 known skips.
 <!-- queue:end -->
