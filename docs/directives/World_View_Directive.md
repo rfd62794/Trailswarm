@@ -87,3 +87,17 @@ thread from a snapshot copy.
 ## 8. Report
 
 Event schema, PNG path, steps/sec measurement, test tail, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 20:23 · agentflow-tick · none → Queued — suggested by heartbeat: Scope appears already built; closure audit only (merge state, tests, steps/sec), do not rebuild.
+<!-- queue:end -->
