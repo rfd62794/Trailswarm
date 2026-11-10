@@ -13,6 +13,16 @@ def rec(agent="a-1", **kw):
     return r
 
 
+def rewrite_live(source, record):
+    """write_live over an existing file, with an explicit later mtime: the store's change
+    stamp is (mtime_ns, size), and a same-size rewrite inside one filesystem timestamp tick
+    (coarse on Windows) is otherwise indistinguishable from no change."""
+    write_live(source, record)
+    path = source / "live" / f"{record['agent']}.json"
+    ns = path.stat().st_mtime_ns + 1_000_000_000
+    os.utime(path, ns=(ns, ns))
+
+
 def test_write_then_read_round_trip_atomically(tmp_path):
     write_live(tmp_path, rec())
     out = tmp_path / "live" / "a-1.json"
@@ -57,7 +67,7 @@ def test_store_refresh_picks_up_drops_and_stays_cached(tmp_path):
     parsed = store.parsed
     assert store.refresh(tmp_path, 1000.5) is False                      # same stamp: no re-parse
     assert store.parsed == parsed
-    write_live(tmp_path, rec(x=7, updated_at=1000.5))                    # changed file
+    rewrite_live(tmp_path, rec(x=7, updated_at=1000.5))                  # changed file
     assert store.refresh(tmp_path, 1000.5) is True
     assert store.parsed == parsed + 1 and store.positions()["a-1"].x == 7.0
     os.remove(tmp_path / "live" / "a-1.json")
@@ -70,7 +80,7 @@ def test_store_treats_old_records_as_absent(tmp_path):
     write_live(tmp_path, rec(updated_at=100.0))
     assert store.refresh(tmp_path, 100.0 + STALE_S + 1) is False         # stale on arrival
     assert store.positions() == {}
-    write_live(tmp_path, rec(updated_at=200.0))
+    rewrite_live(tmp_path, rec(updated_at=200.0))
     assert store.refresh(tmp_path, 200.0) is True                        # fresh again
     assert "a-1" in store.positions()
 

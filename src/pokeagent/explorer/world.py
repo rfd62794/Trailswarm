@@ -125,15 +125,19 @@ class WorldGraph:
 
 
 def interaction_spots(maps: dict, needle: str) -> list[tuple[int, int, int, str]]:
-    """(map, x, y, facing) of recorded interactions whose text mentions `needle`."""
-    out = []
+    """(map, x, y, facing) of recorded interactions whose text mentions `needle`; an entry whose
+    ``type`` equals it (case-insensitive) also matches, and type matches come before text-only ones."""
+    typed, texted = [], []
     for mid, d in maps.items():
         for key, e in d.get("interactions", {}).items():
+            x, y, f = key.split(",")
+            if (e.get("type", "") or "").lower() == needle.lower():
+                typed.append((int(mid), int(x), int(y), f))
+                continue
             hay = ((e.get("text") or "") + " " + " ".join(e.get("choices", []) or [])).lower()
             if needle.lower() in hay:
-                x, y, f = key.split(",")
-                out.append((int(mid), int(x), int(y), f))
-    return out
+                texted.append((int(mid), int(x), int(y), f))
+    return typed + texted
 
 
 PLAYER_HOUSE_MAPS = (0x25, 0x26)  # Red's house and bedroom: the parcel is never handed out there
