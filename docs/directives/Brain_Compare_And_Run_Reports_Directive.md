@@ -85,7 +85,7 @@ Run-directory files `brain assists` reads (real shapes, from `src/pokeagent/expl
 - `transitions.jsonl`, one JSON object per press: `{"step": int, "from": [map, x, y], "button": "A", "to": [map, x, y], "moved": bool, "textbox": "dialog" or "none", "text": str, "facing": "UP", "source": "agent" or "human" or "claude" (any other string is a non-assist driver), ...}`. `source` human or claude marks a press made by a person or by Claude through the control server; those are the assists.
 - `goal_frames.jsonl`, one object per goal first reached in the run: `{"goal": "<goal id>", "step": int, "frame": int}`.
 - `meta.json`: an object that may hold `"initial_goals": [goal ids]`, goals already done at the start (a missing key means none).
-- The goal ladder, in order, is `pokeagent.goals.GOALS` (a list of ids). The stage at a step is the first goal that is neither an initial goal nor reached at or before that step, or `"done"`, exactly as `explorer.decisions.goal_stage` defines it.
+- The goal ladder, in order, is `pokeagent.goals.GOALS` (a list of ids). The stage at a step is the first goal that is neither an initial goal nor reached at or before that step, or `"done"`. This is the same first-unreached rule as `explorer.decisions.goal_stage`, which reads one goals dict and has no step argument, applied here per step over the step-indexed goal frames.
 
 ## 2. Scope
 
