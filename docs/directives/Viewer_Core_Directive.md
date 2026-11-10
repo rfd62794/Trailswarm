@@ -170,3 +170,17 @@ touch, inactive after `idle_s` with an injected clock, a second touch extends it
 
 Test tail, line counts, the grid column counts your `grid` returns for n = 1..12 at 1920x1000, and anything in
 section 3 you had to interpret.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 20:24 · agentflow-tick · none → Queued — suggested by heartbeat: Reconcile only: deliverables exist and V2 cites V1 (#26) as merged; verify and mark Done, do not rebuild.
+<!-- queue:end -->
