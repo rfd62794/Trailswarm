@@ -12,7 +12,7 @@ import time
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from pokeagent.mapview import controls, overlay, playback
+from pokeagent.mapview import controls, overlay, pick, playback, pointer
 from pokeagent.mapview.best import best_index
 from pokeagent.mapview.compose import agent_rows, compose_base  # noqa: F401  (re-exported)
 from pokeagent.mapview.layout import LABEL_H, Layout, locate
@@ -20,6 +20,7 @@ from pokeagent.mapview.presets import resolve
 from pokeagent.mapview.texcache import TexCache
 from pokeagent.mapview.smooth import Smoother
 from pokeagent.mapview.walk import LiveTracker
+from pokeagent.viewer import selection as _selection
 from pokeagent.world.follow import Follow
 from pokeagent.world.pyramid import Pyramid
 from pokeagent.world.view import Viewport
@@ -32,10 +33,14 @@ class MapWindow:
     """Window state plus one frame of work. ``headless`` skips input, textures and draw writes."""
 
     def __init__(self, snapshot, headless: bool = False, fps: int = playback.FPS,
-                 avatars=None) -> None:
-        self.headless, self._avatars = headless, avatars
+                 avatars=None, on_pick=None) -> None:
+        self.headless, self._avatars, self.on_pick = headless, avatars, on_pick
+        self.unified = on_pick is not None    # inside the viewer: click-pick + "Follow selected", no agent pane
+        self.sel = _selection.Selection()     # the host's shared selection, pushed via set_selected
+        self.selected: tuple[str, str] | None = None
+        self._drawn: list = []                # heads the last tick drew (the click-target list)
         self.clock, self.vp, self.follow = playback.Clock(), Viewport(1, 1), Follow()
-        self.trails, self.marks, self.follow_best = True, True, False
+        self.trails, self.marks, self.follow_best = True, True, self.unified
         self.follow_live = self._follow_touched = False
         self.preset, self.preset_note = resolve(), ""
         self._live_pts, self._track, self._smooth = {}, None, Smoother()
@@ -102,52 +107,37 @@ class MapWindow:
     def _set_follow_best(self, on: bool) -> None:
         self.follow_best, self._best_run, self._follow_touched = on, None, True
         if not on: self.follow.stop()
-        if not self.headless and dpg.does_item_exist(controls.FOLLOW_CB):
-            dpg.set_value(controls.FOLLOW_CB, on)
+        if not self.headless:
+            for tag in (controls.FOLLOW_CB, controls.FOLLOW_SEL):
+                if dpg.does_item_exist(tag):
+                    dpg.set_value(tag, on)
 
     def _user_panned(self) -> None:
-        """A manual pan wins: follow goes off (and the checkbox with it), the camera stays put."""
-        self.follow.stop()
-        if self.follow_best:
-            self._set_follow_best(False)
+        pointer.user_panned(self)
+
+    def set_selected(self, agent: str | None, kind: str = "live") -> None:
+        """The unified host pushes the shared selection; the camera follows it (unified mode)."""
+        self.sel.agent, self.sel.is_live, self.selected = agent, kind == "live", (agent, kind) if agent else None
+
+    def _best_ghost_pos(self, agent: str) -> tuple[float, float] | None:
+        gs = [g for g in self.tables.ghosts if g.agent == agent]
+        b = best_index(gs, self.tables.area_names)
+        return self._points().get(gs[b].run) if b is not None else None
 
     def _follow_agent(self, agent: str) -> None:
-        gs = [g for g in self.tables.ghosts if g.agent == agent]
-        if (b := best_index(gs, self.tables.area_names)) is not None:
-            self._set_follow_best(False)
-            self.follow.start(gs[b].run, time.monotonic())
-            if (p := self._points().get(gs[b].run)) is not None:
-                self.vp.center_on(*p)
+        controls.follow_agent(self, agent)
 
     def resize(self, w: int, h: int) -> None:
         if not dpg.does_item_exist(CANVAS): return
-        dpg.configure_item(CANVAS, width=max(100, w - 250), height=max(100, h - 60))
-        self.vp.resize(max(100, w - 250), max(100, h - 60))
+        side = 0 if self.unified else 250      # the agent pane is hidden in the unified window
+        dpg.configure_item(CANVAS, width=max(100, w - side), height=max(100, h - 60))
+        self.vp.resize(max(100, w - side), max(100, h - 60))
 
-    def _mouse(self):
-        if not dpg.does_item_exist(CANVAS) or not dpg.is_item_hovered(CANVAS):
-            return None
-        mx, my = dpg.get_mouse_pos(local=False)
-        ox, oy = dpg.get_item_rect_min(CANVAS)
-        return mx - ox, my - oy
-
-    def _wheel(self, delta) -> None:
-        if (m := self._mouse()) is not None:
-            self.vp.step_zoom_at(m[0], m[1], 1 if float(delta) > 0 else -1)
-
-    def _press(self) -> None: self._down_at = self._mouse()
-
-    def _release(self) -> None: self._down_at = self._last_mouse = None
-
-    def _drag(self) -> None:
-        m = self._mouse()
-        down = m is not None and self._down_at is not None and dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
-        if down and self._last_mouse is not None:
-            d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
-            if d[0] or d[1]:
-                self.vp.pan(*d)
-                self._user_panned()
-        self._last_mouse = m if down else None
+    def _mouse(self): return pointer.mouse(self)
+    def _wheel(self, delta): pointer.wheel(self, delta)
+    def _press(self): pointer.press(self)
+    def _release(self): pointer.release(self)
+    def _drag(self): pointer.drag(self)
 
     def tick(self, dt: float, now: float | None = None) -> playback.Frame:
         """One frame of replay: advance the shared clock, follow, rasterise the one overlay."""
@@ -158,12 +148,17 @@ class MapWindow:
         self.best = best_index(self.tables.ghosts, self.tables.area_names)
         self._live_pts = self._smooth.step(self._live_points(), dt)
         self._follow_tick(now, dt)
+        live_draw = self._live_draw()
+        if self.unified:
+            self._drawn = pick.heads(self.frame, self.tables, self.layout, self.vp.visible(),
+                                     self.vp.zoom, live=live_draw)
         self.overlay_img = overlay.render(self.frame, self.tables, self.layout, self.vp.visible(),
                                           self.vp.zoom, trails=self.trails,
                                           show_marks=self.marks, best=self.best,
-                                          avatars=self._avatars, live=self._live_draw(),
+                                          avatars=self._avatars, live=live_draw,
                                           avatar_size=self.preset.avatar_size,
-                                          walk_frames=self.preset.walk_frames)
+                                          walk_frames=self.preset.walk_frames,
+                                          selected=self.selected)
         self.uploads += 1
         if not self.headless:
             self._upload_overlay()
@@ -200,6 +195,16 @@ class MapWindow:
         return out
 
     def _follow_tick(self, now: float, dt: float) -> None:
+        if self.unified:   # "Follow selected": the camera rides the shared selection's target
+            target = None
+            if self.follow_best and self.sel.agent is not None:
+                if self.follow.agent_id != self.sel.agent:
+                    self.follow.start(self.sel.agent, now)
+                target = _selection.camera_target(self.sel, self._live_points(), self._best_ghost_pos)
+            if target is not None:
+                self.follow.step(self.vp, target, 0.0 if self._follow_t is None else now - self._follow_t)
+            self._follow_t = now
+            return
         if self.follow_best:
             if self.follow_live and self._live_pts:
                 agent = min(self._live_pts)

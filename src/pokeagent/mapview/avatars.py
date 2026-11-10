@@ -136,5 +136,7 @@ def feed(cache: AvatarCache, preset, positions, frame_for, track) -> None:
         got = frame_for(agent)
         if got is not None:
             rgb, w, h = got
+            px = np.frombuffer(rgb, np.uint8) if isinstance(rgb, (bytes, bytearray)) \
+                else np.asarray(rgb, np.uint8)
             facing, _ph = track.update(agent, pos.area, pos.x, pos.y)
-            cache.offer(preset, facing, np.asarray(rgb, np.uint8).reshape(h, w, -1), pos)
+            cache.offer(preset, facing, px.reshape(h, w, -1), pos)

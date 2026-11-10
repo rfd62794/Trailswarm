@@ -6,13 +6,17 @@ existing window tests drive the same methods and see the same uploads.
 """
 from __future__ import annotations
 
+import time
+
 import dearpygui.dearpygui as dpg
 
 from pokeagent.mapview import overlay
+from pokeagent.mapview.best import best_index
 from pokeagent.world.pyramid import to_gpu
 
 ROOT, TEX, CANVAS = "mapview_root", "mapview_tex", "mapview_canvas"
 AGENTS_PANE, FOLLOW_CB = "mapview_agents", "mapview_follow_best"
+FOLLOW_SEL = "mapview_follow_sel"           # the unified mode's "Follow selected" checkbox
 MAX_UPLOADS, COARSEST_F = 2, 8          # uploads per frame, fallback pyramid depth
 SPEEDS = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0, "4x": 4.0}
 
@@ -32,11 +36,14 @@ def build_body(win, parent=None) -> None:
             for label, attr in (("trails", "trails"), ("marks", "marks")):
                 dpg.add_checkbox(label=label, default_value=True,
                                  callback=cb(lambda a, attr=attr: setattr(win, attr, bool(a))))
-            dpg.add_checkbox(label="follow", default_value=win.follow_best, tag=FOLLOW_CB,
+            dpg.add_checkbox(label="Follow selected" if win.unified else "follow",
+                             default_value=win.follow_best,
+                             tag=FOLLOW_SEL if win.unified else FOLLOW_CB,
                              callback=cb(lambda a: win._set_follow_best(bool(a))))
         with dpg.group(horizontal=True):
             dpg.add_drawlist(width=800, height=560, tag=CANVAS)
-            dpg.add_child_window(width=230, border=True, tag=AGENTS_PANE)
+            if not win.unified:  # unified: the agent list is the viewer side panel's instead
+                dpg.add_child_window(width=230, border=True, tag=AGENTS_PANE)
 
 
 def wire_input(win) -> None:
@@ -45,6 +52,17 @@ def wire_input(win) -> None:
         dpg.add_mouse_wheel_handler(callback=cb(win._wheel))
         dpg.add_mouse_click_handler(dpg.mvMouseButton_Left, callback=lambda s, a, u=None: win._press())
         dpg.add_mouse_release_handler(dpg.mvMouseButton_Left, callback=lambda s, a, u=None: win._release())
+
+
+def follow_agent(win, agent: str) -> None:
+    """Agent-table row click: follow that agent's best ghost's replay."""
+    gs = [g for g in win.tables.ghosts if g.agent == agent]
+    b = best_index(gs, win.tables.area_names)
+    if b is not None:
+        win._set_follow_best(False)
+        win.follow.start(gs[b].run, time.monotonic())
+        if (p := win._points().get(gs[b].run)) is not None:
+            win.vp.center_on(*p)
 
 
 def fill_agent_table(win) -> None:

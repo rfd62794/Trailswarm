@@ -27,6 +27,7 @@ from pokeagent.viewer.ui.focus_view import FocusView
 from pokeagent.viewer.ui.grid_view import GridView
 from pokeagent.viewer.spawn_control import SpawnControl
 from pokeagent.viewer.ui.stadium_pane import StadiumPane
+from pokeagent.viewer.ui.stitched_host import StitchedHost
 from pokeagent.viewer.ui.swarm_page import SwarmPage
 from pokeagent.viewer.ui.window_health import HealthLayoutMixin
 from pokeagent.viewer.ui.window_host import CommandHostMixin
@@ -44,13 +45,14 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
     def __init__(self, model: ViewerModel, sources: dict, fps: int = 30,
                  supervisor=None, hold_s_for: Callable[[str], float | None] | None = None,
                  root: Path | None = None, world: WorldModel | None = None,
-                 health: HealthStore | None = None, swarm=None) -> None:
+                 health: HealthStore | None = None, swarm=None, stitched=None) -> None:
         self.model, self.sources, self.fps = model, sources, fps
         self.supervisor, self.root = supervisor, root
         self._spawn = SpawnControl(supervisor, root)
         self._hold_s_for = hold_s_for or (lambda _aid: None)
         self.focus = FocusState()
         self.world = WorldHost(self, world)
+        self.stitched = StitchedHost(self, stitched) if stitched is not None else None
         self.health = health or HealthStore()
         self.entries: dict = {}                # agent_id -> registry entry; app.run() assigns before run()
         self._stadium_pref: bool | None = None  # user toggle; None = follow the mode
@@ -130,7 +132,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         prev = self.focus.mode
         self.focus.set_mode(mode)
         if mode == "world" and prev != "world" and self.selected is not None:
-            self.world.follow(self.selected)
+            (self.stitched or self.world).follow(self.selected)
 
     def toggle_view_mode(self) -> None:
         self.set_view_mode("world" if self.focus.mode == "grid" else "grid")
@@ -139,12 +141,14 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         """Card 'Follow' button: select, switch to World and follow."""
         self.selected = agent_id
         self.set_view_mode("world")
-        self.world.follow(agent_id)
+        (self.stitched or self.world).follow(agent_id)
 
     def view_mode(self) -> str:
         return self.focus.mode
 
     def following(self) -> str | None:
+        if self.stitched is not None:
+            return self.stitched.following()
         v = self.world.view
         return v.follow.agent_id if v is not None else self.world.pending_follow
 
@@ -183,7 +187,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
                               self.toggle_focus, self._on_select)
         self._focus_view = FocusView(self._win, self.model, self._card_factory,
                                      self.leave_focus, self.toggle_focus, self._on_select)
-        self.world.build()
+        (self.stitched or self.world).build()
         self._stadium = StadiumPane(self.toggle_focus, on_close=self.on_stadium_close)
         self._swarm = SwarmPage(self.toggle_focus, on_close=self.on_swarm_close)
         menu.build(self)
@@ -203,7 +207,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         self._last_size = (vw, vh)
         dpg.configure_item(self._win, pos=[0, 0], width=vw, height=vh)
         avail = max(80, vh - ui_scale.px(_BAR_H))
-        self.world.fit(vw, avail)
+        (self.stitched or self.world).fit(vw, avail)
         for view in (self._grid, self._focus_view):
             if view is not None and dpg.does_item_exist(view.area):
                 dpg.delete_item(view.area)
@@ -235,7 +239,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         if focused != self._shown_focus:  # the title always names the view (and what steers)
             self._shown_focus = focused
             dpg.set_viewport_title(self._title(getattr(self, "ui_fps", None)))
-        self.world.tick()
+        (self.stitched or self.world).tick()
         self._panes_tick()  # Stadium + Swarm top-level windows: visibility, menu mirrors, content
         if self._grid is not None:
             dpg.configure_item(self._grid.area, show=self.focus.view == "grid")

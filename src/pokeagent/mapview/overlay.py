@@ -90,8 +90,9 @@ def _stamp_all(out, img, xs0, ys0) -> None:
     out[py[inside], px[inside], 3] = 255
 
 
-def _live(out, live, avatars, size, zoom, x0, y0, side, palette) -> None:
-    """Each live agent (space coords) drawn like a head plus a 1 px white ring."""
+def _live(out, live, avatars, size, zoom, x0, y0, side, palette, selected=None) -> None:
+    """Each live agent (space coords) drawn like a head plus a 1 px white ring; the selected
+    one gets a further 2 px ring in its agent colour."""
     for agent, lx, ly, f, ph in live:
         px, py = (lx - x0) * zoom, (ly - y0) * zoom
         if not (0 <= px < out.shape[1] and 0 <= py < out.shape[0] and math.isfinite(px) and math.isfinite(py)):
@@ -106,6 +107,9 @@ def _live(out, live, avatars, size, zoom, x0, y0, side, palette) -> None:
             _stamp(out, s, px, py)
             rw, rh = s.shape[1] + 2, s.shape[0] + 2
         _ring(out, px, py, rw, rh, BEST_RGB)
+        if agent == selected:
+            _ring(out, px, py, rw + 2, rh + 2, rgb)
+            _ring(out, px, py, rw + 4, rh + 4, rgb)
 
 
 def _trails(out, frame: Frame, tb: Tables, ox, oy, known, colors, x0, y0, zoom, w, h) -> None:
@@ -131,10 +135,12 @@ def _trails(out, frame: Frame, tb: Tables, ox, oy, known, colors, x0, y0, zoom, 
 
 def render(frame: Frame, tb: Tables, layout, rect, zoom, palette: np.ndarray = PALETTE, *,
            trails: bool = True, show_marks: bool = True, best: int | None = None,
-           avatars=None, avatar_size: int = 16, live=None, walk_frames: bool = False) -> np.ndarray:
+           avatars=None, avatar_size: int = 16, live=None, walk_frames: bool = False,
+           selected: tuple[str, str] | None = None) -> np.ndarray:
     """ONE uint8 RGBA array the size of the visible screen rectangle (never the whole space).
     ``avatars``: object with ``get(agent, facing, phase, colour) -> RGBA | None``; ``live``:
-    ``(agent, x, y, facing, phase)`` tuples in space coordinates."""
+    ``(agent, x, y, facing, phase)`` tuples in space coordinates; ``selected``: an optional
+    ``(agent, "live" | "ghost")`` pair whose heads get a 2 px agent-colour ring."""
     x0, y0, x1, y1 = rect
     w, h = max(1, int(round((x1 - x0) * zoom))), max(1, int(round((y1 - y0) * zoom)))
     out, side = np.zeros((h, w, 4), np.uint8), max(3, int(3 * zoom))
@@ -176,5 +182,12 @@ def render(frame: Frame, tb: Tables, layout, rect, zoom, palette: np.ndarray = P
                 mx, my = (cx[:, None] + arms).ravel(), (cy[:, None] + span).ravel()
                 inside = (mx >= 0) & (mx < w) & (my >= 0) & (my < h)
                 out[my[inside], mx[inside], :3], out[my[inside], mx[inside], 3] = MARK_RGB, 255
-    _live(out, live or (), avatars, avatar_size, zoom, x0, y0, side, palette)
+            if selected is not None and selected[1] == "ghost":
+                sc = palette[color_index(selected[0], len(palette))]
+                rw = max(side, int(round(avatar_size * zoom))) + 4
+                for k in np.flatnonzero(ok & (np.asarray(tb.agents) == selected[0])):
+                    _ring(out, hx[k], hy[k], rw, rw, sc)
+                    _ring(out, hx[k], hy[k], rw + 2, rw + 2, sc)
+    _live(out, live or (), avatars, avatar_size, zoom, x0, y0, side, palette,
+          selected[0] if selected is not None and selected[1] == "live" else None)
     return out

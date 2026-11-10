@@ -29,20 +29,22 @@ class Preset:
     walk_frames: bool             # facing + walk phase apply
     area_gap_px: int              # world px between stacked areas; 0 = the layout default
     edge_palette: tuple[str, ...] # hex colours; empty = no edge lines
+    world_renderer: str           # "rom-world" | "stitched": which renderer World mode uses
 
 
 GENRES = {
     "platformer": Preset("platformer", "platformer", "strip", "frame_crop", 16, "line", 90,
-                         "live", ("segment",), False, 8, EDGE_PALETTE),
+                         "live", ("segment",), False, 8, EDGE_PALETTE, "stitched"),
     "rpg-overworld": Preset("rpg-overworld", "rpg-overworld", "grid", "rom_sprite", 18, "dots", 90,
-                            "live", ("segment",), True, 0, ()),
+                            "live", ("segment",), True, 0, (), "rom-world"),
     "flip-screen": Preset("flip-screen", "flip-screen", "strip", "frame_crop", 16, "line", 90,
-                          "live", ("segment",), False, 0, EDGE_PALETTE),
+                          "live", ("segment",), False, 0, EDGE_PALETTE, "stitched"),
 }
 
 GAMES = {
-    "super-mario-land": {"inherits": "platformer", "status_fields": ("segment", "screen.box_text")},
-    "pokemon-red": {"inherits": "rpg-overworld",
+    "super-mario-land": {"inherits": "platformer", "status_fields": ("segment", "screen.box_text"),
+                         "world_renderer": "stitched"},
+    "pokemon-red": {"inherits": "rpg-overworld", "world_renderer": "rom-world",
                     "status_fields": ("segment", "screen.party", "screen.money")},
 }
 

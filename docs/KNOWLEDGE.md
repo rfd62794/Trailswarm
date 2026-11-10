@@ -293,6 +293,21 @@ fields and the area gap per game/genre (`--game`/`--preset`/`--genre`; explicit 
 unknown names show "unknown preset"). `mapview/edges.py` draws a 2 px gap line between stacked
 areas so touching maps read as separate rooms.
 
+The viewer's World mode has two renderers (2026-11-09): with no `--source` it is always the
+ROM-rendered world (`"rom-world"`); with `--source <dir>` the resolved preset's `world_renderer`
+field decides — `rom-world` keeps the ROM world even with a source, `stitched` embeds the mapview
+renderer (same window, same control bar). Launch:
+`uv run pokeagent view --mode world --source runs/mario-land [--game super-mario-land]`;
+`tools/map_view.py <source>` forwards to it. One `Selection` (`viewer/selection.py`) drives the
+map camera, the gameplay panel and the agent list: auto mode follows the "featured" agent
+(freshest live file among registry ids, else the first registry id), a click on a head
+(`mapview/pick.py`) or a list row makes a sticky user pick, and "Auto" releases it. Selecting a
+ghost-only name moves the camera but leaves the gameplay panel on the featured agent with a
+"recorded run" notice. Implementation: `viewer/stitched_source.py` (stores + refresh threads +
+`frame_for` frame bridge) and `viewer/ui/stitched_{host,side}.py`; the embedded `MapWindow` runs
+in a "unified" mode (`on_pick` set): Follow selected replaces the follow checkbox, its agent pane
+stays hidden, and a `set_selected` ring marks the pick.
+
 ## Viewer (pull model, 2026-11-07)
 
 - The poll thread pulls on a per-source cadence instead of polling everything every frame: snapshots
