@@ -83,7 +83,10 @@ def test_bad_game_env_exits_2(tmp_path, monkeypatch, capsys):
 
 
 def test_other_subcommands_do_not_gain_the_flag():
-    for cmd in ("world", "states", "view"):
+    # `view` is deliberately absent: the Unified World view directive gives it its own --game, which
+    # names a mapview preset row (super-mario-land, pokemon-red), not the shared GameSpec registry
+    # that add_game_argument serves; it is validated by viewer.app.check_launch.
+    for cmd in ("world", "states"):
         with pytest.raises(SystemExit) as exc:
             cli.main([cmd, "--game", "pokemon-red"])
         assert exc.value.code == 2

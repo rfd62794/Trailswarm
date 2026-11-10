@@ -29,20 +29,22 @@ class Preset:
     walk_frames: bool             # facing + walk phase apply
     area_gap_px: int              # world px between stacked areas; 0 = the layout default
     edge_palette: tuple[str, ...] # hex colours; empty = no edge lines
+    world_renderer: str = "rom-world"  # "rom-world" | "stitched": which renderer World mode uses
 
 
 GENRES = {
     "platformer": Preset("platformer", "platformer", "strip", "frame_crop", 16, "line", 90,
-                         "live", ("segment",), False, 8, EDGE_PALETTE),
+                         "live", ("segment",), False, 8, EDGE_PALETTE, "stitched"),
     "rpg-overworld": Preset("rpg-overworld", "rpg-overworld", "grid", "rom_sprite", 18, "dots", 90,
-                            "live", ("segment",), True, 0, ()),
+                            "live", ("segment",), True, 0, (), "rom-world"),
     "flip-screen": Preset("flip-screen", "flip-screen", "strip", "frame_crop", 16, "line", 90,
-                          "live", ("segment",), False, 0, EDGE_PALETTE),
+                          "live", ("segment",), False, 0, EDGE_PALETTE, "stitched"),
 }
 
 GAMES = {
-    "super-mario-land": {"inherits": "platformer", "status_fields": ("segment", "screen.box_text")},
-    "pokemon-red": {"inherits": "rpg-overworld",
+    "super-mario-land": {"inherits": "platformer", "status_fields": ("segment", "screen.box_text"),
+                         "world_renderer": "stitched"},
+    "pokemon-red": {"inherits": "rpg-overworld", "world_renderer": "rom-world",
                     "status_fields": ("segment", "screen.party", "screen.money")},
 }
 
@@ -61,6 +63,18 @@ def _game(name: str) -> Preset:
 
 def _unknown(requested: str, genre: str | None) -> Preset:
     return _clamp(replace(GENRES.get(genre or "", GENRES[DEFAULT_GENRE]), name=f"{requested}?"))
+
+
+def name_error(game: str | None = None, preset: str | None = None, genre: str | None = None) -> str | None:
+    """A message listing the valid names when any given name is unknown, else None (resolve itself still falls back)."""
+    bad = []
+    if game is not None and game not in GAMES:
+        bad.append(f"--game {game!r} (valid: {', '.join(sorted(GAMES))})")
+    if preset is not None and preset not in GENRES and preset not in GAMES:
+        bad.append(f"--preset {preset!r} (valid: {', '.join(sorted({*GENRES, *GAMES}))})")
+    if genre is not None and genre not in GENRES:
+        bad.append(f"--genre {genre!r} (valid: {', '.join(sorted(GENRES))})")
+    return ("unknown view name: " + "; ".join(bad)) if bad else None
 
 
 def resolve(game: str | None = None, preset: str | None = None, genre: str | None = None) -> Preset:

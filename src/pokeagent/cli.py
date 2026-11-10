@@ -156,7 +156,8 @@ def _cmd_view(args: argparse.Namespace) -> int:
     # Lazy import: the viewer pulls dearpygui/PIL only when actually opened.
     from pokeagent.viewer.app import run
 
-    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode)
+    return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode,
+               source=args.source, game=args.game, preset=args.preset, genre=args.genre)
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
@@ -228,6 +229,12 @@ def _build_parser() -> argparse.ArgumentParser:
                       help="poll/UI rate (default 30)")
     view.add_argument("--mode", choices=("tiles", "world"), default="world",
                       help="start view: world (default) or tiles (the agent card grid); Tab swaps")
+    view.add_argument("--source", metavar="DIR",
+                      help="stitched map source (maps/ ghosts/ live/) for World mode")
+    view.add_argument("--game", metavar="NAME", help="named game row of the preset table")
+    view.add_argument("--preset", metavar="NAME", help="named view preset (wins over --game)")
+    view.add_argument("--genre", metavar="NAME",
+                      help="named genre fallback when --game/--preset are absent")
     view.set_defaults(func=_cmd_view)
 
     from pokeagent.world.app import add_parser as _add_world
