@@ -29,7 +29,7 @@ class Preset:
     walk_frames: bool             # facing + walk phase apply
     area_gap_px: int              # world px between stacked areas; 0 = the layout default
     edge_palette: tuple[str, ...] # hex colours; empty = no edge lines
-    world_renderer: str           # "rom-world" | "stitched": which renderer World mode uses
+    world_renderer: str = "rom-world"  # "rom-world" | "stitched": which renderer World mode uses
 
 
 GENRES = {
@@ -63,6 +63,18 @@ def _game(name: str) -> Preset:
 
 def _unknown(requested: str, genre: str | None) -> Preset:
     return _clamp(replace(GENRES.get(genre or "", GENRES[DEFAULT_GENRE]), name=f"{requested}?"))
+
+
+def name_error(game: str | None = None, preset: str | None = None, genre: str | None = None) -> str | None:
+    """A message listing the valid names when any given name is unknown, else None (resolve itself still falls back)."""
+    bad = []
+    if game is not None and game not in GAMES:
+        bad.append(f"--game {game!r} (valid: {', '.join(sorted(GAMES))})")
+    if preset is not None and preset not in GENRES and preset not in GAMES:
+        bad.append(f"--preset {preset!r} (valid: {', '.join(sorted({*GENRES, *GAMES}))})")
+    if genre is not None and genre not in GENRES:
+        bad.append(f"--genre {genre!r} (valid: {', '.join(sorted(GENRES))})")
+    return ("unknown view name: " + "; ".join(bad)) if bad else None
 
 
 def resolve(game: str | None = None, preset: str | None = None, genre: str | None = None) -> Preset:

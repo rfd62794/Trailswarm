@@ -122,14 +122,15 @@ def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=N
 
 
 def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False,
-        mode: str = modes.DEFAULT_MODE, source=None, game=None, preset=None, genre=None) -> int:
+        mode: str = modes.DEFAULT_MODE, source=None, game=None, preset=None, genre=None,
+        refresh: float | None = None) -> int:
     """One entry point: the same window for `view` and `world`; ``mode`` ('tiles' | 'world') only picks the start view.
     ``source`` is a stitched-map dir (maps/ ghosts/ live/); the preset's world_renderer picks World's renderer."""
     root = Path(root)
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
     world = WorldModel()
-    stitched = _stitched_source(source, model, game, preset, genre)
+    stitched = _stitched_source(source, model, game, preset, genre, fps=fps, refresh=refresh)
     holder = {"sources": dict(sources), "entries": entries}
     health = health_mod.HealthStore()
     swarm = swarm_rows.SwarmRowStore()
@@ -182,7 +183,8 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
     return 0
 
 
-def _stitched_source(source, model: ViewerModel, game, preset, genre):
+def _stitched_source(source, model: ViewerModel, game, preset, genre, fps: int | None = None,
+                     refresh: float | None = None):
     """The stitched-map source when World mode's renderer is "stitched", else None."""
     if source is None:
         return None
@@ -191,8 +193,11 @@ def _stitched_source(source, model: ViewerModel, game, preset, genre):
     from pokeagent.viewer.stitched_source import StitchedSource
     p = resolve(game=game, preset=preset, genre=genre)
     if renderer_choice.choose(p, Path(source)) != renderer_choice.STITCHED:
+        print(f"pokeagent view: --source {source} ignored: preset {p.name!r} uses the rom-world renderer "
+              "(pick a stitched game/preset to use it)", file=sys.stderr)
         return None
-    st = StitchedSource(source, model, p)
+    kw = {k: v for k, v in (("fps", fps), ("refresh", refresh)) if v is not None}
+    st = StitchedSource(source, model, p, **kw)
     st.start()
     return st
 
@@ -209,10 +214,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--game", help="named game row of the preset table")
     p.add_argument("--preset", help="named view preset (wins over --game)")
     p.add_argument("--genre", help="named genre fallback when --game/--preset are absent")
+    p.add_argument("--refresh", type=float, default=None, metavar="S",
+                   help="stitched-map re-read cadence in seconds (default 2; needs --source)")
     args = p.parse_args(argv)
+    from pokeagent.mapview.presets import name_error
+    bad = name_error(args.game, args.preset, args.genre)
+    if bad:
+        p.exit(2, f"pokeagent view: {bad}\n")
+    if args.source is not None and not Path(args.source).is_dir():
+        p.exit(2, f"pokeagent view: --source {args.source!r} is not an existing directory\n")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode,
-               source=args.source, game=args.game, preset=args.preset, genre=args.genre)
+               source=args.source, game=args.game, preset=args.preset, genre=args.genre,
+               refresh=args.refresh)
 
 
 if __name__ == "__main__":

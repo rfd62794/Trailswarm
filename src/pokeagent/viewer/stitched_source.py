@@ -7,6 +7,7 @@ cached frames into the avatar crop cache (a registry agent's frame, None for gho
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from pathlib import Path
@@ -17,9 +18,12 @@ from pokeagent.mapview.areas import AreaStore
 from pokeagent.mapview.avatars import AvatarCache, AvatarSource, feed
 from pokeagent.mapview.fast_live import live_loop
 from pokeagent.mapview.ghosts import GhostStore
-from pokeagent.mapview.holder import Holder
+from pokeagent.mapview.holder import Holder, Snapshot
+from pokeagent.mapview.layout import gap_for, place
 from pokeagent.mapview.live import LiveStore
 from pokeagent.mapview.walk import LiveTracker
+
+log = logging.getLogger(__name__)
 
 
 class StitchedSource:
@@ -32,10 +36,18 @@ class StitchedSource:
         self.cache = AvatarCache()
         self.avatars = AvatarSource(self.cache, preset)
         self._track = LiveTracker(preset.walk_frames)
-        snap, _ = snapshot_once(self.source, self.areas, self.ghosts, fps, self.live, preset)
-        self.holder = Holder(snap)
+        self.holder = Holder(self._first_snapshot())
         self.stop = threading.Event()
         self.started = False
+
+    def _first_snapshot(self):
+        """The opening Snapshot; an unreadable store shows an empty map instead of raising on the UI thread."""
+        try:
+            return snapshot_once(self.source, self.areas, self.ghosts, self.fps, self.live, self.preset)[0]
+        except Exception:
+            log.exception("stitched source %s unreadable; starting with an empty map", self.source)
+            return Snapshot(self.source, False, (), {}, place((), gap=gap_for(self.preset)),
+                            playback.tables({}, [], self.fps), {}, self.preset)
 
     def snapshot(self):
         """The latest immutable Snapshot the map window adopts."""
@@ -55,6 +67,8 @@ class StitchedSource:
 
     def start(self) -> None:
         """The two refresh daemons: a slow full re-read and the fast live-only feed."""
+        if self.started:
+            return
         self.started = True
         threading.Thread(target=poll_loop, daemon=True, name="stitched-refresh",
                          args=(self.source, self.holder, self.areas, self.ghosts, self.live,
