@@ -121,11 +121,24 @@ def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=N
     return gone
 
 
+def check_launch(source, game, preset, genre) -> None:
+    """Exit 2 with a clear message on an unknown view name or a --source that is not a directory
+    (the one check every entry point, `pokeagent view` and `map_view`, goes through via ``run``)."""
+    from pokeagent.mapview.presets import name_error
+    bad = name_error(game, preset, genre)
+    if bad is None and source is not None and not Path(source).is_dir():
+        bad = f"--source {str(source)!r} is not an existing directory"
+    if bad:
+        print("pokeagent view: " + bad, file=sys.stderr)
+        raise SystemExit(2)
+
+
 def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8899, world_mode: bool = False,
         mode: str = modes.DEFAULT_MODE, source=None, game=None, preset=None, genre=None,
         refresh: float | None = None) -> int:
     """One entry point: the same window for `view` and `world`; ``mode`` ('tiles' | 'world') only picks the start view.
     ``source`` is a stitched-map dir (maps/ ghosts/ live/); the preset's world_renderer picks World's renderer."""
+    check_launch(source, game, preset, genre)
     root = Path(root)
     sources, entries = _sources_for(root, fake)
     model = ViewerModel()
@@ -217,12 +230,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--refresh", type=float, default=None, metavar="S",
                    help="stitched-map re-read cadence in seconds (default 2; needs --source)")
     args = p.parse_args(argv)
-    from pokeagent.mapview.presets import name_error
-    bad = name_error(args.game, args.preset, args.genre)
-    if bad:
-        p.exit(2, f"pokeagent view: {bad}\n")
-    if args.source is not None and not Path(args.source).is_dir():
-        p.exit(2, f"pokeagent view: --source {args.source!r} is not an existing directory\n")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     return run(args.root, fps=args.fps, fake=args.fake, web=args.web, web_port=args.port, mode=args.mode,
                source=args.source, game=args.game, preset=args.preset, genre=args.genre,

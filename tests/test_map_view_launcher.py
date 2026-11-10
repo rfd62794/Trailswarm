@@ -101,7 +101,7 @@ def test_source_with_rom_world_renderer_warns_on_stderr(tmp_path, capsys):
 
 @pytest.mark.parametrize("flag", ["--game", "--preset", "--genre"])
 def test_unknown_name_exits_listing_valid_names(monkeypatch, tmp_path, capsys, flag):
-    monkeypatch.setattr(viewer_app, "run", lambda *a, **k: pytest.fail("must not open a window"))
+    _no_window(monkeypatch)
     with pytest.raises(SystemExit) as e:
         viewer_app.main([flag, "typo-name"])
     assert e.value.code == 2
@@ -117,7 +117,7 @@ def test_known_names_still_accepted(monkeypatch):
 
 
 def test_missing_source_dir_exits_with_message(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(viewer_app, "run", lambda *a, **k: pytest.fail("must not open a window"))
+    _no_window(monkeypatch)
     with pytest.raises(SystemExit) as e:
         viewer_app.main(["--source", str(tmp_path / "nope")])
     assert e.value.code == 2 and "not an existing directory" in capsys.readouterr().err
@@ -146,3 +146,29 @@ def test_start_is_idempotent(monkeypatch, tmp_path):
     st.start()
     st.start()
     assert len(started) == 2        # two daemons once, not four
+
+
+def _no_window(monkeypatch):
+    import pokeagent.viewer.ui.window as win
+    monkeypatch.setattr(win, "ViewerWindow", lambda *a, **k: pytest.fail("built a window"))
+    monkeypatch.setattr(viewer_app, "_sources_for", lambda *a, **k: pytest.fail("got past validation"))
+
+
+def test_pokeagent_view_bad_game_exits_2_without_window(monkeypatch, tmp_path, capsys):
+    from pokeagent.cli import _build_parser
+    _no_window(monkeypatch)
+    a = _build_parser().parse_args(["view", "--mode", "world", "--source", str(tmp_path), "--game", "typo"])
+    with pytest.raises(SystemExit) as e:
+        a.func(a)
+    err = capsys.readouterr().err
+    assert e.value.code == 2 and "typo" in err and "super-mario-land" in err
+
+
+def test_pokeagent_view_missing_source_exits_2_without_window(monkeypatch, tmp_path, capsys):
+    from pokeagent.cli import _build_parser
+    _no_window(monkeypatch)
+    a = _build_parser().parse_args(["view", "--mode", "world", "--source", str(tmp_path / "nope"),
+                                    "--game", "super-mario-land"])
+    with pytest.raises(SystemExit) as e:
+        a.func(a)
+    assert e.value.code == 2 and "not an existing directory" in capsys.readouterr().err
