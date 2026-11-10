@@ -119,3 +119,17 @@ multipliers so the RL selector and the review tool can tune them later.
 ## 8. Report
 
 Tool output with every check, test tail, line counts, and the ROM run's move-choice summary.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 19:21 · agentflow-tick · none → Queued — suggested by heartbeat: Items 1-4 appear built; remaining item 5 and ROM verification need a laptop builder with the cartridge.
+<!-- queue:end -->
