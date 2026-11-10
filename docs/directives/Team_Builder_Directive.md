@@ -74,3 +74,17 @@ merged).
 ## 8. Report
 
 The plan for the next two bosses, ROM purchases/catches/party, test tail, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 20:25 · agentflow-tick · none → Queued — suggested by heartbeat: Superseded by Team_Builder_V2 (PR #151, Done); do not approve as written; claude to retire or rescope leftovers (shopping, PC, DV keep-best, metrics).
+<!-- queue:end -->
