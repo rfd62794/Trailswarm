@@ -172,12 +172,12 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-unified-world-view-directive |
 | Base branch | - |
 | Base commit | 500782e9ebaca45a786b0aa57fcdcda18760df27 |
-| Head commit | 8e58b8421ac499c750e67363cc22cf7e87b4beb7 |
+| Head commit | 1454c6edc6deb374ba2f1dbf9fb785310500b9e2 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -189,4 +189,5 @@ Real-window checklist (Claude, in a real window; Devin cannot do it): with the M
 - 2026-11-10 07:13 · robert-claude-laptop · Review → Blocked — Row head bffa8b9 is stale after review fixes; branch head is 8e58b84. Re-resolving the head so verify runs against it.
 - 2026-11-10 07:13 · robert-claude-laptop · Blocked → Review — Head re-resolved to 8e58b84 after review fixes; independent re-review APPROVE on PR #186. [origin] spent: devin 55 min est. n/a
 - 2026-11-10 07:19 · robert-claude-laptop · Review → Blocked — Row head 8e58b84 is stale; branch head is 1454c6e after merging main and one test scope fix. Re-resolving the head.
+- 2026-11-10 07:19 · robert-claude-laptop · Blocked → Review — Head re-resolved to 1454c6e; review of the merge and test scope change recorded on PR #186. [origin] spent: devin 55 min est. n/a
 <!-- queue:end -->
