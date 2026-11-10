@@ -83,3 +83,17 @@ All scoring pure and tested; behaviour changes limited to trainer-battle lead/sw
 ## 8. Report
 
 Species-book sample, counter table for Brock (or the nearest gym), test tail, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | claude |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 19:19 · agentflow-tick · none → Queued — suggested by heartbeat: Needs local ROM/kb verification and a design call on overlap with team_plan; use a Sonnet builder.
+<!-- queue:end -->
