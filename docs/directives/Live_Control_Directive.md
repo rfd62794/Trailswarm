@@ -91,3 +91,17 @@ params getter is a dict lookup - no per-step file I/O.
 ## 8. Report
 
 Test tail, line counts, the list of registered params with defaults, anything that did not fit.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-09 19:18 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified, dependencies present in tree; Devin-first build work. Confirm Devin login before dispatch.
+<!-- queue:end -->
