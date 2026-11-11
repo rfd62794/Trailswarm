@@ -73,3 +73,17 @@ Python is 3.12 (`uv run python --version` -> `Python 3.12.12`, checked 2026-11-1
 ## 8. Report
 
 What changed per item, the pasted tails of both §5 commands, and anything in §1 you found to be inaccurate.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-10 22:44 · robert-claude-laptop · none → Queued — Independent review of Trailswarm #188 CHANGES-NEEDED (probe exit, crash flush, route-cache key); controller confirmed findings 1-2 in code
+<!-- queue:end -->
