@@ -14,17 +14,15 @@ use arrows / a (A) / s (B) / Enter (START) / Shift (SELECT); p pauses the agent.
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import queue
 import random
 import sys
 import time
-import tkinter as tk
 from concurrent.futures import Future
 from pathlib import Path
-
-from PIL import Image, ImageTk
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pokeagent.emulator import Button, PyBoyEmulator  # noqa: E402
@@ -32,6 +30,8 @@ from pokeagent.explorer.context import ExplorerContext, ExplorerOptions  # noqa:
 from pokeagent.explorer.decisions import DecisionLog  # noqa: E402
 from pokeagent.explorer.demos import shutdown  # noqa: E402
 from pokeagent.explorer.engine import Engine  # noqa: E402
+from pokeagent.explorer.headless_loop import LogRing, run as run_headless  # noqa: E402
+from pokeagent.explorer.jsonl_buf import JsonlBuffer  # noqa: E402
 from pokeagent.explorer.memory import MapMemory  # noqa: E402
 from pokeagent.explorer.perceive import (  # noqa: E402  (re-exported: tools/probe_pc.py imports these from here)
     DIRS, TILEMAP, TILEMAP_LEN, ascii_vision, battle_view, box_open, box_text, frame_lines, is_menu, npc_positions,
@@ -72,6 +72,8 @@ def main(argv=None) -> int:
                     help="publish rendered frames to shared memory pokeagent_frames_<control-port>_<pid> for tools/watch.py")
     ap.add_argument("--frame-every", type=int, default=2,
                     help="render+publish every Nth tick when frame-sharing (render cost only, no extra game frames)")
+    ap.add_argument("--runs-dir", default="runs",
+                    help="parent dir for the run output dir (default runs; probes redirect it to scratch)")
     ap.add_argument("--stop-at-goal", default=None, choices=GOALS, help="end the run when this goal lands (segment runs)")
     ap.add_argument("--stop-at-map", type=lambda v: int(v, 0), default=None,
                     help="end the run on first entry into this map id (a split sub-segment; see tools/segments.py)")
@@ -109,9 +111,10 @@ def main(argv=None) -> int:
         a.starter = random.choice(["bulbasaur", "charmander", "squirtle"])
     explore_run = random.random() < a.explore_rate
 
-    run_dir = Path("runs") / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
+    run_dir = Path(a.runs_dir) / f"explore-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"  # unique even for a swarm started in one second
     run_dir.mkdir(parents=True, exist_ok=True)
-    trans = (run_dir / "transitions.jsonl").open("a", encoding="utf-8")
+    buf = JsonlBuffer()  # one cadence (every 50 steps + close) for the run's per-step jsonl appends
+    trans = buf.open(run_dir / "transitions.jsonl")
     (run_dir / "meta.json").write_text(json.dumps({"start": state_goal(Path(a.state).stem) if a.state else "baseline",
                                                     "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag, "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace, "starter": a.starter, "seed": a.seed,
                                                     "frame_share": a.frame_share, "train_level": a.train_level,
@@ -121,25 +124,35 @@ def main(argv=None) -> int:
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
     emu.tick(idle_frames(a.seed))  # --seed shifts the game's RNG (seed 0/None: unchanged)
 
-    root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
-    root.configure(bg="#111")
-    screen = tk.Label(root, bg="#111", bd=0); screen.grid(row=0, column=0, padx=8, pady=8)
-    con = tk.Text(root, width=78, height=28, bg="#0b0b0b", fg="#d8d8d8", font=("Consolas", 10), bd=0, padx=10, pady=8, wrap="word")
-    con.grid(row=0, column=1, padx=(0, 8), pady=8, sticky="ns")
-    # third pane: what the agent SEES (tile map as text) and what it REMEMBERS (map memory around it)
-    vis = tk.Label(root, bg="#0b0b0b", fg="#9fd8ff", font=("Consolas", 13), justify="left", anchor="nw",
-                   padx=10, pady=8, width=22, height=27)
-    vis.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ns")
-    # fourth pane under the game: the current dialog / menu text, goals, and battle flag (not on the map)
-    dlg = tk.Label(root, bg="#0b0b0b", fg="#ffd9a0", font=("Consolas", 11), justify="left", anchor="nw",
-                   padx=10, pady=6, width=58, height=6)
-    dlg.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
-    for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
-        con.tag_config(tag, foreground=col)
-    def log(t, tag=None):
-        con.insert("end", t + "\n", tag); con.see("end")
+    ring = None
+    if a.headless:
+        # no Tk root at all (a hidden mainloop still paid ~16% of the profile, and any window on
+        # Robert's screen is a hard rule): the console Text becomes a tail ring + console.log file
+        ring = LogRing(run_dir / "console.log")
+        log = ring
+        root = screen = con = vis = dlg = None
+    else:
+        import tkinter as tk
+        from PIL import Image, ImageTk
+        root = tk.Tk(); root.title("PokeAgent explorer demo - 1x  (t turbo, p pause, arrows/a/s/Enter/Shift steer)")
+        root.configure(bg="#111")
+        screen = tk.Label(root, bg="#111", bd=0); screen.grid(row=0, column=0, padx=8, pady=8)
+        con = tk.Text(root, width=78, height=28, bg="#0b0b0b", fg="#d8d8d8", font=("Consolas", 10), bd=0, padx=10, pady=8, wrap="word")
+        con.grid(row=0, column=1, padx=(0, 8), pady=8, sticky="ns")
+        # third pane: what the agent SEES (tile map as text) and what it REMEMBERS (map memory around it)
+        vis = tk.Label(root, bg="#0b0b0b", fg="#9fd8ff", font=("Consolas", 13), justify="left", anchor="nw",
+                       padx=10, pady=8, width=22, height=27)
+        vis.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ns")
+        # fourth pane under the game: the current dialog / menu text, goals, and battle flag (not on the map)
+        dlg = tk.Label(root, bg="#0b0b0b", fg="#ffd9a0", font=("Consolas", 11), justify="left", anchor="nw",
+                       padx=10, pady=6, width=58, height=6)
+        dlg.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
+        for tag, col in {"hdr": "#7fd1ff", "why": "#c9f29b", "btn": "#ffd166", "res": "#ff9f7f", "human": "#f78fff"}.items():
+            con.tag_config(tag, foreground=col)
+        def log(t, tag=None):
+            con.insert("end", t + "\n", tag); con.see("end")
 
-    decisions = DecisionLog(run_dir / "decisions.jsonl")
+    decisions = DecisionLog(run_dir / "decisions.jsonl", fh=buf.open(run_dir / "decisions.jsonl"))
     ctx = ExplorerContext(
         emu=emu, mem=mem, log=log, run_dir=run_dir, trans=trans, explore_run=explore_run,
         opts=ExplorerOptions(starter=a.starter, state_stem=state_goal(Path(a.state).stem) if a.state else "", state_path=a.state or "", steps=a.steps,
@@ -148,6 +161,7 @@ def main(argv=None) -> int:
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
                              bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
                              role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
+    ctx.jsonl_buf = buf  # the shared cadence: per-step jsonl appends flush every 50 steps and on exit
     legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log, goto=a.drill_goto)
     if a.bandit:
         from pokeagent.bandit.driver import attach
@@ -182,7 +196,6 @@ def main(argv=None) -> int:
 
     agent_view = None
     try:  # viewer agent: snapshot+commands on pokeagent.control_server, frames via --frame-share/telemetry
-        import atexit
         from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
         agent_view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id=f"explore-{os.getpid()}",
                                        frame_slot=frame_pub.name if frame_pub else "")
@@ -191,11 +204,14 @@ def main(argv=None) -> int:
         log(f"[viewer agent registered: {agent_view.agent_id}]", "res")
     except Exception as e:
         log(f"[viewer agent unavailable: {e!r}]", "res")
+    atexit.register(buf.close)  # a crash or Ctrl-C still drains the run's buffered .jsonl tail (close is idempotent)
     pos = ctx.pos
 
     def close_logs() -> None:
         ctx.bandit is not None and ctx.bandit.save()
+        buf.close()  # drains every buffered jsonl (transitions, decisions, progress, loops) before they close
         trans.close(); decisions.close()
+        ring is not None and ring.close()
 
     def on_key(ev):
         if ev.keysym == "p":
@@ -286,9 +302,28 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
+    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
+    log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
+    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
+        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
+
     def close_frame_shm() -> None:
         if frame_pub is not None:
             frame_pub.close()
+
+    if a.headless:
+        def _exit_headless() -> None:
+            try:
+                close_frame_shm(); shutdown(ctx); close_logs(); emu.close()
+            except Exception:
+                pass
+            try:
+                ctl.stop()
+            except Exception:
+                pass
+        run_headless(ctx, engine, jobs=jobs, on_exit=_exit_headless, agent_view=agent_view,
+                     frame_pub=frame_pub, frame_every=a.frame_every)
+        return 0
 
     def frame():
         agent_view and agent_view.tick()  # viewer commands + cached snapshot, on this (emulator) thread
@@ -299,31 +334,16 @@ def main(argv=None) -> int:
             except Exception as e:
                 fut.set_exception(e)
         if ctx.done:
-            if a.headless:  # a finished headless agent must EXIT (swarm rounds wait on it)
-                try:
-                    close_frame_shm(); shutdown(ctx); close_logs(); emu.close(); root.destroy()
-                except Exception:
-                    pass
-                os._exit(0)
             root.after(100, frame)  # only job draining after the run, so /status still answers; ONE reschedule
             return
-        if a.headless:
-            if frame_pub is not None and ctx.frame % max(1, a.frame_every) == 0:
-                try:
-                    frame_pub.publish()  # render this tick anyway and publish it (no extra game frame)
-                except Exception:
-                    emu.tick(1)
-            else:
-                emu.tick(1)  # no rendering at all
-        else:
-            if ctx.speed > 1:
-                emu.tick(ctx.speed - 1)  # turbo: frameskip - run extra frames unrendered, draw one
-            img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
-            ctx.photo = ImageTk.PhotoImage(img); screen.configure(image=ctx.photo)
-            if frame_pub is not None:
-                frame_pub.publish(advance=False)  # reuse the frame screenshot() just rendered
+        if ctx.speed > 1:
+            emu.tick(ctx.speed - 1)  # turbo: frameskip - run extra frames unrendered, draw one
+        img = emu.screenshot().resize((480, 432), Image.NEAREST)  # screenshot renders one frame
+        ctx.photo = ImageTk.PhotoImage(img); screen.configure(image=ctx.photo)
+        if frame_pub is not None:
+            frame_pub.publish(advance=False)  # reuse the frame screenshot() just rendered
         ctx.frame += 1
-        if ctx.frame % 15 == 0 and not a.headless:
+        if ctx.frame % 15 == 0:
             try:
                 m_, x_, y_ = pos(); npcs = npc_positions(emu)
                 if emu.read(0xD057):
@@ -356,21 +376,9 @@ def main(argv=None) -> int:
         except Exception as e:  # never let one bad step freeze the window: log it and keep the loop alive
             log(f"[agent step error: {e!r}]", "res")
         finally:
-            if ctx.done and a.headless:
-                try:
-                    close_frame_shm(); shutdown(ctx); close_logs(); emu.close(); root.destroy()
-                except Exception:
-                    os._exit(0)  # a swarm parent is waiting on us; never hang in mainloop
-            else:
-                root.after(1 if a.headless else 16, frame)
+            root.after(16, frame)
 
     root.bind("<Key>", on_key)
-    if a.headless:
-        root.withdraw()  # keep tk's event loop (it drives everything) but show no window
-    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
-    log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
-    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
-        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
     root.after(300, frame)
     root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(ctx), close_logs(), emu.close(), root.destroy()))
     root.mainloop()

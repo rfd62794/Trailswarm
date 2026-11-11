@@ -45,7 +45,9 @@ class Loops:
             return
         try:
             if self._fh is None:
-                self._fh = Path(ctx.run_dir / "loops.jsonl").open("a", encoding="utf-8")
+                buf = getattr(ctx, "jsonl_buf", None)
+                self._fh = buf.open(ctx.run_dir / "loops.jsonl") if buf is not None \
+                    else Path(ctx.run_dir / "loops.jsonl").open("a", encoding="utf-8")
             self._fh.write(json.dumps(row) + "\n")
             self._fh.flush()
         except OSError as exc:

@@ -5,7 +5,7 @@ Mixed into MapMemory (moved unchanged from tools/explore_demo.py).
 from __future__ import annotations
 
 from pokeagent.explorer.perceive import DIRS, ahead_tiles, stand_tile
-from pokeagent.explorer.world import WorldGraph
+from pokeagent.explorer.world import WorldGraph, maps_version
 
 OPPOSITE = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
 
@@ -86,11 +86,61 @@ class NavMixin:
         why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[2]}x"
         return best[1], why, best[2] > 0
 
+    def _mem_version(self) -> tuple:
+        """Route-cache validity: the maps fingerprint plus what a goal predicate can read OUTSIDE the
+        maps edge data - the temp-blocked tiles, every never-moving NPC's last position and the
+        beaten-trainer set. Any change rolls the version and re-searches."""
+        npc_last = frozenset(
+            (mid, tuple(e["last"]))
+            for mid, d in self.data["maps"].items()
+            for e in d.get("npcs", {}).values()
+            if not e.get("moves") and e.get("last"))
+        beaten = getattr(self, "beaten_tiles", None)
+        tiles = beaten() if callable(beaten) else beaten
+        return (maps_version(self.data["maps"]), frozenset(self.temp_blocked), npc_last,
+                frozenset(tiles) if tiles else ())
+
+    def _route_graph(self, allowed=None, version=None) -> WorldGraph:
+        """The routing graph for the current memory version, shared by the step's searches: one wall,
+        warp, jump, visited tile or temp-blocked change rebuilds it (and its neighbour-memo key
+        rolls), while an unchanged version keeps the same graph and its warmed cache."""
+        v = version or self._mem_version()
+        key = frozenset(allowed) if allowed is not None else None
+        cache = self.__dict__.setdefault("_route_graphs", {})
+        ent = cache.get(key)
+        if ent is None or ent[0] != v:
+            g = WorldGraph(self.data["maps"]); g.strict = True
+            g.blocked_now = frozenset(self.temp_blocked)
+            g.allowed_maps = key
+            g.__dict__["_mv"] = v[0]
+            cache[key] = ent = (v, g)
+        return ent[1]
+
+    def cached_route(self, start, goal_key, goal_fn, *, allowed=None, limit=4000):
+        """``_bfs_node`` with a last-result cache keyed on ``goal_key``: while the memory version
+        holds and the agent stays on the cached path, its remaining suffix answers without a new
+        search; a memory/temp-block/NPC/been change or stepping off the path re-runs it."""
+        v = self._mem_version()
+        routes = self.__dict__.setdefault("_routes", {})
+        c = routes.get(goal_key)
+        if c is not None and c["version"] == v:
+            nodes = c["nodes"]
+            if nodes is None:
+                if start == c["start"]:
+                    return None
+            elif start in nodes:
+                i = nodes.index(start)
+                return nodes[-1], list(c["buttons"][i:])
+        r = self._route_graph(allowed, v)._bfs_route(start, goal_fn, limit)
+        if len(routes) > 32:
+            routes.clear()
+        routes[goal_key] = {"version": v, "start": start,
+                            "nodes": None if r is None else tuple(r[0]),
+                            "buttons": None if r is None else tuple(r[1])}
+        return None if r is None else (r[0][-1], r[1])
+
     def _frontier_graph(self, allowed=None) -> WorldGraph:
-        g = WorldGraph(self.data["maps"]); g.strict = True
-        g.blocked_now = frozenset(self.temp_blocked)
-        g.allowed_maps = frozenset(allowed) if allowed is not None else None
-        return g
+        return self._route_graph(allowed)
 
     def _frontier(self, d: dict, visited: dict, blocked: set, n: tuple) -> bool:
         """A tile that still has an unexplored side (same predicate the demo's frontier_step used)."""
@@ -144,12 +194,14 @@ class NavMixin:
         """(target node, buttons) of the nearest frontier tile on this map, or None. ``allowed`` bounds the
         route's intermediate maps (a grind episode's map set): the plan may never leave it."""
         d = self.m(map_id); visited, blocked = d["visited"], set(d["blocked"])
-        return self._frontier_graph(allowed)._bfs_node(
-            (map_id, x, y), lambda n: n[0] == map_id and self._frontier(d, visited, blocked, n), 4000)
+        return self.cached_route((map_id, x, y),
+                                 ("frontier", map_id, frozenset(allowed) if allowed is not None else None),
+                                 lambda n: n[0] == map_id and self._frontier(d, visited, blocked, n),
+                                 allowed=allowed)
 
     def route_to(self, map_id, x, y, target: tuple):
         """Strict BFS route to one node: (node, buttons) or None."""
-        return self._frontier_graph()._bfs_node((map_id, x, y), lambda n: n == target, 4000)
+        return self.cached_route((map_id, x, y), ("to", target), lambda n: n == target)
 
     def frontier_step(self, map_id, x, y) -> tuple[str, str] | None:
         """First step of the shortest known route to a tile that still has an unexplored side (big towns need

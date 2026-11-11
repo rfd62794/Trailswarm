@@ -29,6 +29,60 @@ SHIP_MAPS = frozenset(range(0x5E, 0x69))  # Vermilion dock + S.S. Anne decks/roo
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
 
 
+def maps_version(maps: dict) -> int:
+    """A fingerprint of everything a route reads from memory: each map's visited count, blocked set,
+    warps, jumps, and every never-moving NPC's single recorded tile. A write under any of those rolls
+    the version, so cached neighbours and cached routes re-search; ``visited`` only ever grows, so
+    its length is enough."""
+    v = 0x9E3779B1
+    for d in maps.values():
+        h = len(d.get("visited", ()))
+        h = h * 31 + hash(frozenset(d.get("blocked", ())))
+        h = h * 31 + hash(frozenset((k, tuple(w)) for k, w in d.get("warps", {}).items()))
+        h = h * 31 + hash(frozenset((k, tuple(j)) for k, j in d.get("jumps", {}).items()))
+        for e in d.get("npcs", {}).values():
+            pos = e.get("positions") or {}
+            if not e.get("moves") and len(pos) == 1:
+                h = h * 13 + hash(next(iter(pos)))
+        v = v * 131 + h
+    return v
+
+
+# Shared per-run caches. Both are keyed by the memory fingerprint above, so a learned wall, warp,
+# jump, visited tile or static-NPC move rolls the key and stale entries are never served. Entries
+# keep a strong ref to the maps dict: that pins it while the key's id() is live, so an id reused by
+# a later dict can never alias an old bucket. Bounded: a run's versions churn, so both clear at CAP.
+_NEIGH: dict = {}   # (id(maps), version, strict, blocked_now, allowed) -> (maps, {node: [(nxt, btn)]})
+_ROUTES: dict = {}  # same key tuple + (goal signature, limit) -> (maps, start, nodes, buttons)
+_CACHE_CAP = 64
+
+
+def _immutable(v) -> bool:
+    """A value a route-cache key can trust: ``int``/``str``/``bool``/``float``/``None``, or a
+    ``tuple``/``frozenset`` of them (recursively). Anything else - a live dict/set/list, or an
+    identity-hashed object (``ctx``, ``self``, a ``Decision``) whose mutable state is not in the
+    key - can change under the cached entry, so its goal must re-search every call."""
+    if v is None or isinstance(v, (int, str, bool, float)):
+        return True
+    return isinstance(v, (tuple, frozenset)) and all(_immutable(x) for x in v)
+
+
+def _goal_sig(goal_fn) -> tuple | None:
+    """A repeatable identity for a per-step repeated goal lambda: code object + bound values. Any
+    closure cell that is not immutable (see ``_immutable``) means no signature - that goal must
+    re-search every call."""
+    try:
+        cells = tuple(c.cell_contents for c in (goal_fn.__closure__ or ()))
+        if not all(_immutable(v) for v in cells):
+            return None
+        sig = (goal_fn.__code__, goal_fn.__defaults__ or (), cells,
+               tuple(sorted((goal_fn.__kwdefaults__ or {}).items())))
+        hash(sig)
+        return sig
+    except (TypeError, AttributeError, ValueError):
+        return None
+
+
 class WorldGraph:
     """Nodes are (map, x, y). Edges: visited neighbours not separated by a confirmed wall, plus warps."""
 
@@ -54,7 +108,32 @@ class WorldGraph:
             cache[m] = tiles
         return cache[m]
 
+    def _version(self) -> int:
+        """The memory fingerprint this graph's caches key on. Computed once per graph (a graph is
+        per-search); NavMixin re-stamps ``_mv`` on its long-lived shared graph when memory changes."""
+        v = self.__dict__.get("_mv")
+        if v is None:
+            v = self.__dict__["_mv"] = maps_version(self.maps)
+        return v
+
+    def _neigh_memo(self) -> dict:
+        """This graph's slice of the shared neighbour memo, keyed on everything an edge can read:
+        memory version, strict, the temp-blocked tiles and the allowed-map bound."""
+        key = (id(self.maps), self._version(), self.strict, self.blocked_now, self.allowed_maps)
+        ent = _NEIGH.get(key)
+        if ent is None or ent[0] is not self.maps:
+            if len(_NEIGH) >= _CACHE_CAP:
+                _NEIGH.clear()
+            ent = _NEIGH[key] = (self.maps, {})
+        return ent[1]
+
     def neighbours(self, node):
+        out = self._neigh_memo().get(node)
+        if out is None:
+            out = self._neigh_memo()[node] = list(self._neighbours(node))
+        yield from out
+
+    def _neighbours(self, node):
         m, x, y = node
         d = self.maps.get(str(m))
         if not d:
@@ -105,18 +184,58 @@ class WorldGraph:
             WorldGraph.last_route = (start, r[0], r[1])
         return r[1] if r else None
 
+    def _route_key(self, goal_fn, limit) -> tuple | None:
+        """The last-result cache key for a repeatable goal, or None for a goal with no stable
+        signature (one that reads mutable state must re-search every call)."""
+        sig = _goal_sig(goal_fn)
+        if sig is None:
+            return None
+        return (id(self.maps), self._version(), self.strict, self.blocked_now, self.allowed_maps, sig, limit)
+
+    def _bfs_route(self, start, goal_fn, limit):
+        """(nodes, buttons) of the BFS path start->goal, or None.
+
+        The last route per (goal signature, memory version, blocked set, bound) is kept: while the
+        agent stays on that path its remaining suffix answers without a new search, while a memory
+        change rolls the version, a temp-blocked tile rolls the key, and stepping off the path (or a
+        cached miss's different start) re-runs the search."""
+        key = self._route_key(goal_fn, limit)
+        if key is not None:
+            ent = _ROUTES.get(key)
+            if ent is not None and ent[0] is self.maps:
+                src, nodes, buttons = ent[1:]
+                if nodes is None:
+                    if start == src:
+                        return None
+                elif start in nodes:
+                    i = nodes.index(start)
+                    return list(nodes[i:]), list(buttons[i:])
+        r = self._bfs_walk(start, goal_fn, limit)
+        if key is not None:
+            if len(_ROUTES) >= _CACHE_CAP:
+                _ROUTES.clear()
+            _ROUTES[key] = (self.maps, start, None if r is None else tuple(r[0]),
+                            None if r is None else tuple(r[1]))
+        return r
+
     def _bfs_node(self, start, goal_fn, limit):
         """_bfs that also returns the goal node: (node, buttons) or None (buttons [] when start is the goal)."""
+        r = self._bfs_route(start, goal_fn, limit)
+        return (r[0][-1], r[1]) if r else None
+
+    def _bfs_walk(self, start, goal_fn, limit):
+        """The search itself: first goal hit wins, path reconstructed from the parent table."""
         prev = {start: None}
         q = deque([start])
         while q and len(prev) < limit:
             cur = q.popleft()
             if goal_fn(cur):
-                out, node = [], cur
+                nodes, out, node = [cur], [], cur
                 while prev[node]:
                     node, btn = prev[node]
+                    nodes.append(node)
                     out.append(btn)
-                return cur, out[::-1]
+                return nodes[::-1], out[::-1]
             for nxt, btn in self.edges(cur):
                 if nxt not in prev:
                     prev[nxt] = (cur, btn)

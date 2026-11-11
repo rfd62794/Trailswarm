@@ -66,7 +66,9 @@ class ControlServer:
             def do_GET(self): self._dispatch("GET")
             def do_POST(self): self._dispatch("POST")
         self.httpd = ThreadingHTTPServer(("127.0.0.1", self.port), H)
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        # The select() wait lives on this daemon thread only - the emulator stepping thread never
+        # blocks on sockets; 0.5s is serve_forever's shutdown poll (same as the default, made explicit).
+        threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.5}, daemon=True).start()
         return self
 
     def stop(self):

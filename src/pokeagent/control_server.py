@@ -164,7 +164,8 @@ class ControlServer:
         self._httpd = ThreadingHTTPServer((self.host, self.port), Handler)
         self._httpd.daemon_threads = True
         self.port = self._httpd.server_address[1]
-        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread = threading.Thread(target=self._httpd.serve_forever,
+                                        kwargs={"poll_interval": 0.5}, daemon=True)
         self._thread.start()
         return self.port
 

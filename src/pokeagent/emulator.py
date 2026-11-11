@@ -86,6 +86,7 @@ class PyBoyEmulator:
         self._pyboy = PyBoy(str(rom_path), window="null" if headless else "SDL2")
         self._pyboy.set_emulation_speed(0 if headless else 1)
         self._closed = False
+        self._ram_rev = 0  # bumped by write/load_state: reads memoized per frame stay honest
         self.on_press = None  # optional (button, hold, settle) callback, fired before each press (replay traces)
 
     @property
@@ -120,6 +121,7 @@ class PyBoyEmulator:
 
     def write(self, addr: int, value: int) -> None:
         self._pyboy.memory[addr] = value & 0xFF
+        self._ram_rev += 1
 
     def screenshot(self) -> Image.Image:
         # Headless ticks never render, so the screen buffer would be stale/blank: render one frame first.
@@ -157,6 +159,7 @@ class PyBoyEmulator:
         check_state_game(path, self.game)
         with Path(path).open("rb") as f:
             self._pyboy.load_state(f)
+        self._ram_rev += 1
 
     def close(self) -> None:
         if not self._closed:
@@ -164,15 +167,60 @@ class PyBoyEmulator:
             self._pyboy.stop(save=False)
 
 
+class _RamDict(dict):
+    """FakeEmulator's memory: every write bumps the owner's ``_ram_rev`` so reads memoized per
+    frame stay honest even when a test pokes ``emu.memory[addr]`` directly instead of ``.set``."""
+
+    def __init__(self, *a, owner=None, **k):
+        super().__init__(*a, **k)
+        self._owner = owner
+
+    def _bump(self, *_):
+        if self._owner is not None:
+            self._owner._ram_rev += 1
+
+    def __setitem__(self, k, v):
+        super().__setitem__(k, v)
+        self._bump()
+
+    def __delitem__(self, k):
+        super().__delitem__(k)
+        self._bump()
+
+    def update(self, *a, **k):
+        super().update(*a, **k)
+        self._bump()
+
+    def clear(self):
+        super().clear()
+        self._bump()
+
+    def pop(self, *a):
+        r = super().pop(*a)
+        self._bump()
+        return r
+
+    def popitem(self):
+        r = super().popitem()
+        self._bump()
+        return r
+
+    def setdefault(self, *a):
+        r = super().setdefault(*a)
+        self._bump()
+        return r
+
+
 class FakeEmulator:
     """In-memory emulator for tests; records presses and frame counts."""
 
     def __init__(self, memory: dict[int, int] | None = None, *, game: GameSpec = RED) -> None:
         self.game = game
-        self.memory: dict[int, int] = dict(memory or {})
+        self.memory: dict[int, int] = _RamDict(memory or {}, owner=self)
         self.presses: list[Button] = []
         self.frames: int = 0
         self.closed: bool = False
+        self._ram_rev: int = 0  # bumped by set/write/load_state (same contract as PyBoyEmulator)
 
     @property
     def screen_size(self) -> tuple[int, int]:
@@ -181,6 +229,7 @@ class FakeEmulator:
 
     def set(self, addr: int, value: int) -> None:
         self.memory[addr] = value
+        self._ram_rev += 1
 
     def write(self, addr: int, value: int) -> None:
         self.set(addr, value)
@@ -219,7 +268,8 @@ class FakeEmulator:
 
     def load_state(self, path: Path) -> None:
         check_state_game(path, self.game)
-        self.memory = {int(k): v for k, v in json.loads(Path(path).read_text()).items()}
+        self.memory = _RamDict({int(k): v for k, v in json.loads(Path(path).read_text()).items()}, owner=self)
+        self._ram_rev += 1
 
     def close(self) -> None:
         self.closed = True
