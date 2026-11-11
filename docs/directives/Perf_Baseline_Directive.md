@@ -141,4 +141,5 @@ Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect
 - 2026-11-10 20:59 · robert-claude-laptop · Blocked → Queued — Robert's 11-08 hold lifted: multi-ROM phase 4 (Game_Namespaced_Stores) merged as Trailswarm #187
 - 2026-11-10 21:00 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert approved all recs 2026-11-10
 - 2026-11-10 21:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M747FKE5W57RJHXG4NZVM2BK
+- 2026-11-10 21:48 · dispatcher · launched pid=21544; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 <!-- queue:end -->
