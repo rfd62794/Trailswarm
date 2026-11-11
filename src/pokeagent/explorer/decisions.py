@@ -43,11 +43,11 @@ def make_record(step: int, behaviour: str, rule: str, button: str, before: tuple
 
 
 class DecisionLog:
-    def __init__(self, path: Path | str) -> None:
+    def __init__(self, path: Path | str, fh=None) -> None:
         self.path = Path(path)
         self.listeners: list = []  # callables(record): the intervene tracker follows the agent's recent decisions
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._fh = self.path.open("a", encoding="utf-8")
+        self._fh = fh if fh is not None else self.path.open("a", encoding="utf-8")
 
     def write(self, record: dict) -> None:
         for fn in self.listeners:

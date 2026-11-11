@@ -69,8 +69,8 @@ class ProgressTracker:
 class ProgressLog:
     """``<run_dir>/progress.jsonl``: a row per progress event plus a heartbeat while barren. Never raises."""
 
-    def __init__(self, path: Path | str, log=lambda text, tag=None: None) -> None:
-        self.path, self.log = Path(path), log
+    def __init__(self, path: Path | str, log=lambda text, tag=None: None, buf=None) -> None:
+        self.path, self.log, self._buf = Path(path), log, buf
         self._fh = None
         self._failed = False
 
@@ -85,7 +85,7 @@ class ProgressLog:
             return
         try:
             if self._fh is None:
-                self._fh = self.path.open("a", encoding="utf-8")
+                self._fh = self._buf.open(self.path) if self._buf is not None else self.path.open("a", encoding="utf-8")
             self._fh.write(json.dumps(row) + "\n")
             self._fh.flush()
         except OSError as exc:

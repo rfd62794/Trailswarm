@@ -106,15 +106,50 @@ def decode_item_list(raw: bytes, capacity: int) -> list[tuple[int, int]]:
     return [(raw[1 + 2 * i], raw[2 + 2 * i]) for i in range(count)]
 
 
+_PARTY_MEMO: dict = {}  # id(emu) -> (emu, key, {"count": int, "party": [PartyMon]})
+_PARTY_MEMO_CAP = 8     # a live run shares one emulator; the test suite makes thousands - bound it
+
+
+def _party_key(emu) -> tuple | None:
+    """(frames, write-revision) a party read stays valid for: a press ticks frames forward and a
+    RAM write or state load bumps ``_ram_rev``, so either change forces a re-read. An emulator with
+    no frames counter (a stub or mock) bypasses the memo entirely."""
+    try:
+        return (int(emu.frames), int(getattr(emu, "_ram_rev", 0)))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _memoized(emu, kind: str, read):
+    """One RAM read per emulator frame for the party block: the baseline profile counted ~6
+    read_party calls per step, all inside one frame window, all decoding identical bytes."""
+    key = _party_key(emu)
+    if key is None:
+        return read()
+    ent = _PARTY_MEMO.get(id(emu))
+    if ent is None or ent[0] is not emu or ent[1] != key:
+        if len(_PARTY_MEMO) >= _PARTY_MEMO_CAP:
+            _PARTY_MEMO.clear()
+        ent = _PARTY_MEMO[id(emu)] = (emu, key, {})
+    vals = ent[2]
+    if kind not in vals:
+        vals[kind] = read()
+    return vals[kind]
+
+
 def read_party_count(emu: Emulator) -> int:
-    return min(emu.read(PARTY_COUNT), MAX_PARTY)
+    return _memoized(emu, "count", lambda: min(emu.read(PARTY_COUNT), MAX_PARTY))
+
+
+def _read_party(emu: Emulator) -> list[PartyMon]:
+    n = min(emu.read(PARTY_COUNT), MAX_PARTY)
+    raw = emu.read_range(PARTY_MON1, PARTY_MON_SIZE * n) if n else b""
+    return [decode_party_mon(raw[i * PARTY_MON_SIZE:(i + 1) * PARTY_MON_SIZE]) for i in range(n)]
 
 
 def read_party(emu: Emulator) -> list[PartyMon]:
-    """The party as PartyMon records, one per occupied slot."""
-    n = read_party_count(emu)
-    raw = emu.read_range(PARTY_MON1, PARTY_MON_SIZE * n) if n else b""
-    return [decode_party_mon(raw[i * PARTY_MON_SIZE:(i + 1) * PARTY_MON_SIZE]) for i in range(n)]
+    """The party as PartyMon records, one per occupied slot; one RAM read per emulator frame."""
+    return list(_memoized(emu, "party", lambda: _read_party(emu)))
 
 
 def read_battle_mon(emu: Emulator) -> BattleMon:

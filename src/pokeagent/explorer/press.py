@@ -123,7 +123,10 @@ def write_transition(ctx: ExplorerContext, fr: PressFrame) -> None:
     ctx.trans.write(json.dumps({"step": ctx.step, "from": list(before), "button": name, "to": list(after),
                             "moved": before != after, "textbox": "dialog" if box_before else "none",
                             "text": text, "facing": ctx.facing, "source": source, **extra}) + "\n")
-    ctx.trans.flush()  # the later process reads this file while the demo is still running
+    ctx.trans.flush()  # the later process reads this file while the demo runs; a no-op when the run's JsonlBuffer owns the cadence
+    buf = getattr(ctx, "jsonl_buf", None)
+    if buf is not None:
+        buf.tick(ctx.step)  # the per-step flush cadence: every buffered jsonl drains every 50 presses
 
 
 def log_press(ctx: ExplorerContext, fr: PressFrame) -> None:

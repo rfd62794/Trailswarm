@@ -126,7 +126,7 @@ class Engine:
 
     def _progress_log(self, ctx) -> ProgressLog:
         if self._prog_log is None:
-            self._prog_log = ProgressLog(ctx.run_dir / "progress.jsonl", ctx.log)
+            self._prog_log = ProgressLog(ctx.run_dir / "progress.jsonl", ctx.log, buf=getattr(ctx, "jsonl_buf", None))
         return self._prog_log
 
     def _note_progress(self, goals_before: int, after: tuple) -> list[str]:
