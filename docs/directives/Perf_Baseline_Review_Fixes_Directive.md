@@ -79,12 +79,14 @@ What changed per item, the pasted tails of both §5 commands, and anything in §
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-perf-baseline-review-fixes-directive |
 | Base branch | directive/pokeagent-perf-baseline-directive |
+| Base commit | 473bccd9e75f7f39c9148c2a0e9ce9f92da265ee |
 
 **Status log**
 - 2026-11-10 22:44 · robert-claude-laptop · none → Queued — Independent review of Trailswarm #188 CHANGES-NEEDED (probe exit, crash flush, route-cache key); controller confirmed findings 1-2 in code
 - 2026-11-10 22:44 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives; Robert approved all recs 2026-11-10
+- 2026-11-11 06:45 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-review-fixes-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M756T9VBE6T4EP5RFHVB8R11
 <!-- queue:end -->
