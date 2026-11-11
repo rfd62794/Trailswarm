@@ -10,11 +10,13 @@ import json
 from collections import deque
 from pathlib import Path
 
+from pokeagent.game.stores import store_path
+
 DIRS = {'UP': (0, -1), 'DOWN': (0, 1), 'LEFT': (-1, 0), 'RIGHT': (1, 0)}
 BUTTON = {'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3}
 
 
-def load_memory(path: str = 'runs/maps.json') -> dict:
+def load_memory(path: str = store_path("runs/maps.json").as_posix()) -> dict:  # POKEAGENT_GAME read once at def time
     try:
         return json.loads(Path(path).read_text())
     except Exception:

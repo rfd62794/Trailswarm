@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from pokeagent.game.stores import store_path
 from pokeagent.observations import SpatialObserver, local_tile_window
 from pokeagent.qmodels import atomic_json
 from pokeagent.ram import read_state
@@ -35,6 +36,7 @@ class StateMeta:
     git_sha: str | None = None
     verified: bool = True
     tiles: dict[str, Any] | None = None
+    game_key: str | None = None  # which game wrote the state (the guard key); absent in older sidecars
 
 
 def _git_sha() -> str | None:
@@ -68,7 +70,8 @@ def game_snapshot(emu) -> dict[str, Any]:
     }
 
 
-def tile_snapshot(emu, maps_path: str | Path = 'runs/maps.json') -> dict[str, Any]:
+def tile_snapshot(emu, maps_path: str | Path | None = None) -> dict[str, Any]:
+    maps_path = store_path("runs/maps.json") if maps_path is None else maps_path
     state = read_state(emu)
     tilemap = emu.read_range(0xC3A0, 360)
     box_open = tilemap.find(bytes([0x79, 0x7A])) >= 0
@@ -98,6 +101,8 @@ def write_state(emu, path: str | Path, *, source: str | Path | None = None,
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     emu.save_state(path)
+    game_key = getattr(getattr(emu, "game", None), "key", None) \
+        if hasattr(emu, "game") else "pokemon-red"  # the fallback covers test doubles with no game attr
     meta = StateMeta(
         path=str(path),
         digest=digest(path),
@@ -110,6 +115,7 @@ def write_state(emu, path: str | Path, *, source: str | Path | None = None,
         git_sha=_git_sha(),
         verified=verified,
         tiles=tile_snapshot(emu),
+        game_key=game_key,
     )
     atomic_json(sidecar(path), asdict(meta))
     return meta
@@ -147,4 +153,5 @@ def describe(path: str | Path) -> dict[str, Any]:
         "git_sha": None,
         "verified": False,
         "tiles": None,
+        "game_key": None,
     }

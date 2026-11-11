@@ -12,6 +12,7 @@ from pyboy import PyBoy
 
 from pokeagent.game.pokemon_red import RED
 from pokeagent.game.spec import GameSpec
+from pokeagent.game.state_guard import check_state_game
 
 
 class Button(StrEnum):
@@ -153,6 +154,7 @@ class PyBoyEmulator:
             self._pyboy.save_state(f)
 
     def load_state(self, path: Path) -> None:
+        check_state_game(path, self.game)
         with Path(path).open("rb") as f:
             self._pyboy.load_state(f)
 
@@ -216,6 +218,7 @@ class FakeEmulator:
         Path(path).write_text(json.dumps(self.memory))
 
     def load_state(self, path: Path) -> None:
+        check_state_game(path, self.game)
         self.memory = {int(k): v for k, v in json.loads(Path(path).read_text()).items()}
 
     def close(self) -> None:

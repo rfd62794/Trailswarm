@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pokeagent.game.spec import GameSpec
+from pokeagent.game.spec import LEGACY_FAMILY, GameSpec
 
 RED = GameSpec(
     key="pokemon-red",
@@ -11,4 +11,6 @@ RED = GameSpec(
     default_rom=Path("roms/Pokemon Red.gb"),
     screen=(160, 144),
     buttons=("up", "down", "left", "right", "a", "b", "start", "select"),
+    memory_family=LEGACY_FAMILY,
+    owns_legacy_paths=True,
 )

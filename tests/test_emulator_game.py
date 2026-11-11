@@ -12,6 +12,8 @@ TINY = GameSpec(
     default_rom=Path("roms/Tiny.gb"),
     screen=(2, 2),
     buttons=("a", "b", "start"),
+    memory_family="tiny-game",
+    owns_legacy_paths=False,
 )
 
 

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from pokeagent import stalls, statefp
+from pokeagent.game.stores import store_path
 from pokeagent.review.load import jsonl, load_json, run_start
 from pokeagent.review.loops import BREAK_LOOP_ROWS, LONG_LOOP_ROWS, collapse_loops, find_loops
 
@@ -108,7 +109,7 @@ def _legality(runs_dir: Path, checkpoint_paths: list[Path]) -> tuple[str, list]:
         rom = find_rom(Path(runs_dir))
         if rom is None:
             return "unavailable (no ROM beside runs/ for legality.check)", []
-        kb = load_json(Path(runs_dir).parent / "kb" / "rom_tables.json") or None
+        kb = load_json(store_path("kb/rom_tables.json", root=Path(runs_dir).parent)) or None
         from pokeagent.emulator import PyBoyEmulator
         emu = PyBoyEmulator(rom, headless=True)
         violations: list[str] = []

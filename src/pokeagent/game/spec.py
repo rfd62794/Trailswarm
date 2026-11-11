@@ -9,6 +9,7 @@ from pathlib import Path
 _KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _SHA1_RE = re.compile(r"^[0-9A-F]{40}$")
 KNOWN_BUTTONS = frozenset({"up", "down", "left", "right", "a", "b", "start", "select"})
+LEGACY_FAMILY = "gen1-pokemon"  # the shared memory of Red/Blue/Yellow-class games: its stores keep today's paths
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class GameSpec:
     default_rom: Path              # relative to the repo root, forward slashes, e.g. Path("roms/<game>.gb")
     screen: tuple[int, int]        # (width, height) in pixels
     buttons: tuple[str, ...]       # lowercase names of the buttons the game uses, in this order
+    memory_family: str             # the family whose memory this game shares; LEGACY_FAMILY = the legacy root
+    owns_legacy_paths: bool        # True for the one game (Red) whose per-game stores also stay on today's paths
 
     def __post_init__(self) -> None:
         if not _KEY_RE.fullmatch(self.key):
@@ -45,4 +48,10 @@ class GameSpec:
         if bad:
             raise ValueError(
                 f"{self.key}: unknown buttons {bad!r} (this pad: {', '.join(sorted(KNOWN_BUTTONS))})"
+            )
+        if not _KEY_RE.fullmatch(self.memory_family):
+            raise ValueError(f"bad memory_family: {self.memory_family!r}")
+        if self.owns_legacy_paths and self.memory_family != LEGACY_FAMILY:
+            raise ValueError(
+                f"{self.key}: owns_legacy_paths requires memory_family == LEGACY_FAMILY"
             )

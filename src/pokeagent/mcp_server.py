@@ -20,12 +20,13 @@ from PIL import Image as PILImage
 from pokeagent.emulator import Button, Emulator, PyBoyEmulator
 from pokeagent.emu_thread import EmulatorThread
 from pokeagent.explorer import Explorer
+from pokeagent.game.stores import store_path
 from pokeagent.mcp_brain import BrainTools
 from pokeagent.ram import RAM_MAP, read_state
 
 WRAM_START, WRAM_LEN = 0xC000, 0x2000  # WRAM 0xC000-0xDFFF
 RUNS_DIR = Path("runs/mcp")
-MAPS_PATH = Path("runs/maps.json")
+MAPS_PATH = store_path("runs/maps.json")  # POKEAGENT_GAME read once at import (a process runs one game)
 SAFE_NAME = re.compile(r"[^A-Za-z0-9_-]+")
 NAME_AT = {addr: name for name, addr in RAM_MAP.items()}
 BOOT_FRAMES = 60

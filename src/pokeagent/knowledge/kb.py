@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-_KB = Path(__file__).resolve().parents[3] / "kb" / "rom_tables.json"
+from pokeagent.game.stores import store_path
+
+_KB = store_path("kb/rom_tables.json", root=Path(__file__).resolve().parents[3])  # POKEAGENT_GAME read once at import
 ROM_KB = json.loads(_KB.read_text(encoding="utf-8")) if _KB.exists() else None
 
 

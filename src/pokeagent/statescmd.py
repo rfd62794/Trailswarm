@@ -13,8 +13,11 @@ from pathlib import Path
 from pokeagent import checkpoint_goals as cg
 from pokeagent import statefp, statelog
 from pokeagent.game.paths import default_rom
+from pokeagent.game.stores import store_path
 
-DEFAULT_DIRS = (Path("runs/checkpoints"), Path("runs/legs/states"))
+# checkpoints is game-scope (a state is ROM-bound); runs/legs/states stays literal - never family-shared.
+# POKEAGENT_GAME is read once at import (a process runs one game).
+DEFAULT_DIRS = (store_path("runs/checkpoints", scope="game"), Path("runs/legs/states"))
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ROM = default_rom(root=ROOT)
@@ -29,7 +32,7 @@ def make_emulator(rom):
 def _kb_json(name: str) -> dict | None:
     """A kb/ table (rom_tables.json, items.json, hm_compat.json) or None when absent/unreadable."""
     try:
-        return json.loads((ROOT / "kb" / name).read_text(encoding="utf-8"))
+        return json.loads(store_path(Path("kb") / name, root=ROOT).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
