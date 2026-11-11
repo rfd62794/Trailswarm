@@ -179,7 +179,7 @@ md5 identical to 574fa3e0... for the empty-maps run (compare the seeded run base
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -188,4 +188,5 @@ md5 identical to 574fa3e0... for the empty-maps run (compare the seeded run base
 **Status log**
 - 2026-11-11 · robert-claude-laptop · none → Draft — Drafted by Claude: #188 missed its route-cache and party-read counter targets; measured 2026-11-11
 - 2026-11-11 08:15 · robert-claude-laptop · Draft → Queued — merged via #189 (review MERGE_WITH_NITS, nits fixed; verify 0 failed / 41 ROM skips); Robert 2026-11-11 07:15 PokeAgent focus + permanent full approval
+- 2026-11-11 08:15 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
