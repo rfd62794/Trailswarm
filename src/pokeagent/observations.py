@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from pokeagent.game.stores import store_path
+
 
 def schema_id(segment, *, screen=False, spatial=False, combat=False, battle_learning=False, travel_priority=False, potential=False, hold=8, settle=8, maps_digest='', novelty=0.0, menu_controls=False):
     spec = dict(version=4, segment=segment, screen=screen, spatial=spatial, combat=combat,
@@ -30,7 +32,7 @@ def local_tile_window(tilemap: bytes) -> tuple[str, ...]:
 
 
 class SpatialObserver:
-    def __init__(self, path='runs/maps.json'):
+    def __init__(self, path=store_path("runs/maps.json").as_posix()):  # POKEAGENT_GAME read once at def time
         self.memory = json.loads(Path(path).read_text())
         self.digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
 

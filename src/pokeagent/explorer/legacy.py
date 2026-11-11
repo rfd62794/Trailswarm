@@ -16,6 +16,7 @@ from pokeagent.explorer.memory import MapMemory
 from pokeagent.explorer.perceive import (
     BATTLE_FLAG, DIRS, TILEMAP_ADDR, TILEMAP_LEN, box_open, frame_lines, is_menu,
 )
+from pokeagent.goals import store_path
 from pokeagent.ram import read_state
 from pokeagent.screencontext import classify_screen
 
@@ -23,7 +24,7 @@ from pokeagent.screencontext import classify_screen
 class Explorer:
     """Runs the demo's rule-based policy one press at a time on any Emulator."""
 
-    def __init__(self, maps_path: Path | str = Path("runs/maps.json")) -> None:
+    def __init__(self, maps_path: Path | str = store_path("runs/maps.json")) -> None:  # POKEAGENT_GAME read once at def time
         self.mem = MapMemory(maps_path)
         self.facing = "DOWN"
         self.box_streak = 0

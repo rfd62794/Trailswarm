@@ -10,7 +10,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.stat_records import note_stat_exp
-from pokeagent.goals import GOALS, bag_contents, check_goals
+from pokeagent.goals import GOALS, bag_contents, check_goals, store_path
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
               0x0B: "ANTIDOTE", 0x0C: "BURN HEAL", 0x0D: "ICE HEAL", 0x0E: "AWAKENING", 0x0F: "PARLYZ HEAL", 0x10: "FULL RESTORE",
@@ -50,14 +50,14 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     if lvl > ctx.best_level_seen:
         ctx.best_level_seen = lvl
         best = ctx.mem.data.get("team_best_level", 0)
-        side = Path("runs/checkpoints/team_best.level")
+        side = store_path("runs/checkpoints/team_best.level", scope="game")
         try:  # another agent may have saved a stronger team than our copy of the memory knows about
             best = max(best, int(side.read_text())) if side.exists() else best
         except Exception:
             pass
         if lvl > best and ctx.emu.read(0xD057) == 0 and not box_after:
             try:
-                cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
+                cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 side.write_text(str(lvl))
                 tmp = cp / f"team_best.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / "team_best.state")
                 stamp_fingerprint(ctx.emu, cp / "team_best.state", ctx.run_dir.name, inherit=getattr(ctx.opts, "state_path", "") or None)  # lineage carries from the run's start

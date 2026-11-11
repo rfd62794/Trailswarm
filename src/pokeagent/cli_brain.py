@@ -16,10 +16,11 @@ from pathlib import Path
 import pokeagent.brain as brain
 from pokeagent.brain import fileops, text
 from pokeagent.explorer import edits as edit_journal
+from pokeagent.game.stores import store_path
 from pokeagent.qdecode import BUTTONS
 from pokeagent.qmodels import load_model
 
-MAPS_DEFAULT = "runs/maps.json"
+MAPS_DEFAULT = store_path("runs/maps.json").as_posix()  # POKEAGENT_GAME read once at import (a process runs one game)
 
 
 def _emit(obj, args, text_out: str | None = None) -> None:

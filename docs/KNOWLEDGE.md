@@ -379,3 +379,17 @@ selected game into that ROM path (honouring `$POKEAGENT_GAME`); `cli._rom_path` 
 (key -> spec, edited by hand; only Red today) and `DEFAULT_GAME`. Selection: `--game KEY` on `run`,
 `check-rom`, `state` and `mcp` wins, else `$POKEAGENT_GAME`, else the default `pokemon-red`; an unknown key
 fails the command with exit code 2 listing the known keys. Red behaviour is byte-identical by default.
+
+Stores are namespaced by **memory family**, not by game (settled 2026-11-08: Red and Blue share one memory,
+individuality minimal). A `GameSpec` declares `memory_family` (`LEGACY_FAMILY = "gen1-pokemon"` for the
+Red/Blue/Yellow-class games; every other game names its own) and `owns_legacy_paths` (True only for Red,
+and it requires the legacy family). `game/stores.py`'s `store_path(rel, game=None, root=None, scope=)`
+is the single mapping: `scope="family"` (the default, for `runs/maps.json`, `runs/bandit.json`,
+`runs/novelty.json`, `kb/*.json` — shared memory) returns `rel` unchanged for legacy-family members and
+inserts the family as the second component otherwise; `scope="game"` (for `runs/checkpoints` — a save
+state is bound to one ROM even when memory is shared) returns `rel` unchanged only for the legacy owner
+and inserts the game key otherwise. State sidecars (`.state.meta.json`) now carry `game_key` — the game,
+not the family — and `game/state_guard.py`'s `check_state_game` runs in both emulators' `load_state`
+before anything is touched: a mismatched label raises `StateGameMismatch` naming both keys, and an
+unlabeled state (no sidecar or no `game_key` — every state written before this change) loads only for
+the legacy owner, so all of today's Red states still load exactly as before.

@@ -11,7 +11,7 @@ from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
 from pokeagent.checkpoint_goals import completed_goals, read_completed, stamp_fingerprint, write_completed
-from pokeagent.goals import GOALS, check_goals, is_unverified
+from pokeagent.goals import GOALS, check_goals, is_unverified, store_path
 from pokeagent.segment_names import state_goal
 
 
@@ -59,7 +59,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
                 fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
-                cp = Path("runs/checkpoints"); cp.mkdir(parents=True, exist_ok=True)
+                cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
                 write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
                 try:

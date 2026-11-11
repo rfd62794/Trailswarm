@@ -27,6 +27,7 @@ from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
 from pokeagent.game import GameSpec, UnknownGame, add_game_argument, resolve_game
 from pokeagent.game.paths import default_rom
+from pokeagent.game.state_guard import StateGameMismatch
 from pokeagent.ram import read_state
 from pokeagent.runlog import RunLog
 
@@ -97,6 +98,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"error: {e}")
         emu.close()
         return 1
+    except StateGameMismatch as e:
+        print(f"error: {e}")
+        emu.close()
+        return 2
     result = Agent(emu, backend, log, max_steps=steps).run()
     return EXIT_CODES.get(result.stop_reason, 1)
 

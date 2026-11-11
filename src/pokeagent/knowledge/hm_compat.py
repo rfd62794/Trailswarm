@@ -11,9 +11,10 @@ from functools import lru_cache
 from pathlib import Path
 
 from pokeagent.game.paths import default_rom
+from pokeagent.game.stores import store_path
 
 ROOT = Path(__file__).resolve().parents[3]
-KB_PATH, ROM_PATH = ROOT / "kb" / "hm_compat.json", default_rom(root=ROOT)
+KB_PATH, ROM_PATH = store_path("kb/hm_compat.json", root=ROOT), default_rom(root=ROOT)  # POKEAGENT_GAME read once at import
 BASE_STATS, REC, TMHM_AT = 0x0E * 0x4000 + (0x43DE - 0x4000), 28, 20
 HM_BITS = {"cut": 50, "fly": 51, "surf": 52, "strength": 53, "flash": 54}
 
@@ -32,7 +33,7 @@ def extract(rom: bytes, names: dict[int, str]) -> dict[str, list[str]]:
     return hms
 
 
-def build(rom_path: Path = ROM_PATH, kb_rom: Path = ROOT / "kb" / "rom_tables.json", out: Path = KB_PATH) -> dict[str, list[str]]:
+def build(rom_path: Path = ROM_PATH, kb_rom: Path = store_path("kb/rom_tables.json", root=ROOT), out: Path = KB_PATH) -> dict[str, list[str]]:
     names = {int(k): v["name"] for k, v in json.loads(kb_rom.read_text(encoding="utf-8"))["species_by_dex"].items()}
     hms = extract(Path(rom_path).read_bytes(), names)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 from pokeagent.explorer.memory import MapMemory
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines
-from pokeagent.goals import check_goals
+from pokeagent.goals import check_goals, store_path
 from pokeagent.ram import read_state
 
 
@@ -30,15 +30,15 @@ class ExplorerOptions:
     box_pace: int = 6
     frames_per_step: int = 10
     train_level: int = 8
-    maps_path: str = "runs/maps.json"
+    maps_path: str = store_path("runs/maps.json").as_posix()  # str field; POKEAGENT_GAME read once at class def
     adaptive_pace: bool = False  # A through text boxes at the learned pace (text_press) instead of the fixed settle
     fast_text: bool = False  # run the set_text_speed_fast procedure once at the start
     bandit: bool = False  # behaviour bandit overrides the Explorer at three decision points (pokeagent.bandit)
-    bandit_path: str = "runs/bandit.json"  # shared table the bandit loads at start
+    bandit_path: str = store_path("runs/bandit.json").as_posix()  # shared table the bandit loads at start
     bandit_delta: str = ""  # where this run's delta goes ("" = <run_dir>/bandit_delta.json)
     role: str = ""  # swarm role ("explorer" / "exploiter" / ...); only "explorer" is steered and paid by novelty
     novelty: bool = False  # track global novelty + discoveries (pokeagent.novelty); bonuses reach only role == "explorer"
-    novelty_path: str = "runs/novelty.json"
+    novelty_path: str = store_path("runs/novelty.json").as_posix()
     novelty_runs: str = "runs"  # the runs directory the discovery log and its review saves go under
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
@@ -262,7 +262,6 @@ class ExplorerContext:
     item_notes: set = field(default_factory=set)  # one-time use_items log notes already printed (e.g. an HM with no learner in the party)
     xitem: dict | None = None  # item_policies.xitems_battle: this battle's X-item decision {battle, item, count0}
     par: Any = None  # explorer.par_follow.ParState, created on first use when opts.par_follow is on
-
     # --- dict-protocol shim for goals.check_goals ---
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)

@@ -9,6 +9,7 @@ sibling, not a source.
 from __future__ import annotations
 
 from pokeagent import campaign
+from pokeagent.game.stores import store_path  # re-exported for the explorer package (its layering rule bars pokeagent.game)
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
 from pokeagent.magikarp import magikarp_goal_settled, team_ready_settled

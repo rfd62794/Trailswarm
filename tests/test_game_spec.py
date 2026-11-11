@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from pokeagent.game import GameSpec, RED
+from pokeagent.game import GAMES, GameSpec, RED
+from pokeagent.game.spec import LEGACY_FAMILY
 
 _KW = dict(
     key="x-game",
@@ -11,6 +12,8 @@ _KW = dict(
     default_rom=Path("roms/x.gb"),
     screen=(160, 144),
     buttons=("up", "a"),
+    memory_family="x-game",
+    owns_legacy_paths=False,
 )
 
 
@@ -92,3 +95,30 @@ def test_uppercase_buttons_rejected():
 def test_unknown_buttons_rejected():
     with pytest.raises(ValueError):
         _spec(buttons=("up", "turbo"))
+
+
+def test_red_joins_the_legacy_family_and_owns_its_paths():
+    assert RED.memory_family == LEGACY_FAMILY == "gen1-pokemon"
+    assert RED.owns_legacy_paths is True
+
+
+def test_bad_memory_family_rejected():
+    for fam in ("Gen 1", "gen_1", "-gen1", "gen1-", ""):
+        with pytest.raises(ValueError):
+            _spec(memory_family=fam)
+
+
+def test_owns_legacy_paths_requires_the_legacy_family():
+    with pytest.raises(ValueError):
+        _spec(owns_legacy_paths=True, memory_family="x-game")
+    _spec(owns_legacy_paths=True, memory_family=LEGACY_FAMILY)  # allowed
+
+
+def test_registry_holds_at_most_one_legacy_owner():
+    assert sum(1 for g in GAMES.values() if g.owns_legacy_paths) <= 1
+
+
+def test_no_nonlegacy_family_names_a_different_games_key():
+    for g in GAMES.values():
+        if g.memory_family != LEGACY_FAMILY:
+            assert g.memory_family not in {k for k in GAMES if k != g.key}
