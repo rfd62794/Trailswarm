@@ -113,6 +113,23 @@ In order:
   - `npcs`: candidate stationary NPCs (`moves` falsy and `last` present, identified by `(pic, tuple(last))`) and how many the baseline also has.
   - `walls`: for each baseline wall edge whose source AND destination tile the candidate visited (`suspect`, the script's `conflicts`), split by `classify_wall(baseline_map, edge)` into `ledge_exact`, `ledge_row`, `plain`. `unexplained` is the `plain` count. Also `baseline_walls` (total baseline edges on shared maps) as the denominator, and `malformed`.
   - Rows list the worst 10 maps by `unexplained`, then by `candidate_only`.
+  - The return shape is fixed (Game_Compat's `thresholds.py` and its fixtures read these exact keys; do not rename them):
+    ```python
+    {
+      "totals": {
+        "tiles": {"candidate": 2203, "overlap": 2170, "candidate_only": 33},
+        "warps": {"common": 21, "different": 0, "candidate_only": 4},
+        "npcs": {"candidate": 35, "overlap": 35},
+        "walls": {"baseline_walls": 2127, "suspect": 210, "ledge_exact": 60,
+                  "ledge_row": 66, "plain": 84, "unexplained": 84, "malformed": 0},
+      },
+      "rows": [  # worst 10 maps, same per-map keys as "totals" plus "map"
+        {"map": 12, "tiles": {...}, "warps": {...}, "npcs": {...}, "walls": {...}},
+      ],
+      "shared_maps": 14,
+    }
+    ```
+    The numbers are illustrative only; a test asserts the key sets of `totals`, each sub-dict and each row.
   Counts are integers. A zero denominator in any ratio the text output prints shows as `n/a`, never a division error. The module judges nothing (no pass or fail); thresholds belong to `Game_Compat_Check_Directive.md`.
 
 ### brain assists RUN_DIR
