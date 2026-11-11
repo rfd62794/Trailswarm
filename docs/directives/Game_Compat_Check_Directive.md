@@ -2,7 +2,7 @@
 
 **Size:** S. **Assignee:** devin.
 
-No dependency on the other Multi_Game directives: this reads files and needs no `GameSpec`. `Family_Shared_Memory_Directive.md` imports `src/pokeagent/compat/ledges.py` from here, so this one merges first. It is the gate for Yellow (plan phase 10): Yellow does not join the `gen1-pokemon` memory family until this report passes between Yellow and the Red/Blue family.
+**Depends on `Brain_Compare_And_Run_Reports_Directive.md` merged** (adjusted 2026-11-08 so the map comparison has one implementation): it provides `src/pokeagent/brain/ledges.py` (`classify_wall`, `opposite`, `parse_edge`) and `src/pokeagent/brain/compare.py` (`compare_memory`). Import them; do not rebuild them. If they are missing, stop and write that in the Status row. Otherwise no dependency on the other Multi_Game directives: this reads files and needs no `GameSpec`. `Family_Shared_Memory_Directive.md` imports `src/pokeagent/compat/ledges.py` from here, so this one merges first (that module is now a one-line re-export of the brain one). It is the gate for Yellow (plan phase 10): Yellow does not join the `gen1-pokemon` memory family until this report passes between Yellow and the Red/Blue family.
 
 ## 1. Why this exists
 
@@ -95,9 +95,9 @@ A visited-both-ends edge is only a SUSPECT wall conflict, not proof: standing on
 
 New package `src/pokeagent/compat/` and a thin CLI. Only these files:
 
-1. `src/pokeagent/compat/__init__.py` <!-- new: src/pokeagent/compat/__init__.py --> - re-exports `compare_memory`, `compare_addresses`, `build_report`.
-2. `src/pokeagent/compat/ledges.py` <!-- new: src/pokeagent/compat/ledges.py --> - wall classifier. Under 90 lines.
-3. `src/pokeagent/compat/maps.py` <!-- new: src/pokeagent/compat/maps.py --> - tile, warp, NPC and wall comparison between two map docs. Under 150 lines.
+1. `src/pokeagent/compat/__init__.py` <!-- new: src/pokeagent/compat/__init__.py --> - re-exports `compare_memory` (from `pokeagent.brain.compare`), `compare_addresses`, `build_report`.
+2. `src/pokeagent/compat/ledges.py` <!-- new: src/pokeagent/compat/ledges.py --> - a re-export only (`from pokeagent.brain.ledges import classify_wall, opposite, parse_edge`), so existing importers keep working. Under 10 lines.
+3. (removed: the map comparison is `pokeagent.brain.compare.compare_memory`; there is no maps module under `src/pokeagent/compat`.)
 4. `src/pokeagent/compat/addresses.py` <!-- new: src/pokeagent/compat/addresses.py --> - address-table comparison. Under 80 lines.
 5. `src/pokeagent/compat/thresholds.py` <!-- new: src/pokeagent/compat/thresholds.py --> - the proposed thresholds and the verdict function. Under 100 lines.
 6. `src/pokeagent/compat/report.py` <!-- new: src/pokeagent/compat/report.py --> - assembles the JSON report and the plain summary. Under 100 lines.
@@ -114,7 +114,7 @@ New package `src/pokeagent/compat/` and a thin CLI. Only these files:
 - The two address-table arguments are optional and come as a pair; both absent means the address section is `"skipped"`, not passed.
 - Output: the JSON report to `--out` (or stdout), then a plain summary of at most 15 lines on stdout. Exit code 0 on `pass`, 1 on `fail`, 3 on `insufficient`, 2 on bad input (a missing or malformed file: print `error: <message>`, never a traceback). Never writes under `runs/` or `kb/` and never reads a ROM.
 
-### ledges.py (wall classifier)
+### ledges.py (wall classifier): specified and built in `Brain_Compare_And_Run_Reports_Directive.md` as `src/pokeagent/brain/ledges.py`; the contract below is unchanged. Do not reimplement it.
 
 `classify_wall(map_doc: dict, edge: str) -> str` returns one of:
 
@@ -124,7 +124,7 @@ New package `src/pokeagent/compat/` and a thin CLI. Only these files:
 
 Also export `opposite(button)` and `parse_edge(edge) -> (x, y, button)` (a `ValueError` on a malformed edge; callers count malformed edges as `plain` and report the count). No ROM access.
 
-### maps.py
+### Map comparison: specified and built in `Brain_Compare_And_Run_Reports_Directive.md` as `pokeagent.brain.compare.compare_memory`; the contract below is unchanged. `report.py` calls it. Do not reimplement it.
 
 `compare_memory(baseline: dict, candidate: dict) -> dict` over the shared map ids. Return per-map rows and totals:
 
@@ -160,7 +160,7 @@ Verdict: `fail` if any rule with enough evidence is violated; else `insufficient
 
 ### report.py and the summary
 
-JSON keys: `schema` (1), `generated` (ISO time), `baseline_name`, `candidate_name`, `inputs` (the file paths as given, and each file's sha256 so a rerun is recognisable), `memory` (maps.py result), `addresses`, `thresholds_status`, `rules`, `verdict`. The plain summary prints the verdict first, then one line per rule, then the worst three maps, then "thresholds are proposals". It prints no ROM data and no absolute personal paths beyond what the caller passed.
+JSON keys: `schema` (1), `generated` (ISO time), `baseline_name`, `candidate_name`, `inputs` (the file paths as given, and each file's sha256 so a rerun is recognisable), `memory` (`compare_memory` result), `addresses`, `thresholds_status`, `rules`, `verdict`. The plain summary prints the verdict first, then one line per rule, then the worst three maps, then "thresholds are proposals". It prints no ROM data and no absolute personal paths beyond what the caller passed.
 
 ## 4. What NOT to do
 
@@ -176,7 +176,7 @@ JSON keys: `schema` (1), `generated` (ISO time), `baseline_name`, `candidate_nam
 
 ```
 uv run python --version
-uv run pytest -q tests/test_compat_ledges.py tests/test_compat_maps.py tests/test_compat_addresses.py tests/test_compat_thresholds.py tests/test_compat_cli.py
+uv run pytest -q tests/test_compat_addresses.py tests/test_compat_thresholds.py tests/test_compat_cli.py
 ```
 Expected: `Python 3.12.x`; all pass, none skipped.
 
@@ -201,8 +201,8 @@ Expected: no new failures against main's tail; the diff stat prints nothing.
 
 ## 7. Completion criteria
 
-- [ ] `classify_wall` returns `ledge_exact` for the back-edge of a recorded jump (jump `"5,26,DOWN"` -> `[5,28]` makes `"5,28,UP"` exact), `ledge_row` for `"9,28,UP"` on the same row with the same opposite direction, `plain` for a wall elsewhere or with the wrong direction, and a malformed edge is reported, not raised, by the callers. <!-- test: tests/test_compat_ledges.py --> <!-- new: tests/test_compat_ledges.py -->
-- [ ] `compare_memory` on two hand-built docs returns the exact tile overlap, warp common/different, stationary NPC matches (a moving NPC is excluded) and the wall split (suspect, `ledge_exact`, `ledge_row`, `unexplained`); only shared map ids are compared. <!-- test: tests/test_compat_maps.py --> <!-- new: tests/test_compat_maps.py -->
+- [ ] `src/pokeagent/compat/ledges.py` re-exports the brain implementation, and importing `classify_wall` from `pokeagent.compat.ledges` works. <!-- test: tests/test_compat_cli.py -->
+- [ ] The report's `memory` section is the output of `pokeagent.brain.compare.compare_memory` on the two inputs (the comparison itself is tested by `tests/test_brain_compare.py`). <!-- test: tests/test_compat_cli.py -->
 - [ ] `compare_addresses` counts in-both, only-in-one, different addresses and the verified subset on two small synthetic tables. <!-- test: tests/test_compat_addresses.py --> <!-- new: tests/test_compat_addresses.py -->
 - [ ] The verdict is `pass` for a fixture meeting every proposed threshold, `fail` when one rule is violated (one case per rule), and `insufficient` below each minimum; a zero denominator never yields `pass`; a `--thresholds` override changes the verdict and is recorded in the report. <!-- test: tests/test_compat_thresholds.py --> <!-- new: tests/test_compat_thresholds.py -->
 - [ ] The CLI writes valid JSON with every key in section 3, prints the verdict first and says "proposals", returns exit codes 0, 1, 3 and 2 as stated, and never creates a file under `runs/` or `kb/`. <!-- test: tests/test_compat_cli.py --> <!-- new: tests/test_compat_cli.py -->
