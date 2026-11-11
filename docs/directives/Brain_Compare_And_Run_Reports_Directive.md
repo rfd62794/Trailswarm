@@ -218,3 +218,17 @@ Nothing before the run. Afterwards Claude runs the three commands on the real fi
 - Exec(uv run python tools/brain.py)
 - Exec(uv run pytest)
 - Exec(git diff)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Draft |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-11 07:25 · robert-claude-laptop · none → Draft — queue block added so the directive lints (PR #182 verify failed on lint_scope: no queue block)
+<!-- queue:end -->
