@@ -184,12 +184,14 @@ Diff stat, test tails, the grep output, the new files' line counts, the list of 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-game-namespaced-stores-directive |
 | Base branch | - |
+| Base commit | 8d84c6f226366c5fc4d1055583c615f2ec2d613b |
 
 **Status log**
 - 2026-11-08 12:16 · robert-claude-laptop · none → Queued — Drafted by Claude: plan phase 4; do not approve before Rom_Screen_Buttons merged
 - 2026-11-10 18:56 · robert-claude-laptop · Queued → Approved
+- 2026-11-10 19:03 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-game-namespaced-stores-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M73YMQGYQ2Q9SVATSB0M9K1J
 <!-- queue:end -->
