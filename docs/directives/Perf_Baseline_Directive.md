@@ -128,7 +128,7 @@ Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -137,4 +137,5 @@ Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect
 - 2026-11-07 21:07 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's efficiency request; cProfile evidence pasted (Tk loop 16.5%, BFS 28%, emulator 26%)
 - 2026-11-07 21:08 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert asked for efficiency work tonight
 - 2026-11-08 08:30 · robert-claude-laptop · Approved → Blocked — Held by Robert 2026-11-08: multi-ROM framework extension goes first; requeue after it lands (the queue has no Approved to Queued edge)
+- 2026-11-10 20:59 · robert-claude-laptop · Blocked → Queued — Robert's 11-08 hold lifted: multi-ROM phase 4 (Game_Namespaced_Stores) merged as Trailswarm #187
 <!-- queue:end -->
