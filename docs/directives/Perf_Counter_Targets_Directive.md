@@ -101,15 +101,22 @@ list and swallows per-item errors); `close_logs()` must run even when `shutdown(
 
 - WP1 `tests/test_world_route_cache.py`: (a) synthetic map, cache a route, then mark new tiles visited elsewhere:
   `cached_route` returns the cached route with no new `_bfs_node` call; (b) add a wall or blocked tile ON the cached
-  path: the route is re-searched and avoids it; (c) a wall OFF the path that cannot affect it is still a hit (or, if a
-  stricter per-map rule is chosen, document and test the actual rule); (d) a goal predicate reading `visited` returns
+  path: the route is re-searched and avoids it; (c) the rule is fixed: a cached route stays a HIT after the agent visits new tiles, as long as no wall, warp
+  or blocked edge on or adjacent to that route changed; the cache key / invalidation is a per-map version of the
+  blocking-edge set (blocked, warps, jumps), NOT `len(visited)`; the test asserts the hit (zero new `_bfs_node` calls)
+  after visits and after a wall change far from the route; (d) a goal predicate reading `visited` returns
   the same path as the uncached BFS after visits; (e) warp, jump, temp_blocked, static-NPC and beaten-tile changes
   each invalidate. A counter test: N steps of walking a synthetic corridor produce `_bfs_node` calls / N < 0.3.
-- WP2 `tests/test_perceive_memo.py`: a fake emulator counting `read` / `read_range` on the party addresses; many
-  frame ticks within one agent step with no RAM write cause one real read; an adapter write (and `load_state`)
-  causes a re-read; a stub without the marker still reads every time.
-- WP3 `tests/test_perf_probe.py` (extend): real-work rows present and distinct from wrapper rows on the synthetic
-  `.prof` fixture; `--maps` copies the file into the work dir and leaves the source unchanged.
+- WP2 `tests/test_perceive_memo.py`: a fake emulator counting `read` / `read_range` on the party addresses. The test
+  that FAILS on pre-change code: several frames and presses within one agent step with no RAM write between them
+  produce exactly one real `_read_party` (today it is one per frame window, about 1.5 per press). Also: an adapter
+  write (and `load_state`) causes a re-read. Regression guard only (passes today, must keep passing): a stub
+  emulator without the marker/frames counter still reads every time (`_party_key` / `_memoized`,
+  `src/pokeagent/ramstructs.py` lines 112-152).
+- WP3 `tests/test_perf_probe.py` (extend): the test that FAILS on pre-change code asserts the new real-work `COUNTS`
+  rows (`_read_party`, `_bfs_node`, `neighbours`) are present, distinct from the wrapper rows, on the synthetic
+  `.prof` fixture. Regression guard only (already passes on main, `tools/perf_probe.py` lines 134-136): `--maps`
+  copies the file into the work dir and leaves the source unchanged.
 - WP4 `tests/test_headless_no_tk.py` or a new `tests/test_exit_headless.py`: `shutdown` raises, `close_logs` is
   still called (and `emu.close`, `ctl.stop`).
 
