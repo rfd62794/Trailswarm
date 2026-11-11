@@ -14,6 +14,7 @@ use arrows / a (A) / s (B) / Enter (START) / Shift (SELECT); p pauses the agent.
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import queue
@@ -195,7 +196,6 @@ def main(argv=None) -> int:
 
     agent_view = None
     try:  # viewer agent: snapshot+commands on pokeagent.control_server, frames via --frame-share/telemetry
-        import atexit
         from pokeagent.adapters.explorer_snapshot import ExplorerAgentView
         agent_view = ExplorerAgentView(ctx, emu, mem, engine, presser, agent_id=f"explore-{os.getpid()}",
                                        frame_slot=frame_pub.name if frame_pub else "")
@@ -204,6 +204,7 @@ def main(argv=None) -> int:
         log(f"[viewer agent registered: {agent_view.agent_id}]", "res")
     except Exception as e:
         log(f"[viewer agent unavailable: {e!r}]", "res")
+    atexit.register(buf.close)  # a crash or Ctrl-C still drains the run's buffered .jsonl tail (close is idempotent)
     pos = ctx.pos
 
     def close_logs() -> None:
@@ -301,6 +302,11 @@ def main(argv=None) -> int:
     except OSError as e:  # port taken (another agent): run without the API rather than crash
         log(f"[control API unavailable: {e}]", "res")
 
+    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
+    log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
+    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
+        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
+
     def close_frame_shm() -> None:
         if frame_pub is not None:
             frame_pub.close()
@@ -373,10 +379,6 @@ def main(argv=None) -> int:
             root.after(16, frame)
 
     root.bind("<Key>", on_key)
-    log("Explorer demo. Rule-based agent learning the map; your key presses are learned too. Click the window to steer.", "hdr")
-    log(f"Remote control for Claude: http://127.0.0.1:{a.control_port}/status  (press, pause, resume, goto, say)\n", "hdr")
-    log(f"map memory: {a.maps} ({len(mem.data['maps'])} maps known so far); starter: {a.starter}; "
-        f"{'EXPLORATION run (trying to beat the record)' if explore_run else 'exploitation run (follows what works)'}\n", "res")
     root.after(300, frame)
     root.protocol("WM_DELETE_WINDOW", lambda: (shutdown(ctx), close_logs(), emu.close(), root.destroy()))
     root.mainloop()

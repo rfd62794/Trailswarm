@@ -108,3 +108,36 @@ def test_frontier_plan_cached_per_map(tmp_path, monkeypatch):
     p2 = mem.frontier_plan(1, 0, 1)  # on the committed path: the suffix answers without a search
     assert p2 is not None and p2[0] == (1, 0, 1) and p2[1] == []
     assert len(walks) == before
+
+
+def test_goal_closing_over_mutable_state_gets_no_cache_entry(tmp_path, monkeypatch):
+    """A goal whose closure holds a mutable object can change under any cached key, so
+    _goal_sig returns None and every path() re-searches."""
+    mem = _mem(tmp_path)
+    walks = _count_walks(monkeypatch)
+    box = {"target": (1, 4, 0)}
+
+    def goal(n):
+        return n == box["target"]
+
+    g = WorldGraph(mem.data["maps"])
+    assert g.path((1, 0, 0), goal) is not None
+    assert g.path((1, 0, 0), goal) is not None
+    assert len(walks) == 2  # no cache entry: the second call ran the search again
+
+
+def test_goal_closing_over_immutable_values_still_caches(tmp_path, monkeypatch):
+    """Ints/tuples/frozensets in the closure keep the last-result cache: the repeat call is
+    answered by the committed path's suffix, not a fresh search."""
+    mem = _mem(tmp_path)
+    walks = _count_walks(monkeypatch)
+    target, bound = (1, 4, 0), frozenset({1})
+
+    def goal(n):
+        return n == target and n[0] in bound
+
+    g = WorldGraph(mem.data["maps"])
+    r1 = g.path((1, 0, 0), goal)
+    assert r1 is not None
+    assert g.path((1, 0, 0), goal) == r1
+    assert len(walks) == 1  # the repeat was served from the cached route

@@ -57,13 +57,25 @@ _ROUTES: dict = {}  # same key tuple + (goal signature, limit) -> (maps, start, 
 _CACHE_CAP = 64
 
 
+def _immutable(v) -> bool:
+    """A value a route-cache key can trust: ``int``/``str``/``bool``/``float``/``None``, or a
+    ``tuple``/``frozenset`` of them (recursively). Anything else - a live dict/set/list, or an
+    identity-hashed object (``ctx``, ``self``, a ``Decision``) whose mutable state is not in the
+    key - can change under the cached entry, so its goal must re-search every call."""
+    if v is None or isinstance(v, (int, str, bool, float)):
+        return True
+    return isinstance(v, (tuple, frozenset)) and all(_immutable(x) for x in v)
+
+
 def _goal_sig(goal_fn) -> tuple | None:
     """A repeatable identity for a per-step repeated goal lambda: code object + bound values. Any
-    unhashable closure (a live dict/set/list the goal reads or mutates) means no signature - that
-    goal must re-search every call."""
+    closure cell that is not immutable (see ``_immutable``) means no signature - that goal must
+    re-search every call."""
     try:
-        sig = (goal_fn.__code__, goal_fn.__defaults__ or (),
-               tuple(c.cell_contents for c in (goal_fn.__closure__ or ())),
+        cells = tuple(c.cell_contents for c in (goal_fn.__closure__ or ()))
+        if not all(_immutable(v) for v in cells):
+            return None
+        sig = (goal_fn.__code__, goal_fn.__defaults__ or (), cells,
                tuple(sorted((goal_fn.__kwdefaults__ or {}).items())))
         hash(sig)
         return sig

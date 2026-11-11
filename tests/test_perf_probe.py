@@ -3,7 +3,9 @@ directive's bucket and the per-step call counts come out. (No ROMs/runs in a wor
 probe itself cannot be run here - the fixture exercises the report path.)"""
 from __future__ import annotations
 
+import os
 import pstats
+import queue
 import sys
 from pathlib import Path
 
@@ -12,6 +14,10 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 import perf_probe  # noqa: E402
+from pokeagent.emulator import FakeEmulator  # noqa: E402
+from pokeagent.explorer.context import ExplorerContext, ExplorerOptions  # noqa: E402
+from pokeagent.explorer.headless_loop import run  # noqa: E402
+from pokeagent.explorer.memory import MapMemory  # noqa: E402
 
 
 def _stats(entries) -> pstats.Stats:
@@ -62,3 +68,29 @@ def test_report_only_reads_a_prof_file(tmp_path):
     _fixture().dump_stats(str(prof))
     rc = perf_probe.main(["--report-only", str(prof), "--steps", "2000"])
     assert rc == 0
+
+
+class _DoneEngine:
+    """Counts steps like Engine.step and marks the run done at the cap."""
+
+    def __init__(self, ctx, until: int) -> None:
+        self.ctx, self.until = ctx, until
+
+    def step(self) -> None:
+        self.ctx.step += 1
+        if self.ctx.step >= self.until:
+            self.ctx.done = True
+
+
+def test_run_returns_when_os_exit_is_trapped_after_import(tmp_path, monkeypatch):
+    """The probe swaps ``os._exit`` for ``_trap_exit`` AFTER headless_loop was imported, so the
+    default ``exit_fn`` must resolve ``os._exit`` at call time: run() reaches ctx.done, the trap
+    fires, and control returns here to keep profiling (the bug killed the process before
+    ``prof.dump_stats``)."""
+    ctx = ExplorerContext(emu=FakeEmulator({0xD35E: 0x28, 0xD362: 5, 0xD361: 6}),
+                          mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(headless=True),
+                          run_dir=tmp_path)
+    exits = []
+    monkeypatch.setattr(os, "_exit", lambda code=0: exits.append(code))
+    run(ctx, _DoneEngine(ctx, 3), jobs=queue.Queue())  # no exit_fn: the default must see the trap
+    assert exits == [0] and ctx.step == 3  # the trapped exit fired and run() returned control
