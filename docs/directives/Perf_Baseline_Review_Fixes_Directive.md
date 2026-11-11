@@ -79,7 +79,7 @@ What changed per item, the pasted tails of both §5 commands, and anything in §
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-perf-baseline-review-fixes-directive |
 | Base branch | directive/pokeagent-perf-baseline-directive |
@@ -93,4 +93,5 @@ What changed per item, the pasted tails of both §5 commands, and anything in §
 - 2026-11-11 06:45 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-review-fixes-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M756T9VBE6T4EP5RFHVB8R11
 - 2026-11-11 06:54 · dispatcher · launched pid=17564; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-review-fixes-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-11 07:05 · devin · In progress → Review — All 4 findings fixed + tested; targeted 54 passed, full suite 2412 passed / 41 skipped / 0 failed; commit 74d7448 pushed [origin] spent: devin 11 min est. n/a
+- 2026-11-11 08:03 · robert-claude-laptop · Review → Done — note: Landed via #188 (branch fast-forwarded to 74d7448, merged b57902f7f); independent review MERGE_WITH_NITS; suite 2412 passed 0 failed 41 skipped.
 <!-- queue:end -->
