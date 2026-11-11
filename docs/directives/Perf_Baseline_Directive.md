@@ -128,10 +128,11 @@ Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-perf-baseline-directive |
 | Base branch | - |
+| Base commit | 63eb8f3f7315756cf5def5dd17ce7c030ff5867a |
 
 **Status log**
 - 2026-11-07 21:07 · robert-claude-laptop · none → Queued — Claude 2026-11-07 from Robert's efficiency request; cProfile evidence pasted (Tk loop 16.5%, BFS 28%, emulator 26%)
@@ -139,4 +140,5 @@ Diff stat, test tails, wc -l line, and for each of items 2-6 the expected effect
 - 2026-11-08 08:30 · robert-claude-laptop · Approved → Blocked — Held by Robert 2026-11-08: multi-ROM framework extension goes first; requeue after it lands (the queue has no Approved to Queued edge)
 - 2026-11-10 20:59 · robert-claude-laptop · Blocked → Queued — Robert's 11-08 hold lifted: multi-ROM phase 4 (Game_Namespaced_Stores) merged as Trailswarm #187
 - 2026-11-10 21:00 · robert-claude-laptop · Queued → Approved — lint override: dispatch-path-missing is the known false positive on PokeAgent directives (greenfield modules); Robert approved all recs 2026-11-10
+- 2026-11-10 21:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-baseline-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M747FKE5W57RJHXG4NZVM2BK
 <!-- queue:end -->
