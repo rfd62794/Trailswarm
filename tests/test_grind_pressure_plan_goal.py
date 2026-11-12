@@ -150,3 +150,13 @@ def test_leader_avoid_blocks_the_guessed_sight_line(tmp_path, monkeypatch):
     assert (0x41, 4, 6) not in ctx.mem.temp_blocked            # ... while the exit walk stays open
     assert team_plan.of(ctx)["avoid_key"] is not None
     PlanGoal._leader_avoid(ctx, 0x03, 4, 5, 0x41)              # off the gym map: a no-op
+
+
+def test_gym_hold_replaces_the_road_to_the_gym_with_the_grind_step(tmp_path, monkeypatch):
+    """Pewter, not ready: the planner's 'goal road north' toward the gym map must not win over the hold."""
+    ctx = _full_ctx(tmp_path, mem_map=0x02)
+    _gate_patch(monkeypatch, grind=("LEFT", "team gate: grinding the party"))
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")
+    monkeypatch.setattr(plan_goal, "plan_step", lambda goals, maps, pos, facing: ("UP", "goal road north: 9 steps to map 0x36"))
+    d = PlanGoal().step(ctx)
+    assert d.button == "LEFT" and "grinding" in d.why

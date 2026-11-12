@@ -15,9 +15,10 @@ from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, 
 from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
+from pokeagent.grind import stage_maps
 from pokeagent.knowledge import blackout_tax, team_plan, trainers
 from pokeagent.knowledge.cut_learner import LEARNER_STEP_CAP
-from pokeagent.knowledge.encounters import level_ceiling
+from pokeagent.knowledge.encounters import TRAIN_MAP, level_ceiling
 from pokeagent.knowledge.party import our_party
 from pokeagent.knowledge.readiness import TEAM_GAP
 from pokeagent.magikarp import BUY_STEP_CAP, EVOLVE_LEVEL, GYARADOS_STEP_CAP, GYARADOS_IDLE_CAP, MAGIKARP, MT_MOON_CENTER, party_species, trainee_slot
@@ -151,8 +152,8 @@ class PlanGoal(BehaviourBase):
             self._leader_avoid(ctx, m, x, y, gym)
             if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
                 planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, hp_now, mx_now)
-            elif self._enters(ctx, m, x, y, planned, gym):
-                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)
+            elif self._enters(ctx, m, x, y, planned, gym) or self._gym_road(planned):
+                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)  # the hold owns the step: no road to the gym
         elif st.get("grinding") and need > 0:
             grind = self._grind_step(ctx, m, x, y, hp_now, mx_now)
             errands = ("checkpoint", "heal", "pokecenter", "parcel", "potion", "magikarp", "mom")
@@ -236,7 +237,13 @@ class PlanGoal(BehaviourBase):
         route; ``grind_episode.boundary`` (checked in ``step``) vetoes any press that would leave a live
         episode's map set."""
         grind_episode.start(ctx, "the pressure latch")
-        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx)
+        kw = {"target": TRAIN_MAP[ctx.stage_goal]} if stage_maps.allowed(ctx.stage_goal) else {}  # pre-Brock: never Route 24
+        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, **kw)
+
+    @staticmethod
+    def _gym_road(planned) -> bool:
+        """The planner's push toward the gym map (the road north / the gym walk): never taken while the hold stands."""
+        return bool(planned) and planned[1].startswith(("goal road north", "goal gym"))
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):

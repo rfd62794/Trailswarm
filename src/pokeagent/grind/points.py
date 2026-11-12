@@ -170,11 +170,12 @@ def _reachable(maps, pos, map_id, blocked) -> bool:
 
 
 def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_map, mem=None,
-           trainee_slot: int | None = None, blocked=frozenset()) -> GrindPoint | None:
+           trainee_slot: int | None = None, blocked=frozenset(), only_maps=None) -> GrindPoint | None:
     """The best point for the trainee's level (``trainee_slot``, else the lead), or None when there is
     no gap. Deterministic: measured xp/min once MIN_MEASURED episodes exist (else prior) minus travel
     and blackout costs; ties by map id. ``blocked``: (map, x, y) tiles that are walls right now (a story
-    blocker); a point only they cut off is skipped."""
+    blocker); a point only they cut off is skipped. ``only_maps``: story-stage allow-list (None = any);
+    a point on another map is skipped, and so is one with no learned route from here."""
     if not party_levels:
         return None
     lvl = party_levels[trainee_slot] if trainee_slot is not None and 0 <= trainee_slot < len(party_levels) \
@@ -185,6 +186,8 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
     for p in ledger.points.values():
         lo, hi = p.level_band
         if not lo <= lvl <= hi:
+            continue
+        if only_maps is not None and (p.map_id not in only_maps or travel_steps(maps, current_map, p.map_id) >= FAR_TRAVEL):
             continue
         if blocked and isinstance(current_map, (tuple, list)) and travel_steps(maps, current_map, p.map_id) < FAR_TRAVEL                 and not _reachable(maps, current_map, p.map_id, blocked):
             continue

@@ -140,3 +140,16 @@ def test_swarm_merge_grind_points_round_trips():
     once = json.dumps(dst["grind_points"], sort_keys=True)
     swarm_merge.merge_memory(dst, src)                      # the shared merge is idempotent too
     assert json.dumps(dst["grind_points"], sort_keys=True) == once
+
+
+def test_only_maps_keeps_a_pre_brock_stage_off_mt_moon_and_unreachable_points():
+    mt_moon, route2 = pt(0x3C, prior=500.0), pt(0x0D, prior=50.0)
+    maps = {"2": {"warps": {"1,1,UP": [0x0D, 3, 3]}}, "13": {"warps": {"3,3,DOWN": [2, 1, 1]}}}   # Pewter <-> Route 2 only
+    led = ledger_with(mt_moon, route2)
+    cur = 0x02
+    assert gp.choose(led, [9], 17, cur, maps).map_id == 0x3C            # unrestricted: the high-prior point wins (the 11-12 bug)
+    from pokeagent.grind import stage_maps
+    got = gp.choose(led, [9], 17, cur, maps, only_maps=stage_maps.allowed("beat_brock"))
+    assert got.map_id == 0x0D
+    assert gp.choose(ledger_with(mt_moon), [9], 17, cur, maps, only_maps=stage_maps.allowed("beat_brock")) is None
+    assert stage_maps.allowed("beat_misty") is None
