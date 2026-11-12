@@ -206,13 +206,17 @@ Nothing during the run. Publishing any export is the owner's decision, made late
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-progress-export-sanitized |
 | Base branch | - |
+| Base commit | cc3b56eb852ab1a55fe6ed65337bb185d5d4e5a5 |
+| Head commit | db992dc87728e8e0dc717d322bf7a7f77ea8b14b |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 17:18 · robert-claude-laptop · none → Queued — Drafted by Claude at Robert's request 2026-11-08: allow-list export of map progress with no game text
 - 2026-11-12 16:37 · devin-laptop-overseer (delegated) · Queued → Approved — devin-laptop-overseer: Robert permanent PokeAgent approval + 2026-11-12 all-personal-repos approval; cloud drain; under delegate.band-normal, delegate.rate-limit
 - 2026-11-12 16:37 · devin-laptop-overseer (delegated) · Approved → Blocked — devin-laptop-overseer: claimed for manual devin --cloud run; under delegate.envelope
+- 2026-11-12 17:34 · devin-laptop-overseer (delegated) · Blocked → Review — devin-laptop-overseer: cloud run verdict done, head db992dc87728e8e0dc717d322bf7a7f77ea8b14b; under delegate.envelope [origin] base commit derived: merge-base of db992dc87728e8e0dc717d322bf7a7f77ea8b14b and origin/main spent: nothing recorded
 <!-- queue:end -->
