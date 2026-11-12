@@ -50,11 +50,16 @@ def can_buy(emu) -> bool:
 
 
 def magikarp_goal_settled(emu, st: dict, seen: set) -> bool:
-    """buy_magikarp: owned (or already evolved), or no longer a live option (Mt Moon 1F entered, cannot afford/no room)."""
+    """buy_magikarp: owned (or already evolved), or no longer a live option. "No longer an option" is only judged where
+    the salesman is: standing in the Mt Moon Pokemon Center (cannot afford it / no room: latched as st["buy_skipped"]),
+    or later in the story (Mt Moon 1F entered), or the step cap spent (st["buy_skipped"]). Money spent elsewhere
+    (e.g. on items in Pewter, before Brock) must not settle it: the plan is still pending until Route 4."""
     sp = party_species(emu)
     if MAGIKARP in sp or GYARADOS in sp:
         st["had_magikarp"] = True
-    return bool(st.get("had_magikarp")) or bool(st.get("buy_skipped")) or 0x3B in seen or not can_buy(emu)
+    if not st.get("had_magikarp") and not can_buy(emu) and emu.read(0xD35E) == MT_MOON_CENTER:
+        st["buy_skipped"] = True  # sticky: leaving the center must not reopen the goal
+    return bool(st.get("had_magikarp")) or bool(st.get("buy_skipped")) or 0x3B in seen
 
 
 def gyarados_goal(emu, st: dict) -> bool:
