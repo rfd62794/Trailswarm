@@ -2,6 +2,8 @@
 
 **Size:** M. **Assignee:** devin.
 
+**Depends on:** none.
+
 **Follow-up:** `Party_View_Migration_Constants_Directive.md` (single constants, species gating) and then `Party_View_Migration_Lead_Directive.md` (lead/fighter readers) move the remaining direct RAM readers onto this view. Both depend on this one; do not start them here.
 
 ## 1. Why this exists
