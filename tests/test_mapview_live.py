@@ -53,7 +53,7 @@ def test_write_live_validates_and_never_raises(tmp_path):
     assert not (tmp_path / "live").exists() or not list((tmp_path / "live").glob("*.json"))
     write_live(tmp_path, rec(x="bad"))                                   # wrong type: nothing written
     assert not list((tmp_path / "live").glob("*.json"))
-    with patch("pokeagent.mapview.live.os.replace", side_effect=OSError("ro")):
+    with patch("pokeagent.fsutil.os.replace", side_effect=OSError("ro")):
         write_live(tmp_path, rec())                                      # a failing write does not raise
     assert not list((tmp_path / "live").glob("*.tmp"))                   # tmp cleaned up
 

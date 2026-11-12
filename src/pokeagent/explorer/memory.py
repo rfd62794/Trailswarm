@@ -3,7 +3,6 @@ framework module's MapMemory). The schema is unchanged."""
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_wall
 from pokeagent.explorer.memory_tiles import TilesMixin
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
+from pokeagent.fsutil import atomic_write_text
 
 # After a blackout the game drops us at the last Pokecenter's door (Viridian (23,26) once we healed there) or at home
 # (Pallet (5,6)). Arriving there from any other map is a respawn, never a door: it made a ghost 3-step 'warp' from the
@@ -294,6 +294,4 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         self.apply_edits()  # the journal is re-applied on top of whatever this process learned
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")  # atomic replace: a kill mid-write cannot corrupt the memory
-        tmp.write_text(json.dumps(self.data, indent=1))
-        os.replace(tmp, self.path)
+        atomic_write_text(self.path, json.dumps(self.data, indent=1))  # atomic, per-process tmp, retried: a kill mid-write cannot corrupt the memory

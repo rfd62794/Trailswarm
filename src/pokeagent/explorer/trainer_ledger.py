@@ -21,9 +21,10 @@ keep one import surface.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
+
+from pokeagent.fsutil import atomic_write_text
 
 FLAG_LO, FLAG_HI = 0xD747, 0xD886  # wEventFlags block (ramlab.flags.FLAG_LO/FLAG_HI; ramlab is not an explorer layer)
 MATCH_MAX_DIST = 6      # how far (Manhattan, tiles) a walked-up NPC may stand from its ROM placement
@@ -181,9 +182,7 @@ class TrainerLedger:
                                                       "step": e.step, "provenance": e.provenance}
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(json.dumps(rec))
-        os.replace(tmp, path)  # atomic: a kill mid-write cannot corrupt the ledger
+        atomic_write_text(path, json.dumps(rec))  # atomic: a kill mid-write cannot corrupt the ledger
 
     def restore(self, path) -> int:
         """Re-apply this run's own file on resume (a fresh run dir has none). Rows for maps not yet
