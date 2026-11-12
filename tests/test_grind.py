@@ -119,3 +119,32 @@ def test_plan_goal_lifts_the_gate_when_the_budget_is_spent_and_logs_it(monkeypat
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 0
     assert any("grind budget spent for beat_brock" in t and "lifting the training gate" in t for t in logs)
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 0                              # stays lifted for that goal
+
+
+def test_budget_tracks_the_strongest_slot_not_a_weak_lead(monkeypatch):
+    """Run explore-20261111-214628: lead slot L4, Charmander L12 behind it: the budget saw 'stuck at L4' and lifted the gate."""
+    from pokeagent.explorer.grind import best_level, stall_keeps_hold
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    assert best_level(4, [SimpleNamespace(level=4), SimpleNamespace(level=12)]) == 12
+    assert best_level(4, None) == 4
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    ctx = SimpleNamespace(emu=SimpleNamespace(read=lambda a: 4, read_range=lambda a, n: bytes(n)), step=0, battles=0,
+                          blackouts_row=0, grind=None, log=lambda t, tag=None: None)
+    party = [SimpleNamespace(level=4), SimpleNamespace(level=12)]
+    PlanGoal._budgeted(ctx, goals, 17, None, party)
+    ctx.step = 100
+    party[1].level = 13                                                    # the strong slot levels: progress, window resets
+    PlanGoal._budgeted(ctx, goals, 17, None, party)
+    ctx.step = GRIND_STEPS - 1
+    assert PlanGoal._budgeted(ctx, goals, 17, None, party) == 17
+
+
+def test_stall_lift_keeps_the_gym_hold_but_ceiling_and_blackouts_release_it():
+    from pokeagent.explorer.grind import stall_keeps_hold
+    assert stall_keeps_hold("2500 steps without a level gain (stuck at L12)")
+    assert stall_keeps_hold("25 battles without a level gain (stuck at L12)")
+    assert not stall_keeps_hold("lead L20 is 6+ levels above the route's wild ceiling L5: no XP left to grind")
+    assert not stall_keeps_hold("2 blackouts in a row while training")
+    assert not stall_keeps_hold("")

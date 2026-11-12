@@ -107,7 +107,7 @@ def test_gym_hold_grinds_instead_of_entering_while_the_budget_lasts(tmp_path, mo
     assert d.button == "DOWN" and d.rule == "plan_goal"      # the hold: grind, do not walk in
 
 
-def test_the_lifted_budget_drops_the_gym_hold(tmp_path, monkeypatch):
+def test_a_spent_stall_budget_keeps_the_gym_hold_so_the_team_leaves_to_grind(tmp_path, monkeypatch):
     ctx = _full_ctx(tmp_path)
     _gate_patch(monkeypatch)
     ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}
@@ -116,8 +116,8 @@ def test_the_lifted_budget_drops_the_gym_hold(tmp_path, monkeypatch):
     lines = []
     ctx.log = lambda text, tag=None: lines.append(text)
     d = PlanGoal().step(ctx)
-    assert (d.button, d.rule) == ("UP", "plan_goal")         # gate lifted: the stage push walks in
-    assert any("gym hold lifted" in ln for ln in lines)      # one line says why the hold stood down
+    assert d.button != "UP"                                  # stalled budget, team not ready: the stage push must not walk in
+    assert not any("gym hold lifted" in ln for ln in lines)  # the hold stands (the gym stays shut until ready)
 
 
 def test_inside_the_gym_not_ready_walks_out_before_anything_else(tmp_path, monkeypatch):

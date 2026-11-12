@@ -14,6 +14,17 @@ GRIND_BLACKOUTS = 2
 CEILING_MARGIN = 6   # lead this far above the route's top wild level: a fight there gives negligible XP
 
 
+def best_level(lead: int, party) -> int:
+    """The level the budget tracks: the strongest real slot (a weak lead would 'spend' the budget while the team levels)."""
+    return max([lead, *(c.level for c in party or ())])
+
+
+def stall_keeps_hold(reason: str) -> bool:
+    """A lift for 'N battles/steps without a level gain' must not open the gym to an unready team: leave and grind.
+    Ceiling and blackout lifts still release the hold (nothing left to gain / training is losing)."""
+    return "without a level gain" in (reason or "")
+
+
 def battle_outcome(*, trainer: bool, start: tuple, end: tuple, party_count: int) -> tuple[bool, bool]:
     """(won, moved_away) from where the battle began and where it ended.
     A trainer battle cannot be fled, and a loss warps you to another MAP (a Pokecenter): so a trainer fight is won when we

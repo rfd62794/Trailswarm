@@ -10,7 +10,7 @@ from pokeagent.explorer.status_care import of as care_state
 from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
+from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, stall_keeps_hold
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
@@ -104,7 +104,7 @@ class PlanGoal(BehaviourBase):
             if ul:
                 ctx.log(f"[readiness] {ul}", "res")
         need = self._team_need(ctx, goals_now_all, need)
-        need = self._budgeted(ctx, goals_now_all, need, verdict)
+        need = self._budgeted(ctx, goals_now_all, need, verdict, party)
         need_raw = need
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
         area_grind.note_map(ctx, m)
@@ -139,7 +139,7 @@ class PlanGoal(BehaviourBase):
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not nv.ready and gym is not None
-        if hold and st.get("gate_lifted") is not None:
+        if hold and st.get("gate_lifted") is not None and not stall_keeps_hold(ctx.grind.reason(st["gate_lifted"])):
             hold = False  # the grind budget is spent: the hold must not lock the run out of the gym forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal
@@ -259,11 +259,11 @@ class PlanGoal(BehaviourBase):
             ctx.log(f"[team_ready: training gate closed or lifted for {GYARADOS_IDLE_CAP} plan steps - settled for this run]", "res")
 
     @staticmethod
-    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
+    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict, party=None) -> int:
         """The training level, or 0 (gate lifted) once the grind budget for this goal is spent. The
         lifted goal is published on the team-plan state so the gym hold stands down with the gate."""
         st = team_plan.of(ctx)
-        stage, level = stage_goal(goals), lead_level(ctx.emu)
+        stage, level = stage_goal(goals), best_level(lead_level(ctx.emu), party)  # the strongest slot, not a weak L4 lead
         st["gate_lifted"] = None
         if stage is None:
             return need
