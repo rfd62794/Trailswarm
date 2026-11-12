@@ -321,3 +321,44 @@ def test_warn_once_logs_at_warning(caplog):
         grind_episode._warn_once("t-w", "x %s", 1)
         measure._warn_once("t-w", "y %s", 2)
     assert [r.levelname for r in caplog.records if r.getMessage() in ("x 1", "y 2")] == ["WARNING", "WARNING"]
+
+
+# --- story blocker (the drunk old man north of Viridian, 2026-11-11): synthetic fixtures ---
+VIRIDIAN = {"1": {"visited": {"19,11": 1, "19,10": 1, "19,9": 1}, "blocked": [], "encounters": {},
+                  "warps": {"19,9,UP": [13, 5, 35]},
+                  "interactions": {"19,10,UP": {"type": "blocker", "goal": "oaks_parcel", "count": 9}}},
+            "13": {"visited": {"5,35": 1, "5,34": 1}, "blocked": [], "warps": {}, "encounters": {"5,34": 2}}}
+
+
+def _viridian_ctx(tmp_path, maps=None, stage_done=()):
+    from pokeagent.goals import GOALS
+    ctx = make_ctx(tmp_path, m=1, x=19, y=11, lvl=5, need=8, maps=maps or VIRIDIAN)
+    ctx.goals = lambda: {g: True for g in GOALS[:GOALS.index("oaks_parcel")]}   # the stage is oaks_parcel
+    return use_ledger(ctx, make_ledger(13, band=(0, 100)))
+
+
+def test_no_episode_toward_a_map_a_story_blocker_cuts_off(tmp_path, monkeypatch):
+    monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows.jsonl")
+    ctx = _viridian_ctx(tmp_path)
+    assert grind_episode.update(ctx) is None
+    assert any("no grind point fits" in t for t in ctx.logs)
+
+
+def test_blocker_from_an_earlier_goal_no_longer_blocks(tmp_path, monkeypatch):
+    monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows.jsonl")
+    ctx = _viridian_ctx(tmp_path)
+    ctx.mem.data["maps"]["1"]["interactions"]["19,10,UP"]["goal"] = "to_viridian"   # the goal moved on
+    assert grind_episode.update(ctx) is not None
+
+
+def test_live_episode_ends_when_a_blocker_is_recorded_on_the_way(tmp_path, monkeypatch):
+    monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows.jsonl")
+    monkeypatch.setattr(grind_episode, "LEDGER", tmp_path / "gp.json")
+    clean = {k: dict(v) for k, v in VIRIDIAN.items()}
+    clean["1"] = {**VIRIDIAN["1"], "interactions": {}}
+    ctx = _viridian_ctx(tmp_path, maps=clean)
+    assert grind_episode.update(ctx) is not None                       # nothing known yet: it starts
+    ctx.mem.data["maps"]["1"]["interactions"]["19,10,UP"] = {"type": "blocker", "goal": "oaks_parcel", "count": 1}
+    assert grind_episode.update(ctx) is None                           # the first bump ends it
+    assert grind_episode.active(ctx) is None
+    assert "story blocker" in (tmp_path / "rows.jsonl").read_text()

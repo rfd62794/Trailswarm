@@ -7,7 +7,7 @@ patch on the ROM grid when one exists (else walks between the encounter-proven t
 episode's map set while it lives."""
 from __future__ import annotations
 
-from pokeagent.explorer import grind_episode, train_route
+from pokeagent.explorer import grind_episode, story_blockers, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.perceive import lead_level, party_hp
 from pokeagent.explorer.trainee_gate import trainee_check
@@ -67,7 +67,7 @@ class GrindDrill(BehaviourBase):
         pt, pos = ep["point"], (ctx.view.m, ctx.view.x, ctx.view.y)
         hp, mx = party_hp(ctx.emu)
         if pos[0] != pt.map_id:
-            r = train_route.step(ctx.mem.data["maps"], pos, ctx.mem.temp_blocked, hp, mx, target=pt.map_id, patch=pt.patch)
+            r = train_route.step(ctx.mem.data["maps"], pos, frozenset(ctx.mem.temp_blocked) | story_blockers.blocked_tiles(ctx), hp, mx, target=pt.map_id, patch=pt.patch)
             return Decision(r[0], "grind_drill", f"grind episode: {r[1]}") if r else None
         g = self._grid(ctx, pt.map_id)
         if g is not None:

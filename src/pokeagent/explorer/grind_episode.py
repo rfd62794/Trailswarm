@@ -22,7 +22,7 @@ import logging
 import time
 from pathlib import Path
 
-from pokeagent.explorer import party_log, train_route
+from pokeagent.explorer import party_log, story_blockers, train_route
 from pokeagent.explorer.economy import heal_items
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.perceive import lead_level, party_hp
@@ -196,7 +196,7 @@ def _try_start(ctx, st: dict) -> tuple[dict | None, str | None]:
     if why:
         return None, f"would end at once ({why})"
     pt = gp.choose(_ledger(ctx, st), levels or [lvl], need, (ctx.view.m, ctx.view.x, ctx.view.y), ctx.mem,
-                   trainee_slot=slot)
+                   trainee_slot=slot, blocked=story_blockers.blocked_tiles(ctx))
     if pt is None:
         return None, "no grind point fits"
     pt.patch = gp.patch_of(ctx.mem.data.get("maps", {}), pt.map_id) or pt.patch
@@ -229,6 +229,11 @@ def _end_reason(ctx, ep: dict) -> str | None:
     hp, mx = party_hp(ctx.emu)
     if mx and hp / mx < train_route.MIN_HP_FRACTION and not heal_items.heal_count(bag_contents(ctx.emu)):
         return "hurt with no potion"
+    pt = ep.get("point")
+    if pt is not None and ctx.view.m != pt.map_id:  # a story blocker met on the way cuts the point off: the story goal goes first
+        wall = story_blockers.blocked_tiles(ctx)
+        if wall and not story_blockers.reachable(ctx.mem.data.get("maps", {}), (ctx.view.m, ctx.view.x, ctx.view.y), pt.map_id, wall):
+            return "a story blocker bars the way to the point"
     return None
 
 

@@ -12,14 +12,17 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.world import WorldGraph
 
 # goal -> (map id, stand x, stand y, facing, who). The captain sits at (4,2) in SS_ANNE_CAPTAINS_ROOM (0x65); his back is rubbed from below.
-GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain")}
+# Oak stands static at (5,2) in his lab (0x28): the parcel is delivered from below, once it is in the bag (REQUIRES).
+GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain"),
+              "deliver_parcel": (0x28, 5, 3, "UP", "Prof. Oak")}
+REQUIRES = {"deliver_parcel": "oaks_parcel"}  # goal -> the goal that must already be met before the talk is wanted
 MAX_TALKS = 8  # A presses at the person per run before giving up on the goal (a dialog box in between resets nothing: counted per press)
 
 
 def pending(ctx: ExplorerContext) -> tuple[str, tuple] | None:
     goals = ctx.goals()
     for goal, spec in GOAL_TALKS.items():
-        if not goals.get(goal) and ctx.view.m == spec[0]:
+        if not goals.get(goal) and ctx.view.m == spec[0] and (goal not in REQUIRES or goals.get(REQUIRES[goal])):
             return goal, spec
     return None
 

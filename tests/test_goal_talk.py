@@ -36,3 +36,11 @@ def test_registered_after_use_items_and_table_names_the_captain_tile():
     names = [getattr(b, "name", "") for b in default_behaviours()]
     assert "goal_talk" in names and names.index("goal_talk") > names.index("use_items")
     assert GOAL_TALKS["hm01_cut"][:4] == (0x65, 4, 3, "UP") and goal_talk.pending(ctx({"hm01_cut": False})) is not None
+
+
+def test_oak_is_talked_to_only_once_the_parcel_is_in_the_bag():
+    lab = dict(m=0x28, x=5, y=3)
+    assert not GoalTalk().applies(ctx({"oaks_parcel": False, "deliver_parcel": False}, **lab))   # starter stage: leave the lab flow alone
+    assert not GoalTalk().applies(ctx({"oaks_parcel": True, "deliver_parcel": True}, **lab))
+    c = ctx({"oaks_parcel": True, "deliver_parcel": False}, **lab)
+    assert GoalTalk().applies(c) and GoalTalk().step(c).button == "A"
