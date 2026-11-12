@@ -163,15 +163,18 @@ Nothing for the build. After merge, Claude runs the ROM state tests (`tests/rom/
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-view-migration-constants-directive |
 | Base branch | - |
 | Base commit | 7a3e01e6751dedb59beff9c6c39acda87a0e7520 |
+| Head commit | 4cd38bbec41aee968a4ac30644fe51a822fd48f5 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 11:37 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: mechanical, fully specified; dispatch only after Party_View_Directive merges (ram_symbols.py/party_view.py absent locally)
 - 2026-11-12 14:37 · robert-claude-laptop · Queued → Approved
 - 2026-11-12 14:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-constants-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78M7K6AZV10P25RT86VMX6B
 - 2026-11-12 14:41 · dispatcher · launched pid=11600; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-constants-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (7 declared need(s); 3 external))
+- 2026-11-12 15:07 · devin · In progress → Review — [origin] spent: devin 26 min est. n/a
 <!-- queue:end -->
