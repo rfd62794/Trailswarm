@@ -172,7 +172,7 @@ PLAYER_MON = PLAYER_MON_NUMBER  # wPlayerMonNumber: the party slot in the fight
 
 
 def active_slot(emu: Emulator) -> int | None:
-    """0-based party slot of the Pokemon in the fight, VERIFIED: wPlayerMonNumber (0xCC2F) must agree with wBattleMon's species,
+    """0-based party slot of the Pokemon in the fight, VERIFIED: wPlayerMonNumber must agree with wBattleMon's species,
     or that species must sit in exactly one party slot. None when the battle data is not loaded or cannot be matched."""
     species = read_battle_mon(emu).species
     party = read_party(emu)

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.party_view import read_battle_view
 
 HOLD_STEPS = 40
 PARTY_LIST_MARKERS = ("bring out", "choose a pok")
@@ -38,6 +39,7 @@ class AlreadyOutGuard(BehaviourBase):
         press, ctx.already_out_until = already_out_decision(text, ctx.step, ctx.already_out_until)
         if not press:
             return None
-        if ctx.emu.read(0xD015) == 0 and ctx.emu.read(0xD016) == 0 and not already_out_screen(text):
+        bm = read_battle_view(ctx.emu).battle_mon  # None while wBattleMon is stale: press nothing
+        if bm is None or (bm.hp == 0 and not already_out_screen(text)):
             return None  # our battler fainted: the forced "Bring out" list is not the active mon, bring_out drives it
         return Decision("B", "already_out", "party slot of the mon already fighting: backing out, not reselecting it")

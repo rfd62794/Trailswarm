@@ -23,6 +23,7 @@ from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import our_party, trainer_mon
 from pokeagent.knowledge.readiness import best_move
 from pokeagent.magikarp import MAGIKARP, MAX_RUNS, party_species, switch_candidate, trainee_slot_for
+from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
 MAX_PRESSES = 30  # a switch is about 6 presses; past this the menus are not what we think: fight on
@@ -152,7 +153,7 @@ class SwitchOut(BehaviourBase):
         if target is None:
             # Nobody fit to send in. A Magikarp only knows SPLASH: leave a wild fight (the first sighting is logged once),
             # a trainer fight cannot be left, so it carries on as before.
-            if ctx.emu.read(0xD057) == 1 and party_species(ctx.emu)[t] == MAGIKARP:  # only a Magikarp is useless: a fighter trainee never flees
+            if ctx.emu.read(IS_IN_BATTLE) == 1 and party_species(ctx.emu)[t] == MAGIKARP:  # only a Magikarp is useless: a fighter trainee never flees
                 wild_run = run_press(frame_lines(tm))
                 if wild_run is None:
                     return None

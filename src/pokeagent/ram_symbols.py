@@ -8,6 +8,10 @@ names. Layout notes are the working notes the decoders were written against."""
 PARTY_COUNT = 0xD163          # wPartyCount
 PARTY_SPECIES = 0xD164        # wPartySpecies: list of species bytes (0-terminated)
 PARTY_MON1 = 0xD16B           # wPartyMon1: first 44-byte party struct
+PARTY_MON1_HP = 0xD16C        # wPartyMon1HP (2 bytes, big-endian)
+PARTY_MON1_MOVES = 0xD173     # wPartyMon1Moves: 4 move ids
+PARTY_MON1_LEVEL = 0xD18C     # wPartyMon1Level
+PARTY_MON1_MAX_HP = 0xD18D    # wPartyMon1MaxHP (2 bytes, big-endian)
 PARTY_MON_SIZE = 44           # sizeof(party_struct)
 MAX_PARTY = 6
 PARTY_MON_OT = 0xD273         # wPartyMonOT: 11 chars per slot
@@ -18,6 +22,10 @@ NAME_SIZE = 11
 BATTLE_MON = 0xD014           # wBattleMon (the player's active mon)
 ENEMY_MON = 0xCFE5            # wEnemyMon
 BATTLE_STRUCT_SIZE = 29
+BATTLE_MON_HP = 0xD015        # wBattleMonHP (2 bytes, big-endian)
+BATTLE_MON_MOVES = 0xD01C     # wBattleMonMoves: 4 move ids
+BATTLE_MON_LEVEL = 0xD022     # wBattleMonLevel
+BATTLE_MON_MAX_HP = 0xD023    # wBattleMonMaxHP (2 bytes, big-endian)
 BATTLE_MON_PP = 0xD02D        # wBattleMonPP: 4 bytes, move PP
 ENEMY_MON_PP = 0xCFFE         # wEnemyMonPP
 

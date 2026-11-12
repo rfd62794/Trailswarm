@@ -72,6 +72,9 @@ class FakeEmu:
     def read(self, a):
         return self.mem.get(a, 0)
 
+    def read_range(self, a, n):
+        return bytes(self.mem.get(a + i, 0) for i in range(n))
+
 
 def test_feed_emits_moves_map_changes_battles():
     emu, feed = FakeEmu(), EventFeed()
@@ -82,7 +85,7 @@ def test_feed_emits_moves_map_changes_battles():
     feed.observe(emu, ctx)
     emu.mem.update({0xD35E: 1, 0xD362: 2, 0xD361: 2})
     feed.observe(emu, ctx)
-    emu.mem.update({0xD057: 1, 0xCFE6: 0, 0xCFE7: 20, 0xCFF4: 0, 0xCFF5: 20, 0xD015: 0, 0xD016: 15, 0xD023: 0, 0xD024: 15})
+    emu.mem.update({0xD057: 1, 0xD014: 0xB2, 0xCFE6: 0, 0xCFE7: 20, 0xCFF4: 0, 0xCFF5: 20, 0xD015: 0, 0xD016: 15, 0xD023: 0, 0xD024: 15})
     feed.observe(emu, ctx)
     emu.mem[0xCFE7] = 0
     feed.observe(emu, ctx)

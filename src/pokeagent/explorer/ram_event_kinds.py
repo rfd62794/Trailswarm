@@ -8,12 +8,22 @@ from __future__ import annotations
 from typing import Any
 
 from pokeagent.explorer.perceive import is_menu
+from pokeagent.ram_symbols import (
+    ENEMY_MON,
+    IS_IN_BATTLE,
+    PARTY_COUNT,
+    PARTY_MON1_HP,
+    PARTY_MON1_MAX_HP,
+    PARTY_SPECIES,
+)
 
 WRAM_START, WRAM_LEN, HRAM_START, HRAM_LEN = 0xC000, 0x2000, 0xFF80, 0x7F
 SNAP_LEN = WRAM_LEN + HRAM_LEN
 
-IN_BATTLE, CUR_MAP, PARTY_COUNT, PARTY_SPECIES, MONEY = 0xD057, 0xD35E, 0xD163, 0xD164, 0xD347
-ENEMY_SPECIES, LEAD_HP, LEAD_MAXHP = 0xCFE5, 0xD16C, 0xD18D
+IN_BATTLE, CUR_MAP, MONEY = IS_IN_BATTLE, 0xD35E, 0xD347
+ENEMY_SPECIES = ENEMY_MON
+# slot 0 on purpose: "lead" means party mon 1 - a heal shows up in the first struct's HP
+LEAD_HP, LEAD_MAXHP = PARTY_MON1_HP, PARTY_MON1_MAX_HP
 
 TEXT_RULES = (("heal", ("fighting fit", "restore your")), ("shop", ("may i help", "anything else")),
               ("pc", ("turned on", "accessed", "someone's pc", "bill's pc")))

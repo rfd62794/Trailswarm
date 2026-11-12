@@ -67,7 +67,8 @@ def test_enclosed_tile_walls_are_purged_on_load_but_real_walls_stay(tmp_path):
 
 
 def _fainted_party(tmp_path, battler_hp=0):
-    mem = {BATTLE: 2, 0xD163: 3, 0xD164: 179, 0xD165: 133, 0xD166: 24, 0xD015: battler_hp >> 8, 0xD016: battler_hp & 255,
+    mem = {BATTLE: 2, 0xD163: 3, 0xD164: 179, 0xD165: 133, 0xD166: 24,
+           0xD014: 179, 0xD015: battler_hp >> 8, 0xD016: battler_hp & 255,   # the loaded battler (fainted Wartortle or the live Magikarp)
            0xD16C: 0, 0xD16D: 0,                      # slot 0 fainted
            0xD16C + 0x2C: 0, 0xD16D + 0x2C: 22,       # slot 1 Magikarp, 22 HP
            0xD16C + 0x58: 0, 0xD16D + 0x58: 15}       # slot 2 a real mon, 15 HP

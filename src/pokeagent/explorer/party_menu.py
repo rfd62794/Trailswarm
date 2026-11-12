@@ -2,15 +2,14 @@
 
 The party list is a full-screen list WITHOUT a frame (so ``perceive.frame_lines`` sees nothing of it): its rows are
 decoded here. Texts verified on the ROM 2026-11-05 (docs/KNOWLEDGE.md): the list says "Choose a POKeMON."; choosing a
-member opens STATS / SWITCH / CANCEL; SWITCH asks "Move POKeMON where?". The cursor row is wCurrentMenuItem (0xCC26).
+member opens STATS / SWITCH / CANCEL; SWITCH asks "Move POKeMON where?". The cursor row is wCurrentMenuItem (MENU_ITEM).
 """
 from __future__ import annotations
 
 import re
 
+from pokeagent.ram_symbols import MENU_ITEM
 from pokeagent.screentext import CHARMAP
-
-MENU_ITEM = 0xCC26
 
 
 def screen_lines(tm: bytes) -> list[str]:

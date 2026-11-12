@@ -65,6 +65,7 @@ def test_stab_uses_active_battler_types_not_party_slot(monkeypatch):
     """0xD019/0xD01A (wBattleMon) drive STAB; party slot 1's 0xD170/0xD171 must be ignored."""
     monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
     emu = FakeEmulator({
+        BATTLE: 1, 0xD014: 4,           # wild fight, the battler's block loaded (CHARMANDER)
         0xCFEA: 22, 0xCFEB: 3,          # enemy GRASS/POISON
         0xD019: 20, 0xD01A: 25,         # OUR battler FIRE/ICE
         0xD170: 21, 0xD171: 21,         # party slot 1 WATER/WATER (the old, wrong source)
@@ -229,7 +230,8 @@ def test_move_choose_decision_carries_the_rule_string(tmp_path, monkeypatch):
     monkeypatch.setattr(kbattle, "ROM_KB", FAKE_KB)
     monkeypatch.setattr(bms, "ROM_KB", FAKE_KB)  # battle_moves binds kb.ROM_KB itself for the name lookup
     ctx = make_ctx(tmp_path, memory={
-        BATTLE: 1, 0xCFE5: 25, 0xCFE6: 0, 0xCFE7: 20, 0xCFF3: 3, 0xCFF4: 0, 0xCFF5: 30,
+        BATTLE: 1, 0xD014: 4,           # the battler's block is loaded (CHARMANDER)
+        0xCFE5: 25, 0xCFE6: 0, 0xCFE7: 20, 0xCFF3: 3, 0xCFF4: 0, 0xCFF5: 30,
         0xCFEA: 22, 0xCFEB: 3, 0xD019: 20, 0xD01A: 20,
         0xD01C: 4, 0xD01D: 7, 0xD01E: 1, 0xD01F: 13,
         0xD02D: 25, 0xD02E: 25, 0xD02F: 25, 0xD030: 25})

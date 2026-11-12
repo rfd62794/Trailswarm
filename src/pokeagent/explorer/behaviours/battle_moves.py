@@ -11,6 +11,7 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle import _finalize_pending_effect
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
+from pokeagent.party_view import read_battle_view
 
 
 MENU_CURSORS = ("", "FIGHT", "PKMN", "ITEM", "RUN", "CANCEL")  # a cursor on the battle menu is not a move
@@ -81,8 +82,10 @@ class BattleMoves(BehaviourBase):
                 if rejected:
                     ctx.no_pp.add(rejected)
                     ctx.log(f"[{rejected} was refused (no PP / disabled) - not reselecting it this battle]", "res")
-            # 2) the PP bytes already trusted by move_scores (wBattleMonPP 0xD02D-0xD030, slots = list order)
-            pp_of = [ctx.emu.read(0xD02D + i) & 0x3F for i in range(4)]
+            # 2) the PP bytes already trusted by move_scores (wBattleMonPP, slots = list order); a stale
+            #    wBattleMon (species 0) reads as the same all-zero PP the fallback below already handles
+            bm = read_battle_view(ctx.emu).battle_mon
+            pp_of = [p & 0x3F for p in bm.pp] if bm is not None else [0, 0, 0, 0]
             avail = [mv for i, mv in enumerate(moves)
                      if (i >= len(pp_of) or pp_of[i] > 0) and mv not in ctx.no_pp]
             if not avail:  # every move refused or reads 0 PP: B out so the game can fall to STRUGGLE

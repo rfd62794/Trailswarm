@@ -8,9 +8,11 @@ from pokeagent.explorer.party_menu import MENU_ITEM, is_party_screen, screen_lin
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines, is_menu
 from pokeagent.intervene.names import norm, species_name
 from pokeagent.knowledge.kb import ROM_KB
+from pokeagent.party_view import read_battle_view
+from pokeagent.ram_symbols import BATTLE_MON_MOVES
 from pokeagent.ramstructs import PLAYER_MON, active_slot, read_bag, read_battle_mon, read_party  # noqa: F401  (re-exported)
 
-BATTLE_MOVES = 0xD01C  # wBattleMonMoves
+BATTLE_MOVES = BATTLE_MON_MOVES  # wBattleMonMoves
 GRID = {"FIGHT": (0, 0), "PKMN": (1, 0), "ITEM": (0, 1), "RUN": (1, 1)}  # the battle menu: FIGHT PKMN / ITEM RUN
 
 
@@ -72,9 +74,12 @@ def toward_main(cur: str, want: str) -> str:
 
 
 def battle_moves(emu) -> list[str]:
-    """Names of our battler's moves in menu order (empty slots dropped)."""
+    """Names of our battler's moves in menu order (empty slots dropped); empty while wBattleMon is stale."""
+    bm = read_battle_view(emu).battle_mon
+    if bm is None:
+        return []
     moves = (ROM_KB or {}).get("moves") or {}
-    return [moves.get(str(i), {}).get("name", f"move {i}") for i in emu.read_range(BATTLE_MOVES, 4) if i]
+    return [moves.get(str(i), {}).get("name", f"move {i}") for i in bm.moves if i]
 
 
 def party_names(emu) -> list[str]:

@@ -4,7 +4,7 @@ from test_explorer_behaviours import BATTLE, TM, make_ctx, put_box
 
 
 def _battle_ctx(tmp_path, rows):
-    ctx = make_ctx(tmp_path, memory={BATTLE: 2, 0xD015: 0, 0xD016: 20})
+    ctx = make_ctx(tmp_path, memory={BATTLE: 2, 0xD014: 0xB2, 0xD015: 0, 0xD016: 20})
     put_box(ctx, text_rows=rows)
     return ctx
 

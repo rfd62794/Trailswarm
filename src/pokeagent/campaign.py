@@ -23,6 +23,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from pokeagent.ram_symbols import PARTY_COUNT, PARTY_MON1_MOVES, PARTY_MON_SIZE
+
 CAMPAIGN_PATH = Path(__file__).with_name("data") / "campaign.json"
 BADGES = 0xD356
 UNVERIFIED = "unverified"
@@ -93,9 +95,6 @@ def _flag(emu, flag: dict) -> bool:
     return bool(emu.read(addr) >> int(flag["bit"]) & 1)
 
 
-PARTY_COUNT, PARTY_MON1_MOVES, PARTY_MON_SIZE = 0xD163, 0xD173, 0x2C  # wPartyCount; wPartyMon1Moves (4 bytes); struct stride
-
-
 def party_knows_move(emu, move_id: int) -> bool:
     """Any of the (up to 6) party members has ``move_id`` in one of its four move slots."""
     n = min(emu.read(PARTY_COUNT), 6)
@@ -118,7 +117,7 @@ def evaluate(det, emu, st: dict, seen: set, bag: dict) -> bool | None:
     if "flag" in det:
         return _flag(emu, det["flag"])
     if "party" in det:
-        return emu.read(0xD163) >= int(det["party"].get("min_count", 1))
+        return emu.read(PARTY_COUNT) >= int(det["party"].get("min_count", 1))
     if "party_move" in det:
         return party_knows_move(emu, int(det["party_move"]))
     if "map_and_badge" in det:
