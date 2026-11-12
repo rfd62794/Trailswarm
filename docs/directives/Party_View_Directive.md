@@ -403,15 +403,18 @@ Nothing for the build. After merge, Claude confirms on the laptop that `PartyVie
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-view-directive |
 | Base branch | - |
 | Base commit | 2e3edfaef299aba9fe39f1aee58cca35311633af |
+| Head commit | e5b6a455f1960c6b0cf80a1963a972930bcfb24a |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 08:13 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; PR #207 merged fb27482 after audit + 2 review rounds
 - 2026-11-12 08:16 · robert-claude-laptop · Queued → Approved — lint override: line 382 cites tests/rom/test_party_states.py as a follow-up created by Party_RAM_State_Tests_Directive (queued alongside); D1 does not need it
 - 2026-11-12 08:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M77YF3EZ7QYJNCB3M3BESAFX
 - 2026-11-12 08:20 · dispatcher · launched pid=444; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (9 declared need(s); 5 external))
+- 2026-11-12 08:51 · devin · In progress → Review — [origin] spent: devin 31 min est. n/a
 <!-- queue:end -->
