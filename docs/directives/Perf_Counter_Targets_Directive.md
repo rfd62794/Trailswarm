@@ -179,11 +179,13 @@ md5 identical to 574fa3e0... for the empty-maps run (compare the seeded run base
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-perf-counter-targets-directive |
 | Base branch | - |
 | Base commit | c2f29940494336be4a2ee36f05da02961ab2b436 |
+| Head commit | 88610631b6a67e34e599ab40fefc609774705d77 |
+| Head remote | rfd62794/trailswarm |
 | Model | swe-2-flash-max |
 
 **Status log**
@@ -192,4 +194,5 @@ md5 identical to 574fa3e0... for the empty-maps run (compare the seeded run base
 - 2026-11-11 08:15 · robert-claude-laptop · Queued → Approved
 - 2026-11-11 19:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-counter-targets-directive; lane=explicit; model=swe-2-flash-max; perm=accept-edits; persona=steady-builder; agent_id=01M76J83FRJMBVJR8R6BDNEVHP
 - 2026-11-11 19:33 · dispatcher · launched pid=2780; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-counter-targets-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-11 19:56 · devin · In progress → Review — WP1-WP4 landed, one commit each: d6bbe7a (route cache keyed on routing-relevant state, visited excluded; cached paths revalidate edges + goal predicate; misses need full-version+visited match), dc21a72 (party memo keyed on agent_step marker + _ram_rev, bumped in Engine.step and non-agent begin_press; frame fallback kept for stubs), ac867c0 (probe COUNTS adds _read_party (real) row, wrapper/real labels distinct; --maps copy extracted to _work_maps + tested), 8861063 (_exit_headless cleanup per-item isolated via _run_exit_cleanups; close_logs runs even if shutdown raises). Verification (worktree, Python 3.12.12): - Targeted: uv run pytest -q -p no:cacheprovider tests/test_world_route_cache.py tests/test_perceive_memo.py tests/test_perf_probe.py tests/test_headless_no_tk.py tests/test_exit_headless.py tests/test_explorer_behaviours.py tests/test_explorer.py -> 64 passed - Full: uv run pytest -q -p no:cacheprovider -> 2424 passed, 41 skipped, 0 failed (157.60s) - wc -l src/pokeagent/explorer/*.py tools/perf_probe.py tools/explore_demo.py src/pokeagent/ramstructs.py -> all explorer files <=299 (context.py/memory.py at 299 ceiling), perf_probe.py 202, explore_demo.py 392, ramstructs.py 192 Diff stat vs base c2f2994: 14 files, +491/-112 (world.py -120/+~, memory_nav.py, new route_cache.py 82, ramstructs.py, emulator.py, engine.py, press.py, perf_probe.py, explore_demo.py, 4 test files). Expected probe effect (controller to measure on main checkout, ROM, seed 1, 2000 steps, empty maps AND seeded --maps copy): _bfs_node < 0.3/step, neighbours near ~100/step, real _read_party <= ~1/step (wrapper rows stay high - that is call volume), decisions.jsonl md5 identical to 574fa3e0... for empty-maps run. No ROM in worktree: md5 check and both probe runs delegated to controller per directive. [origin] spent: devin 22 min est. n/a
 <!-- queue:end -->
