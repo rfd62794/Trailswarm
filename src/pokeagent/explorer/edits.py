@@ -18,11 +18,12 @@ import time
 import uuid
 from pathlib import Path
 
-from pokeagent.explorer import edits_ops, legend
+from pokeagent.explorer import edits_ops, edits_ops_notes, legend
 
 JOURNAL_NAME = "memory_edits.jsonl"
 OPS = ("wall_add", "wall_remove", "warp_remove", "warp_add", "jump_add", "jump_remove",
-       "interaction_clear", "npc_trainer", "npc_forget", "tile_kind", "visited_clear", "undo")
+       "interaction_clear", "npc_trainer", "npc_forget", "tile_kind", "visited_clear",
+       *edits_ops_notes.OPS, "undo")
 DIRECT_EDITS = OPS[:-1]  # every op except undo
 DIRS = ("UP", "DOWN", "LEFT", "RIGHT")
 KINDS = set(legend.GLYPHS) - {"you"}  # a tile_kind override may be any legend kind but the player
@@ -124,6 +125,13 @@ def prepare(op: str, map_id, key: str, value=None):
         raise ValueError(f"interaction_clear key must be 'x,y,FACING', got {key!r}")
     if op in ("npc_trainer", "npc_forget", "tile_kind", "visited_clear") and not _tile_key(key):
         raise ValueError(f"{op} key must be 'x,y', got {key!r}")
+    if op in edits_ops_notes.EDGE_VALUES and not _edge_key(key):
+        raise ValueError(f"{op} key must be 'x,y,FACING', got {key!r}")
+    if op in edits_ops_notes.TILE_VALUES and not _tile_key(key):
+        raise ValueError(f"{op} key must be 'x,y', got {key!r}")
+    allowed = edits_ops_notes.EDGE_VALUES.get(op) or edits_ops_notes.TILE_VALUES.get(op)
+    if allowed and value not in allowed:
+        raise ValueError(f"{op} value must be one of {allowed}, got {value!r}")
     if op == "warp_add":
         dest = _coords(value, 3)
         if dest is None:
@@ -172,6 +180,8 @@ def prior_state(data: dict, op: str, map_id, key: str, value=None):
         return ((d or {}).get("tile_overrides") or {}).get(key)
     if op == "visited_clear":
         return ((d or {}).get("visited") or {}).get(key)
+    if op in edits_ops_notes.OPS:
+        return edits_ops_notes.prior(data, op, map_id, key, value)
     return None
 
 

@@ -6,6 +6,8 @@ journal edit list) - no UI, no emulator, no file writes. The CLI (``pokeagent br
 """
 from __future__ import annotations
 
+from pokeagent.brain.audit import audit
+from pokeagent.brain.cleanplan import plan_clean
 from pokeagent.brain.diff import diff
 from pokeagent.brain.find import find
 from pokeagent.brain.lessons import lessons
@@ -14,6 +16,6 @@ from pokeagent.brain.qtools import q_state, q_summary
 from pokeagent.brain.tile import tile_facts
 
 __all__ = [
-    "diff", "find", "lessons", "map_view", "maps_summary", "overlay_cells",
-    "q_state", "q_summary", "tile_facts",
+    "audit", "diff", "find", "lessons", "map_view", "maps_summary", "overlay_cells",
+    "plan_clean", "q_state", "q_summary", "tile_facts",
 ]
