@@ -267,15 +267,18 @@ Nothing for the build. After merge, Claude (controller) runs the recheck and the
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-ram-trust-tiers-and-discovery-directive |
 | Base branch | - |
 | Base commit | 62489c33b40fa4e6e623b7841d7acda24a689c1e |
+| Head commit | 1f160913b0e39e5973955b2d831471e58ea13e79 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 15:56 · robert-claude-laptop · none → Queued — Robert 2026-11-12: auto-assume known addresses, verify over time, discover unmapped; merged via PR #212
 - 2026-11-12 15:56 · robert-claude-laptop · Queued → Approved — lint override: Paths it cites under tools/ and src/pokeagent/ramlab that are not on main are new files this directive creates (Scope lists them as new).
 - 2026-11-12 15:57 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-ram-trust-tiers-and-discovery-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78RSFRBVYWNFD7WTFH17XQ1
 - 2026-11-12 16:01 · dispatcher · launched pid=18396; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-ram-trust-tiers-and-discovery-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (8 declared need(s); 3 external))
+- 2026-11-12 16:16 · devin · In progress → Review — [origin] spent: devin 14 min est. n/a
 <!-- queue:end -->
