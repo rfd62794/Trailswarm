@@ -13,20 +13,17 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import replace
 
 from pokeagent.explorer import heal_walk
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.economy import ledger, outside_use
+from pokeagent.explorer.retreat_risk import party_now
 from pokeagent.explorer.procedures.state import of
 from pokeagent.goals import bag_contents
 from pokeagent.knowledge import trainers
-from pokeagent.knowledge.kb import table
-from pokeagent.knowledge.party import our_party, species_row
 from pokeagent.procedures.after_victory_rules import decide
 from pokeagent.procedures.predicates import beaten_trainers
-from pokeagent.ramstructs import read_party
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +32,7 @@ FAR = 10 ** 6  # a trainer not on the active procedure's path sorts last (by dis
 _walk_warned: set = set()  # walk_to_center failures already logged (once per distinct message)
 
 
-def _party_now(emu) -> list:
-    """Our party as Combatants with each member's hp replaced by its CURRENT hp (same slot filter our_party uses)."""
-    names = table(None, "name_of_internal")
-    mons = [m for m in read_party(emu) if m.level and species_row(names.get(str(m.species), ""), None) is not None]
-    return [replace(c, hp=mons[i].hp) for i, c in enumerate(our_party(emu)) if i < len(mons)]
+_party_now = party_now  # the tests patch this name
 
 
 class AfterVictory(BehaviourBase):

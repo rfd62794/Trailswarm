@@ -20,6 +20,9 @@ PUSH_MARGIN = MARGIN           # fight() score the NEXT trainer must clear with 
 PUSH_MIN_LEAD_HP = 0.35        # never push on with the lead below this HP fraction (untuned first value)
 PUSH_MIN_ALIVE = 2             # ... and at least this many members above 0 HP (a party of 1: 1) (untuned)
 HEAL_WALK_MAX_FRAMES = 4000    # a Pokecenter round trip above this many frames is "too far" (untuned)
+NEAR_WALK_FRAMES = 1200        # a Pokecenter this close (about 75 steps) is cheap insurance: push needs a healthier party
+NEAR_MIN_LEAD_HP = 0.60        # ... lead at least this HP fraction (Robert 2026-11-12: pushed on at 63% lead / 42% party) (untuned)
+NEAR_MIN_PARTY_HP = 0.55       # ... and the whole party at least this (untuned)
 LOOKAHEAD = 2                  # how many remaining trainers on the path are simulated (next decides, second warns) (untuned)
 
 
@@ -69,7 +72,10 @@ def decide(party_now: list, remaining: list, bag: dict, walk, kb=None) -> Victor
         if len(theirs2) == len(remaining[LOOKAHEAD - 1]):
             s2 = fight(party_now, theirs2, chart, moves)
             warn = f"; next-but-one {s2:+.2f}" if s2 < PUSH_MARGIN else ""
-    if score >= PUSH_MARGIN and lead_hp_frac >= PUSH_MIN_LEAD_HP and alive >= min(PUSH_MIN_ALIVE, len(party_now)):
+    near = walk is not None and walk[0] <= NEAR_WALK_FRAMES
+    hurt_near = near and (lead_hp_frac < NEAR_MIN_LEAD_HP or hp_frac < NEAR_MIN_PARTY_HP)  # a short walk: retreat earlier
+    if (score >= PUSH_MARGIN and lead_hp_frac >= PUSH_MIN_LEAD_HP and alive >= min(PUSH_MIN_ALIVE, len(party_now))
+            and not hurt_near):
         return VictoryDecision("push", _label(mons), score, hp_frac, lead_hp_frac, alive,
                                f"margin {score:+.2f} clears {PUSH_MARGIN}{warn}")
     lead_hp = party_now[0].hp
@@ -81,7 +87,7 @@ def decide(party_now: list, remaining: list, bag: dict, walk, kb=None) -> Victor
     if walk is not None and walk[0] <= HEAL_WALK_MAX_FRAMES:
         return VictoryDecision("heal", _label(mons), score, hp_frac, lead_hp_frac, alive,
                                f"Pokecenter walk {walk[0]:.0f} frames{warn}")
-    if score >= 0:
+    if score >= 0:  # (reached only with no walk / too far: hurt_near always found the "heal" branch above)
         return VictoryDecision("push", _label(mons), score, hp_frac, lead_hp_frac, alive,
                                f"no cheaper heal; thin margin{warn}")
     return VictoryDecision("continue", _label(mons), score, hp_frac, lead_hp_frac, alive,
