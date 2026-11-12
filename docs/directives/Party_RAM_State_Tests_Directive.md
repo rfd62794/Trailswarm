@@ -211,11 +211,12 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-12 08:14 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; fixtures committed with PR #207 (fb27482)
+- 2026-11-12 08:14 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
