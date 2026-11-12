@@ -57,7 +57,7 @@ Entry key `"{map}:{kind}:{key}"` where `kind` is `i` (interaction, key `x,y,FACI
 - Schema-versioned (`"schema": 1`). Load: a missing file is an empty store (every entry is `unknown`); a malformed file or a malformed entry is ignored, never raised over, never overwritten with less (rename a corrupt file to `memory_grades.json.bad` once, then start empty). A `schema` newer than this build reads as empty and is NOT saved over.
 - Migration: an entry in `maps.json` with no sidecar record has grade `unknown`. Never write records for entries nobody has consulted. Nothing is ever deleted from the sidecar or from `maps.json`; a record for an entry that no longer exists in `maps.json` is kept and shown as `orphan` by `brain grades`.
 - Writes are atomic (write a temp file in the same directory, then `os.replace`) and happen at the same flush points as the loop table fold (`PROMOTE_FLUSH_STEPS` and run end, see `loop_veto.fold`), never per step. Add no new thread.
-- Merge between agents: the sidecar is per-checkout and is NOT merged by `swarm_merge` in this directive. Do not touch `tools/swarm_merge.py`. (Whether grades should travel with shared facts is an open question for Robert; the default is no, because a grade measures one agent's experience.)
+- Merge between agents: the sidecar is per-checkout and is NOT merged by `swarm_merge` in this directive. Do not touch `tools/swarm_merge.py`. (Decided 2026-11-12: grades do not travel with shared facts, and are not shared between Red and Blue; a grade measures one agent's experience.)
 
 ### 3.2 Grades from evidence
 
@@ -203,6 +203,12 @@ Expected: each under 300.
 ## 8. Report
 
 Findings first: the real names of the hook sites you used (and any that did not exist as described), whether `fact_labels.py` was needed, whether any file had to be split for size, and every judgement call on thresholds or keys. Then the command tails from section 5, with `tests/test_golden_red.py` reported NOT run. List the follow-ups left out (walls, ledges, tile kinds, NPC positions).
+
+## Decisions (Robert, 2026-11-12: "I approve all")
+
+1. Stripping persisted per-run flags (done/gave/beaten) unless `state_run` matches this run is accepted.
+2. Grades are per checkout and per game: not merged by `swarm_merge`, not shared between Red and Blue.
+3. Thresholds stay as written (quarantine at 3 contradictions in the last 8 outcomes; a re-probe of a quarantined entry every 200 steps).
 
 ## Required from User
 
