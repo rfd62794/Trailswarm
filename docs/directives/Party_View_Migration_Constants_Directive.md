@@ -163,7 +163,7 @@ Nothing for the build. After merge, Claude runs the ROM state tests (`tests/rom/
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-view-migration-constants-directive |
 | Base branch | - |
@@ -177,4 +177,5 @@ Nothing for the build. After merge, Claude runs the ROM state tests (`tests/rom/
 - 2026-11-12 14:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-constants-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78M7K6AZV10P25RT86VMX6B
 - 2026-11-12 14:41 · dispatcher · launched pid=11600; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-constants-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (7 declared need(s); 3 external))
 - 2026-11-12 15:07 · devin · In progress → Review — [origin] spent: devin 26 min est. n/a
+- 2026-11-12 16:03 · robert-claude-laptop · Review → Done — note: Merged PR #213 (a82d2d1) at 4cd38bb: verify 2565 passed / 0 failed; real-ROM hands-off to_pewter->beat_brock PASS at step 1089/3000, 0 non-agent presses, 0 step errors; Sonnet review APPROVE
 <!-- queue:end -->
