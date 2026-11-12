@@ -36,6 +36,11 @@ def _case(raw: dict) -> Case:
         raise ValueError(f"case {name}: budget must be a positive integer, got {budget!r}")
     if raw["memory"] not in MEMORY_MODES:
         raise ValueError(f"case {name}: unknown memory {raw['memory']!r}")
+    if str(raw["goal"]).startswith("map:"):
+        try:
+            int(raw["goal"][4:], 0)
+        except ValueError:
+            raise ValueError(f"case {name}: bad stop map {raw['goal']!r}") from None
     if raw["game"] not in GAME_ROMS:
         raise ValueError(f"case {name}: unknown game {raw['game']!r}")
     return Case(**{f.name: raw[f.name] for f in fields(Case)})
@@ -48,7 +53,17 @@ def load_cases(path: Path) -> list[Case]:
 
 
 def state_path(case: Case) -> str:
+    """A bare name means ``baselines/<name>.state``; a ``*.state`` path (a saved leg state) is used as given."""
+    if case.state.endswith(".state"):
+        return case.state
     return f"baselines/{case.state}.state"
+
+
+def stop_args(goal: str) -> list[str]:
+    """``map:0x25`` is a segment stop map (``--stop-at-map``); anything else is a goal name."""
+    if goal.startswith("map:"):
+        return ["--stop-at-map", goal[4:]]
+    return ["--stop-at-goal", goal]
 
 
 def inputs(case: Case) -> list[str]:
@@ -73,7 +88,7 @@ def build_argv(case: Case, index: int) -> list[str]:
         "tools/explore_demo.py",
         "--headless",
         "--state", state_path(case),
-        "--stop-at-goal", case.goal,
+        *stop_args(case.goal),
         "--steps", str(case.budget),
         "--seed", str(case.seed),
         "--maps", "runs/maps.json",

@@ -109,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         cases = [c for c in cases if c.name == args.case]
         if not cases:
             ap.error(f"no case named {args.case!r} in {CASES.name}")
-    counts = {"pass": 0, "fail": 0, "skip": 0}
+    counts = {"pass": 0, "fail": 0, "error": 0, "skip": 0}
     for index, case in enumerate(cases):
         reason = skip_reason(case, ROOT)
         if reason:
@@ -126,9 +126,10 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 shutil.rmtree(scratch, ignore_errors=True)
         print(line)
-        counts["pass" if status == "pass" else "fail"] += 1
-    print(f"{counts['pass']} passed, {counts['fail']} failed, {counts['skip']} skipped")
-    return 1 if counts["fail"] else 0
+        counts[status] += 1
+    print(f"{counts['pass']} passed, {counts['fail']} failed, "
+          f"{counts['error']} errored, {counts['skip']} skipped")
+    return 1 if counts["fail"] or counts["error"] else 0
 
 
 if __name__ == "__main__":

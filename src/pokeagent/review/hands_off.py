@@ -56,13 +56,45 @@ def _goal_reasons(run_dir: Path, goal: str, budget: int) -> tuple[list[str], int
     return [], step
 
 
+def normalize_goal(goal: str) -> str:
+    """``map:0x25`` / ``map:37`` -> the ``map:0x25`` form the demo writes to goal_frames.jsonl."""
+    if goal.startswith("map:"):
+        try:
+            return f"map:{int(goal[4:], 0):#04x}"
+        except ValueError:
+            return goal
+    return goal
+
+
+def _console_reasons(run_dir: Path) -> list[str]:
+    """Scan console.log line by line (it can be tens of MB) for step errors and human press lines."""
+    path = run_dir / "console.log"
+    errors, human, first = 0, 0, ""
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if line.startswith("[agent step error"):
+                    errors += 1
+                    first = first or line.strip()
+                elif line.lstrip().startswith("human:"):
+                    human += 1
+    except OSError:
+        return []
+    out: list[str] = []
+    if errors:
+        out.append(f"{errors} agent step error(s) in console.log, first: {first[:200]}")
+    if human:
+        out.append(f"{human} human: press line(s) in console.log")
+    return out
+
+
 def judge_run(run_dir: Path, goal: str, budget: int) -> Verdict:
     """Pass only when every press is the agent's and ``goal`` was first reached at step <= ``budget``."""
     run_dir = Path(run_dir)
     skipped: dict = {}
     rows = jsonl(run_dir / "transitions.jsonl", skipped)
     reasons, non_agent = _press_reasons(rows, skipped.get("transitions.jsonl", 0))
-    goal_reasons, goal_step = _goal_reasons(run_dir, goal, budget)
-    reasons += goal_reasons
+    goal_reasons, goal_step = _goal_reasons(run_dir, normalize_goal(goal), budget)
+    reasons += goal_reasons + _console_reasons(run_dir)
     return Verdict(passed=not reasons, reasons=reasons, goal_step=goal_step,
                    presses=len(rows), non_agent=non_agent)

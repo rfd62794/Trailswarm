@@ -273,8 +273,9 @@ def test_pipeline_no_new_run_dir_fails(tmp_path):
 
 def test_checked_in_case_table():
     cases = load_cases(ROOT / "tools" / "hands_off_cases.json")
-    assert cases == [CASE]
+    assert cases[0] == CASE
     assert cases[0].budget == 105 and cases[0].goal == "potion"
+    assert [c.memory for c in cases] == ["none", "live"]
 
 
 def _table(tmp_path, **override):
@@ -328,3 +329,55 @@ def test_skip_reason_order_and_none_when_present(tmp_path):
     _touch(tmp_path, "runs/maps.json")
     assert skip_reason(CASE, tmp_path) is None
     assert skip_reason(live, tmp_path) is None
+
+
+# --- console.log, segment starts, main counts ---------------------------------------------------------
+
+def test_step_errors_in_console_fail_with_count_and_first_text(tmp_path):
+    run = make_run(tmp_path, sources=AGENT35)
+    (run / "console.log").write_text(
+        "ok\n[agent step error: ValueError('boom')]\nok\n[agent step error: KeyError('x')]\n", encoding="utf-8")
+    v = judge_run(run, "potion", 105)
+    assert not v.passed
+    assert "2 agent step error" in v.reasons[0] and "boom" in v.reasons[0]
+
+
+def test_human_console_lines_fail(tmp_path):
+    run = make_run(tmp_path, sources=AGENT35)
+    (run / "console.log").write_text("thinking: a\nhuman:    b\n", encoding="utf-8")
+    v = judge_run(run, "potion", 105)
+    assert not v.passed and "1 human: press line" in v.reasons[0]
+
+
+def test_clean_console_log_still_passes(tmp_path):
+    run = make_run(tmp_path, sources=AGENT35)
+    (run / "console.log").write_text("thinking: fine\n", encoding="utf-8")
+    assert judge_run(run, "potion", 105).passed
+
+
+def test_segment_case_argv_uses_stop_at_map_and_state_path():
+    seg = replace(CASE, state="runs/explore-1/end.state", goal="map:0x25")
+    argv = build_argv(seg, 0)
+    assert argv[argv.index("--state") + 1] == "runs/explore-1/end.state"
+    assert argv[argv.index("--stop-at-map") + 1] == "0x25"
+    assert "--stop-at-goal" not in argv
+
+
+def test_judge_handles_stop_map_goal(tmp_path):
+    run = make_run(tmp_path, sources=AGENT35, goal="map:0x25", goal_step=20)
+    assert judge_run(run, "map:0x25", 105).passed
+    assert judge_run(run, "map:37", 105).passed
+    assert not judge_run(run, "map:0x26", 105).passed
+
+
+def test_bad_stop_map_raises_naming_case(tmp_path):
+    with pytest.raises(ValueError, match="bad_case"):
+        load_cases(_table(tmp_path, goal="map:zz"))
+
+
+def test_main_counts_error_separately(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(tool, "skip_reason", lambda c, r: None)
+    monkeypatch.setattr(tool, "copy_inputs", lambda c, s: None)
+    monkeypatch.setattr(tool, "check_case", lambda c, i, s: ("error", f"ERROR {c.name}: x"))
+    assert tool.main(["--case", CASE.name]) == 1
+    assert "0 failed, 1 errored" in capsys.readouterr().out

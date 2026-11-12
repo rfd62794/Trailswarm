@@ -68,7 +68,7 @@ New files only, in this order:
 - `memory` is `"none"` (no maps file: the run starts blind) or `"live"` (copy `runs/maps.json` into the scratch tree, read only; skipped when absent). (runs/maps.json is gitignored, so missing in a fresh worktree.)
 - `budget` is a step budget: 105 is 3x the 35 steps seen. A pass needs the goal line with `step <= budget`.
 - `game` selects the ROM: only `"red"` exists, mapping to `roms/Pokemon Red.gb`. Keep that mapping as one small dict in `hands_off_cases.py`.
-- Add no other case. This one is the proven baseline; a case that has not been seen to pass would be a guess.
+- Extensions: `state` may be a `*.state` path (a saved leg state) used as given; `goal` may be `map:0x25`, which builds `--stop-at-map 0x25` and is judged against the `map:0x25` goal_frames row. The judge also fails on `[agent step error` and `human:` lines in console.log.
 
 ### 3.2 `hands_off_cases.py`
 
