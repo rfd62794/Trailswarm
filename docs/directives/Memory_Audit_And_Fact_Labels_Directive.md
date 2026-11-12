@@ -214,13 +214,17 @@ Nothing before the run. Afterwards, and not part of this directive: Claude runs 
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-memory-audit-fact-labels |
 | Base branch | - |
+| Base commit | dcc2f2359c032282cca38e5d4afdf9b1abd10a2c |
+| Head commit | 216d877423caf7575a646004f129fcc422d9caa4 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 18:57 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert 2026-11-08: field labels, repeatable memory audit, and a cleaner that writes a new file plus quarantine
 - 2026-11-11 21:06 · robert-claude-laptop · Queued → Approved
 - 2026-11-11 21:23 · devin-laptop-overseer (delegated) · Approved → Blocked — devin-laptop-overseer: claimed for manual devin --cloud run (queue-drain, RAM-gated locally); Review if branch lands, Approved if it dies; under delegate.envelope
+- 2026-11-12 16:21 · devin-laptop-overseer (delegated) · Blocked → Review — devin-laptop-overseer: cloud run landed head 216d877423caf7575a646004f129fcc422d9caa4, verdict done w/ real tails (57+46 green, golden skipped - no ROM); under delegate.envelope [origin] base commit derived: merge-base of 216d877423caf7575a646004f129fcc422d9caa4 and origin/main spent: nothing recorded
 <!-- queue:end -->
