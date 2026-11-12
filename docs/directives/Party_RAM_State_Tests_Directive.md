@@ -205,3 +205,17 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 - Exec(uv run python --version)
 - Exec(uv run pytest)
 - Exec(git status)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 08:14 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; fixtures committed with PR #207 (fb27482)
+<!-- queue:end -->
