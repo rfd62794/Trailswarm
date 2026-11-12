@@ -46,11 +46,13 @@ The existing reserve, `src/pokeagent/explorer/economy/budget.py` (the only place
 
 With money 600 and no boss beaten this reserve is `300 + blackout_cost(600) // 2 = 300 + 150 = 450`, below 500: the agent may spend 150 and arrive with 450.
 
-**Purchase decision sites (the only three; `shop.buy` is called from one place):**
+**Purchase decision sites.** Every caller of `budget.reserve` / `budget.spendable` (grep `git grep -n "spendable\|budget.reserve\|shopping_list" src tools`), and each gets the floor from ONE place (the goals dict, 3.2), with no new argument threaded through any of them:
 
-1. `src/pokeagent/explorer/economy/shopping.py:36` `left = budget.spendable(goals, money, ref_money)` in `shopping_list(...)` (lines 30-68). Every item (Poke Ball line 52, heal item 53-60, Antidote 63-66, Escape Rope 67) is capped by `left`. `trip_plan` (`economy/plan.py:55-62`) and `plan.make_list` (`plan.py:50-52`) call it, passing `ref_money=ledger.of(ctx).reserve_ref(ctx.step)`.
-2. `src/pokeagent/explorer/behaviours/restock.py:122,128` inside `_visit` (lines 107-148): `reserve = budget.reserve(ctx.goals(), money, led.ref_money)` then `qty = min(qty, max(0, (read_money(ctx.emu) - reserve) // max(1, price(item))))  # the reserve is never breached`, then `shop.buy(ctx.emu, item, qty)` at line 131 (the only `shop.buy` call in `src/`).
-3. `src/pokeagent/explorer/restock.py:12-30`: `BALL_ID, BALL_MIN, BALL_BUY, MONEY_RESERVE = 0x04, 5, 10, 300`, `buy_quantity` (`(money - MONEY_RESERVE) // ball_price()`) and `ball_buy_wanted` (`money >= ball_price() * BALL_BUY + MONEY_RESERVE`). These decide *whether to walk to a Mart*; they use a flat 300 and never the budget module. Route them through the same floor so the agent does not walk to a Mart that will then buy nothing.
+1. `src/pokeagent/explorer/economy/shopping.py:36` `left = budget.spendable(goals, money, ref_money)` in `shopping_list(...)` (lines 30-68). Every item (Poke Ball line 52, heal item 53-60, Antidote 63-66, Escape Rope 67) is capped by `left`. Called by `economy/plan.py:51` (`make_list`, which `trip_plan` at `plan.py:55-62` uses) with `ctx.goals()`.
+2. `src/pokeagent/explorer/economy/bundles.py:20` `shopping_list(goals, bag, money, party, stats, ...)` in `candidate_bundles` (lines 14-23): same `goals` dict, so it inherits the floor through (1).
+3. `src/pokeagent/explorer/behaviours/restock.py:122,128` inside `_visit` (lines 107-148): `reserve = budget.reserve(ctx.goals(), money, led.ref_money)` then `qty = min(qty, max(0, (read_money(ctx.emu) - reserve) // max(1, price(item))))  # the reserve is never breached`, then `shop.buy(ctx.emu, item, qty)` at line 131 (the only `shop.buy` call in `src/`).
+4. `src/pokeagent/knowledge/catch_plan.py:88` `spend = budget.spendable(goals or {}, money or 0)`: how many balls the catch plan may budget for; `goals` is the caller's goals dict, so it inherits the floor too (verify the caller passes `ctx.goals()`: `git grep -n "catch_plan\." src`; if one passes a hand-built dict it simply gets floor 0, which is the old behaviour).
+5. `src/pokeagent/explorer/restock.py:12-30`: `MONEY_RESERVE = 300`, `buy_quantity`, `ball_buy_wanted`. Exercised only by `tests/test_team_inventory.py:59-64` (no caller in `src/`). Leave them unchanged; the test must keep passing.
 
 Healing at a Pokemon Center is free and spends no money: it is not a purchase and must stay unaffected. Selling Nuggets (`shop.sell`) is unaffected too.
 
@@ -84,15 +86,15 @@ These read `runs/milestones.json` (no flag today, so add it in the writer first)
 
 Leave alone: `tools/seg_ingest.py:67` (frame/step calibration; a skipped row's frame and step are real) and `tools/swarm_watch.py:105` (counts lines as run progress for stall detection; a skipped goal is progress).
 
-## 2. Scope (one PR, in order)
+## 2. Scope (items 1-3 and 5 are one PR; item 4 may ship as a separate PR)
 
 1. `src/pokeagent/magikarp_reserve.py` <!-- new: src/pokeagent/magikarp_reserve.py -->: pure functions and constants (3.1).
-2. Wire the floor into the three purchase sites (3.2): `economy/budget.py`, `economy/shopping.py`, `economy/plan.py`, `behaviours/restock.py`, `explorer/restock.py`. No change to `shop.py`.
-3. Circle-back (3.3): `src/pokeagent/magikarp.py` (`magikarp_goal_settled`), `explorer/planner_magikarp.py`, one call line in `explorer/behaviours/plan_goal.py`.
-4. Skipped readers (3.4): `src/pokeagent/review/load.py` (one helper), the call sites in 1.3, and the flag in `press_goals.py`.
+2. The floor, single source of truth (3.2): `src/pokeagent/goals.py` (`check_goals` adds two keys), `src/pokeagent/explorer/economy/budget.py` (reads one). No other purchase caller changes.
+3. Circle-back (3.3): new `src/pokeagent/explorer/magikarp_deferral.py` <!-- new: src/pokeagent/explorer/magikarp_deferral.py -->, `src/pokeagent/magikarp.py` (`magikarp_goal_settled`), `explorer/planner_magikarp.py`, and `explorer/behaviours/plan_goal.py` (replace two existing blocks with one-line calls; it must end at or below its current 300 lines).
+4. Skipped readers (3.4), **may ship as a separate PR**: `review/load.py`, the call sites in 1.3, the flag in `press_goals.py`.
 5. Tests (3.5): `tests/test_magikarp_reserve.py` <!-- new: tests/test_magikarp_reserve.py -->, additions to `tests/test_magikarp.py` and `tests/test_hands_off.py`.
 
-Size rule: every new module and every file you touch stays under 300 lines (`behaviours/restock.py` and `plan_goal.py` are close: add a call line at most; logic goes in the new module).
+Size rule, honest version: every NEW module stays under 300 lines. Two touched files are at the limit today: `explorer/behaviours/plan_goal.py` (300 lines) and `tools/seg_ingest.py` (299). Neither may grow: all new logic goes in the new modules; `plan_goal.py` only swaps existing blocks for one-line calls (net fewer lines), and `seg_ingest.py` gets an in-place edit of one existing line with NO new import (inline `not r.get("skipped")`). Check with `wc -l` before and after; if either ends above its starting count, stop and move logic out.
 
 ## 3. The work
 
@@ -117,48 +119,70 @@ def should_circle_back(money: int, party_count: int, map_id: int, path_len: int 
 
 `reserve_active` depends only on `st` and `seen` (`goals.py:90-94`: `st.setdefault("seen_maps", set())`, `st["had_magikarp"]`, `st["buy_skipped"]`). Once the goal settles by any path (`magikarp_goal_settled` true) the floor is 0 and normal spending resumes. `from_pewter_onward` means `0x02 in seen`.
 
-### 3.2 Using the floor
+### 3.2 Using the floor (one source, no new arguments)
 
-- `budget.reserve(goals, money, ref_money)` gains `floor: int = 0` and returns `max(existing, floor)`; `spendable` passes it through. Default 0 keeps every existing test valid.
-- `plan.make_list` computes the floor once and passes it to `shopping.shopping_list` (new keyword, default 0). Find where `ctx` holds `st`/`seen` with `git grep -n "seen_maps" src/pokeagent`; if it is not reachable from `ctx` in two reads, stop and write that in the Status row rather than adding a global.
-- `behaviours/restock.py:122`: pass the same floor into `budget.reserve(...)`; the `qty` clamp at line 128 then enforces it. No other edit in that file.
-- `explorer/restock.py`: `ball_buy_wanted` and `buy_quantity` take `floor=0` and use `max(MONEY_RESERVE, floor)`. Callers: `git grep -n "ball_buy_wanted\|buy_quantity" src tests`; pass the floor where the caller has it, else leave the default and say so in the Report.
+`check_goals(emu, st)` (`goals.py:88`, `st` is the explorer context) already returns a goals dict that carries non-ladder keys (`goals["_sprites"]`, read at `planner_east.py:147` and `planner_magikarp.py:36`). Follow that precedent: after the dict `g` is built, set `g["_magikarp_floor"] = magikarp_floor(st, seen)` (an int) and `g["_buy_deferred"] = bool(st.get("buy_deferred"))`. Ladder loops iterate `GOALS`, so nothing else sees them. Then:
+
+- `budget.reserve(goals, money, ref_money)` returns `max(existing, int(goals.get("_magikarp_floor", 0)))`. `spendable` calls `reserve`, so it follows. A goals dict without the key (tests, hand-built dicts) gives floor 0: every existing test is unchanged.
+- That one edit covers callers 1-4 in 1.1 (shopping_list, bundles, `_visit`, catch_plan). Do not add a `floor` argument to any of them.
+- `explorer/restock.py` (caller 5) stays as is.
 
 ### 3.3 Circle-back
 
-Today (`magikarp.py:60-61`): at 0x44, no Magikarp, `not can_buy` -> `st["buy_skipped"] = True`, permanently. Change to:
+Today (`magikarp.py:60-61`): at 0x44, no Magikarp, `not can_buy` -> `st["buy_skipped"] = True`, permanently. Two existing blocks in `plan_goal.py` would also kill a deferred goal, and the design must handle both:
 
-1. At 0x44, `not can_buy(emu)`, no Magikarp, `0x3B not in seen`, and the party has room: set `st["buy_deferred"] = True` and `st.setdefault("deferred_steps", 0)`; do NOT latch `buy_skipped`. A full party (6) is not fixed by walking, so it still latches `buy_skipped` at once.
-2. While `buy_deferred` and `0x3B not in seen` the goal stays open. `deferred_steps` += 1 per step (one call line in `plan_goal.py` beside the `ctx.buy_steps` counter at lines 39-44; logic in the new module). Past `CIRCLE_BACK_STEP_CAP` latch `buy_skipped` (settles skipped, log line shaped like the existing cap's).
-3. Route back only when ALL hold: map in `WEST_OF_MT_MOON`; `money >= MAGIKARP_PRICE + MAGIKARP_RESERVE_MARGIN`; party count < 6; `len(g.path(pos, lambda n: n[0] == MT_MOON_CENTER)) <= CIRCLE_BACK_MAX_PATH`. That is the pure `should_circle_back`. `planner_magikarp.magikarp_step` (already walks to 0x44, lines 23-34) returns None while `buy_deferred` and `should_circle_back` is false, so the explorer keeps earning money (trainers on Route 3/4) instead of walking into the center poor again.
-4. Once `0x3B in seen` the goal settles skipped exactly as today (`or 0x3B in seen`, line 62). A goal skipped after Mt Moon is never re-opened: `buy_deferred` is ignored once `0x3B in seen`, and `buy_skipped` stays sticky.
-5. A successful buy (Magikarp in party) sets `had_magikarp` as today; the goal is reached with no `skipped` field.
+```python
+# plan_goal.py:38-44 (the buy_steps cap; counts on 0x44 AND Route 4 0x0F, which is west of Mt Moon)
+        if not goals_now_all["buy_magikarp"] and m in (MT_MOON_CENTER, 0x0F):
+            ctx.buy_steps += 1
+            if ctx.buy_steps > BUY_STEP_CAP:
+                ctx.buy_skipped = True; ctx.center_intent = None
+                ctx.log(f"[buy_magikarp: {BUY_STEP_CAP} steps in/around the Mt Moon Pokemon Center without buying - settled for this run]", "res")
+                goals_now_all = ctx.goals()
+# plan_goal.py:58-61 (keeps the agent inside the center while the goal is open)
+        if m == MT_MOON_CENTER and not goals_now_all["buy_magikarp"]:
+            ctx.center_intent = "buy_magikarp"  # stay inside until the salesman has been dealt with
+        elif ctx.center_intent == "buy_magikarp" and goals_now_all["buy_magikarp"]:
+            ctx.center_intent = None  # bought (or no longer possible): the planner may walk out now
+```
 
-The money test for circling back is price + margin, not price alone (Robert's rule).
+A deferred goal is open, so without a change the agent would stay in the center (`center_intent`) until `buy_steps > 600` latched `buy_skipped`, long before any 1500 cap, and circle-back would be dead. Move both blocks into `src/pokeagent/explorer/magikarp_deferral.py` as `tick(ctx, m) -> dict` (returns the refreshed `ctx.goals()`), and replace each block in `plan_goal.py` with a one-line call (`goals_now_all = magikarp_deferral.tick(ctx, m)`; the `center_intent` handling is inside `tick` too, so `plan_goal.py` shrinks). Rules for `tick`:
 
-### 3.4 Skipped readers
+1. **Deferring.** At 0x44, no Magikarp, `not can_buy`, `0x3B not in seen`, party has room: set `st["buy_deferred"] = True`; do NOT latch `buy_skipped`. A full party (6) is not fixed by walking: it still latches `buy_skipped` at once.
+2. **center_intent.** While `buy_deferred`: never set `ctx.center_intent = "buy_magikarp"`, and clear it if set, so the planner walks out of the center.
+3. **buy_steps vs deferred_steps.** `buy_steps` (cap `BUY_STEP_CAP` 600, unchanged) counts only while NOT deferred (the active attempt to reach and buy). `deferred_steps` counts every step while `buy_deferred` and `0x3B not in seen`, on any map; past `CIRCLE_BACK_STEP_CAP` latch `buy_skipped` and log it like the existing cap. They never run together, and `deferred_steps` is never reset, so repeated blackouts cannot extend the wait.
+4. **Starting the trip.** Each step while deferred, `tick` computes `should_circle_back(money, party_count, map_id, path_len)` (3.1) and, when true, sets `st["buy_deferred"] = False` and `ctx.buy_steps = 0`: the normal buy attempt resumes (planner walks to 0x44, `buy_steps` counts again with its 600 cap, far above the path bound). `path_len` is `len(WorldGraph(ctx.mem.data.get("maps", {})).path(pos, lambda n: n[0] == MT_MOON_CENTER) or ())` as `explorer/heal_walk.py:83` builds its graph (no path -> `None` -> false). Arriving poor again (another blackout) re-defers via rule 1.
+5. **Planner.** While `goals["_buy_deferred"]` is true `planner_magikarp.magikarp_step` returns None (guard at the top), so the explorer keeps earning money (trainers on Route 3/4) instead of walking into the center poor.
+6. **Mt Moon 1F.** Once `0x3B in seen` the goal settles skipped exactly as today (`or 0x3B in seen`, `magikarp.py:62`); `buy_deferred` is ignored from then on and a skipped goal is never re-opened (`buy_skipped` stays sticky).
+7. A successful buy (Magikarp in party) sets `had_magikarp` as today; the goal is reached with no `skipped` field.
 
-- `src/pokeagent/review/load.py`: add `def reached_rows(rows): return [r for r in rows if isinstance(r, dict) and not r.get("skipped")]`, imported by the others (`tools/` files import `pokeagent`; verify with `git grep -n "^from pokeagent\|^import pokeagent" tools/seg_ingest.py tools/milestones_clean.py`).
-- Apply it at each row of the 1.3 table: hands_off.py:43, events.py:35, diff.py:35, timeline.py:19, swarm.py:76, evaluation_ab.py:35, seg_ingest.py:110, milestones_clean.py:45. For `hands_off.py`, a skipped row for the asked goal gives the reason `"goal <name> was skipped (not reached)"`, not "never reached".
-- Writer: in `press_goals.py` add `"skipped": True` to `rec` when `skipped`, before `hist.setdefault(g, []).append(rec)`. `backfill.py:55` and `mine.py:30` ignore entries with `e.get("skipped")`.
+`magikarp_goal_settled` (`magikarp.py:52-62`) changes only at lines 60-61: poor with room and `0x3B not in seen` sets `st["buy_deferred"] = True` instead of `buy_skipped` (full-party and 0x3B cases as above). The money test for circling back is price + margin, not price alone (Robert's rule). `CIRCLE_BACK_MAX_PATH` and `CIRCLE_BACK_STEP_CAP` are tunable first guesses, like the margin: not measured, a run may retune them.
+
+### 3.4 Skipped readers (may ship as a separate PR)
+
+- `src/pokeagent/review/load.py:111` builds `RunData.goal_frames` from `jsonl(run_dir / "goal_frames.jsonl", skipped)`. Wrap it once: `goal_frames=reached_rows(jsonl(...))`, with `def reached_rows(rows): return [r for r in rows if isinstance(r, dict) and not r.get("skipped")]` defined in the same file. That covers `events.py:35-37`, `diff.py:35-36` and `timeline.py:19-20` (they read `data.goal_frames`).
+- Readers that open `goal_frames.jsonl` themselves, each changed at its one line: `review/hands_off.py:43` (import `reached_rows` from `pokeagent.review.load`; a skipped row for the asked goal gives the reason `"goal <name> was skipped (not reached)"`, not "never reached"), `review/swarm.py:76`, `evaluation_ab.py:35` (inline `not g.get("skipped")`), `tools/seg_ingest.py:110` and `tools/milestones_clean.py:45` (inline `not r.get("skipped")`, no new import: seg_ingest is at the 299-line limit).
+- Writer: in `press_goals.py` add `"skipped": True` to `rec` when `skipped`, before `hist.setdefault(g, []).append(rec)`. `novelty/backfill.py:55` and `procedures/mine.py:30` ignore entries with `e.get("skipped")`.
 - Existing `runs/milestones.json` entries stay as they are. Never rewrite any file under `runs/`.
 
 ### 3.5 Tests (synthetic, no ROM, no emulator; fake emulators as `tests/test_magikarp.py` already does)
 
 `tests/test_magikarp_reserve.py`:
 - reserve blocks a buy: Pewter seen, money 600, `shopping_list(...)` with the floor returns no Poke Ball line that takes money below 600 (500 + 100); the same call without the floor returns the buy.
+- floor comes through the goals dict: `budget.spendable({"_magikarp_floor": 600}, 800)` is 200 and the same call without the key is unchanged; `catch_plan` and `candidate_bundles` given such a dict also stay above 600.
 - floor is 0 once settled: `had_magikarp`, `buy_skipped`, and `0x3B in seen` each give floor 0 and the buy is allowed.
 - floor is 0 before Pewter (`0x02 not in seen`).
 - circle-back triggers on Route 3 with money restored: `buy_deferred`, map 0x0E, money 700, party 3, path 40 -> true; money 550 -> false; path 81 -> false; party 6 -> false.
 - never after Mt Moon 1F: `0x3B in seen` with `buy_deferred` set -> `magikarp_goal_settled` true, no route.
-- deferral at 0x44: poor with room does not latch `buy_skipped`; a full party does.
+- deferral at 0x44: poor with room does not latch `buy_skipped` and `tick` clears `center_intent`; a full party does latch it.
+- `buy_steps` does not count while deferred: more than 600 steps on Route 4 with the goal deferred does not latch `buy_skipped`; it does count once the trip has started (rule 4).
 - step cap: `deferred_steps` past `CIRCLE_BACK_STEP_CAP` settles skipped.
 
-`tests/test_hands_off.py`: a `goal_frames.jsonl` row `{"goal": "buy_magikarp", "step": 40, "frame": 1, "skipped": true}` fails with a reason containing `skipped`; the same row without the flag passes. One test for `reached_rows` (drops skipped, keeps normal, ignores non-dicts) and one that `review/diff._goal_times` ignores a skipped row.
+`tests/test_hands_off.py`: a `goal_frames.jsonl` row `{"goal": "buy_magikarp", "step": 40, "frame": 1, "skipped": true}` fails with a reason containing `skipped`; the same row without the flag passes. One test for `reached_rows` (drops skipped, keeps normal, ignores non-dicts) and one that `load.py` drops a skipped row from `RunData.goal_frames` (so `review/diff._goal_times` ignores it).
 
 ## 4. What NOT to do
 
-- Do not touch `shop.py`, the shop menu pressing, or the Pokemon Center/heal behaviours. Healing is free and unaffected.
+- Do not thread a `floor` argument through any purchase caller; the floor lives in `budget` only. Do not touch `shop.py`, the shop menu pressing, or the Pokemon Center/heal behaviours. Healing is free and unaffected.
 - Do not change `MAGIKARP_PRICE`, `BUY_STEP_CAP`, or the #202 `0x3B in seen` settle rule. Do not re-open a goal skipped after Mt Moon.
 - Do not rewrite `runs/` data, `maps.json`, or any checkpoint. Do not touch `tools/swarm_watch.py` or the calibration loop at `seg_ingest.py:67`.
 - Do not change the order of `GOALS` in `goals.py` and do not add a goal.
@@ -172,12 +196,12 @@ Run through `uv run`; confirm the interpreter first (verified 2026-11-12 on this
 
 ```
 uv run python --version
-uv run pytest tests/test_magikarp.py tests/test_magikarp_reserve.py tests/test_hands_off.py tests/test_economy.py tests/test_status_care_shopping.py tests/test_review_diff.py tests/test_review_swarm.py -q -p no:cacheprovider
+uv run pytest tests/test_magikarp.py tests/test_magikarp_reserve.py tests/test_hands_off.py tests/test_economy.py tests/test_status_care_shopping.py tests/test_team_inventory.py tests/test_review_diff.py tests/test_review_swarm.py -q -p no:cacheprovider
 ```
 
-Baseline on branch head 58bb975 for the subset that exists today (`tests/test_magikarp.py tests/test_hands_off.py tests/test_economy.py tests/test_status_care_shopping.py`, run by the spec author): `104 passed, 2 skipped, 1 warning in 2.51s`. After the work every test above passes. Also `uv run pytest -q -p no:cacheprovider` over the whole suite if it finishes in your sandbox (say so if it does not): no failures beyond pre-existing skips.
+Baseline on current main (run by the spec author on the merged branch, the seven existing files above minus `test_magikarp_reserve.py`): `139 passed, 5 skipped, 1 warning in 2.55s`. After the work every test above passes. Also `uv run pytest -q -p no:cacheprovider` over the whole suite if it finishes in your sandbox (say so if it does not): no failures beyond pre-existing skips.
 
-`git grep -n "reached_rows" src tools` shows each reader in 3.4 using it.
+`wc -l src/pokeagent/explorer/behaviours/plan_goal.py tools/seg_ingest.py` shows each at or below 300 / 299.
 
 ## 6. Rules for this run
 
@@ -192,16 +216,16 @@ Baseline on branch head 58bb975 for the subset that exists today (`tests/test_ma
 ## 7. Completion criteria
 
 - [ ] `src/pokeagent/magikarp_reserve.py` exists with the constants, `reserve_active`, `magikarp_floor`, `should_circle_back`.
-- [ ] The three purchase sites in 1.1 use the floor; with the floor at 0 every existing test is unchanged.
+- [ ] `budget.reserve` reads `goals["_magikarp_floor"]` and all callers in 1.1 get it with no signature change; with the floor at 0 every existing test is unchanged.
 - [ ] A Poke Ball buy that would take money below 600 is blocked in Pewter and allowed once the goal settles (tests).
 - [ ] At 0x44 poor and west of Mt Moon the goal stays open; circle-back fires only under all four conditions in 3.3; after `0x3B in seen` or the step cap it settles skipped and never re-opens (tests).
-- [ ] Skipped rows are ignored by every reader in 1.3's table; `milestones.json` entries carry `"skipped": true` going forward.
-- [ ] The section 5 command passes; no touched file newly over 300 lines; no change outside section 2.
+- [ ] (Item 4, may be a separate PR) Skipped rows are ignored by every reader in 1.3; `milestones.json` entries carry `"skipped": true` going forward.
+- [ ] The section 5 command passes; `plan_goal.py` not above 300 and `seg_ingest.py` not above 299 lines, no new module over 300; no change outside section 2.
 - [ ] Changes committed on the `directive/<slug>` branch; Status row updated.
 
 ## 8. Report
 
-Findings first: for each of the three purchase sites, the line you changed. Then the real output tail of the section 5 pytest command. Then each reader changed (file:line), anything in 1.3 you left alone and why, the final constants, and anything you could not settle (for example, where `ctx` reaches `st`/`seen`). Do not claim real-ROM behaviour works.
+Findings first: the `budget.py` and `check_goals` lines you changed and the callers you verified get the floor. Then the real output tail of the section 5 pytest command. Then each reader changed (file:line), anything in 1.3 you left alone and why, the final constants, and anything you could not settle (for example, where `ctx` reaches `st`/`seen`). Do not claim real-ROM behaviour works.
 
 ## Required from User
 
