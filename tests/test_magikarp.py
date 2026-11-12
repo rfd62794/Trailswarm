@@ -70,9 +70,11 @@ def test_buy_magikarp_detector():
     emu = FakeEmulator(rich)
     assert not check_goals(emu, {})["buy_magikarp"]  # affordable, room in the party, not owned: the goal is open
     emu.memory.update(bcd(499))
-    assert check_goals(emu, {})["buy_magikarp"]  # cannot afford it: not a live option
-    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)] * 6), **bcd(3000), MAP: 0x0F})
-    assert check_goals(emu, {})["buy_magikarp"]  # no free slot
+    assert not check_goals(emu, {})["buy_magikarp"]  # money spent elsewhere does not settle it (see tests below)
+    emu.memory.update({MAP: 0x44})
+    assert check_goals(emu, {})["buy_magikarp"]  # at the salesman and cannot afford it: not a live option
+    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)] * 6), **bcd(3000), MAP: 0x44})
+    assert check_goals(emu, {})["buy_magikarp"]  # at the salesman, no free slot
     emu = FakeEmulator({**rich, **party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 18, 18)])})
     st: dict = {}
     assert check_goals(emu, st)["buy_magikarp"]
@@ -82,6 +84,29 @@ def test_buy_magikarp_detector():
     g = check_goals(emu, st)
     assert g["buy_magikarp"] and g["team_ready"]  # evolved: still bought; team_ready is now the ladder goal
     assert check_goals(FakeEmulator({**rich, MAP: 0x3B}), {})["buy_magikarp"]  # Mt Moon 1F entered: the chance is gone
+
+
+def test_buy_magikarp_not_settled_by_poverty_in_pewter():
+    """Regression: items bought in Pewter (money < 500) used to settle buy_magikarp before Brock."""
+    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)]), **bcd(120), MAP: 0x02})
+    st: dict = {}
+    assert not check_goals(emu, st)["buy_magikarp"]
+    assert not st.get("buy_skipped")
+    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)] * 6), **bcd(3000), MAP: 0x0E})  # full party on Route 3
+    assert not check_goals(emu, {})["buy_magikarp"]
+
+
+def test_buy_magikarp_skipped_at_the_center_and_latched():
+    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)]), **bcd(120), MAP: 0x44})
+    st: dict = {}
+    assert check_goals(emu, st)["buy_magikarp"] and st["buy_skipped"]
+    emu.memory.update({MAP: 0x0F})
+    assert check_goals(emu, st)["buy_magikarp"]  # latched: leaving the center keeps it settled
+
+
+def test_buy_magikarp_settled_once_mt_moon_1f_seen():
+    emu = FakeEmulator({**party_mem([(STARTER, 14, 30, 30)]), **bcd(3000), MAP: 0x3B})
+    assert check_goals(emu, {})["buy_magikarp"]
 
 
 def test_team_ready_never_blocks_the_ladder():

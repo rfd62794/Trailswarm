@@ -60,9 +60,12 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
         if is_unverified(g):
             continue  # inferred from later goals (no detector of its own): never a goal_frames line, checkpoint or milestone
         if goals[g] and g not in ctx.goal_steps and g not in ctx.initial_goals:
-            ctx.goal_steps[g] = ctx.step; ctx.log(f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
+            skipped = g == "buy_magikarp" and not ctx.get("had_magikarp")  # settled by skip (cannot buy / cave entered), not a purchase
+            ctx.goal_steps[g] = ctx.step
+            ctx.log(f"[goal] buy_magikarp skipped: no Magikarp bought, goal settled at step {ctx.step}" if skipped
+                    else f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
             with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
-                fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame}) + chr(10))
+                fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame, **({"skipped": True} if skipped else {})}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); replace_retry(tmp, cp / f"{g}.state")
