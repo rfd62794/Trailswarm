@@ -98,3 +98,15 @@ def test_bring_out_leaves_the_voluntary_swap_and_the_member_submenu_alone(tmp_pa
     assert bring_out_press(fainted, ["Bring out which", "POKEMON?", "STATS", "SWITCH", "CANCEL"]) is None  # submenu row cursor
     fainted.switch_train = {"rule": "switch_train", "presses": 3}
     assert bring_out_press(fainted, ["Bring out which", "POKEMON?"]) is None         # a swap in progress is never overridden
+
+
+def test_bring_out_drives_the_plain_choose_a_pokemon_forced_list(tmp_path):
+    """The forced post-faint list can read 'Choose a POKeMON.' (not 'Bring out'): pick the healthy slot, never B."""
+    from pokeagent.explorer.behaviours.bring_out import bring_out_press
+    ctx = _fainted_party(tmp_path)
+    ctx.emu.set(0xCC26, 1)                                                           # cursor on slot 1 (Magikarp): move to 2
+    d = bring_out_press(ctx, ["Choose a POKeMON."])
+    assert d is not None and d.button == "DOWN" and d.button != "B"
+    ctx.emu.set(0xCC26, 2)
+    assert bring_out_press(ctx, ["Choose a POKeMON."]).button == "A"
+    assert bring_out_press(_fainted_party(tmp_path, battler_hp=22), ["Choose a POKeMON."]) is None   # voluntary list untouched

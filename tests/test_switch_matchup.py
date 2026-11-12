@@ -50,7 +50,7 @@ def _patch(monkeypatch, ctx):
     monkeypatch.setattr(team_plan, "table", lambda kb, k: SYN.get(k, {}))
     monkeypatch.setattr(so_mod, "our_party", lambda emu: team)
     monkeypatch.setattr(so_mod, "_foe", lambda c: _mon("STARMIE", 21))
-    monkeypatch.setattr(so_mod, "read_battle_mon", lambda emu: SimpleNamespace(party_pos=0))
+    monkeypatch.setattr(so_mod, "active_slot", lambda emu: 0)
     hp = [c.hp for c in team]
     if ctx._active_hp is not None:
         hp[0] = ctx._active_hp
@@ -106,7 +106,7 @@ def _step_ctx(tmp_path, monkeypatch):
     from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
     from pokeagent.explorer.memory import MapMemory
     from test_magikarp import party_mem
-    emu = FakeEmulator({0xD35E: 0x28, 0xD362: 5, 0xD361: 6, 0xD057: 2,
+    emu = FakeEmulator({0xD35E: 0x28, 0xD362: 5, 0xD361: 6, 0xD057: 2, 0xD014: 0xB1, 0xCC2F: 0,
                         **party_mem([(0xB1, 18, 51, 51), (0x85, 5, 17, 17)])})   # two members, slot 1 is the target
     ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), opts=ExplorerOptions(),
                           run_dir=tmp_path, battles=3, stable_frames=10)
@@ -137,7 +137,24 @@ def test_matchup_step_counts_the_landed_switch_on_the_battle_record(tmp_path, mo
     draw_framed(ctx.emu, [">FIGHT PKMN", "ITEM RUN"])
     d = so_mod.SwitchOut()._matchup_step(ctx)                  # press 1: RIGHT toward PKMN
     assert d.button == "RIGHT"
-    ctx.emu.set(0xD017, 1)                                     # the swap landed: slot 1 is out now
+    ctx.emu.set(0xD014, 0x85); ctx.emu.set(0xCC2F, 1)          # the swap landed: slot 1 is out now
     assert so_mod.SwitchOut()._matchup_step(ctx) is None
     assert ctx.battle_log["matchup_switches"] == 1
     assert "matchup" not in team_plan.of(ctx)
+
+
+def test_active_pos_ignores_the_stale_battle_struct_party_byte(tmp_path, monkeypatch):
+    """Pewter Gym 2026-11-12: Rattata fainted, the forced switch sent Charmander out, but wBattleMon's party byte stayed 0
+    (the fainted Rattata), so the matchup 'switched' Rattata -> Charmander, i.e. into the mon already out, for ~3,000 steps."""
+    ctx = _step_ctx(tmp_path, monkeypatch)
+    ctx.emu.set(0xD014, 0x85); ctx.emu.set(0xCC2F, 1); ctx.emu.set(0xD017, 0)   # Charmander out, stale byte says slot 0
+    assert so_mod.active_pos(ctx) == 1
+    team_plan.of(ctx)["matchup"] = {"battle": ctx.battles, "target": 1, "presses": 2, "why": "x", "rule": "switch_matchup: x"}
+    assert so_mod.SwitchOut()._matchup_step(ctx) is None        # target already fighting: done, no menu presses
+    assert ctx.battle_log["matchup_switches"] == 1
+
+
+def test_matchup_pick_none_when_the_fighter_has_fainted(monkeypatch):
+    ctx = _ctx([_mon("CHARMELEON", 15), _mon("ODDISH", 16)], active_hp=0)
+    _patch(monkeypatch, ctx)
+    assert so_mod.matchup_pick(ctx) is None                     # the forced list belongs to bring_out
