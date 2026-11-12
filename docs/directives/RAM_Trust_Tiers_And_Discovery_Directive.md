@@ -267,12 +267,14 @@ Nothing for the build. After merge, Claude (controller) runs the recheck and the
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-ram-trust-tiers-and-discovery-directive |
 | Base branch | - |
+| Base commit | 62489c33b40fa4e6e623b7841d7acda24a689c1e |
 
 **Status log**
 - 2026-11-12 15:56 · robert-claude-laptop · none → Queued — Robert 2026-11-12: auto-assume known addresses, verify over time, discover unmapped; merged via PR #212
 - 2026-11-12 15:56 · robert-claude-laptop · Queued → Approved — lint override: Paths it cites under tools/ and src/pokeagent/ramlab that are not on main are new files this directive creates (Scope lists them as new).
+- 2026-11-12 15:57 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-ram-trust-tiers-and-discovery-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78RSFRBVYWNFD7WTFH17XQ1
 <!-- queue:end -->
