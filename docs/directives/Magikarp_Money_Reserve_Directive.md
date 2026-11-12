@@ -253,3 +253,17 @@ Claude runs a real-ROM hands-off check before merge (Devin has no ROM): (1) `uv 
 ## Sandbox needs
 
 Read/write inside this worktree only; `uv run pytest` with the existing `.venv`. No network, no installs, no ROM, no access to `runs/` or `kb/rom_tables.json`.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 07:53 · robert-claude-laptop · none → Queued — Robert asked 2026-11-12 ("Write it up for Devin"); PR #203 merged 9846704 after 3 review rounds
+<!-- queue:end -->
