@@ -110,6 +110,21 @@ def test_deferred_goal_keeps_the_planner_off_the_salesman():
     assert magikarp_deferral.deferred(type("C", (), {"get": lambda s, k, d=None: True})())
 
 
+def test_deferred_goal_keeps_the_generic_planner_out_of_the_center():
+    """Review of d0a9166: magikarp_step's None fell through to east_road_step's g.path(pos, _on(0x44)) - door ping-pong."""
+    from pokeagent.explorer.planner_east import LADDER, east_road_step
+
+    class Everywhere(WorldGraph):                      # every target is one step away
+        def path(self, *a, **k):
+            return ["UP"]
+
+    done = {s: True for s in LADDER[:LADDER.index("buy_magikarp")]}
+    poor = east_road_step(Everywhere({}), {}, {**done, "_buy_deferred": True, "_level": 20, "_train_level": 8}, (0x0F, 11, 8))
+    assert poor is None or "Mt Moon Pokemon Center" not in poor[1] and "toward it" not in poor[1]
+    rich = east_road_step(Everywhere({}), {}, {**done, "_level": 20, "_train_level": 8}, (0x0F, 11, 8))
+    assert rich is not None                            # not deferred: the goal still walks to the center
+
+
 # --- the counters ------------------------------------------------------------------------------------------------
 
 def test_tick_counts_once_per_plan_step(tmp_path):

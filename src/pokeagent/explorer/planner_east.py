@@ -119,6 +119,8 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
                               goals.get("_rom_route"))
         if rom:
             return rom
+    if stage == "buy_magikarp" and goals.get("_buy_deferred"):
+        return None  # deferred (poor): the generic path below would walk straight back into 0x44; let grind/explore earn
     training = stage == "beat_misty" and 0 < goals.get("_level", 0) < goals.get("_train_level", 8)
     if not training:
         p = g.path(pos, target)
