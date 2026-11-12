@@ -60,7 +60,10 @@ def magikarp_goal_settled(emu, st: dict, seen: set) -> bool:
     if MAGIKARP in sp or GYARADOS in sp:
         st["had_magikarp"] = True
     if not st.get("had_magikarp") and not can_buy(emu) and emu.read(0xD35E) == MT_MOON_CENTER:
-        st["buy_skipped"] = True  # sticky: leaving the center must not reopen the goal
+        if 0x3B not in seen and emu.read(PARTY_COUNT) < 6:
+            st["buy_deferred"] = True  # poor with room west of Mt Moon: earn, then circle back (magikarp_deferral)
+        else:
+            st["buy_skipped"] = True  # sticky: leaving the center must not reopen the goal
     return bool(st.get("had_magikarp")) or bool(st.get("buy_skipped")) or 0x3B in seen
 
 

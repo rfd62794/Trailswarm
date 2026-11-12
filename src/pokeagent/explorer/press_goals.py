@@ -82,7 +82,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 hist = json.loads(gp.read_text()) if gp.exists() else {}
             except json.JSONDecodeError:
                 hist = {}
-            rec = {"run": ctx.run_dir.name, "step": ctx.step}
+            rec = {"run": ctx.run_dir.name, "step": ctx.step, **({"skipped": True} if skipped else {})}
             if g == "first_pokemon":
                 rec["species_byte"] = ctx.emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
                 rec["wanted"] = ctx.opts.starter

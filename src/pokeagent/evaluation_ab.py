@@ -32,7 +32,7 @@ def extract_metrics(run_dir: Path | str, goal: str, cap: int | None = None) -> d
     lines = _lines(run_dir / "decisions.jsonl")
     presses = [d for d in lines if "event" not in d]
     events = [d for d in lines if "event" in d]
-    hit = next((g for g in _lines(run_dir / "goal_frames.jsonl") if g.get("goal") == goal), None)
+    hit = next((g for g in _lines(run_dir / "goal_frames.jsonl") if g.get("goal") == goal and not g.get("skipped")), None)
     seen, since_new, window_stalls = set(), 0, 0
     for d in presses:
         tile = (d.get("map"), d.get("x"), d.get("y"))

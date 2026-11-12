@@ -27,7 +27,8 @@ def load_runs(root: Path):
 
 
 def goal_steps_for(run: str, milestones: dict) -> dict:
-    return {g: min(e["step"] for e in v if e["run"] == run) for g, v in milestones.items() if any(e["run"] == run for e in v)}
+    return {g: min(e["step"] for e in v if e["run"] == run and not e.get("skipped"))
+            for g, v in milestones.items() if any(e["run"] == run and not e.get("skipped") for e in v)}
 
 
 def best_segment(goal: str, runs: dict, milestones: dict):

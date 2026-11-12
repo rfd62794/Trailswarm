@@ -44,7 +44,8 @@ def run_facts(runs_dir: Path, run: str):
     try:
         for line in (runs_dir / run / "goal_frames.jsonl").read_text(encoding="utf-8").splitlines():
             rec = json.loads(line)
-            reached.setdefault(rec["goal"], int(rec["step"]))
+            if isinstance(rec, dict) and not rec.get("skipped"):
+                reached.setdefault(rec["goal"], int(rec["step"]))
     except (OSError, ValueError, KeyError):
         pass
     return (max(idx) if idx else 0), initial, reached
