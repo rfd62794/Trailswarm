@@ -211,12 +211,14 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-party-ram-state-tests-directive |
 | Base branch | - |
+| Base commit | c18ac0803665ce5c59dcb05c99c5d26304255785 |
 
 **Status log**
 - 2026-11-12 08:14 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; fixtures committed with PR #207 (fb27482)
 - 2026-11-12 08:14 · robert-claude-laptop · Queued → Approved
+- 2026-11-12 08:14 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-ram-state-tests-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M77YAMQ1D4FSMPN18B57D2C1
 <!-- queue:end -->
