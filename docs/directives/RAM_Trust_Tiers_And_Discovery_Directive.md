@@ -261,3 +261,17 @@ Nothing for the build. After merge, Claude (controller) runs the recheck and the
 - Exec(uv run python tools/build_ram_map.py --migrate-trust)
 - Exec(uv run python tools/ram_probe.py gaps)
 - Exec(git status)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 15:56 · robert-claude-laptop · none → Queued — Robert 2026-11-12: auto-assume known addresses, verify over time, discover unmapped; merged via PR #212
+<!-- queue:end -->
