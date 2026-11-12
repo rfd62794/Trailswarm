@@ -1,0 +1,74 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "Gen 1 measured RAM address table",
+ "description": "Output of tools/ram_address_table.py: ram_map.json labels and addresses, with per-game evidence status from observation files. Holds counts and contexts only, never a raw observed value, and none of the map's source/sym/evidence/note/alias text.",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["schema_version", "games", "source_map", "status_rules", "entries", "unmapped"],
+ "$defs": {
+  "game": {"type": "string", "enum": ["pokemon-red", "pokemon-blue"]},
+  "status": {"type": "string", "enum": ["not-exercised", "believed", "measured"]},
+  "addr": {"type": "string", "pattern": "^0x[0-9A-F]{4}$"},
+  "gameRecord": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["status", "samples", "distinct_values", "exercised_by"],
+   "properties": {
+    "status": {"$ref": "#/$defs/status"},
+    "samples": {"type": "integer", "minimum": 0, "description": "number of samples for this game credited to the entry"},
+    "distinct_values": {"type": "integer", "minimum": 0, "description": "count of distinct observed values; the values themselves are never written"},
+    "exercised_by": {"type": "array", "maxItems": 8, "uniqueItems": true, "description": "sorted unique sample contexts (at most 8)",
+     "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"}}
+   }
+  }
+ },
+ "properties": {
+  "schema_version": {"const": 1},
+  "games": {"type": "array", "items": {"$ref": "#/$defs/game"}, "minItems": 2, "maxItems": 2},
+  "source_map": {"const": "src/pokeagent/data/ram_map.json"},
+  "status_rules": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["not-exercised", "believed", "measured"],
+   "description": "the status rules, written into the output so a reader sees them",
+   "properties": {"not-exercised": {"type": "string"}, "believed": {"type": "string"}, "measured": {"type": "string"}}
+  },
+  "entries": {
+   "type": "array",
+   "description": "one row per ram_map.json entry, sorted by (addr, label)",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["addr", "label", "width", "type", "region", "ram_map_verified", "games"],
+    "properties": {
+     "addr": {"$ref": "#/$defs/addr"},
+     "label": {"type": "string"},
+     "width": {"type": "integer", "minimum": 1, "description": "size in bytes"},
+     "type": {"type": "string", "description": "the ram_map.json encoding (u8, u16be, bcd, bitmask, text, bytes)"},
+     "region": {"type": "string"},
+     "ram_map_verified": {"type": "boolean", "description": "the ram_map.json 'verified' flag copied as-is. It is a single-game claim of unknown game and says nothing about Red versus Blue; use the per-game status instead."},
+     "games": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pokemon-red", "pokemon-blue"],
+      "properties": {"pokemon-red": {"$ref": "#/$defs/gameRecord"}, "pokemon-blue": {"$ref": "#/$defs/gameRecord"}}
+     }
+    }
+   }
+  },
+  "unmapped": {
+   "type": "array",
+   "description": "sampled addresses no ram_map.json entry covers, sorted by addr, with per-game sample counts",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["addr", "samples"],
+    "properties": {
+     "addr": {"$ref": "#/$defs/addr"},
+     "samples": {"type": "object", "additionalProperties": false, "required": ["pokemon-red", "pokemon-blue"],
+      "properties": {"pokemon-red": {"type": "integer", "minimum": 0}, "pokemon-blue": {"type": "integer", "minimum": 0}}}
+    }
+   }
+  }
+ }
+}
