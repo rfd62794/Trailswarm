@@ -59,8 +59,9 @@ def tick(ctx, m: int) -> dict:
             if ctx.buy_steps > BUY_STEP_CAP:
                 ctx.buy_skipped = True; ctx.center_intent = None
                 ctx.log(f"[buy_magikarp: {BUY_STEP_CAP} steps in/around the Mt Moon Pokemon Center without buying - settled for this run]", "res")
-    budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(ctx, seen))
-    return ctx.goals()
+    goals = ctx.goals()
+    budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(ctx, seen, bool(goals.get("beat_brock"))))
+    return goals
 
 
 def sync_center_intent(ctx, m: int, goals: dict) -> None:
