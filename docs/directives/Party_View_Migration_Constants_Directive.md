@@ -163,12 +163,14 @@ Nothing for the build. After merge, Claude runs the ROM state tests (`tests/rom/
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-party-view-migration-constants-directive |
 | Base branch | - |
+| Base commit | 7a3e01e6751dedb59beff9c6c39acda87a0e7520 |
 
 **Status log**
 - 2026-11-12 11:37 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: mechanical, fully specified; dispatch only after Party_View_Directive merges (ram_symbols.py/party_view.py absent locally)
 - 2026-11-12 14:37 · robert-claude-laptop · Queued → Approved
+- 2026-11-12 14:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-constants-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78M7K6AZV10P25RT86VMX6B
 <!-- queue:end -->
