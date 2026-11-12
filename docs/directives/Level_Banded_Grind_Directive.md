@@ -213,3 +213,17 @@ Claude runs a real-ROM hands-off check before merge (Devin has no ROM): a run fr
 ## Sandbox needs
 
 Read/write inside this worktree only; `uv run pytest` with the existing `.venv`. No network, no installs, no ROM, no access to `runs/`.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 08:23 · robert-claude-laptop · none → Queued — Robert 2026-11-12 (level-banded grind areas); PR #208 merged c88909c. Approve after Party_View_Directive merges (both touch grind_episode.py)
+<!-- queue:end -->
