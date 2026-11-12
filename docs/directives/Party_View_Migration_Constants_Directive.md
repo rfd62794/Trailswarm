@@ -163,11 +163,12 @@ Nothing for the build. After merge, Claude runs the ROM state tests (`tests/rom/
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-12 11:37 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: mechanical, fully specified; dispatch only after Party_View_Directive merges (ram_symbols.py/party_view.py absent locally)
+- 2026-11-12 14:37 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
