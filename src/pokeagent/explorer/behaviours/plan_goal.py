@@ -10,17 +10,18 @@ from pokeagent.explorer.status_care import of as care_state
 from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget
+from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
+from pokeagent.explorer import party_log, area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
+from pokeagent.grind import stage_maps
 from pokeagent.knowledge import blackout_tax, team_plan, trainers
 from pokeagent.knowledge.cut_learner import LEARNER_STEP_CAP
-from pokeagent.knowledge.encounters import level_ceiling
+from pokeagent.knowledge.encounters import TRAIN_MAP, level_ceiling
 from pokeagent.knowledge.party import our_party
 from pokeagent.knowledge.readiness import TEAM_GAP
-from pokeagent.magikarp import BUY_STEP_CAP, EVOLVE_LEVEL, GYARADOS_STEP_CAP, GYARADOS_IDLE_CAP, MAGIKARP, MT_MOON_CENTER, party_species
+from pokeagent.magikarp import BUY_STEP_CAP, EVOLVE_LEVEL, GYARADOS_STEP_CAP, GYARADOS_IDLE_CAP, MAGIKARP, MT_MOON_CENTER, party_species, trainee_slot
 
 
 class PlanGoal(BehaviourBase):
@@ -104,7 +105,7 @@ class PlanGoal(BehaviourBase):
             if ul:
                 ctx.log(f"[readiness] {ul}", "res")
         need = self._team_need(ctx, goals_now_all, need)
-        need = self._budgeted(ctx, goals_now_all, need, verdict)
+        need = self._budgeted(ctx, goals_now_all, need, verdict, party)
         need_raw = need
         need = gate_for(m, need)  # never grind inside the cave: head for the exit, fight what blocks the way
         area_grind.note_map(ctx, m)
@@ -139,18 +140,26 @@ class PlanGoal(BehaviourBase):
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not nv.ready and gym is not None
-        if hold and st.get("gate_lifted") is not None:
-            hold = False  # the grind budget is spent: the hold must not lock the run out of the gym forever
+        if st.get("stall_hold_goal") not in (None, ctx.stage_goal):
+            st.pop("stall_hold", None)  # the clock runs from first engagement until the STAGE moves on; a battle frame
+            st.pop("lifted_need", None)  # (party unread, nv None) or a one-step readiness flap must never reset it
+        st["stall_hold_goal"] = ctx.stage_goal
+        lifted = st.get("gate_lifted") is not None
+        if hold and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]) if lifted else "without a level gain",
+                                         ctx.step, party_log.of(ctx).blackouts):  # monotonic: a win resets blackouts_row
+            hold = False  # budget spent (ceiling/blackout), the hold cap, or a blackout while held: never locked out forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal
-                ctx.log(f"[team gate: grind budget spent ({ctx.grind.reason(st['gate_lifted'])}); "
-                        f"gym hold lifted for {ctx.stage_goal}]", "res")
+                why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
+                ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
+        if hold and st.get("gate_lifted") is not None:
+            ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:
             self._leader_avoid(ctx, m, x, y, gym)
             if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
                 planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, hp_now, mx_now)
-            elif self._enters(ctx, m, x, y, planned, gym):
-                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)
+            elif self._enters(ctx, m, x, y, planned, gym) or self._gym_road(planned):
+                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)  # the hold owns the step: no road to the gym
         elif st.get("grinding") and need > 0:
             grind = self._grind_step(ctx, m, x, y, hp_now, mx_now)
             errands = ("checkpoint", "heal", "pokecenter", "parcel", "potion", "magikarp", "mom")
@@ -234,7 +243,13 @@ class PlanGoal(BehaviourBase):
         route; ``grind_episode.boundary`` (checked in ``step``) vetoes any press that would leave a live
         episode's map set."""
         grind_episode.start(ctx, "the pressure latch")
-        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx)
+        kw = {"target": TRAIN_MAP[ctx.stage_goal]} if stage_maps.allowed(ctx.stage_goal) else {}  # pre-Brock: never Route 24
+        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, **kw)
+
+    @staticmethod
+    def _gym_road(planned) -> bool:
+        """The planner's push toward the gym map (the road north / the gym walk): never taken while the hold stands."""
+        return bool(planned) and planned[1].startswith(("goal road north", "goal gym"))
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):
@@ -259,11 +274,13 @@ class PlanGoal(BehaviourBase):
             ctx.log(f"[team_ready: training gate closed or lifted for {GYARADOS_IDLE_CAP} plan steps - settled for this run]", "res")
 
     @staticmethod
-    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict) -> int:
+    def _budgeted(ctx: ExplorerContext, goals: dict, need: int, verdict, party=None) -> int:
         """The training level, or 0 (gate lifted) once the grind budget for this goal is spent. The
         lifted goal is published on the team-plan state so the gym hold stands down with the gate."""
         st = team_plan.of(ctx)
         stage, level = stage_goal(goals), lead_level(ctx.emu)
+        if trainee_slot(ctx.emu) is None:
+            level = best_level(level, party)  # the strongest slot, not a weak L4 lead (a Magikarp trainee keeps the gated measure)
         st["gate_lifted"] = None
         if stage is None:
             return need
@@ -271,11 +288,12 @@ class PlanGoal(BehaviourBase):
         goal = "team_ready" if tr else stage  # the team_ready stage has its own budget key: it must not accrue on the next boss's
         ctx.grind = ctx.grind or GrindBudget()
         why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
-                               training=0 < level < need, ceiling=level_ceiling(stage),
+                               training=0 < level < need and grinding_now(ctx), ceiling=level_ceiling(stage),
                                max_battles=GRIND_BATTLES_GYARADOS if tr else GRIND_BATTLES)
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
         if ctx.grind.lifted(goal):
             st["gate_lifted"] = goal
+            st["lifted_need"] = need  # a held gym still wants this level: the episode gate reads it back
             return 0
         return need
