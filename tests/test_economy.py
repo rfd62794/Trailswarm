@@ -445,3 +445,84 @@ def test_economy_refresh_folds_battles_by_cursor_and_finished_runs(tmp_path):
         fh.write(rec())
     assert atlas.refresh(runs)["battles"] == 1
     assert hp_stats.from_atlas(json.loads((runs / "economy.json").read_text())).overall == [4, 60]
+
+
+# ---- restock is ONE trip (2026-11-12: the Route 3 <-> Pewter ping-pong after Brock) ----
+from pokeagent.explorer.economy import one_trip  # noqa: E402
+
+
+def _trip(*items):
+    from pokeagent.explorer.economy.plan import TripPlan
+    return TripPlan((), tuple(items))
+
+
+def _quiet(monkeypatch, cave=True, balls=True):
+    monkeypatch.setattr(shopping, "ball_need", lambda goals: balls)
+    monkeypatch.setattr(shopping, "cave_ahead", lambda goals: cave)
+
+
+def _restock_ctx(tmp_path, monkeypatch, *, m, balls, money, potions=0, cave=True):
+    _quiet(monkeypatch, cave=cave)
+    ctx = make_ctx(tmp_path, balls, money, m=m, x=3, y=7, potions=potions)
+    ctx.restock["stats_path"] = str(tmp_path / "none.jsonl")
+    ctx.goals = lambda: {"beat_brock": True, "deliver_parcel": True}
+    return ctx
+
+
+def test_first_visit_buys_the_whole_list_even_when_balls_would_eat_the_money(tmp_path, monkeypatch):
+    _quiet(monkeypatch)
+    money = 2800   # reserve 300+100 (+blackout share): balls alone (10 x 200) would swallow every yen
+    goals = {"beat_brock": True}
+    old = shopping.shopping_list(goals, {}, money, PARTY, None)
+    new = shopping.shopping_list(goals, {}, money, PARTY, None, essentials_first=True)
+    assert dict(old).get(ESCAPE_ROPE) is None and dict(old).get(POTION) is None   # the bug: balls first, nothing left for the leg
+    assert dict(new).get(POTION) and dict(new).get(ESCAPE_ROPE) and dict(new)[POKE_BALL] >= 1
+    assert shopping.cost(new) <= money - budget.reserve(goals, money)
+
+
+def test_no_second_trip_from_the_same_town(tmp_path, monkeypatch):
+    ctx = _restock_ctx(tmp_path, monkeypatch, m=56, balls=0, money=2800, potions=1)
+    assert Restock().step(ctx) is not None and ctx.restock["intent"]      # first visit: go
+    ctx.restock.update(intent=False, leave=False)
+    one_trip.note_visit(ctx.restock, 56, 2800)
+    ctx.restock["next_check"] = 0
+    assert Restock().step(ctx) is None and not ctx.restock["intent"]
+    assert one_trip.usable_marts(ctx.restock, frozenset({56}), 2800 + shopping.MIN_TRIP_YEN, False) == frozenset({56})  # new money: ok
+    assert one_trip.usable_marts(ctx.restock, frozenset({56}), 2800, True) == frozenset({56})                           # critical: ok
+
+
+def test_route_side_small_top_up_does_not_turn_back(tmp_path, monkeypatch):
+    ctx = _restock_ctx(tmp_path, monkeypatch, m=0x0E, balls=9, money=4000, potions=1)
+    far = one_trip.TOWN_EDGE_FRAMES // (2 * G.FRAME_WALK) + 20   # path steps: outside the town edge
+    bag = {POKE_BALL: 9, POTION: 1}
+    ok, _ = one_trip.allow(ctx, _trip((POTION, 1)), False, far)
+    assert not ok                                                  # 1 Potion on Route 3: keep walking
+    assert not one_trip.allow(ctx, _trip((POTION, 1), (ESCAPE_ROPE, 1)), False, 40)[0] or one_trip.rope_critical(_trip((ESCAPE_ROPE, 1)), bag)
+    assert one_trip.allow(ctx, _trip((POTION, 1)), False, 3)[0]    # one step outside the gate: still next to town
+    assert one_trip.allow(ctx, _trip((POTION, 1)), False, far)[1].startswith("not turning back")
+    assert one_trip.allow(_restock_ctx(tmp_path, monkeypatch, m=56, balls=9, money=4000), _trip((POTION, 1)), False, far)[0]  # in town
+
+
+def test_critical_need_still_turns_back(tmp_path, monkeypatch):
+    ctx = _restock_ctx(tmp_path, monkeypatch, m=0x0E, balls=9, money=4000, potions=0)
+    assert one_trip.allow(ctx, _trip((POTION, 1)), False, 60)[0]            # no heal item at all: always
+    ctx = _restock_ctx(tmp_path, monkeypatch, m=0x0E, balls=9, money=4000, potions=2)
+    short, long_ = 20, one_trip.TURN_BACK_FRAMES // (2 * G.FRAME_WALK) + 40
+    rope = _trip((ESCAPE_ROPE, 1))
+    assert one_trip.allow(ctx, rope, False, short)[0]                       # cave next, no rope, short walk back
+    assert not one_trip.allow(ctx, rope, False, long_)[0]                   # too far to turn back for it
+    assert one_trip.round_trip_frames(long_) > one_trip.TURN_BACK_FRAMES >= one_trip.round_trip_frames(short)
+
+
+def test_magikarp_floor_still_holds_in_the_one_trip_list(monkeypatch):
+    _quiet(monkeypatch)
+    budget.set_magikarp_floor(0)
+    try:
+        free = shopping.shopping_list({}, {}, 3000, PARTY, None, essentials_first=True)
+        budget.set_magikarp_floor(2900)
+        held = shopping.shopping_list({}, {}, 3000, PARTY, None, essentials_first=True)
+        assert budget.reserve({}, 3000) == 2900 and held == [] and free
+        budget.set_magikarp_floor(1500)
+        assert 3000 - shopping.cost(shopping.shopping_list({}, {}, 3000, PARTY, None, essentials_first=True)) >= 1500
+    finally:
+        budget.set_magikarp_floor(0)
