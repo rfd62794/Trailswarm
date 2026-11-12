@@ -35,6 +35,8 @@ def _thing_in_front(ctx) -> bool:
 
 def veto(ctx, decision) -> str | None:
     """None to let the press through, else the policy rule that says talking again is not worth it."""
+    if decision.behaviour == "goal_talk":
+        return None  # a goal that is only met by talking to this person (goal_talk) is a deliberate re-read, whatever the memory says
     if decision.button != "A" or ctx.view.box or ctx.view.battling or ctx.proc is not None:
         return None
     if decision.behaviour == "readiness" and _thing_in_front(ctx):

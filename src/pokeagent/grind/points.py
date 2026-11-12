@@ -164,11 +164,17 @@ def travel_steps(maps: dict, current, map_id: int) -> float:
     return float(FAR_TRAVEL)
 
 
+def _reachable(maps, pos, map_id, blocked) -> bool:
+    from pokeagent.explorer.story_blockers import reachable  # deferred: explorer imports grind
+    return reachable(maps, pos, map_id, blocked)
+
+
 def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_map, mem=None,
-           trainee_slot: int | None = None) -> GrindPoint | None:
+           trainee_slot: int | None = None, blocked=frozenset()) -> GrindPoint | None:
     """The best point for the trainee's level (``trainee_slot``, else the lead), or None when there is
     no gap. Deterministic: measured xp/min once MIN_MEASURED episodes exist (else prior) minus travel
-    and blackout costs; ties by map id."""
+    and blackout costs; ties by map id. ``blocked``: (map, x, y) tiles that are walls right now (a story
+    blocker); a point only they cut off is skipped."""
     if not party_levels:
         return None
     lvl = party_levels[trainee_slot] if trainee_slot is not None and 0 <= trainee_slot < len(party_levels) \
@@ -179,6 +185,8 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
     for p in ledger.points.values():
         lo, hi = p.level_band
         if not lo <= lvl <= hi:
+            continue
+        if blocked and isinstance(current_map, (tuple, list)) and travel_steps(maps, current_map, p.map_id) < FAR_TRAVEL                 and not _reachable(maps, current_map, p.map_id, blocked):
             continue
         xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None) \
             else p.xp_per_min_prior

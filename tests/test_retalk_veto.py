@@ -110,3 +110,9 @@ def test_an_empty_party_at_the_starter_stage_is_never_vetoed_even_on_an_info_typ
     assert veto(c, Decision("A", "x")) is None
     c.emu = FakeEmulator({it.A_PARTY_N: 1, it.A_HP + 1: 20, it.A_MAXHP + 1: 20})  # starter taken: once only again
     assert veto(c, Decision("A", "x")) is not None
+
+
+def test_goal_talk_is_never_vetoed():
+    info = {"type": "info", "pages": ["hello"], "count": 2}
+    assert veto(ctx_for(info), Decision("A", "x", behaviour="plan_goal")) is not None
+    assert veto(ctx_for(info), Decision("A", "goal_talk", behaviour="goal_talk")) is None
