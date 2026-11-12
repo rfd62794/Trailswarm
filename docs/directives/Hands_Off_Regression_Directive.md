@@ -39,12 +39,7 @@ def goal_stage(goals: dict) -> str:
 
 How the existing golden test isolates a run (`tests/test_golden_red.py`): it copies `tools/` and `src/` into pytest's tmp dir, plus `roms/Pokemon Red.gb`, `baselines/bedroom.state` (+ optional `.meta.json`) and `kb/rom_tables.json`, makes an empty `runs/`, then runs the demo with `cwd` set to that tmp dir: (kb/rom_tables.json is gitignored, so missing in a fresh worktree.)
 
-```python
-subprocess.run([sys.executable, "tools/explore_demo.py", "--headless", "--state", "baselines/bedroom.state",
-                "--stop-at-goal", "potion", "--steps", "400", "--seed", "42", "--maps", str(maps),
-                "--control-port", str(port)], cwd=cwd, check=True, capture_output=True, timeout=600)
-(run,) = set((cwd / "runs").glob("explore-*")) - before
-```
+It then runs the demo once with `cwd` set to that tmp dir (headless, `--state baselines/bedroom.state`, stop at goal `potion`, 400 steps, seed 42, an explicit `--maps` path and a `--control-port`), and finds the single new `runs/explore-*` dir by set difference against a `before` snapshot of the glob. Reference only: you reproduce the argument list through `build_argv` in 3.4, and you never run it.
 
 Why the copy must include `src`: `tools/explore_demo.py` does `sys.path.insert(0, <its parent's parent>/src)`, so the scratch `src` wins; and `src/pokeagent/knowledge/kb.py` finds the kb with `Path(__file__).resolve().parents[3] / "kb" / "rom_tables.json"`, which is the scratch root only when `src` itself lives in the scratch tree. Skip either and the run silently reads or writes the live `kb/` and `runs/`. A run with no existing `--maps` file starts with empty map memory.
 
@@ -119,12 +114,25 @@ Per case: compute `skip_reason(case, ROOT)`; if set, print `SKIP <name>: <reason
 
 1. Make a scratch dir with `tempfile.mkdtemp(prefix="hands-off-")`.
 2. Copy `tools/` and `src/` (ignore `__pycache__`), the ROM, `baselines/<state>.state` (+ `.state.meta.json` if present) and the whole `kb/` dir into it, preserving relative paths, exactly as `tests/test_golden_red.py` does. Make an empty `runs/`. For `memory == "live"` copy `runs/maps.json` to scratch `runs/maps.json`.
-3. Run `sys.executable tools/explore_demo.py --headless --state baselines/<state>.state --stop-at-goal <goal> --steps <budget> --seed <seed> --maps runs/maps.json --control-port <9100 + case index>` with `cwd` = scratch, `timeout=600`, `capture_output=True`. A non-zero exit or a timeout is reported as `ERROR <name>: <last 400 chars of stderr>` and counts as a failure.
+3. Run the demo through `run_case(case, index, scratch, runner=subprocess.run)` (see below). It is the only place the emulator is ever started, and Devin never calls it for real: Devin has no ROM, so every real run is the controller's (see "Required from User"). A non-zero exit or a timeout is reported as `ERROR <name>: <last 400 chars of stderr>` and counts as a failure.
 4. Find the single new `runs/explore-*` dir and call `judge_run` on it.
 5. Print `PASS <name>: <goal> at step N of budget B, 0 non-agent presses` or `FAIL <name>: <reasons joined by "; ">`, plus the scratch run dir path on a failure.
 6. Remove the scratch dir with `shutil.rmtree(..., ignore_errors=True)` unless `--keep`.
 
 Final line: `N passed, M failed, K skipped`. Exit 1 if any failed or errored, else 0. The tool never reads or writes the live `runs/` or `kb/` except the read-only copies listed above. Keep the tool under 150 lines; the verdict logic stays in `hands_off.py`.
+
+**The demo invocation is data, built by a pure function.** Put it in `src/pokeagent/review/hands_off_cases.py`: `build_argv(case, index) -> list[str]` returns the argument list after the interpreter, in this order, one element per list item:
+
+- `"tools/explore_demo.py"`
+- `"--headless"`
+- `"--state"`, `"baselines/<state>.state"`
+- `"--stop-at-goal"`, the case goal
+- `"--steps"`, the case budget as a string
+- `"--seed"`, the case seed as a string
+- `"--maps"`, `"runs/maps.json"`
+- `"--control-port"`, `str(9100 + index)`
+
+`run_case` prepends `sys.executable`, calls `runner(argv, cwd=scratch, check=False, capture_output=True, text=True, timeout=600)` and returns the completed process. `runner` defaults to `subprocess.run` and is a parameter precisely so the tests inject a fake. Devin must never execute this invocation, in the shell or anywhere else: it is code in the tool, exercised only through the fake runner in the tests.
 
 ### 3.5 Tests, `tests/test_hands_off.py`
 
@@ -140,13 +148,17 @@ Everything is synthetic. Build a fake run dir under `tmp_path` with hand-written
 - a corrupt (non-JSON) line in `transitions.jsonl` fails and is counted.
 - a nonexistent run dir returns a failed verdict and does not raise.
 - all reasons are collected together (human press AND too slow gives two reasons).
+- `build_argv(case, 3)` returns exactly the list above (compare the whole list), with `"--control-port"` followed by `"9103"`, and `"--maps"` present for both `memory` values.
+- `run_case` with a fake `runner` that records its arguments and returns a stub object: the call receives `sys.executable` first, then `build_argv`'s items, `cwd` equal to the scratch path and `timeout=600`; a fake returning a non-zero `returncode` produces an error result carrying the last 400 characters of its `stderr`; a fake raising `subprocess.TimeoutExpired` produces an error result, not an exception.
+- an end-to-end pass of the pure pipeline with the fake runner: the fake writes a synthetic run dir (`runs/explore-X/` with the four files, 35 agent rows, potion at 35) under the scratch path, and the tool's find-and-judge step returns a pass; the same with one human row returns a fail.
 - cases: `load_cases` on the checked-in `tools/hands_off_cases.json` returns the one case with `budget == 105` and `goal == "potion"`; a bad `memory` value raises `ValueError` naming the case; `skip_reason` returns text starting with `missing roms/` against an empty `tmp_path`, and `None` when you create the four input files as empty placeholder files under `tmp_path`.
 
 ## 4. What NOT to do
 
 - Do not touch `src/pokeagent/game`, `src/pokeagent/cli.py` (another phase is changing those), `tests/test_golden_red.py`, `src/pokeagent/explorer/retalk_veto.py` or `loop_veto.py`.
 - Do not run the explorer or the emulator, and do not add a test that needs a ROM, `kb/` data, a baseline state or a `runs/` directory. Those files are gitignored, so missing in a fresh worktree; that is correct. Do not commit, create, copy, read or print any of them. The ROM-present run is Claude's, after merge.
-- Do not add a pytest that shells out to `tools/hands_off_check.py` or calls its run function.
+- Do not add a pytest that shells out to `tools/hands_off_check.py`, and never let a test or a command of yours reach the real `subprocess.run` with the demo; `run_case` is only ever called with a fake runner.
+- Do not run `tools/explore_demo.py` in any form (no `--headless`, no `--control-port`, no `--stop-at-goal`). Nothing in this directive asks you to, and the sandbox refuses it.
 - Do not search, glob or hunt for the ROM or states. If an input is missing, the code skips with a reason; that is the whole behaviour.
 - Do not say where any game copy came from, in code, comments, docs or the report.
 - Do not add cases beyond the one in 3.1, and do not change `src/pokeagent/explorer/*`.
@@ -193,17 +205,18 @@ Expected: only the five new files from section 2.
 
 - [ ] `judge_run` passes a clean 35-step agent run and fails on each of: any non-agent press, goal too slow, goal absent, missing or empty files, corrupt transitions line. <!-- test: tests/test_hands_off.py -->
 - [ ] The case table loads, validates, and reports a stated skip reason when an input is missing. <!-- test: tests/test_hands_off.py -->
+- [ ] `build_argv` and `run_case` are covered with an injected fake runner; no test starts a subprocess for the demo. <!-- test: tests/test_hands_off.py -->
 - [ ] `uv run python tools/hands_off_check.py` in this worktree prints a SKIP with a reason and exits 0.
 - [ ] No new file is over 600 lines; no ROM, kb, baseline or runs data was added.
 - [ ] Nothing outside the five files in section 2 changed.
 
 ## 8. Report
 
-Findings first: any deviation from sections 3.1-3.5, the exact SKIP line the tool printed, and the pytest tails. State plainly that the ROM-present run (`uv run python tools/hands_off_check.py` on a machine with the ROM and states) was NOT run.
+Findings first: any deviation from sections 3.1-3.5, the exact SKIP line the tool printed, and the pytest tails. State plainly that no real case was run (no ROM in this worktree) and that the controller owns the ROM-present run.
 
 ## Required from User
 
-After merge, on the laptop with the ROM, `baselines/bedroom.state` and `kb/rom_tables.json` present, Claude runs `uv run python tools/hands_off_check.py` and confirms `PASS red_bedroom_potion_cold` (potion at about step 35, budget 105). That run is the real acceptance check and is not part of this directive.
+Controller verification, not Devin's job and not part of this run. After merge, on the laptop with the ROM, `baselines/bedroom.state` and `kb/rom_tables.json` present, Claude runs `uv run python tools/hands_off_check.py` and confirms `PASS red_bedroom_potion_cold` (potion at about step 35, budget 105). Claude also confirms a negative control: judge a run whose `transitions.jsonl` has one `human` row with `uv run python tools/hands_off_check.py --judge RUN_DIR --goal potion --budget 105` and sees `FAIL`. Those real-ROM cases are the acceptance check; Devin's pytest suite proves the checker with synthetic runs only.
 
 ## Forbidden Actions
 
