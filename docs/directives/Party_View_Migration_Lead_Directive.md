@@ -164,15 +164,18 @@ Nothing for the build. After merge, Claude runs the ROM state tests and a hands-
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-view-migration-lead-directive |
 | Base branch | - |
 | Base commit | acf275e60ceb6a4988e9326594ecb9d36066f9e4 |
+| Head commit | d665f5b19493a4a45e49043e4a642d702f2bc437 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 11:38 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: fully specified migration; dispatch only after Party_View and Party_View_Migration_Constants both merge
 - 2026-11-12 16:04 · robert-claude-laptop · Queued → Approved
 - 2026-11-12 17:29 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-lead-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78Y28H82VE8YJD8PX91CBZ3
 - 2026-11-12 17:39 · dispatcher · launched pid=14620; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-lead-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (8 declared need(s); 4 external))
+- 2026-11-12 18:04 · devin · In progress → Review — [origin] spent: devin 25 min est. n/a
 <!-- queue:end -->
