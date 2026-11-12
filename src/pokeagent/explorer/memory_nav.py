@@ -5,7 +5,7 @@ Mixed into MapMemory (moved unchanged from tools/explore_demo.py).
 from __future__ import annotations
 
 from pokeagent.explorer.perceive import DIRS, ahead_tiles, stand_tile
-from pokeagent.explorer.world import WorldGraph, maps_version
+from pokeagent.explorer.world import WorldGraph, maps_version, route_maps_version
 
 OPPOSITE = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
 
@@ -86,10 +86,9 @@ class NavMixin:
         why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[2]}x"
         return best[1], why, best[2] > 0
 
-    def _mem_version(self) -> tuple:
-        """Route-cache validity: the maps fingerprint plus what a goal predicate can read OUTSIDE the
-        maps edge data - the temp-blocked tiles, every never-moving NPC's last position and the
-        beaten-trainer set. Any change rolls the version and re-searches."""
+    def _env_version(self) -> tuple:
+        """What a goal predicate can read OUTSIDE the maps edge data - the temp-blocked tiles, every
+        never-moving NPC's last position and the beaten-trainer set."""
         npc_last = frozenset(
             (mid, tuple(e["last"]))
             for mid, d in self.data["maps"].items()
@@ -97,13 +96,21 @@ class NavMixin:
             if not e.get("moves") and e.get("last"))
         beaten = getattr(self, "beaten_tiles", None)
         tiles = beaten() if callable(beaten) else beaten
-        return (maps_version(self.data["maps"]), frozenset(self.temp_blocked), npc_last,
-                frozenset(tiles) if tiles else ())
+        return (frozenset(self.temp_blocked), npc_last, frozenset(tiles) if tiles else ())
+
+    def _mem_version(self) -> tuple:
+        """Route-cache validity for the shared graph and neighbour memo: the FULL maps fingerprint
+        (learned walls included - neighbours must see them) plus the goal-visible environment."""
+        return (maps_version(self.data["maps"]),) + self._env_version()
+
+    def _visited_total(self) -> int:
+        return sum(len(d.get("visited", ())) for d in self.data["maps"].values())
 
     def _route_graph(self, allowed=None, version=None) -> WorldGraph:
         """The routing graph for the current memory version, shared by the step's searches: one wall,
-        warp, jump, visited tile or temp-blocked change rebuilds it (and its neighbour-memo key
-        rolls), while an unchanged version keeps the same graph and its warmed cache."""
+        warp, jump, static-NPC or temp-blocked change rebuilds it (and its neighbour-memo key rolls),
+        while an unchanged version keeps the same graph and its warmed cache. ``visited`` is not in
+        the version: new tiles only grow the graph, they do not invalidate it."""
         v = version or self._mem_version()
         key = frozenset(allowed) if allowed is not None else None
         cache = self.__dict__.setdefault("_route_graphs", {})
@@ -117,24 +124,32 @@ class NavMixin:
         return ent[1]
 
     def cached_route(self, start, goal_key, goal_fn, *, allowed=None, limit=4000):
-        """``_bfs_node`` with a last-result cache keyed on ``goal_key``: while the memory version
-        holds and the agent stays on the cached path, its remaining suffix answers without a new
-        search; a memory/temp-block/NPC/been change or stepping off the path re-runs it."""
-        v = self._mem_version()
+        """``_bfs_node`` with a last-result cache keyed on ``goal_key``: while the route version
+        holds, the cached path's own edges stay open and its goal still holds, its remaining suffix
+        answers without a new search; a wall ON the path, a warp/jump/NPC/temp-blocked/beaten change,
+        stepping off the path, or a visited-reading goal gone stale re-runs it. A cached miss also
+        needs the full memory version and the visited total: only those can open a route that was
+        not there."""
+        env = self._env_version()
+        v = (maps_version(self.data["maps"]),) + env
+        vr = (route_maps_version(self.data["maps"]),) + env
+        seen = self._visited_total()
         routes = self.__dict__.setdefault("_routes", {})
         c = routes.get(goal_key)
-        if c is not None and c["version"] == v:
+        if c is not None and c["version"] == vr:
             nodes = c["nodes"]
             if nodes is None:
-                if start == c["start"]:
+                if start == c["start"] and c["full"] == v and c["seen"] == seen:
                     return None
             elif start in nodes:
                 i = nodes.index(start)
-                return nodes[-1], list(c["buttons"][i:])
+                g = self._route_graph(allowed, v)
+                if g._suffix_edges_ok(nodes, c["buttons"], i) and goal_fn(nodes[-1]):
+                    return nodes[-1], list(c["buttons"][i:])
         r = self._route_graph(allowed, v)._bfs_route(start, goal_fn, limit)
         if len(routes) > 32:
             routes.clear()
-        routes[goal_key] = {"version": v, "start": start,
+        routes[goal_key] = {"version": vr, "full": v, "seen": seen, "start": start,
                             "nodes": None if r is None else tuple(r[0]),
                             "buttons": None if r is None else tuple(r[1])}
         return None if r is None else (r[0][-1], r[1])

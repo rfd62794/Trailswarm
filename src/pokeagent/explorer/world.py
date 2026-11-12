@@ -6,6 +6,9 @@ from collections import deque
 from pathlib import Path
 from typing import Callable
 
+from pokeagent.explorer.route_cache import (
+    _CACHE_CAP, _NEIGH, _ROUTES, _goal_sig, maps_version, route_maps_version)
+
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 STARTERS = ("BULBASAUR", "CHARMANDER", "SQUIRTLE")
@@ -27,60 +30,6 @@ MT_MOON_MAPS = frozenset({0x3B, 0x3C, 0x3D})  # 1F, B1F, B2F
 DUNGEON_MAPS = MT_MOON_MAPS  # no training gate inside: grind outside (Route 3/4), inside head for the exit
 SHIP_MAPS = frozenset(range(0x5E, 0x69))  # Vermilion dock + S.S. Anne decks/rooms (0x5E..0x68): no grass, no training gate
 POKECENTER_MAP = 41  # Viridian City's Pokecenter (door at Viridian (23,26)); learned in maps.json, same layout as every center
-
-
-def maps_version(maps: dict) -> int:
-    """A fingerprint of everything a route reads from memory: each map's visited count, blocked set,
-    warps, jumps, and every never-moving NPC's single recorded tile. A write under any of those rolls
-    the version, so cached neighbours and cached routes re-search; ``visited`` only ever grows, so
-    its length is enough."""
-    v = 0x9E3779B1
-    for d in maps.values():
-        h = len(d.get("visited", ()))
-        h = h * 31 + hash(frozenset(d.get("blocked", ())))
-        h = h * 31 + hash(frozenset((k, tuple(w)) for k, w in d.get("warps", {}).items()))
-        h = h * 31 + hash(frozenset((k, tuple(j)) for k, j in d.get("jumps", {}).items()))
-        for e in d.get("npcs", {}).values():
-            pos = e.get("positions") or {}
-            if not e.get("moves") and len(pos) == 1:
-                h = h * 13 + hash(next(iter(pos)))
-        v = v * 131 + h
-    return v
-
-
-# Shared per-run caches. Both are keyed by the memory fingerprint above, so a learned wall, warp,
-# jump, visited tile or static-NPC move rolls the key and stale entries are never served. Entries
-# keep a strong ref to the maps dict: that pins it while the key's id() is live, so an id reused by
-# a later dict can never alias an old bucket. Bounded: a run's versions churn, so both clear at CAP.
-_NEIGH: dict = {}   # (id(maps), version, strict, blocked_now, allowed) -> (maps, {node: [(nxt, btn)]})
-_ROUTES: dict = {}  # same key tuple + (goal signature, limit) -> (maps, start, nodes, buttons)
-_CACHE_CAP = 64
-
-
-def _immutable(v) -> bool:
-    """A value a route-cache key can trust: ``int``/``str``/``bool``/``float``/``None``, or a
-    ``tuple``/``frozenset`` of them (recursively). Anything else - a live dict/set/list, or an
-    identity-hashed object (``ctx``, ``self``, a ``Decision``) whose mutable state is not in the
-    key - can change under the cached entry, so its goal must re-search every call."""
-    if v is None or isinstance(v, (int, str, bool, float)):
-        return True
-    return isinstance(v, (tuple, frozenset)) and all(_immutable(x) for x in v)
-
-
-def _goal_sig(goal_fn) -> tuple | None:
-    """A repeatable identity for a per-step repeated goal lambda: code object + bound values. Any
-    closure cell that is not immutable (see ``_immutable``) means no signature - that goal must
-    re-search every call."""
-    try:
-        cells = tuple(c.cell_contents for c in (goal_fn.__closure__ or ()))
-        if not all(_immutable(v) for v in cells):
-            return None
-        sig = (goal_fn.__code__, goal_fn.__defaults__ or (), cells,
-               tuple(sorted((goal_fn.__kwdefaults__ or {}).items())))
-        hash(sig)
-        return sig
-    except (TypeError, AttributeError, ValueError):
-        return None
 
 
 class WorldGraph:
@@ -115,6 +64,39 @@ class WorldGraph:
         if v is None:
             v = self.__dict__["_mv"] = maps_version(self.maps)
         return v
+
+    def _route_version(self) -> int:
+        """The last-result route cache's fingerprint: ``maps_version`` minus learned walls. A wall
+        anywhere still rolls ``_version`` (fresh neighbours, graph rebuilds); whether it may roll a
+        cached ROUTE is decided per path by ``_edge_still_open``."""
+        v = self.__dict__.get("_rv")
+        if v is None:
+            v = self.__dict__["_rv"] = route_maps_version(self.maps)
+        return v
+
+    def _visited_total(self) -> int:
+        """Tiles stood on across every map: a cached MISS is only trusted while this holds - a new
+        tile is a new edge, and only a new edge can open a route that was not there."""
+        return sum(len(d.get("visited", ())) for d in self.maps.values())
+
+    def _edge_still_open(self, a, btn, b) -> bool:
+        """Is the cached step ``a --btn--> b`` still a live edge? Only the learned-wall term needs a
+        live check: warps, jumps and static-NPC tiles are inside ``_route_version`` (a change there
+        already missed the cache key), temp-blocked tiles are in the key, ``visited`` only grows,
+        and a warp/jump edge short-circuits exactly like ``_neighbours`` does."""
+        m, x, y = a
+        d = self.maps.get(str(m))
+        if not d:
+            return False
+        key = f"{x},{y},{btn}"
+        if key in d.get("warps", {}) or key in d.get("jumps", {}):
+            return True
+        return not (self.strict and key in d.get("blocked", []))
+
+    def _suffix_edges_ok(self, nodes, buttons, i) -> bool:
+        """Every edge of the cached suffix ``nodes[i:]`` (parallel ``buttons``) is still open."""
+        return all(self._edge_still_open(nodes[j], buttons[j], nodes[j + 1])
+                   for j in range(i, len(nodes) - 1))
 
     def _neigh_memo(self) -> dict:
         """This graph's slice of the shared neighbour memo, keyed on everything an edge can read:
@@ -179,9 +161,10 @@ class WorldGraph:
     last_route: tuple | None = None  # (start, goal node, buttons) of the latest successful path(); par_follow reads the planner's target here
 
     def _bfs(self, start, goal_fn, limit):
-        r = self._bfs_node(start, goal_fn, limit)
+        # _bfs_route, not _bfs_node: a cache hit must not even enter the counted search entry point.
+        r = self._bfs_route(start, goal_fn, limit)
         if r and r[1]:
-            WorldGraph.last_route = (start, r[0], r[1])
+            WorldGraph.last_route = (start, r[0][-1], r[1])
         return r[1] if r else None
 
     def _route_key(self, goal_fn, limit) -> tuple | None:
@@ -190,32 +173,39 @@ class WorldGraph:
         sig = _goal_sig(goal_fn)
         if sig is None:
             return None
-        return (id(self.maps), self._version(), self.strict, self.blocked_now, self.allowed_maps, sig, limit)
+        return (id(self.maps), self._route_version(), self.strict, self.blocked_now,
+                self.allowed_maps, sig, limit)
 
     def _bfs_route(self, start, goal_fn, limit):
         """(nodes, buttons) of the BFS path start->goal, or None.
 
-        The last route per (goal signature, memory version, blocked set, bound) is kept: while the
-        agent stays on that path its remaining suffix answers without a new search, while a memory
-        change rolls the version, a temp-blocked tile rolls the key, and stepping off the path (or a
-        cached miss's different start) re-runs the search."""
+        The last route per (goal signature, route version, blocked_now, bound) is kept: visiting new
+        tiles no longer rolls the key - it only grows the graph - so a hit now re-validates the cached
+        suffix's own edges (``_suffix_edges_ok``: a wall ON the path forces a re-search, one far away
+        stays a hit) and re-asks the CURRENT goal_fn about the cached target (a frontier tile whose
+        unexplored side just got visited stops answering, exactly like a fresh search would see).
+        Stepping off the path re-runs the search. A cached MISS additionally requires the full memory
+        version and the visited total to hold: only a new tile or a removed wall can open a route
+        that was not there."""
         key = self._route_key(goal_fn, limit)
+        full, seen = self._version(), self._visited_total()
         if key is not None:
             ent = _ROUTES.get(key)
             if ent is not None and ent[0] is self.maps:
-                src, nodes, buttons = ent[1:]
+                src, nodes, buttons, full_v, seen_v = ent[1:]
                 if nodes is None:
-                    if start == src:
+                    if start == src and full_v == full and seen_v == seen:
                         return None
                 elif start in nodes:
                     i = nodes.index(start)
-                    return list(nodes[i:]), list(buttons[i:])
+                    if self._suffix_edges_ok(nodes, buttons, i) and goal_fn(nodes[-1]):
+                        return list(nodes[i:]), list(buttons[i:])
         r = self._bfs_walk(start, goal_fn, limit)
         if key is not None:
             if len(_ROUTES) >= _CACHE_CAP:
                 _ROUTES.clear()
             _ROUTES[key] = (self.maps, start, None if r is None else tuple(r[0]),
-                            None if r is None else tuple(r[1]))
+                            None if r is None else tuple(r[1]), full, seen)
         return r
 
     def _bfs_node(self, start, goal_fn, limit):

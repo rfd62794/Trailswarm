@@ -141,3 +141,96 @@ def test_goal_closing_over_immutable_values_still_caches(tmp_path, monkeypatch):
     assert r1 is not None
     assert g.path((1, 0, 0), goal) == r1
     assert len(walks) == 1  # the repeat was served from the cached route
+
+
+def test_visits_and_a_far_wall_keep_the_route_a_hit(tmp_path, monkeypatch):
+    """New tiles on either map and a wall nowhere near the route must not re-search: ``visited``
+    only grows the graph, and the route cache checks the path's own edges, not the whole wall set."""
+    mem = _mem(tmp_path)
+    walks = _count_walks(monkeypatch)
+    r1 = mem.route_to(1, 0, 0, (1, 4, 0))
+    assert r1 is not None
+    mem.data["maps"]["1"]["visited"]["0,0"] = 7          # a revisit count bump on this map
+    mem.data["maps"]["2"]["visited"]["9,9"] = 1          # a brand-new tile on another map
+    mem.data["maps"]["2"]["blocked"].append("0,0,RIGHT")  # a wall on the other map
+    mem.data["maps"]["1"]["blocked"].append("0,2,LEFT")   # and map-1 walls off every route edge
+    mem.data["maps"]["1"]["blocked"].append("4,2,DOWN")
+    before = len(walks)
+    assert mem.route_to(1, 0, 0, (1, 4, 0)) == r1
+    assert len(walks) == before
+
+
+def test_a_wall_on_the_cached_path_forces_a_research(tmp_path, monkeypatch):
+    """A learned wall ON a cached path edge invalidates just that route: one fresh search finds a
+    path that does not repeat the walled step."""
+    mem = _mem(tmp_path)
+    walks = _count_walks(monkeypatch)
+    r1 = mem.route_to(1, 0, 0, (1, 4, 0))
+    assert r1 is not None
+    first_btn = r1[1][0]
+    mem.data["maps"]["1"]["blocked"].append(f"0,0,{first_btn}")
+    walks.clear()
+    r2 = mem.route_to(1, 0, 0, (1, 4, 0))
+    assert len(walks) == 1
+    assert r2 is not None and r2[0] == (1, 4, 0)
+    assert r2[1][0] != first_btn
+
+
+def test_a_goal_reading_visited_stays_correct(tmp_path, monkeypatch):
+    """cached_route re-asks the CURRENT goal_fn about the cached target: a side the goal reads as
+    unexplored that just got visited drops the route exactly like a fresh search would."""
+    mem = _mem(tmp_path)
+    visited = mem.data["maps"]["1"]["visited"]
+    del visited["4,1"]  # (4,1) unexplored: the goal holds only while it stays unvisited
+    walks = _count_walks(monkeypatch)
+    goal = lambda n: n == (1, 4, 0) and "4,1" not in visited
+    assert mem.cached_route((1, 0, 0), "g", goal) is not None
+    mem.data["maps"]["2"]["visited"]["9,9"] = 1  # an unrelated visit: still a hit
+    before = len(walks)
+    got = mem.cached_route((1, 0, 0), "g", goal)
+    assert len(walks) == before
+    assert got == WorldGraph(mem.data["maps"])._bfs_node((1, 0, 0), goal, 4000)
+    visited["4,1"] = 1  # the side the goal reads is now visited: the cached target went stale
+    before = len(walks)
+    got2 = mem.cached_route((1, 0, 0), "g", goal)
+    assert len(walks) == before + 1  # the stale entry was dropped and re-searched once
+    assert got2 is None
+    assert WorldGraph(mem.data["maps"])._bfs_node((1, 0, 0), goal, 4000) is None
+
+
+def test_warp_jump_temp_npc_and_beaten_each_roll_the_route(tmp_path, monkeypatch):
+    """Every routing-relevant change still invalidates the cached plan - only ``visited`` stopped."""
+    walks = _count_walks(monkeypatch)
+    cases = [
+        ("warp", lambda m: m.data["maps"]["1"]["warps"].update({"4,0,UP": [2, 0, 0]})),
+        ("jump", lambda m: m.data["maps"]["1"]["jumps"].update({"4,0,UP": [4, 2]})),
+        ("temp", lambda m: m.temp_blocked.update({(1, 0, 1): 999})),
+        ("npc", lambda m: m.data["maps"]["1"]["npcs"].update(
+            {"e1": {"positions": {"2,1": 1}, "moves": False, "last": [2, 1]}})),
+        ("beaten", lambda m: setattr(m, "beaten_tiles", {(1, 0, 1)})),
+    ]
+    for i, (name, mutate) in enumerate(cases):
+        maps = _maps()
+        maps["1"]["blocked"] += ["0,0,UP", "0,0,LEFT"]  # (0,1) is the nearest frontier
+        mem = MapMemory(tmp_path / f"{name}.json")
+        mem.data["maps"].update(maps)
+        assert mem.frontier_plan(1, 0, 0) is not None  # caches the plan
+        walks.clear()
+        mutate(mem)  # the routing-relevant change lands
+        assert mem.frontier_plan(1, 0, 0) is not None
+        assert len(walks) == 1, f"{name} did not force a re-search"
+
+
+def test_walks_per_step_stays_under_point_three(tmp_path, monkeypatch):
+    """N steps of walking a corridor while exploration adds fresh tiles elsewhere: real searches
+    per step stay under 0.3 (every step used to re-search when ``len(visited)`` rolled the key)."""
+    maps = {"1": {"visited": {f"{x},1": 1 for x in range(10)},
+                  "blocked": [], "warps": {}, "jumps": {}, "npcs": {}},
+            "2": {"visited": {"0,0": 1}, "blocked": [], "warps": {}, "jumps": {}, "npcs": {}}}
+    mem = _mem(tmp_path, maps)
+    walks = _count_walks(monkeypatch)
+    n = 20
+    for i in range(n):
+        mem.data["maps"]["2"]["visited"][f"{i},0"] = i + 1  # the step's own exploration, off-route
+        mem.route_to(1, i % 10, 1, (1, 9, 1))
+    assert len(walks) / n < 0.3
