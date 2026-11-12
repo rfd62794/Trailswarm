@@ -8,13 +8,14 @@ A checkpoint with no sidecar (written before this existed) is accepted only when
 checkpoint file: a gap in the chain proves it was reached out of order.
 """
 from __future__ import annotations
-from pokeagent.fsutil import replace_retry
 
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Callable, Iterable
+
+from pokeagent.fsutil import replace_retry
 
 _log = logging.getLogger(__name__)
 
@@ -108,6 +109,7 @@ def stamp_fingerprint(emu, state: Path, source_run: str | None = None, *, inheri
 
 def copy_sidecar(src: Path, dst: Path) -> None:
     import shutil
+
     from pokeagent import statefp
     for side in (sidecar, statefp.sidecar):
         if side(src).exists():

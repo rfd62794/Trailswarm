@@ -6,7 +6,6 @@ is a launcher that starts the real interpreter, so every agent shows as two proc
 No third-party dependencies: Windows memory comes from ctypes, elsewhere from /proc.
 """
 from __future__ import annotations
-from pokeagent.fsutil import atomic_write_text
 
 import ctypes
 import json
@@ -19,6 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 from pokeagent.agent_registry import list_agents
+from pokeagent.fsutil import atomic_write_text
 from pokeagent.registry import process_state
 
 DEFAULT_CAP = 6

@@ -3,17 +3,16 @@ framework module's MapMemory). The schema is unchanged."""
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 
-from pokeagent.fsutil import atomic_write_text
 from pokeagent.explorer import edits, items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
 from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
 from pokeagent.explorer.memory_tiles import TilesMixin
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
+from pokeagent.fsutil import atomic_write_text
 
 # After a blackout the game drops us at the last Pokecenter's door (Viridian (23,26) once we healed there) or at home
 # (Pallet (5,6)). Arriving there from any other map is a respawn, never a door: it made a ghost 3-step 'warp' from the

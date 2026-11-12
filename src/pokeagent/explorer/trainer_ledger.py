@@ -19,12 +19,12 @@ at the bottom so callers (engine, battle, press_interact, demos, Goal Procedures
 keep one import surface.
 """
 from __future__ import annotations
-from pokeagent.fsutil import atomic_write_text
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
+
+from pokeagent.fsutil import atomic_write_text
 
 FLAG_LO, FLAG_HI = 0xD747, 0xD886  # wEventFlags block (ramlab.flags.FLAG_LO/FLAG_HI; ramlab is not an explorer layer)
 MATCH_MAX_DIST = 6      # how far (Manhattan, tiles) a walked-up NPC may stand from its ROM placement

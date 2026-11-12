@@ -15,9 +15,9 @@ import os
 from collections import deque
 from pathlib import Path
 
-from pokeagent.fsutil import where
 from pokeagent.explorer.jsonl_buf import FLUSH_EVERY
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
+from pokeagent.fsutil import where
 
 TAIL = 400  # log lines kept in memory as the run's console tail
 

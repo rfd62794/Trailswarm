@@ -1,17 +1,21 @@
 """Goal milestones: first-reached steps, checkpoints and runs/milestones.json (moved from the demo's do_press)."""
 from __future__ import annotations
-from pokeagent.fsutil import atomic_write_text, replace_retry
 
 import json
 import os
-import time
 from pathlib import Path
 
+from pokeagent.checkpoint_goals import (
+    completed_goals,
+    read_completed,
+    stamp_fingerprint,
+    write_completed,
+)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
-from pokeagent.checkpoint_goals import completed_goals, read_completed, stamp_fingerprint, write_completed
+from pokeagent.fsutil import atomic_write_text, replace_retry
 from pokeagent.goals import GOALS, check_goals, is_unverified, store_path
 from pokeagent.segment_names import state_goal
 

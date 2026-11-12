@@ -1,9 +1,7 @@
 """Per-press learning that is not tied to one interaction (moved from the demo's do_press)."""
 from __future__ import annotations
-from pokeagent.fsutil import replace_retry
 
 import os
-from pathlib import Path
 
 from pokeagent.checkpoint_goals import stamp_fingerprint
 from pokeagent.explorer.behaviours.frontier import TABU_LEN
@@ -11,6 +9,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.stat_records import note_stat_exp
+from pokeagent.fsutil import replace_retry
 from pokeagent.goals import GOALS, bag_contents, check_goals, store_path
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",

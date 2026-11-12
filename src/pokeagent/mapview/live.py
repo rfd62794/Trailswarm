@@ -7,14 +7,14 @@ space; ``screen_x``/``screen_y`` are the sprite's top-left in the live frame, or
 A record older than ``STALE_S`` counts as absent, so a stopped writer leaves no frozen mark.
 """
 from __future__ import annotations
-from pokeagent.fsutil import replace_retry, unique_tmp
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from pokeagent.mapview.live_schema import SCHEMA, safe_name, valid as _valid
+from pokeagent.fsutil import replace_retry, unique_tmp
+from pokeagent.mapview.live_schema import safe_name
+from pokeagent.mapview.live_schema import valid as _valid
 
 STALE_S = 5.0                  # a record this old counts as gone (the writer stopped)
 

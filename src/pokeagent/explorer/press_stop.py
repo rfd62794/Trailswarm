@@ -1,13 +1,17 @@
 """Segment-run endings: the end-of-segment save state and the sub-segment stop (first entry into a map id)."""
 from __future__ import annotations
-from pokeagent.fsutil import replace_retry
 
 import json
 import os
 
-from pokeagent.checkpoint_goals import completed_goals, stamp_fingerprint, write_completed
+from pokeagent.checkpoint_goals import (
+    completed_goals,
+    stamp_fingerprint,
+    write_completed,
+)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
+from pokeagent.fsutil import replace_retry
 from pokeagent.goals import GOALS, check_goals
 
 CUR_MAP = 0xD35E  # wCurMap

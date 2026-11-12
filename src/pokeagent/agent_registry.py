@@ -1,12 +1,12 @@
 """Agent discovery files: ``<root>/runs/agents/<id>.json`` written by agents, read by viewers."""
 from __future__ import annotations
-from pokeagent.fsutil import replace_retry, unique_tmp
 
 import json
 import os
 import time
 from pathlib import Path
 
+from pokeagent.fsutil import replace_retry, unique_tmp
 from pokeagent.registry import process_state
 
 
