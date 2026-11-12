@@ -397,3 +397,17 @@ Nothing for the build. After merge, Claude confirms on the laptop that `PartyVie
 - Exec(uv run pytest)
 - Exec(git grep)
 - Exec(git status)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 08:13 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; PR #207 merged fb27482 after audit + 2 review rounds
+<!-- queue:end -->
