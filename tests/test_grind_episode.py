@@ -20,7 +20,7 @@ HP_LO, HP_HI, MX_LO, MX_HI = 0xD16C, 0xD16D, 0xD18D, 0xD18E
 
 
 def make_ctx(tmp_path, m=35, x=10, y=35, lvl=10, need=20, maps=None, hp=(20, 20)):
-    emu = FakeEmulator({MAP: m, PX: x, PY: y, LEVEL: lvl,
+    emu = FakeEmulator({MAP: m, PX: x, PY: y, LEVEL: lvl, 0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,
                         HP_LO: hp[0] >> 8, HP_HI: hp[0] & 0xFF, MX_LO: hp[1] >> 8, MX_HI: hp[1] & 0xFF})
     mem = MapMemory(tmp_path / "maps.json")
     for k, v in (maps or {}).items():
@@ -117,6 +117,36 @@ def test_episode_ends_hurt_with_no_potion(tmp_path, monkeypatch):
     assert grind_episode.update(ctx) is None
     row = json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])
     assert row["reason"] == "hurt with no potion" and row["status"] == "aborted"
+
+
+def test_episode_ends_hurt_with_slot_zero_fainted_and_no_potion(tmp_path, monkeypatch):
+    """A fainted member behind a healthy fighter still ends the episode: the whole party feeds the check."""
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), make_ledger())
+    ctx.emu.set(0xD163, 2)                                   # slot 1 joins: a healthy second member
+    for a, v in {0xD165: 0x9A, 0xD16B + 44: 0x9A, 0xD16D + 44: 32, 0xD18E + 44: 32}.items():
+        ctx.emu.set(a, v)
+    _start(ctx, monkeypatch, tmp_path)
+    ctx.emu.set(0xD16D, 0)                                   # the lead faints mid-episode
+    assert grind_episode.update(ctx) is None
+    row = json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])
+    assert row["reason"] == "hurt with no potion" and row["status"] == "aborted"
+
+
+def test_grind_drill_episode_step_gets_heal_gate_hp_when_slot_zero_fainted(tmp_path, monkeypatch):
+    """heal_gate_hp feeds train_route.step: the fighter's numbers, or (0, fighter max) while a member is fainted."""
+    from pokeagent.explorer import train_route
+    ctx = make_ctx(tmp_path, m=13, hp=(20, 35))                       # off the episode's point map
+    ctx.emu.set(0xD163, 2)
+    for a, v in {0xD165: 0x9A, 0xD16B + 44: 0x9A, 0xD16D + 44: 32, 0xD18E + 44: 32}.items():
+        ctx.emu.set(a, v)
+    seen = []
+    monkeypatch.setattr(train_route, "step", lambda *a, **k: seen.append(a[3]) or None)
+    ep = {"maps": {35}, "point": gp.GrindPoint(35)}
+    GrindDrill(grids=lambda _m: None)._episode_step(ctx, ep)
+    assert seen[-1] == 20                                             # healthy: the fighter's HP
+    ctx.emu.set(0xD16D, 0)                                            # the lead faints
+    GrindDrill(grids=lambda _m: None)._episode_step(ctx, ep)
+    assert seen[-1] == 0                                              # (0, fighter max): the heal gate fires
 
 
 def test_hurt_restart_loop_yields_one_aborted_row_and_no_ledger_change(tmp_path, monkeypatch):

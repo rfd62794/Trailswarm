@@ -132,6 +132,7 @@ def test_decision_driver_reaches_the_decision_line(tmp_path):
 
 def test_training_is_not_an_eligible_trip(tmp_path):
     ctx, _ = make(tmp_path)
+    ctx.emu.set(0xD163, 1); ctx.emu.set(0xD164, 0x99); ctx.emu.set(0xD16B, 0x99)  # a party for the lead to live in
     ctx.emu.set(0xD18C, 5)   # lead level (wPartyMon1Level)
     ctx.train_need = 12
     from pokeagent.explorer.perceive import lead_level

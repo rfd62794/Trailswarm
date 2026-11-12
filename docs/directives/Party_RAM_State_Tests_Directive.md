@@ -211,12 +211,12 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-ram-state-tests-directive |
 | Base branch | - |
 | Base commit | c18ac0803665ce5c59dcb05c99c5d26304255785 |
-| Head commit | 7f1831afa70e85a7d43f1712e6024c9299605273 |
+| Head commit | 12ca45ed1d7a51b58e4f2434b1f46564bd1d1a36 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -225,4 +225,5 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 - 2026-11-12 08:14 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-ram-state-tests-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M77YAMQ1D4FSMPN18B57D2C1
 - 2026-11-12 08:20 · dispatcher · launched pid=2704; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-ram-state-tests-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (7 declared need(s); 4 external))
 - 2026-11-12 08:31 · devin · In progress → Review — 5 files under tests/rom committed+pushed. No ROM in worktree: 6 state tests skip ('needs roms/Pokemon Red.gb'), 5 table tests pass, full suite 2528 passed/47 skipped/0 failed. No verified flags flipped - controller owns ROM run + flag flips. [origin] spent: devin 11 min est. n/a
+- 2026-11-12 10:49 · robert-claude-laptop · Review → Done — note: Merged PR #209 (9bbb029) at 12ca45e: verify 2528 passed / 0 failed (47 skips = 41 advisory + 6 ROM tests, which passed with the real ROM: 11 passed); 14 ram_map symbols flipped verified; Sonnet review APPROVE
 <!-- queue:end -->

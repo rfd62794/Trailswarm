@@ -8,6 +8,7 @@ from importlib import resources
 
 from pokeagent.emulator import Emulator
 from pokeagent.ram import decode_bcd
+from pokeagent.ram_symbols import MENU_ITEM
 
 BADGES, MONEY = 0xD356, 0xD347
 POKEDEX_OWNED, POKEDEX_SEEN, POKEDEX_BYTES = 0xD2F7, 0xD30A, 19
@@ -16,7 +17,7 @@ MAP_HEADER = 0xD367          # tileset, height, width, data ptr, text ptr, scrip
 NUM_WARPS, WARP_ENTRIES = 0xD3AE, 0xD3AF
 NUM_SIGNS, SIGN_COORDS = 0xD4B0, 0xD4B1
 NUM_SPRITES, MAP_SPRITE_DATA = 0xD4E1, 0xD4E4
-MENU_ITEM, TOP_MENU_Y, TOP_MENU_X, MAX_MENU_ITEM, TEXT_BOX_ID = 0xCC26, 0xCC24, 0xCC25, 0xCC28, 0xD125
+TOP_MENU_Y, TOP_MENU_X, MAX_MENU_ITEM, TEXT_BOX_ID = 0xCC24, 0xCC25, 0xCC28, 0xD125
 EVENT_FLAGS, EVENT_FLAG_BYTES = 0xD747, 320
 BADGE_NAMES = ("boulder", "cascade", "thunder", "rainbow", "soul", "marsh", "volcano", "earth")
 

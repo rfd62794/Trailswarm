@@ -9,6 +9,7 @@ from collections import deque
 
 from pokeagent.intervene.names import item_name, species_name
 from pokeagent.intervene.screen import PLAYER_MON, read_screen
+from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.ramstructs import read_bag, read_battle_mon, read_enemy_mon, read_party
 
 KINDS = {1: "wild", 2: "trainer"}
@@ -53,7 +54,7 @@ def build(ctx, emu, tracker: Tracker, box_text: str) -> dict:
     try:
         out["bag"] = {item_name(i): q for i, q in read_bag(emu)}
         if scr.in_battle:
-            out["battle"] = {"kind": KINDS.get(emu.read(0xD057), "battle"), "you": _our_mon(emu),
+            out["battle"] = {"kind": KINDS.get(emu.read(IS_IN_BATTLE), "battle"), "you": _our_mon(emu),
                              "enemy": _mon(read_enemy_mon(emu))}
     except Exception:
         pass

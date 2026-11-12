@@ -108,11 +108,13 @@ def test_wild_level_ceiling_comes_from_the_drained_grass_table():
 
 def test_plan_goal_lifts_the_gate_when_the_budget_is_spent_and_logs_it(monkeypatch):
     monkeypatch.setattr(kbmod, "ROM_KB", None)                                        # no ceiling rule: only the battle budget
-    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.explorer.behaviours import plan_goal as pg
     from pokeagent.goals import GOALS
+    monkeypatch.setattr(pg, "lead_level", lambda emu: 8)                             # lead level 8, no Magikarp
+    PlanGoal = pg.PlanGoal
     goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}                      # next stage: BROCK
     logs = []
-    emu = SimpleNamespace(read=lambda a: 8, read_range=lambda a, n: bytes(n))        # lead level 8, no Magikarp
+    emu = SimpleNamespace(read=lambda a: 8, read_range=lambda a, n: bytes(n))        # (the level comes from the patched view now)
     ctx = SimpleNamespace(emu=emu, step=0, battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: logs.append(t))
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 12
     ctx.step, ctx.battles = 300, GRIND_BATTLES
@@ -178,10 +180,12 @@ def test_magikarp_trainee_keeps_the_gated_lead_measure(monkeypatch):
 
 
 def test_budget_accrues_only_on_grinding_steps(monkeypatch):
-    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.explorer.behaviours import plan_goal as pg
     from pokeagent.explorer.grind import grinding_now
     from pokeagent.goals import GOALS
     monkeypatch.setattr(kbmod, "ROM_KB", None)
+    monkeypatch.setattr(pg, "lead_level", lambda emu: 9)
+    PlanGoal = pg.PlanGoal
     goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
     city = {"2": {"encounters": {}}}; grass = {"13": {"encounters": {"1,1": 3}}}
     mk = lambda mid, maps: SimpleNamespace(emu=SimpleNamespace(read=lambda a: 9, read_range=lambda a, n: bytes(n)), step=0,

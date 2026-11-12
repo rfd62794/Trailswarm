@@ -13,6 +13,7 @@ from pokeagent.game.stores import store_path  # re-exported for the explorer pac
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
 from pokeagent.magikarp import magikarp_goal_settled, team_ready_settled
+from pokeagent.ram_symbols import PARTY_COUNT, PARTY_MON1_HP, PARTY_MON1_MAX_HP, PARTY_MON_SIZE
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
 GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 26 ids are the hand-coded ones below
@@ -48,13 +49,13 @@ def through_mt_moon(emu, st: dict, m: int, seen: set) -> bool:
 
 
 def party_full(emu) -> bool:
-    """Every party Pokemon at full HP (wPartyMonN HP 0xD16C / MaxHP 0xD18D, 44 bytes apart; count at 0xD163)."""
-    n = emu.read(0xD163)
+    """Every party Pokemon at full HP (wPartyMonN HP / MaxHP, PARTY_MON_SIZE bytes apart; count at wPartyCount)."""
+    n = emu.read(PARTY_COUNT)
     if not 0 < n <= 6:
         return False
     for i in range(n):
-        hp = (emu.read(0xD16C + 0x2C * i) << 8) | emu.read(0xD16D + 0x2C * i)
-        mx = (emu.read(0xD18D + 0x2C * i) << 8) | emu.read(0xD18E + 0x2C * i)
+        hp = (emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i) << 8) | emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i + 1)
+        mx = (emu.read(PARTY_MON1_MAX_HP + PARTY_MON_SIZE * i) << 8) | emu.read(PARTY_MON1_MAX_HP + PARTY_MON_SIZE * i + 1)
         if mx == 0 or hp < mx:
             return False
     return True
@@ -86,7 +87,7 @@ def cut_learner_settled(emu, st: dict, kb) -> bool:
 
 
 def check_goals(emu, st: dict) -> dict[str, bool]:
-    """Milestones read straight from RAM (bag 0xD31D/E verified; party 0xD163 and battle 0xD057 unverified)."""
+    """Milestones read straight from RAM (bag 0xD31D/E verified; party wPartyCount and battle wIsInBattle unverified)."""
     bag_n = emu.read(0xD31D)
     bag = emu.read_range(0xD31E, 2 * bag_n) if 0 < bag_n < 21 else b""  # PyBoy rejects empty slices
     potion = any(bag[i] == 0x14 for i in range(0, len(bag), 2))
@@ -96,7 +97,7 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
     if has_parcel:
         st["had_parcel"] = True
     g = {"potion": potion, "left_house": m not in (0x25, 0x26) or st.get("goal_left_house", False),
-         "first_pokemon": emu.read(0xD163) > 0, "won_battle": st.get("battles_won", 0) > 0,
+         "first_pokemon": emu.read(PARTY_COUNT) > 0, "won_battle": st.get("battles_won", 0) > 0,
          "to_route1": 0x0C in seen, "to_viridian": 0x01 in seen,
          "oaks_parcel": has_parcel or st.get("had_parcel", False),
          "deliver_parcel": st.get("had_parcel", False) and not has_parcel,

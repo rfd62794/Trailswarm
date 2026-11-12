@@ -19,7 +19,7 @@ def _start(emu):
 
 def test_species_comes_from_enemy_mon_not_move_pp():
     # 0xCFD7 holds a move's max PP (25 here == Gastly's internal id 0x19); 0xCFE5 is the real enemy species.
-    emu = FakeEmulator({0xD057: 1, 0xCFD7: 0x19, 0xCFE5: 36, 0xCFF3: 5})
+    emu = FakeEmulator({0xD057: 1, 0xD014: 0xB2, 0xCFD7: 0x19, 0xCFE5: 36, 0xCFF3: 5})
     feed = EventFeed()
     feed._mon = lambda i: {0x19: "GASTLY", 36: "PIDGEY"}.get(i, f"#{i}")
     feed._battle_events(emu, None)

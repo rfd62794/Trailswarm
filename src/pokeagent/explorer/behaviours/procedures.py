@@ -12,6 +12,7 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines, party_hp
 from pokeagent.goals import bag_contents
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 from pokeagent.explorer.text_speed import check_text_speed, seed_text_speed, text_speed_steps
 
@@ -36,7 +37,7 @@ class Procedures(BehaviourBase):
             seed_text_speed(ctx)  # first thing, retried once on failure, cached when verified
         if ctx.proc is not None:
             return True
-        return bool(ctx.proc_due) and not ctx.view.box and ctx.emu.read(0xD057) == 0
+        return bool(ctx.proc_due) and not ctx.view.box and ctx.emu.read(IS_IN_BATTLE) == 0
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         decision = self._step(ctx)
@@ -46,7 +47,7 @@ class Procedures(BehaviourBase):
 
     def _step(self, ctx: ExplorerContext) -> Decision | None:
         proc = ctx.proc
-        if proc is None and ctx.proc_due and not ctx.view.box and ctx.emu.read(0xD057) == 0:
+        if proc is None and ctx.proc_due and not ctx.view.box and ctx.emu.read(IS_IN_BATTLE) == 0:
             name = ctx.proc_due.pop(0)
             if name in PROCEDURES:
                 rec = ctx.mem.data.setdefault("procedures", {}).setdefault(name, {"ok": 0, "fail": 0, "pace": ctx.opts.box_pace or 12})

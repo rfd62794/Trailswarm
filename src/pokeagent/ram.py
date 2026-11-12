@@ -6,10 +6,11 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from pokeagent.emulator import Emulator
+from pokeagent.ram_symbols import IS_IN_BATTLE, PARTY_COUNT
 
 RAM_MAP = {   # believed addresses from pret/pokered wram.asm - UNVERIFIED, calibrated later; keep in this one table
-    "map_id": 0xD35E, "player_y": 0xD361, "player_x": 0xD362, "party_count": 0xD163,
-    "badges": 0xD356, "in_battle": 0xD057, "money": 0xD347,   # money: 3 bytes BCD
+    "map_id": 0xD35E, "player_y": 0xD361, "player_x": 0xD362, "party_count": PARTY_COUNT,
+    "badges": 0xD356, "in_battle": IS_IN_BATTLE, "money": 0xD347,   # money: 3 bytes BCD
 }
 
 

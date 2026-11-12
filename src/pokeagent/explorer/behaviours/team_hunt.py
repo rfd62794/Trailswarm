@@ -29,6 +29,7 @@ from pokeagent.knowledge.party import our_party
 from pokeagent.knowledge.team_value import BOSS_HORIZON, DEX_GATES
 from pokeagent.explorer.training import BOSS_LABEL, TRAIN_LEVEL_BY_GOAL
 from pokeagent.magikarp import magikarp_stats
+from pokeagent.party_view import read_party_view
 from pokeagent.ramworld import read_money
 from pokeagent.ramstructs import read_party_count
 
@@ -65,7 +66,8 @@ class TeamHunt(BehaviourBase):
         if ok:
             hp, mx = party_hp(ctx.emu)
             bag = bag_contents(ctx.emu)
-            ok = (bool(mx) and hp / mx >= TEAM_HUNT_MIN_HP and heal_items.heal_count(bag) >= FLOOR_MIN
+            ok = (bool(mx) and hp / mx >= TEAM_HUNT_MIN_HP and not read_party_view(ctx.emu).any_fainted
+                  and heal_items.heal_count(bag) >= FLOOR_MIN
                   and bag.get(POKE_BALL, 0) >= 1 and read_party_count(ctx.emu) < TEAM_SIZE)
         if not ok:
             ctx.team_wants = {}

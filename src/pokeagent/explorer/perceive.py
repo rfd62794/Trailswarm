@@ -6,11 +6,13 @@ from pokeagent.hexmap import diff as ram_diff
 from pokeagent.knowledge.readiness import TEAM_GAP
 from pokeagent.magikarp import fighter, magikarp_stats, trainee_slot
 from pokeagent.names import load_registry
+from pokeagent.party_view import read_battle_view, read_party_view
+from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.screentext import CHARMAP
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
 TILEMAP, TILEMAP_LEN, BORDER_TL = 0xC3A0, 360, 0x79
-TILEMAP_ADDR, BATTLE_FLAG = TILEMAP, 0xD057  # the names the old explorer module used
+TILEMAP_ADDR, BATTLE_FLAG = TILEMAP, IS_IN_BATTLE  # the names the old explorer module used
 # Screen-tile offsets of the 2x2 map tile in front of the player (player sprite sits at rows 8-9, cols 8-9).
 AHEAD = {"UP": [(6, 8), (6, 9), (7, 8), (7, 9)], "DOWN": [(10, 8), (10, 9), (11, 8), (11, 9)],
          "LEFT": [(8, 6), (8, 7), (9, 6), (9, 7)], "RIGHT": [(8, 10), (8, 11), (9, 10), (9, 11)]}
@@ -19,20 +21,30 @@ REGISTRY = load_registry()
 
 
 def party_hp(emu) -> tuple[int, int]:
-    """Lead pokemon HP and max HP. VERIFIED 2026-11-03: wPartyMon1HP 0xD16C/6D, wPartyMon1MaxHP 0xD18D/8E
-    (read 11/20 for a level-5 Bulbasaur; wPartyMon1Level 0xD18C read 5; species at 0xD16B read 0x99)."""
-    if trainee_slot(emu) is not None:  # a Magikarp in training lives in the party: the fighter is not the lead
-        _, _, hp, mx = fighter(emu)
-        return hp, mx
-    hp = (emu.read(0xD16C) << 8) | emu.read(0xD16D)
-    mx = (emu.read(0xD18D) << 8) | emu.read(0xD18E)
+    """The fighter's HP and max HP: the lead normally, the verified active mon while a Magikarp trainee
+    is out (party_view). (0, 0) for an empty party."""
+    _, _, hp, mx = fighter(emu)
     return hp, mx
+
+
+def party_needs_heal(emu, below: float) -> bool:
+    """Out-of-battle "are we hurt" for heal/restock/planning callers: the fighter's HP fraction is under
+    ``below``, or any occupied slot is fainted (a healthy second mon must not hide a dead lead)."""
+    _, _, hp, mx = fighter(emu)
+    return read_party_view(emu).any_fainted or (mx > 0 and hp / mx < below)
+
+
+def heal_gate_hp(emu) -> tuple[int, int]:
+    """(hp, max) the route/grind heal gates should see: the fighter's numbers normally; (0, fighter max)
+    while any member is fainted, so a dead lead still routes to a heal like the old slot-0 read did."""
+    _, _, hp, mx = fighter(emu)
+    return (0, mx) if read_party_view(emu).any_fainted else (hp, mx)
 
 
 def true_lead_level(emu) -> int:
     """The fighter's real level (party lead, or the strongest non-Magikarp while a trainee is out): bandit features and
     atlas priors are keyed by this, not by the trainee-band level the training gate sees."""
-    return fighter(emu)[1] if trainee_slot(emu) is not None else emu.read(0xD18C)
+    return fighter(emu)[1]
 
 
 def lead_level(emu) -> int:
@@ -41,7 +53,7 @@ def lead_level(emu) -> int:
     the gate stays open (grass-seeking continues) until the trainee is within TEAM_GAP of the level the stage
     needs. Once it has evolved the function behaves exactly as before."""
     if trainee_slot(emu) is None:
-        return emu.read(0xD18C)
+        return fighter(emu)[1]
     stats = magikarp_stats(emu)
     return min(fighter(emu)[1], stats["level"] + TEAM_GAP) if stats else fighter(emu)[1]
 
@@ -108,14 +120,15 @@ def wrap_move(move: str, width: int = 22, prefix: str = "move  ") -> list[str]:
 
 def battle_view(emu, move: str = "") -> list[str]:
     """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
-    we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
+    we watch them move: wBattleMonHP, wBattleMonMaxHP, wBattleMonLevel via read_battle_view,
     wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu.
     `move` adds the chosen move's rule string ('EMBER x2 FIRE>GRASS/POISON STAB') when supplied."""
     def u16(a): return (emu.read(a) << 8) | emu.read(a + 1)
     tm = emu.read_range(TILEMAP, TILEMAP_LEN)
     lines = frame_lines(tm)
-    rows = [f"BATTLE kind=0x{emu.read(0xD057):02X}",
-            f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
+    bm = read_battle_view(emu).battle_mon  # None while wBattleMon is stale (species 0): no leftover numbers
+    rows = [f"BATTLE kind=0x{emu.read(IS_IN_BATTLE):02X}",
+            f"you   L{bm.level:<3} HP {bm.hp:>3}/{bm.max_hp:<3}" if bm is not None else "you  (not loaded)",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
             "(hp addrs unverified)"]
     rows += wrap_move(move)

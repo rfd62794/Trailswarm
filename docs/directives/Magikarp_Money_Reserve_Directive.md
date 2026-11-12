@@ -259,14 +259,18 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-magikarp-money-reserve-directive |
 | Base branch | - |
 | Base commit | 779718d27c13bffa91fdd337ac9861b947802eb8 |
+| Head commit | 5694902977e4924f2781dab183c072db2a49f190 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 07:53 · robert-claude-laptop · none → Queued — Robert asked 2026-11-12 ("Write it up for Devin"); PR #203 merged 9846704 after 3 review rounds
 - 2026-11-12 07:54 · robert-claude-laptop · Queued → Approved — lint override: line 222 names kb/rom_tables.json only to forbid using it (gitignored, absent in the worktree); not a dependency
 - 2026-11-12 09:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-magikarp-money-reserve-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7840RDCMYNQNVMGVP0ZY29W
+- 2026-11-12 10:06 · dispatcher · launched pid=20300; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-magikarp-money-reserve-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-12 10:27 · devin · In progress → Review — [origin] spent: devin 21 min est. n/a
 <!-- queue:end -->

@@ -10,7 +10,8 @@ LEAD_LEVEL, ENEMY_LEVEL = 0xD18C, 0xCFF3
 
 
 def wild(tmp_path, hp=8, mx=23, lead=7, enemy=3, train_need=8, drill=None):
-    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: hp, 0xD18D: 0, 0xD18E: mx, LEAD_LEVEL: lead, ENEMY_LEVEL: enemy})
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,
+                                     0xD16C: 0, 0xD16D: hp, 0xD18D: 0, 0xD18E: mx, LEAD_LEVEL: lead, ENEMY_LEVEL: enemy})
     ctx.emu.set(BATTLE, 1)
     ctx.train_need = train_need
     ctx.opts.drill_grind = drill

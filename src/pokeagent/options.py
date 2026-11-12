@@ -12,6 +12,7 @@ from pathlib import Path
 from pokeagent.navigation import load_memory, shortest_path
 from pokeagent.qmodels import load_model
 from pokeagent.ram import read_state
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 
 class Option:
@@ -82,7 +83,7 @@ class ScriptedNav:
 
     def available(self, env) -> bool:
         try:
-            return env.emu.read(0xD057) == 0 and env.emu.read_range(0xC3A0, 360).find(bytes([0x79, 0x7A])) < 0
+            return env.emu.read(IS_IN_BATTLE) == 0 and env.emu.read_range(0xC3A0, 360).find(bytes([0x79, 0x7A])) < 0
         except Exception:
             return False
 

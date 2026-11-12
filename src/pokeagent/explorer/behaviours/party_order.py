@@ -16,6 +16,7 @@ from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.knowledge import team_plan, trainers
 from pokeagent.knowledge.party import our_party, trainer_mon
 from pokeagent.magikarp import party_species, trainee_slot
+from pokeagent.ram_symbols import PARTY_COUNT
 from pokeagent.ramstructs import read_party
 
 MAX_PRESSES = 40          # one reorder is about 10 presses; more means the menus are not what we think
@@ -33,7 +34,7 @@ def species_names(emu) -> list[str]:
 def trainee_home(ctx: ExplorerContext) -> int:
     """Where the trainee Magikarp belongs: first outside (sent out and swapped on turn one), LAST inside a dungeon, where
     every fight is a wild one on the way to the exit and the turn-one swap costs ~20 presses a battle (Mt Moon 2026-11-05)."""
-    return max(0, ctx.emu.read(0xD163) - 1) if ctx.view.m in DUNGEON_MAPS else 0
+    return max(0, ctx.emu.read(PARTY_COUNT) - 1) if ctx.view.m in DUNGEON_MAPS else 0
 
 
 def _opponent(ctx: ExplorerContext) -> list:

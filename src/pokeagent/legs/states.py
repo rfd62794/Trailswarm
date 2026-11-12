@@ -12,10 +12,11 @@ import os
 from pathlib import Path
 
 from pokeagent import statefp
+from pokeagent.ram_symbols import IS_IN_BATTLE, PARTY_MON1_HP, PARTY_MON1_MAX_HP
 
 STATES_DIR = Path("runs/legs/states")
 KEEP, MAX_FILES = 3, 2000
-BATTLE_FLAG, HP_FRACTION = 0xD057, 0.5
+BATTLE_FLAG, HP_FRACTION = IS_IN_BATTLE, 0.5
 
 
 def name(m: int, x: int, y: int, n: int = 0) -> str:
@@ -26,8 +27,8 @@ def calm(emu, box: bool) -> bool:
     """Not in battle, no text box, lead HP above half (and a lead exists)."""
     if box or emu.read(BATTLE_FLAG):
         return False
-    hp = (emu.read(0xD16C) << 8) | emu.read(0xD16D)
-    mx = (emu.read(0xD18D) << 8) | emu.read(0xD18E)
+    hp = (emu.read(PARTY_MON1_HP) << 8) | emu.read(PARTY_MON1_HP + 1)
+    mx = (emu.read(PARTY_MON1_MAX_HP) << 8) | emu.read(PARTY_MON1_MAX_HP + 1)
     return mx > 0 and hp > mx * HP_FRACTION
 
 
