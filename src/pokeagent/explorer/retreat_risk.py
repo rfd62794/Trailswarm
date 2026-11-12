@@ -116,6 +116,9 @@ def survives_next_wild(party: list[Combatant], wild: dict, kb=None, fighter_idx:
 def party_survives(emu, map_id: int, kb=None) -> bool:
     """Emu adapter for the grind gates. Any fainted member -> False (routes to heal exactly as before)."""
     from pokeagent.explorer.behaviours.cave_topup import fighter_slot
+    from pokeagent.party_view import read_party_view
+    if read_party_view(emu).any_fainted:
+        return False  # read straight from RAM: a member party_now skips (unknown species) still counts
     party = party_now(emu)
     if not party:  # species unreadable: the fighter's own HP fraction stands in
         from pokeagent.explorer.perceive import party_hp

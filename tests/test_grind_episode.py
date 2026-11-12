@@ -420,3 +420,15 @@ def test_a_fainted_member_is_never_a_survivor_and_still_ends_the_episode(tmp_pat
     assert rr.party_survives(ctx.emu, 35) is False
     assert grind_episode.update(ctx) is None
     assert json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])["reason"] == "hurt with no potion"
+
+
+def test_a_fainted_member_stops_the_gates_even_when_party_now_cannot_read_the_species(tmp_path, monkeypatch):
+    """Review of #221: the unreadable-party fallback used party_hp alone and kept grinding with a member down."""
+    from pokeagent.explorer import retreat_risk as rr
+    from pokeagent import party_view
+    ctx = make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20))
+    monkeypatch.setattr(rr, "party_now", lambda emu: [])
+    monkeypatch.setattr(party_view, "read_party_view", lambda emu: type("V", (), {"any_fainted": True})())
+    assert rr.party_survives(ctx.emu, 35) is False
+    monkeypatch.setattr(party_view, "read_party_view", lambda emu: type("V", (), {"any_fainted": False})())
+    assert rr.party_survives(ctx.emu, 35) is True
