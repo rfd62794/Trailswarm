@@ -107,7 +107,7 @@ The state probe agrees with both candidates: `D74E` bit 1 is clear in `bedroom` 
   "flags": {
     "got_oaks_parcel": {"addr": "0xD74E", "bit": 1, "goal": "oaks_parcel", "status": "mined",
       "evidence": "ram_findings.json flags: 34 runs, 'got OAK PARCEL!' at Viridian Mart (2,5); ROM states 2026-11-12: clear in bedroom and wild_stale_battle, set in the other four"},
-    "bought_magikarp": {"addr": "0xD7C6", "bit": 7, "goal": "buy_magikarp", "status": "mined",
+    "bought_magikarp": {"addr": "0xD7C6", "bit": 7, "goal": "buy_magikarp", "status": "mined", "needs": "magikarp_evidence",
       "evidence": "ram_findings.json flags: 3 runs at Mt Moon Pokecenter (10,5); ROM states 2026-11-12: set in six_mons_with_box and trainer_second_slot_active, clear in the other four"},
     "got_hm01": {"addr": "0xD803", "bit": 0, "goal": null, "status": "confirmed", "evidence": "campaign.json hm01_cut (mined and replay-verified 2026-11-07)"},
     "rubbed_captains_back": {"addr": "0xD803", "bit": 1, "goal": null, "status": "confirmed", "evidence": "campaign.json ss_anne_captain (mined and replay-verified 2026-11-07)"}
@@ -129,6 +129,8 @@ def flag_goals(emu) -> dict[str, bool]:
 ```
 
 `flags_readable`: `emu.read_range(0xD747, 320)` returns exactly 320 bytes without raising, and NOT (`wPartyCount` (0xD163) > 0 and all 320 bytes are zero), because a started game with a party always has the starter-flow bits set (`D74B` is `10001111` or more in every state with a party, section 3), so an all-zero block next to a party means the memory is not really there (a blank fake, a bad state). `bedroom` has no party and zero flags and IS readable. Use the constants from `ram_symbols` (`EVENT_FLAGS = 0xD747`, `EVENT_FLAGS_SIZE = 320`, plus `PARTY_COUNT`, which exists); add `EVENT_FLAGS`, `EVENT_FLAGS_SIZE`, `GRASS_RATE = 0xD887`, `GRASS_MONS = 0xD888`, `GRASS_SLOTS = 10` to `ram_symbols.py` if absent, each with its `# wName` comment (one constant per symbol; do not touch the existing duplicates in `ramworld.py`, `press_track.py`, `trainer_ledger.py`, `novelty/features.py`, `ramlab/flags.py`).
+
+**Sticky-goal guard (mined bits).** Achieved goals are sticky (`goals.py` "stays achieved" loop), so one wrong bit could never be undone. Therefore: (a) log goal provenance when a flag sets a goal, as `flag(mined)` or `flag(verified)` by the row's `status` (`confirmed` logs `flag(verified)`), through the same `st` run-state dict check_goals already receives (e.g. `st.setdefault("goal_source", {})[goal] = "flag(mined)"`; no new logging system); (b) `got_oaks_parcel` (34 runs) may set `oaks_parcel` on its own; (c) `bought_magikarp` (0xD7C6 bit 7, only 3 runs) sets `buy_magikarp` only when the bit is set AND existing evidence agrees: a Magikarp species (internal id 133, `ram_symbols.SPECIES_MAGIKARP`) in the party, or the player is on map 0x44 (Mt Moon Pokecenter). Once its row is promoted to `confirmed` the bit alone suffices. Put the corroboration in a per-row field `"needs": "magikarp_evidence"` honoured by `flag_goals(emu)`; rows without it stand alone.
 
 **The rule (stated once, tested).** A SET flag sets its goal True. A CLEAR flag never sets it False: when the bit is clear, or the block is unreadable, or the name is unknown, the goal keeps the value the old inference gave. Reason: a clear bit is exactly what a wrong bit index looks like, so a clear must never override evidence from the bag or the map; and a set bit is the game's own record that cannot be unset. (`oaks_parcel` therefore becomes True for a run started after the parcel, which is the real gap today.)
 
@@ -165,9 +167,11 @@ Use the `rom_emu` fixture and `load(emu, name)` from `tests/rom/rom_helpers.py`;
 
 ### 4.5 Other tests (no ROM; `FakeEmulator`)
 
+`FakeEmulator.press` is a no-op, so any test that needs bytes to flip on a press must subclass a scripted fake (override `press` to write the scripted bytes); do not expect the stock fake to change memory.
+
 `tests/test_event_flags.py`: the table loads and every entry validates (`addr` hex, `bit` 0-7, `status` in `mined`/`confirmed`, non-empty `evidence`, a `goal` that exists in `campaign.goal_ids()` or is null); `flag_set` on a hand-built block (set `0xD74E` to `0b10`, `PARTY_COUNT` to 1) is True, with the bit clear False, unknown name None; an unreadable emulator (a stub whose `read_range` raises) gives `flags_readable` False and `flag_set` None; the blank-block-with-party case is unreadable; `flag_goals` never contains a False value.
 
-`tests/test_goals_event_flags.py`: with the parcel bit set and an empty bag and no `had_parcel`, `check_goals(...)["oaks_parcel"]` is True (the new behaviour); with the bit clear and the parcel in the bag it is still True (inference kept); with the bit clear and nothing else it is False; with the block unreadable the result equals today's. `buy_magikarp`: bit set gives True even when `magikarp_goal_settled` says False. `deliver_parcel`, `beat_brock`, `beat_misty` are unchanged for every case above (a regression assertion). The existing tests (`tests/test_campaign.py`, `tests/test_goal_order.py`, `tests/test_false_goal_detectors.py`, `tests/test_goals_cerulean.py`, `tests/test_inferred_goals_not_recorded.py`) pass UNMODIFIED (expected: their `FakeEmulator`s set no flag bytes, so a flag is never set and the blank-block rule routes any with a party to inference; if one fails, stop and name it).
+`tests/test_goals_event_flags.py`: with the parcel bit set and an empty bag and no `had_parcel`, `check_goals(...)["oaks_parcel"]` is True (the new behaviour); with the bit clear and the parcel in the bag it is still True (inference kept); with the bit clear and nothing else it is False; with the block unreadable the result equals today's. `buy_magikarp`: bit set AND a Magikarp in the party (or map 0x44) gives True even when `magikarp_goal_settled` says False; bit set with neither stays at the inferred value; the provenance string is `flag(mined)`. `deliver_parcel`, `beat_brock`, `beat_misty` are unchanged for every case above (a regression assertion). The existing tests (`tests/test_campaign.py`, `tests/test_goal_order.py`, `tests/test_false_goal_detectors.py`, `tests/test_goals_cerulean.py`, `tests/test_inferred_goals_not_recorded.py`) pass UNMODIFIED (expected: their `FakeEmulator`s set no flag bytes, so a flag is never set and the blank-block rule routes any with a party to inference; if one fails, stop and name it).
 
 `tests/test_live_encounters.py`: rate 0 with stale slots -> None; a slot with level 0 -> None; species 0 -> None; a valid Route 1 table -> the exact slot list and rate; `mix` weights sum to 1 and a repeated (species, level) pair is summed; `compare_to_table` with a matching synthetic `wild_by_map` row is `[]`, with one level changed returns exactly one line, with `kb=None` returns `[]`. If `solo_viable.py` exists: `encounter_mix(kb, 0x0C, live=LiveGrass(...), current_map=0x0C)` uses the live slots, with `current_map=0x0D` it uses the static row, with the live read None it uses the static row.
 
@@ -199,11 +203,14 @@ uv run pytest -q -p no:cacheprovider tests/test_campaign.py tests/test_goal_orde
 122 passed, 8 skipped, 1 warning in 2.21s
 ```
 
-Re-measure it on your base commit first (the two Migration directives and Level_Banded add tests), then after the work run the same command with `tests/test_event_flags.py tests/test_goals_event_flags.py tests/test_live_encounters.py` appended (and `tests/test_solo_viable.py` if it exists). Expected: baseline plus the new tests passed, zero failed, the 8 baseline skips plus the new ROM-test skips and nothing else.
+Re-measured by the controller on the current origin/main (after more merges): `126 passed, 8 skipped`. Use that as the baseline figure; still re-measure on your own base.
 
 ```
-git grep -n -E "0xD747|0xD887|0xD888" -- src ':!src/pokeagent/data'
 ```
+
+Re-measure it on your base commit first (the two Migration directives and Level_Banded add tests), then after the work run the same command with `tests/test_event_flags.py tests/test_goals_event_flags.py tests/test_live_encounters.py` appended (and `tests/test_solo_viable.py` if it exists). Expected: baseline plus the new tests passed, zero failed, the 8 baseline skips plus the new ROM-test skips and nothing else.
+
+Use the built-in Grep tool (not a shell command) for the regex `0xD747|0xD887|0xD888` over `src/`, ignoring `src/pokeagent/data`.
 Expected: the existing hits (`ramworld.py`, `press_track.py`, `trainer_ledger.py`, `novelty/features.py`, `ramlab/flags.py`, comments) plus `ram_symbols.py` only; no new literal in `goals.py`, `event_flags.py` or `live_encounters.py` (they import the constants).
 
 ```
@@ -232,7 +239,7 @@ Expected: only the files named in section 2 (and `ram_symbols.py` if a constant 
 
 ## 8. Report
 
-Findings first: which goals now read a flag, the new tests, whether the hook was built or skipped (and why), the re-measured baseline, then the tails of the before/after pytest commands, `git status --short`, `wc -l` of `goals.py` and the new modules. State plainly that no ROM was available and which tests skipped.
+Findings first: which goals now read a flag, the new tests, whether the hook was built or skipped (and why), the re-measured baseline, then the tails of the before/after pytest commands, `git status --short`, line counts of `goals.py` and the new modules. State plainly that no ROM was available and which tests skipped.
 
 **Open questions for the controller (do not answer them by guessing; each needs a bit probe on the laptop with the ROM, using `tools/ram_discover.py` mining or a state diff, then a new row in `event_flags.json`):**
 1. `deliver_parcel`: the bit set when Oak receives the parcel (pokered `EVENT_OAK_GOT_PARCEL`). No mined bit exists; `deliver_parcel` stays inferred, and still breaks for a run started after delivery.
@@ -259,5 +266,4 @@ Nothing for the build. After merge, Claude runs `tests/rom/test_event_flags_rom.
 - Read(tests/rom/rom_helpers.py)
 - Exec(uv run python --version)
 - Exec(uv run pytest)
-- Exec(git grep)
 - Exec(git status)
