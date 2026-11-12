@@ -198,3 +198,22 @@ def test_decision_log_marks_reversals(tmp_path):
     engine.decision_log.close()
     recs = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines()]
     assert [r["reversal"] for r in recs] == [False, True, True, True]
+
+
+def test_a_wait_re_chosen_by_the_loop_veto_is_not_pressed(tmp_path, monkeypatch):
+    """loop_veto can swap a dead press for a no-press wait (post_talk_settle); the engine must not press ''."""
+    from pokeagent.explorer import engine as engine_mod
+    from pokeagent.explorer.behaviours.base import Decision as D
+    ctx = make_ctx(tmp_path, map_id=0x28, x=6, y=4)
+    wait = D("", "post_talk_settle", "letting the screen redraw", behaviour="post_talk_settle")
+    monkeypatch.setattr(engine_mod.loop_veto, "check", lambda c, s, d: wait)
+    pressed = []
+
+    class Rec:
+        def press(self, name, source, why):
+            pressed.append(name)
+
+    engine = Engine(ctx, presser=Rec(), decision_log=DecisionLog(tmp_path / "decisions.jsonl"))
+    assert engine.step() is wait
+    engine.decision_log.close()
+    assert pressed == []
