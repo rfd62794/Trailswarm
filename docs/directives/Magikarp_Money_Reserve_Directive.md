@@ -89,7 +89,7 @@ Leave alone: `tools/seg_ingest.py:67` (frame/step calibration; a skipped row's f
 ## 2. Scope (items 1-3 and 5 are one PR; item 4 may ship as a separate PR)
 
 1. `src/pokeagent/magikarp_reserve.py` <!-- new: src/pokeagent/magikarp_reserve.py -->: pure functions and constants (3.1).
-2. The floor, single source of truth (3.2): `src/pokeagent/explorer/economy/budget.py` only (a per-step module value, set by the deferral module). `check_goals` and the goals dict do NOT change. No purchase caller changes.
+2. The floor, single source of truth (3.2): `src/pokeagent/explorer/economy/budget.py` only (a per-step module value, set by the deferral module). `check_goals` output does NOT change (the only new goals-dict key is `_buy_deferred` inside the existing plan_step dict literal, 3.3). No purchase caller changes.
 3. Circle-back (3.3): new `src/pokeagent/explorer/magikarp_deferral.py` <!-- new: src/pokeagent/explorer/magikarp_deferral.py -->, `src/pokeagent/magikarp.py` (`magikarp_goal_settled`), `explorer/planner_magikarp.py`, and `explorer/behaviours/plan_goal.py` (replace two existing blocks with one-line calls, one call site each, plus one key inside an existing dict literal; it must end at or below its current 300 lines).
 4. Skipped readers (3.4), **may ship as a separate PR**: `review/load.py`, the call sites in 1.3, the flag in `press_goals.py`.
 5. Tests (3.5): `tests/test_magikarp_reserve.py` <!-- new: tests/test_magikarp_reserve.py -->, additions to `tests/test_magikarp.py` and `tests/test_hands_off.py`.
@@ -126,8 +126,8 @@ def should_circle_back(money: int, party_count: int, map_id: int, path_len: int 
 **Chosen: a per-step module value in `budget`, set by the new deferral module.** The repo already does this for the blackout tax: `plan_goal.py:64` `set_blackout_tax(extras)  # every readiness_for caller sees the learned margins this step` (`explorer/training.py:35`). Same shape here, and it reaches every caller including `catch_plan.py:88`, which only receives a plain goals dict and has no `ctx`:
 
 - `budget.py` gains `_magikarp_floor = 0`, `def set_magikarp_floor(n: int) -> None` and `def magikarp_floor() -> int`. `budget.reserve(goals, money, ref_money)` returns `max(existing, _magikarp_floor)`; `spendable` calls `reserve`, so it follows. Default 0 keeps every existing test unchanged.
-- `magikarp_deferral.tick` (3.3) calls `budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(st, seen))` once per step, so the value is current whenever a purchase decision runs in that step. `st` is the explorer context and `seen` is `st["seen_maps"]` (`goals.py:94`).
-- Tests that touch it reset it to 0 in a fixture (`budget.set_magikarp_floor(0)` in teardown) so it cannot leak between tests.
+- `magikarp_deferral.tick` (3.3) calls `budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(st, seen))` once per step, so the value is current for every purchase decision made after plan_goal in that step. Check the behaviour order (`behaviours/__init__.py`): if a purchase behaviour (restock) can run earlier in the same step, it sees the previous step's floor; one step of lag is acceptable, but say in the report which order you found. `st` is the explorer context and `seen` is `st["seen_maps"]` (`goals.py:94`).
+- Reset it in an autouse fixture in `tests/conftest.py` (`budget.set_magikarp_floor(0)` before and after every test), exactly like the existing `_clear_blackout_tax` autouse fixture at `tests/conftest.py:36`; any test that runs a plan_goal step would otherwise leak the floor into later test files.
 - This covers callers 1-4 in 1.1 (shopping_list, bundles, `_visit`, catch_plan); do not add a `floor` argument to any of them. `explorer/restock.py` (caller 5) stays as is.
 - **Required test:** `check_goals` output has no key starting with `_` and only bool values (this guards the leak above), run against the existing fake emulator in `tests/test_magikarp.py`.
 
