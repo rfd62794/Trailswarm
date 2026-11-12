@@ -7,6 +7,7 @@ space; ``screen_x``/``screen_y`` are the sprite's top-left in the live frame, or
 A record older than ``STALE_S`` counts as absent, so a stopped writer leaves no frozen mark.
 """
 from __future__ import annotations
+from pokeagent.fsutil import replace_retry, unique_tmp
 
 import json
 import os
@@ -39,11 +40,12 @@ def write_live(source: Path, record: dict) -> None:
         return
     live = Path(source) / "live"
     stem = safe_name(record["agent"])
-    path, tmp = live / f"{stem}.json", live / f"{stem}.json.tmp"
+    path = live / f"{stem}.json"
+    tmp = unique_tmp(path)
     try:
         live.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps(record), encoding="utf-8")
-        os.replace(tmp, path)
+        replace_retry(tmp, path)
     except Exception:
         tmp.unlink(missing_ok=True)
 

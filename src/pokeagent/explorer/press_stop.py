@@ -1,5 +1,6 @@
 """Segment-run endings: the end-of-segment save state and the sub-segment stop (first entry into a map id)."""
 from __future__ import annotations
+from pokeagent.fsutil import replace_retry
 
 import json
 import os
@@ -16,7 +17,7 @@ def save_end_state(ctx: ExplorerContext) -> None:
     """Write <run dir>/end.state: the curriculum copies it to <goal>.best.state when the solve is confirmed."""
     try:
         tmp = ctx.run_dir / f"end.{os.getpid()}.tmp"
-        ctx.emu.save_state(tmp); os.replace(tmp, ctx.run_dir / "end.state")
+        ctx.emu.save_state(tmp); replace_retry(tmp, ctx.run_dir / "end.state")
         write_completed(ctx.run_dir / "end.state", completed_goals(check_goals(ctx.emu, ctx), ctx.initial_goals, GOALS), ctx.emu.read(0xD719))
         stamp_fingerprint(ctx.emu, ctx.run_dir / "end.state", ctx.run_dir.name,
                           inherit=getattr(ctx.opts, "state_path", "") or None)  # a synthetic/promoted start's lineage carries into the end state

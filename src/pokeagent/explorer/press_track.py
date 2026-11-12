@@ -1,5 +1,6 @@
 """Per-press learning that is not tied to one interaction (moved from the demo's do_press)."""
 from __future__ import annotations
+from pokeagent.fsutil import replace_retry
 
 import os
 from pathlib import Path
@@ -59,7 +60,7 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
             try:
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 side.write_text(str(lvl))
-                tmp = cp / f"team_best.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / "team_best.state")
+                tmp = cp / f"team_best.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); replace_retry(tmp, cp / "team_best.state")
                 stamp_fingerprint(ctx.emu, cp / "team_best.state", ctx.run_dir.name, inherit=getattr(ctx.opts, "state_path", "") or None)  # lineage carries from the run's start
                 ctx.mem.data["team_best_level"] = lvl; ctx.log(f"*** TEAM CHECKPOINT: level {lvl} saved as team_best.state ***", "res")
             except Exception as e:

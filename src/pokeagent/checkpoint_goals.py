@@ -8,6 +8,7 @@ A checkpoint with no sidecar (written before this existed) is accepted only when
 checkpoint file: a gap in the chain proves it was reached out of order.
 """
 from __future__ import annotations
+from pokeagent.fsutil import replace_retry
 
 import json
 import logging
@@ -37,7 +38,7 @@ def write_completed(state: Path, completed: Iterable[str], respawn: int | None =
     if respawn is not None:
         rec["respawn"] = respawn
     tmp.write_text(json.dumps(rec), encoding="utf-8")
-    os.replace(tmp, sidecar(state))
+    replace_retry(tmp, sidecar(state))
 
 
 # Segments aboard / at the S.S. Anne: a blackout must land in Vermilion (5) or beyond. Pallet 0, Viridian 1, Pewter 2 and

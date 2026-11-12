@@ -6,6 +6,7 @@ is a launcher that starts the real interpreter, so every agent shows as two proc
 No third-party dependencies: Windows memory comes from ctypes, elsewhere from /proc.
 """
 from __future__ import annotations
+from pokeagent.fsutil import atomic_write_text
 
 import ctypes
 import json
@@ -108,9 +109,7 @@ def load_rss(root: Path | None) -> float:
 def save_rss(root: Path, mb: float, samples: int = 0) -> None:
     _runs(root).mkdir(parents=True, exist_ok=True)
     data = {"per_agent_rss_mb": round(float(mb), 1), "samples": samples, "measured": time.time()}
-    tmp = _runs(root) / "resources.tmp"
-    tmp.write_text(json.dumps(data), encoding="utf-8")
-    os.replace(tmp, _runs(root) / "resources.json")
+    atomic_write_text(_runs(root) / "resources.json", json.dumps(data))
 
 
 def measure_agent_rss(root: Path, reader: Callable[[int], float | None] = process_rss_mb) -> float | None:

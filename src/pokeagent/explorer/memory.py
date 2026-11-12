@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 
+from pokeagent.fsutil import atomic_write_text
 from pokeagent.explorer import edits, items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
 from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
@@ -294,6 +295,4 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         self.apply_edits()  # the journal is re-applied on top of whatever this process learned
         self.data["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")  # atomic replace: a kill mid-write cannot corrupt the memory
-        tmp.write_text(json.dumps(self.data, indent=1))
-        os.replace(tmp, self.path)
+        atomic_write_text(self.path, json.dumps(self.data, indent=1))  # atomic, per-process tmp, retried: a kill mid-write cannot corrupt the memory
