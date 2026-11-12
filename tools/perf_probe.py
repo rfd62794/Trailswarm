@@ -67,11 +67,13 @@ def bucket_of(filename: str, func: str) -> str:
 
 # --- named per-step call counts (the directive's bottom line) -------------------------------------
 # (label, filename_needle, func_name): counts total calls and calls/step of the functions that
-# matter for the perf items (party memo, route cache, jsonl buffer).
+# matter for the perf items. "(wrapper)" rows count the public memoized entry points; "(real)" rows
+# count the work the memo actually saves - a healthy memo shows wrapper calls high and real work ~1.
 
 COUNTS: list[tuple[str, str, str]] = [
-    ("read_party", "ramstructs", "read_party"),
-    ("read_party_count", "ramstructs", "read_party_count"),
+    ("read_party (wrapper)", "ramstructs", "read_party"),
+    ("read_party_count (wrapper)", "ramstructs", "read_party_count"),
+    ("_read_party (real)", "ramstructs", "_read_party"),
     ("read_snapshot", "features", "read_snapshot"),
     ("world.path", "world", "path"),
     ("world._bfs_node", "world", "_bfs_node"),
@@ -124,6 +126,14 @@ def bucket_report_from_prof(prof_path: str | Path, *, steps: int, secs: float, p
     return report(pstats.Stats(str(prof_path)), steps=steps, secs=secs, presses=presses)
 
 
+def _work_maps(a, work: Path) -> Path:
+    """The maps.json the probe run uses: a byte copy of ``--maps`` (the source file is only read,
+    never mutated - the run writes its learned memory into the work dir's copy) or empty memory."""
+    maps = work / "maps.json"
+    maps.write_text(Path(a.maps).read_text(encoding="utf-8") if a.maps else '{"maps": {}}')
+    return maps
+
+
 def run_probe(a) -> dict:
     """Profile ``explore_demo.main`` headless in-process; returns the pieces the report needs."""
     import explore_demo
@@ -131,11 +141,7 @@ def run_probe(a) -> dict:
     work = Path(a.work_dir)
     work.mkdir(parents=True, exist_ok=True)
     run_root = work / "runs"
-    maps = work / "maps.json"
-    if a.maps:
-        maps.write_text(Path(a.maps).read_text(encoding="utf-8"))
-    else:
-        maps.write_text('{"maps": {}}')
+    maps = _work_maps(a, work)
     argv = ["--headless", "--steps", str(a.steps), "--rom", a.rom, "--state", a.state,
             "--maps", str(maps), "--control-port", "0", "--runs-dir", str(run_root)]
     if a.seed is not None:

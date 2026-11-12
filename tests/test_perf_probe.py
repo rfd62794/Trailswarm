@@ -35,6 +35,8 @@ def _fixture() -> pstats.Stats:
         ("C:/repo/src/pokeagent/explorer/world.py", "neighbours", 1936764, 15.0),
         ("C:/repo/src/pokeagent/explorer/world.py", "_bfs_node", 5480, 1.4),
         ("C:/repo/src/pokeagent/ramstructs.py", "read_party", 11320, 1.0),
+        ("C:/repo/src/pokeagent/ramstructs.py", "read_party_count", 4000, 0.2),
+        ("C:/repo/src/pokeagent/ramstructs.py", "_read_party", 5880, 0.9),
         ("C:/python312/lib/json/__init__.py", "dumps", 5730, 0.8),
         ("C:/python312/lib/selectors.py", "select", 4000, 9.0),
         ("C:/repo/src/pokeagent/explorer/press.py", "log_press", 2000, 0.3),
@@ -51,16 +53,47 @@ def test_buckets_match_the_baseline_shape():
     assert "16.7 s" in rows["decision logic"]
     assert "9.0 s" in rows["socket/select wait"]
     assert "0.8 s" in rows["file I/O / json"]
-    assert "1.0 s" in rows["RAM/screen reads"]
+    assert "2.1 s" in rows["RAM/screen reads"]  # read_party + count + the real _read_party decode
     assert "steps/s=17.92" in out
 
 
 def test_per_step_named_counts():
     out = perf_probe.report(_fixture(), steps=2000, secs=111.6)
-    assert "read_party 5.66/step" in out
+    assert "read_party (wrapper) 5.66/step" in out
+    assert "read_party_count (wrapper) 2.00/step" in out
+    assert "_read_party (real) 2.94/step" in out
     assert "world._bfs_node 2.74/step" in out
     assert "world.neighbours 968.38/step" in out
     assert "json.dumps 2.87/step" in out
+
+
+def test_real_work_rows_are_distinct_from_wrapper_rows():
+    """The report must show wrapper call volume AND the real decode count side by side: the memo's
+    effect is only visible when ``_read_party`` is counted separately from ``read_party``."""
+    labels = [label for label, _needle, _func in perf_probe.COUNTS]
+    assert "read_party (wrapper)" in labels and "_read_party (real)" in labels
+    out = perf_probe.report(_fixture(), steps=2000, secs=111.6)
+    assert "read_party (wrapper) 5.66/step" in out and "_read_party (real) 2.94/step" in out
+    assert "world._bfs_node" in out and "world.neighbours" in out
+
+
+def test_maps_option_copies_the_file_and_never_mutates_the_source(tmp_path):
+    """``--maps`` seeds the run from a COPY inside the work dir: the learned memory the probe
+    writes must land on the copy, leaving the seeded source byte-identical."""
+    src = tmp_path / "seeded" / "maps.json"
+    src.parent.mkdir()
+    payload = '{"maps": {"1": {"visited": {"0,0": 1}}}}'
+    src.write_text(payload, encoding="utf-8")
+    work = tmp_path / "work"
+    work.mkdir()
+    a = type("A", (), {"maps": str(src)})()
+    dst = perf_probe._work_maps(a, work)
+    assert dst == work / "maps.json" and dst != src
+    assert dst.read_text(encoding="utf-8") == payload
+    assert src.read_text(encoding="utf-8") == payload  # the source was only read
+    # and with no --maps the work dir still gets a fresh empty memory
+    empty = perf_probe._work_maps(type("A", (), {"maps": None})(), work)
+    assert empty.read_text(encoding="utf-8") == '{"maps": {}}'
 
 
 def test_report_only_reads_a_prof_file(tmp_path):
