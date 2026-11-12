@@ -20,6 +20,11 @@ def add_pages(entry: dict, dialog: list) -> None:
             pages.append(p)
 
 
+def run_id(ctx) -> str:
+    """Identity of this run (its run dir name); "" when the context has none."""
+    return getattr(getattr(ctx, "run_dir", None), "name", "") or ""
+
+
 def stats(ctx) -> dict:
     return ctx.mem.data.setdefault("interaction_stats", {"by_type": {}, "retalks": 0, "heal_visits": 0})
 
@@ -38,6 +43,7 @@ def close_interaction(ctx, inter: dict, pos_after: tuple) -> str:
     kind = record_type(entry, fx)
     if kind == GIVER:
         entry["done"] = True
+        entry["done_run"] = run_id(ctx)  # maps.json outlives the run: "given" is only true for the run that saw the reward
     entry["goal"] = goal_stage(ctx.goals())  # which goal was active when it was last read (retalk_veto compares)
     best = entry.get("best_presses")
     entry["best_presses"] = inter["presses"] if best is None else min(best, inter["presses"])

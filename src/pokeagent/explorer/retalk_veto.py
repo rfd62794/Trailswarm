@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.interaction_policy import Need, decide, needs_heal
-from pokeagent.explorer.interaction_record import stats
+from pokeagent.explorer.interaction_record import run_id, stats
 from pokeagent.explorer.interaction_types import GIVER, HEALER, INFO, SIGN
 from pokeagent.explorer.perceive import DIRS, EFFECT_WINDOW
 from pokeagent.explorer.world import POKECENTER_MAPS
@@ -51,9 +51,11 @@ def veto(ctx, decision) -> str | None:
     if needs_heal(party):
         return None
     stage = goal_stage(ctx.goals())
+    if stage == "first_pokemon" and not party:
+        return None  # no starter yet: whatever the spot's memorised type says, the ball in front may be the one still to be taken
     changed = entry.get("goal") not in (None, stage)  # the goal moved on since this spot was last read
     target = ctx.goto and tuple(ctx.goto[:3]) == (ctx.view.m, ctx.view.x, ctx.view.y)
-    need = Need(party=party, bag_ids=frozenset(_bag(win)), wants_item=bool(ctx.center_intent), goal_changed=changed,
+    need = Need(party=party, bag_ids=frozenset(_bag(win)), wants_item=bool(ctx.center_intent), goal_changed=changed, run_id=run_id(ctx),
                 reread=bool(target))
     talk, rule = decide(entry, need)
     if talk:

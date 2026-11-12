@@ -1,4 +1,5 @@
 """retalk_veto and box_settle: no A at a memorised worthless spot, no A at an empty box."""
+from pathlib import Path
 from types import SimpleNamespace as NS
 
 from pokeagent.emulator import FakeEmulator
@@ -81,7 +82,31 @@ def test_a_pokecenter_nurse_is_never_vetoed():
     nurse = {"type": "giver", "done": True, "count": 9, "type_votes": {"giver": 10, "healer": 1}}
     c = ctx_for(nurse)
     assert veto(c, Decision("A", "x")) is None  # ever voted healer
-    c2 = ctx_for({"type": "giver", "done": True, "count": 9})
+    c2 = ctx_for({"type": "giver", "done": True, "done_run": "r1", "count": 9})
+    c2.run_dir = Path("runs/r1")
     assert veto(c2, Decision("A", "x")) is not None
     c2.view.m = 0x29  # Viridian Pokecenter: the planner is here to heal on purpose
     assert veto(c2, Decision("A", "x")) is None
+
+
+def test_a_giver_flagged_done_by_an_earlier_run_is_not_vetoed():
+    """maps.json outlives runs: a starter ball marked done in a previous game must still be talked to in a fresh one."""
+    stale = {"type": "giver", "done": True, "done_run": "explore-old", "count": 20}
+    c = ctx_for(stale)
+    c.run_dir = Path("runs/explore-new")
+    assert veto(c, Decision("A", "x")) is None
+    c.mem.entry["done_run"] = "explore-new"
+    assert veto(c, Decision("A", "x")) is not None  # given in this run: once only
+
+
+def test_an_empty_party_at_the_starter_stage_is_never_vetoed_even_on_an_info_typed_ball():
+    ball = {"type": "info", "pages": ["So! You want the fire POKEMON"], "count": 20, "done": True}
+    c = ctx_for(ball)
+    c.emu = FakeEmulator({it.A_PARTY_N: 0})
+    c.goals = lambda: {}
+    assert veto(c, Decision("A", "x")) is not None  # not the starter stage: memorised info stays vetoed
+    from pokeagent.goals import GOALS
+    c.goals = lambda: {g: True for g in GOALS[:GOALS.index("first_pokemon")]}
+    assert veto(c, Decision("A", "x")) is None
+    c.emu = FakeEmulator({it.A_PARTY_N: 1, it.A_HP + 1: 20, it.A_MAXHP + 1: 20})  # starter taken: once only again
+    assert veto(c, Decision("A", "x")) is not None
