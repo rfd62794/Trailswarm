@@ -1,0 +1,4 @@
+{"cases": [
+  {"name": "red_bedroom_potion_cold", "game": "red", "state": "bedroom", "memory": "none",
+   "goal": "potion", "budget": 105, "seed": 42}
+]}
