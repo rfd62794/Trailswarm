@@ -43,7 +43,8 @@ def world() -> dict:
 
 
 def make_ctx(tmp_path, balls: int, money: int, m: int = 3, x: int = 23, y: int = 19, party_hp=(30, 30), potions: int = 0) -> ExplorerContext:
-    mem = {MAP: m, PX: x, PY: y, **bcd(money), 0xD16C: 0, 0xD16D: party_hp[0], 0xD18D: 0, 0xD18E: party_hp[1]}
+    mem = {MAP: m, PX: x, PY: y, **bcd(money), 0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,
+           0xD16C: 0, 0xD16D: party_hp[0], 0xD18D: 0, 0xD18E: party_hp[1]}
     bag = [(0x04, balls)] * bool(balls) + [(0x14, potions)] * bool(potions)
     mem[BAG_N] = len(bag)
     for i, (item, qty) in enumerate(bag):

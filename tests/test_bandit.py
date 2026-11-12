@@ -242,7 +242,8 @@ def test_wild_battle_override_reaches_the_battle_behaviour(tmp_path, monkeypatch
 
 
 def test_wild_fight_arm_overrides_a_weak_flee(tmp_path, monkeypatch):
-    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: 9, 0xD18D: 0, 0xD18E: 30})  # 9/30 HP (above the 25% shield): the Explorer flees
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,
+                                     0xD16C: 0, 0xD16D: 9, 0xD18D: 0, 0xD18E: 30})  # 9/30 HP (above the 25% shield): the Explorer flees
     ctx.emu.set(BATTLE, 1)
     put_box(ctx, menu=True, text_rows=(" RUN",))
     ctx.refresh()
@@ -289,7 +290,7 @@ def test_plan_goal_passes_the_flag_to_the_planner(tmp_path, monkeypatch):
 
 
 def test_train_skip_lifts_the_gate_in_plan_goal(tmp_path, monkeypatch):
-    mem = {0xD18C: 5}  # lead level 5
+    mem = {0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99, 0xD18C: 5}  # lead level 5
     grind = make_ctx(sub(tmp_path, "g"), memory=mem)
     grind.refresh()
     PlanGoal().step(grind)
@@ -331,7 +332,8 @@ def test_fight_floor_shield_below_25_percent(tmp_path, monkeypatch):
     from pokeagent.bandit import hook as hk
     monkeypatch.setattr(hk, "catch_target", lambda *a: False)
     monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "fight")
-    ctx = make_ctx(tmp_path, memory={0xD16C: 0, 0xD16D: 7, 0xD18D: 0, 0xD18E: 30})  # 7/30 = 23%
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,
+                                     0xD16C: 0, 0xD16D: 7, 0xD18D: 0, 0xD18E: 30})  # 7/30 = 23%
     attach(ctx, tmp_path / "none.json", seed=0)
     ctx.refresh()
     assert hk.wild_flee(ctx, False) is True and ctx.bandit.open == []

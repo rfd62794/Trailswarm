@@ -32,6 +32,7 @@ from pokeagent.grind import atlas, measure, stage_maps
 from pokeagent.grind import points as gp
 from pokeagent.grind.drill import log_episode
 from pokeagent.magikarp import trainee_slot_for
+from pokeagent.party_view import read_party_view
 from pokeagent.ramstructs import read_party
 
 log = logging.getLogger(__name__)
@@ -228,7 +229,8 @@ def _end_reason(ctx, ep: dict) -> str | None:
     if ctx.step - ep["start_step"] >= GRIND_STEPS:
         return f"{GRIND_STEPS} steps"
     hp, mx = party_hp(ctx.emu)
-    if mx and hp / mx < train_route.MIN_HP_FRACTION and not heal_items.heal_count(bag_contents(ctx.emu)):
+    if (mx and hp / mx < train_route.MIN_HP_FRACTION or read_party_view(ctx.emu).any_fainted) \
+            and not heal_items.heal_count(bag_contents(ctx.emu)):
         return "hurt with no potion"
     pt = ep.get("point")
     if pt is not None and ctx.view.m != pt.map_id:  # a story blocker met on the way cuts the point off: the story goal goes first

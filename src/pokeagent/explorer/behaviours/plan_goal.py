@@ -8,7 +8,7 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.status_care import of as care_state
 from pokeagent.explorer.trainee_gate import trainee_ok
-from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
+from pokeagent.explorer.perceive import heal_gate_hp, lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
@@ -32,7 +32,7 @@ class PlanGoal(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
-        hp_now, mx_now = party_hp(ctx.emu)
+        hp_now, _ = party_hp(ctx.emu)
         if ctx.center_intent and m not in POKECENTER_MAPS:
             ctx.center_intent = None  # left the center: the intent is spent
         goals_now_all = ctx.goals()
@@ -129,14 +129,14 @@ class PlanGoal(BehaviourBase):
             self._team_ready_idle(ctx, training_live, lead_level(ctx.emu))
         else:
             ctx.team_ready_idle = 0  # left the stage: "consecutive" restarts on re-entry
-        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_talk_vetoed": retalk_memory.active(ctx), "_declined": set(ctx.declined_balls), "_hp": (hp_now, mx_now), "_push_on": heal_push_on(ctx, goals_now_all, hp_now, mx_now), "_parcel_spot": parcel,
+        planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_talk_vetoed": retalk_memory.active(ctx), "_declined": set(ctx.declined_balls), "_hp": heal_gate_hp(ctx.emu), "_push_on": heal_push_on(ctx, goals_now_all, *heal_gate_hp(ctx.emu)), "_parcel_spot": parcel,
                              "_level": lead_level(ctx.emu), "_train_level": need, "_heal_trips": ctx.heal_trips,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
                              "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {})},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         ctx.train_route_live = bool(team_ready_stage and training_live)
         if planned is None and team_ready_stage and training_live:
-            planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp_now, mx_now)  # no planner target: go to the grass
+            planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu))  # no planner target: go to the grass
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not nv.ready and gym is not None
@@ -158,11 +158,11 @@ class PlanGoal(BehaviourBase):
         if hold:
             self._leader_avoid(ctx, m, x, y, gym)
             if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
-                planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, hp_now, mx_now)
+                planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))
             elif self._enters(ctx, m, x, y, planned, gym) or self._gym_road(planned):
-                planned = self._grind_step(ctx, m, x, y, hp_now, mx_now)  # the hold owns the step: no road to the gym
+                planned = self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))  # the hold owns the step: no road to the gym
         elif st.get("grinding") and need > 0:
-            grind = self._grind_step(ctx, m, x, y, hp_now, mx_now)
+            grind = self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))
             errands = ("checkpoint", "heal", "pokecenter", "parcel", "potion", "magikarp", "mom")
             if grind is not None and (planned is None or planned[1].startswith("goal ")
                     and not any(k in planned[1].lower() for k in errands)):

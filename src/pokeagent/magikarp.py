@@ -6,10 +6,12 @@ that leads and is swapped out at once still earns a share. It evolves at level 2
 """
 from __future__ import annotations
 
-from pokeagent.ramstructs import PARTY_COUNT, read_battle_mon, read_party
+from pokeagent.party_view import read_battle_view, read_party_view
+from pokeagent.ramstructs import PARTY_COUNT, read_party
+from pokeagent.ram_symbols import IS_IN_BATTLE, PARTY_SPECIES, SPECIES_MAGIKARP
 from pokeagent.ramworld import read_money
 
-MAGIKARP, GYARADOS = 133, 22
+MAGIKARP, GYARADOS = SPECIES_MAGIKARP, 22
 MAGIKARP_PRICE = 500                 # the salesman's price in the Mt Moon Pokemon Center (map 0x44)
 MT_MOON_CENTER = 0x44
 SWITCH_MIN_HP = 0.25                 # never send in a member below this HP fraction (directive section 2.3)
@@ -18,12 +20,12 @@ BUY_STEP_CAP = 600                   # steps in/around the center without buying
 GYARADOS_IDLE_CAP = 300                  # consecutive plan steps at the gyarados stage with the training gate closed/lifted before the goal is settled
 GYARADOS_STEP_CAP = 6000             # steps on the stage without evolving before the goal is settled for this run (named; tune from runs)
 MAX_RUNS = 5                         # RUN attempts per battle when nobody healthy can replace the trainee
-IN_BATTLE = 0xD057
+IN_BATTLE = IS_IN_BATTLE
 
 
 def party_species(emu) -> list[int]:
     n = min(emu.read(PARTY_COUNT), 6)
-    return list(emu.read_range(0xD164, n)) if n else []
+    return list(emu.read_range(PARTY_SPECIES, n)) if n else []
 
 
 def trainee_slot(emu) -> int | None:
@@ -103,19 +105,15 @@ def switch_candidate(emu, trainee: int | None = None) -> int | None:
 def fighter(emu) -> tuple[int, int, int, int]:
     """(species, level, hp, max_hp) of whoever is doing the fighting: the party lead normally; while a Magikarp is
     in the party, the battle's active mon in a fight, or else the strongest non-Magikarp member."""
-    party = read_party(emu)
-    if not party:
+    view = read_party_view(emu)
+    if not view.slots:
         return 0, 0, 0, 0
-    if not any(p.species == MAGIKARP for p in party):
-        p = party[0]
-        return p.species, p.level, p.hp, p.max_hp
-    if emu.read(IN_BATTLE):
-        b = read_battle_mon(emu)
-        if b.species:
-            return b.species, b.level, b.hp, b.max_hp
-    others = [p for p in party if p.species != MAGIKARP] or party
-    p = max(others, key=lambda q: (q.hp > 0, q.level, q.hp))
-    return p.species, p.level, p.hp, p.max_hp
+    if view.in_battle:
+        b = read_battle_view(emu).battle_mon
+        if b is not None:
+            return b.species, b.level, b.hp, b.max_hp   # the live battle struct, for any team now
+    p = view.fighter()
+    return (p.species, p.level, p.hp, p.max_hp) if p is not None else (0, 0, 0, 0)
 
 
 def magikarp_stats(emu) -> dict | None:

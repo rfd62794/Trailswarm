@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import grind_episode, story_blockers, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
-from pokeagent.explorer.perceive import lead_level, party_hp
+from pokeagent.explorer.perceive import heal_gate_hp, lead_level
 from pokeagent.explorer.trainee_gate import trainee_check
 from pokeagent.legs.grass import pace_button, to_grass
 
@@ -65,7 +65,7 @@ class GrindDrill(BehaviourBase):
         """Route to the episode's point, then pace its grass. The boundary guard (train_route.stay_on_route
         on the episode's map set) keeps every other behaviour inside it meanwhile."""
         pt, pos = ep["point"], (ctx.view.m, ctx.view.x, ctx.view.y)
-        hp, mx = party_hp(ctx.emu)
+        hp, mx = heal_gate_hp(ctx.emu)
         if pos[0] != pt.map_id:
             r = train_route.step(ctx.mem.data["maps"], pos, frozenset(ctx.mem.temp_blocked) | story_blockers.blocked_tiles(ctx), hp, mx, target=pt.map_id, patch=pt.patch)
             return Decision(r[0], "grind_drill", f"grind episode: {r[1]}") if r else None
