@@ -94,7 +94,7 @@ def test_no_opponent_and_no_breakers_leaves_the_order(monkeypatch):
 
 # run explore-20261112-072650: Charmander<->Pidgey flipped 12-34 steps apart (matchup lead vs exp rotation).
 def _raw(level, species=1, hp=10):
-    return SimpleNamespace(species=species, level=level, hp=hp)
+    return SimpleNamespace(species=species, level=level, hp=hp, max_hp=20)
 
 
 def _rotation_ctx(monkeypatch, raws):
@@ -111,7 +111,7 @@ def _rotation_ctx(monkeypatch, raws):
 def test_recent_reorder_holds_the_rotation_flip(monkeypatch):
     raws = [_raw(20, 1), _raw(8, 2)]
     ctx = _rotation_ctx(monkeypatch, raws)
-    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx))   # a reorder 12 steps ago
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx), ())   # a reorder 12 steps ago
     assert po_mod.want_home(ctx) is None
     ctx.step += po_mod.HOLD_STEPS                                              # the hold has expired
     assert po_mod.want_home(ctx) is not None
@@ -120,7 +120,7 @@ def test_recent_reorder_holds_the_rotation_flip(monkeypatch):
 def test_level_or_faint_change_releases_the_hold(monkeypatch):
     raws = [_raw(20, 1), _raw(8, 2)]
     ctx = _rotation_ctx(monkeypatch, raws)
-    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx))
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx), ())
     raws[1] = _raw(9, 2)                                                       # the trainee levelled up
     assert po_mod.want_home(ctx) is not None
     raws[1] = _raw(8, 2, hp=0)                                                 # or fainted
@@ -133,5 +133,24 @@ def test_recent_reorder_holds_the_matchup_flip(monkeypatch):
     monkeypatch.setattr(po_mod, "read_party", lambda emu: [_raw(20, 1), _raw(20, 2)])
     ctx = _ctx()
     ctx.step = 100
-    team_plan.of(ctx)["order_hold"] = (90, po_mod.team_sig(ctx))
+    team_plan.of(ctx)["order_hold"] = (90, po_mod.team_sig(ctx), po_mod._opp_key(ctx))
     assert po_mod.want_home(ctx) is None
+
+
+def test_a_different_trainer_releases_the_hold(monkeypatch):
+    team = [_mon("CHARMELEON", 20), _mon("ODDISH", 20)]
+    _patch(monkeypatch, team)
+    monkeypatch.setattr(po_mod, "read_party", lambda emu: [_raw(20, 1), _raw(20, 2)])
+    ctx = _ctx()
+    ctx.step = 100
+    team_plan.of(ctx)["order_hold"] = (90, po_mod.team_sig(ctx), ((10, "RATTATA"),))   # held for trainer A
+    assert po_mod.want_home(ctx) is not None                                           # boss/trainer B engaged now
+
+
+def test_a_weak_lead_releases_the_hold(monkeypatch):
+    raws = [_raw(20, 1), _raw(8, 2)]
+    ctx = _rotation_ctx(monkeypatch, raws)
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx), ())
+    assert po_mod.want_home(ctx) is None
+    raws[0] = _raw(20, 1, hp=4)                       # 4/20 < SWITCH_MIN_HP, alive: sig unchanged
+    assert po_mod.want_home(ctx) is not None

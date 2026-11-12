@@ -154,7 +154,8 @@ def trainee_slot(party, named: int | None = None, breakers=(), wild=None, kb=Non
     lowest breaker leads anyway). MAGIKARP never answers here: its own slot wins upstream."""
     if not party:
         return None
-    if named is not None and 0 < named < len(party) and party[named].level <= party[0].level - TEAM_GAP:
+    # order-independent: compared against the strongest member (the opener), and slot 0 may be the trainee
+    if named is not None and 0 <= named < len(party) and party[named].level <= max(c.level for c in party) - TEAM_GAP:
         return named
     foes = []
     for w in wild or ():

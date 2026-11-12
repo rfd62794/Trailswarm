@@ -60,12 +60,31 @@ def team_sig(ctx: ExplorerContext) -> tuple:
                         for m in read_party(ctx.emu)))
 
 
-def _held(ctx: ExplorerContext) -> bool:
+def _opp_key(ctx: ExplorerContext, opp: list | None = None) -> tuple:
+    """The opponent a matchup lead was chosen for (empty when none): trainer_target and its party."""
+    opp = _opponent(ctx) if opp is None else opp
+    return (tuple(ctx.trainer_target) if getattr(ctx, "trainer_target", None) else None, tuple(opp)) if opp else ()
+
+
+def _lead_weak(ctx: ExplorerContext) -> bool:
+    """The lead is alive but under SWITCH_MIN_HP of its max: a fresh lead choice is warranted, not held."""
+    party = read_party(ctx.emu)
+    lead = party[0] if party else None
+    mx = getattr(lead, "max_hp", 0)
+    return bool(mx) and 0 < getattr(lead, "hp", 0) / mx < team_plan.SWITCH_MIN_HP
+
+
+def _held(ctx: ExplorerContext, opp: list | None = None) -> bool:
     """True while the last reorder is younger than HOLD_STEPS and no level / faint / party change happened since.
     Run explore-20261112-072650 flipped Charmander<->Pidgey 12-34 steps apart (steps 1320/1332/1366, 2764/2788/2805):
     the trainer-matchup lead and the grind's exp-rotation lead alternate with trainer_target, each flip ~10 presses."""
     last = team_plan.of(ctx).get("order_hold")
-    return bool(last) and ctx.step - last[0] < HOLD_STEPS and last[1] == team_sig(ctx)
+    if not last or ctx.step - last[0] >= HOLD_STEPS or last[1] != team_sig(ctx):
+        return False
+    now = _opp_key(ctx, opp)
+    if now and now != last[2]:   # a different trainer / boss is engaged: its matchup lead is not churn
+        return False
+    return not _lead_weak(ctx)
 
 
 def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
@@ -79,7 +98,7 @@ def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
         theirs = [m for lv, n in opp if (m := trainer_mon(n, lv))]
         if party and theirs:
             src = team_plan.choose_lead(party, theirs, None)
-            if src != 0 and not _held(ctx):
+            if src != 0 and not _held(ctx, opp):
                 names = species_names(ctx.emu)
                 who = names[src] if src < len(names) else f"slot {src + 1}"
                 return (src, 0, f"matchup lead {who} for {theirs[0].name}")
@@ -128,7 +147,7 @@ class PartyOrder(BehaviourBase):
             if menu_open(text) or (framed and ctx.view.box):
                 return self._press(po, "B", f"reorder_party: {species_names(ctx.emu)}", "closing the party menus")
             ctx.log(f"[reorder_party: {species_names(ctx.emu)}]", "res")
-            team_plan.of(ctx)["order_hold"] = (ctx.step, team_sig(ctx))
+            team_plan.of(ctx)["order_hold"] = (ctx.step, team_sig(ctx), _opp_key(ctx))
             ctx.party_order = None
             return no_press("party_order_done")
         if po["presses"] >= MAX_PRESSES:

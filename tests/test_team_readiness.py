@@ -240,3 +240,11 @@ def test_verdict_does_not_depend_on_party_order():
     assert fwd.ready == rev.ready and fwd.lead.required == rev.lead.required
     assert fwd.lead.lead == rev.lead.lead == "AQUA"
     assert {(r.name, r.level, r.target) for r in fwd.members} == {(r.name, r.level, r.target) for r in rev.members}
+
+
+def test_trainee_can_be_slot_zero_and_is_compared_to_the_strongest():
+    from pokeagent.knowledge import team_plan
+    weak, strong = _mon("BLAZE", 8), _mon("AQUA", 20)
+    assert team_plan.trainee_slot([weak, strong], named=0) == 0     # slot 0 is the weakest: it is the trainee
+    assert team_plan.trainee_slot([strong, weak], named=1) == 1     # same answer in either order
+    assert team_plan.trainee_slot([_mon("BLAZE", 19), strong], named=0) is None   # within TEAM_GAP of the opener
