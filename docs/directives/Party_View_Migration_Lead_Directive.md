@@ -104,9 +104,7 @@ uv run pytest -q -p no:cacheprovider tests/test_ramstructs.py tests/test_magikar
 ```
 Baseline on `origin/main` for the ten files that existed on 2026-11-12 (without `tests/test_item_use.py` and `tests/test_retreat_heal.py`): `280 passed, 1 warning in 5.78s`. Expected: all pass, none skipped.
 
-```
-git grep -n -E "emu\.read\(PLAYER_MON\)|read\(PLAYER_MON_NUMBER\)" -- src
-```
+Search with your built-in file search tool (Grep), NOT a shell `git grep` (not on the Devin allow list), for the regex `emu\.read\(PLAYER_MON\)|read\(PLAYER_MON_NUMBER\)` over `src/`.
 Expected: the only match is the empty-party fallback in `behaviours/item_use.py`.
 
 ```

@@ -12,19 +12,15 @@ The migration was one directive and was too big for a run: about 30 files of con
 
 Audit 2026-11-12, re-verified on `origin/main` (3f73696; #206 has merged since).
 
-**Duplicate address constants.** 0xD163 (`PARTY_COUNT`), 0xCC26 (`MENU_ITEM`), 0xD057 (`wIsInBattle`, named `IN_BATTLE` / `BATTLE_FLAG` / `A_BATTLE`) and 0xCC2F (`PLAYER_MON`) are defined or written as literals across about 30 files in `src/` (`adapters/event_feed.py`, `campaign.py`, `explorer/anomalies.py`, `behaviours/battle.py`, `box_settle.py`, `bring_out.py`, `guards.py`, `item_use.py`, `party_order.py`, `procedures.py`, `switch_out.py`, `interaction_gate.py`, `interaction_types.py`, `party_menu.py`, `perceive.py`, `press.py`, `press_track.py`, `ram_event_kinds.py`, `text_press.py`, `goals.py`, `intervene/extra.py`, `intervene/rig.py`, `legs/states.py`, `magikarp.py`, `observations.py`, `options.py`, `ram.py`, `ramstructs.py`, `ramworld.py`, `statemeta.py`). The count on your base commit is deliberately NOT pasted, because the first directive changes it. Re-measure it after the first directive has landed, with this exact command, and put the number in your PR description:
+**Duplicate address constants.** 0xD163 (`PARTY_COUNT`), 0xCC26 (`MENU_ITEM`), 0xD057 (`wIsInBattle`, named `IN_BATTLE` / `BATTLE_FLAG` / `A_BATTLE`) and 0xCC2F (`PLAYER_MON`) are defined or written as literals across about 30 files in `src/` (`adapters/event_feed.py`, `campaign.py`, `explorer/anomalies.py`, `behaviours/battle.py`, `box_settle.py`, `bring_out.py`, `guards.py`, `item_use.py`, `party_order.py`, `procedures.py`, `switch_out.py`, `interaction_gate.py`, `interaction_types.py`, `party_menu.py`, `perceive.py`, `press.py`, `press_track.py`, `ram_event_kinds.py`, `text_press.py`, `goals.py`, `intervene/extra.py`, `intervene/rig.py`, `legs/states.py`, `magikarp.py`, `observations.py`, `options.py`, `ram.py`, `ramstructs.py`, `ramworld.py`, `statemeta.py`). The count on your base commit is deliberately NOT pasted, because the first directive changes it. Re-measure it after the first directive has landed, with this exact search, and put the number in your PR description:
 
-```
-git grep -n -i -E "0xD163|0xCC26|0xD057|0xCC2F" -- src ':!src/pokeagent/data' ':!src/pokeagent/ram_symbols.py'
-```
+Search with your built-in file search tool (Grep), NOT a shell `git grep` (not on the Devin allow list), for the regex `0xD163|0xCC26|0xD057|0xCC2F` (case-insensitive) over `src/`, excluding `src/pokeagent/data`, `src/pokeagent/ram_symbols.py`.
 
 (Before the first directive it printed 52 lines in 30 files; treat that as history, not the baseline.) `tools/*.py` carry the same literals and are out of scope (a later follow-up, once they have tests).
 
 **Ungated battle-mon reads.** wBattleMon is half-filled at battle start (measured: `wBattleMonSpecies` 0 with HP 15, level 6, max 21 left over). These read its HP, level, species, moves or PP with no species check: `behaviours/bring_out.py:24` (`BATTLER_HP = 0xD015`, used by `forced_faint_prompt`), `behaviours/already_out.py:41` (0xD015/0xD016), `explorer/perceive.py:118` (`battle_view`: 0xD022, 0xD015, 0xD023), `explorer/press.py:58,65` (0xD014, 0xD022, 0xD015), `adapters/event_feed.py:72-76` (0xD015, 0xD023, 0xD014, 0xD022), `observations.py:60-64` (0xD023, 0xD022, 0xD015, 0xD01C, 0xD02D), `behaviours/battle_moves.py:85` (0xD02D PP), `explorer/battle.py:144` (0xD01C moves, 0xD02D PP) and `intervene/screen.py:13` (`BATTLE_MOVES = 0xD01C`, a duplicate of the symbol). Measured with (it covers 0xD016, 0xD01C and 0xD024 as well as the main fields):
 
-```
-git grep -n -E "0xD014|0xD015|0xD016|0xD01C|0xD022|0xD023|0xD024|0xD02D|emu\.read\((0x)?[Dd]01[45]\)" -- src ':!src/pokeagent/data' ':!src/pokeagent/ram_symbols.py' ':!src/pokeagent/ramstructs.py' ':!src/pokeagent/party_view.py'
-```
+Search with your built-in file search tool (Grep), NOT a shell `git grep` (not on the Devin allow list), for the regex `0xD014|0xD015|0xD016|0xD01C|0xD022|0xD023|0xD024|0xD02D|emu\.read\((0x)?[Dd]01[45]\)` over `src/`, excluding `src/pokeagent/data`, `src/pokeagent/ram_symbols.py`, `src/pokeagent/ramstructs.py`, `src/pokeagent/party_view.py`.
 
 ### The contract you are migrating onto (written by `Party_View_Directive.md`; read `src/pokeagent/party_view.py` and `ram_symbols.py` in your worktree to confirm names before editing)
 
@@ -100,14 +96,10 @@ uv run python --version
 ```
 Expected: `Python 3.12.x`.
 
-```
-git grep -n -i -E "0xD163|0xCC26|0xD057|0xCC2F" -- src ':!src/pokeagent/data' ':!src/pokeagent/ram_symbols.py'
-```
+Search with your built-in file search tool (Grep), NOT a shell `git grep` (not on the Devin allow list), for the regex `0xD163|0xCC26|0xD057|0xCC2F` (case-insensitive) over `src/`, excluding `src/pokeagent/data`, `src/pokeagent/ram_symbols.py`.
 Expected: no output.
 
-```
-git grep -n -E "0xD014|0xD015|0xD016|0xD01C|0xD022|0xD023|0xD024|0xD02D|emu\.read\((0x)?[Dd]01[45]\)" -- src ':!src/pokeagent/data' ':!src/pokeagent/ram_symbols.py' ':!src/pokeagent/ramstructs.py' ':!src/pokeagent/party_view.py'
-```
+Search with your built-in file search tool (Grep), NOT a shell `git grep` (not on the Devin allow list), for the regex `0xD014|0xD015|0xD016|0xD01C|0xD022|0xD023|0xD024|0xD02D|emu\.read\((0x)?[Dd]01[45]\)` over `src/`, excluding `src/pokeagent/data`, `src/pokeagent/ram_symbols.py`, `src/pokeagent/ramstructs.py`, `src/pokeagent/party_view.py`.
 Expected: no output.
 
 ```
