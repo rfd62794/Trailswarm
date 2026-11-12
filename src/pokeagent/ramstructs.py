@@ -171,3 +171,20 @@ def read_bag(emu: Emulator) -> list[tuple[int, int]]:
 
 def read_pc_items(emu: Emulator) -> list[tuple[int, int]]:
     return decode_item_list(emu.read_range(BOX_COUNT, 1 + 2 * BOX_CAPACITY + 1), BOX_CAPACITY)
+
+
+PLAYER_MON = 0xCC2F    # wPlayerMonNumber: the party slot in the fight
+
+
+def active_slot(emu: Emulator) -> int | None:
+    """0-based party slot of the Pokemon in the fight, VERIFIED: wPlayerMonNumber (0xCC2F) must agree with wBattleMon's species,
+    or that species must sit in exactly one party slot. None when the battle data is not loaded or cannot be matched."""
+    species = read_battle_mon(emu).species
+    party = read_party(emu)
+    if not species:
+        return None
+    slot = emu.read(PLAYER_MON)
+    if slot < len(party) and party[slot].species == species:
+        return slot
+    hits = [i for i, m in enumerate(party) if m.species == species]
+    return hits[0] if len(hits) == 1 else None

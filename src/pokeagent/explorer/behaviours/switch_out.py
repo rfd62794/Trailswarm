@@ -18,7 +18,7 @@ from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
 from pokeagent.explorer.kb import ROM_KB
-from pokeagent.intervene.screen import active_slot
+from pokeagent.ramstructs import active_slot
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import our_party, trainer_mon
 from pokeagent.knowledge.readiness import best_move

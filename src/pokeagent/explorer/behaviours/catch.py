@@ -26,7 +26,7 @@ from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import our_party, species_row, trainer_mon
 from pokeagent.knowledge import team_plan
 from pokeagent.magikarp import trainee_slot_for
-from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
+from pokeagent.ramstructs import active_slot, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
 CATCH_BAG_PRESSES = 60   # bag presses without a throw landing before the catch sequence is abandoned (a throw is about 4 presses plus the scroll depth)
@@ -57,8 +57,8 @@ def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_ma
     wild = trainer_mon(sp_name, e_lvl)
     if not party or wild is None:
         return None
-    pos = read_battle_mon(ctx.emu).party_pos
-    lead = pos if 0 <= pos < len(party) else 0
+    pos = active_slot(ctx.emu)  # wBattleMon.party_pos goes stale after a forced post-faint switch
+    lead = pos if pos is not None and 0 <= pos < len(party) else 0
     active = party[lead]
     raw = read_party(ctx.emu)   # current HP per slot (Combatant.hp is the max); only trusted when the slots line up
     party_hp = [(m.hp, m.max_hp) for m in raw] if len(raw) == len(party) else None
