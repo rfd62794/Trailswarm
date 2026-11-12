@@ -204,6 +204,6 @@ def test_step_primes_the_field_potion_cache(tmp_path, monkeypatch):
 
 def test_a_weak_lowest_first_lead_does_not_block_the_push():
     """Review of #222: the party stands lowest-first, so slot 0 is the weakest; the fighter's HP decides, not slot 0's."""
-    party = [_mon("AQUAMON", 5, 0.4), STRONG[0]]
+    party = [_mon("AQUAMON", 5, 0.2), STRONG[0]]  # weak lead at 20% (< PUSH_MIN_LEAD_HP), healthy fighter behind
     d = av.decide(party, BOSS, {0x14: 2}, (100, 0, 58), SYN)
     assert d.action == "push" and d.lead_hp_frac >= av.PUSH_MIN_LEAD_HP
