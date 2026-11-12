@@ -191,4 +191,5 @@ md5 identical to 574fa3e0... for the empty-maps run (compare the seeded run base
 - 2026-11-11 08:15 · robert-claude-laptop · Draft → Queued — merged via #189 (review MERGE_WITH_NITS, nits fixed; verify 0 failed / 41 ROM skips); Robert 2026-11-11 07:15 PokeAgent focus + permanent full approval
 - 2026-11-11 08:15 · robert-claude-laptop · Queued → Approved
 - 2026-11-11 19:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-counter-targets-directive; lane=explicit; model=swe-2-flash-max; perm=accept-edits; persona=steady-builder; agent_id=01M76J83FRJMBVJR8R6BDNEVHP
+- 2026-11-11 19:33 · dispatcher · launched pid=2780; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-perf-counter-targets-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 <!-- queue:end -->
