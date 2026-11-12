@@ -28,7 +28,9 @@ def forced_faint_prompt(ctx: ExplorerContext, lines: list[str]) -> bool:
     """The party list asked because our active battler FAINTED. The same 'Bring out which POKeMON?' text also heads the
     voluntary PKMN list (and its STATS/SWITCH/CANCEL submenu), which the switch-training swap drives: leave those alone."""
     text = " ".join(lines)
-    if "bring out" not in text.lower() or "SWITCH" in text or "STATS" in text:
+    low = text.lower()
+    # "Bring out which POKeMON?" after a faint AND the plain "Choose a POKeMON." list the forced screen can show: B cannot leave either
+    if ("bring out" not in low and "choose a pok" not in low) or "SWITCH" in text or "STATS" in text:
         return False
     if ctx.switch_train is not None:
         return False

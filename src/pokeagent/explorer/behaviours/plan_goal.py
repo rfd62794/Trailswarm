@@ -86,7 +86,7 @@ class PlanGoal(BehaviourBase):
         ctx.train_member = team.weakest.slot if team and team.weakest else None
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
-                return None  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
+                ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
         if team_ready_stage:
             if team is None:
                 ctx.team_ready_nodata = True  # no ROM/boss data: never block the route
@@ -152,6 +152,7 @@ class PlanGoal(BehaviourBase):
                 st["gate_skip_logged"] = ctx.stage_goal
                 why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
                 ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
+        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: Brock is only walked to when no hold is active
         if hold and st.get("gate_lifted") is not None:
             ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:

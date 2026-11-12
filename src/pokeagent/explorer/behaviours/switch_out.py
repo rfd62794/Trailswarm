@@ -18,6 +18,7 @@ from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
 from pokeagent.explorer.kb import ROM_KB
+from pokeagent.ramstructs import active_slot
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import our_party, trainer_mon
 from pokeagent.knowledge.readiness import best_move
@@ -36,7 +37,15 @@ def trainee_out(ctx: ExplorerContext) -> int | None:
     if t is None:
         return None
     b, sp = read_battle_mon(ctx.emu), party_species(ctx.emu)
-    return t if b.party_pos == t and t < len(sp) and b.species == sp[t] else None
+    return t if active_pos(ctx) == t and t < len(sp) and b.species == sp[t] else None
+
+
+def active_pos(ctx: ExplorerContext) -> int | None:
+    """Party slot of the mon actually fighting, or None when it cannot be verified. wBattleMon's own party_pos byte goes
+    stale after a forced post-faint switch (Pewter Gym 2026-11-12: Charmander fighting, byte still 0 = the fainted Rattata,
+    so the matchup 'switched' into the mon already out for ~3,000 steps); active_slot() checks wPlayerMonNumber against
+    the battler's species instead."""
+    return active_slot(ctx.emu)
 
 
 def _foe(ctx: ExplorerContext):
@@ -68,18 +77,20 @@ def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
     bl = ctx.battle_log or {}
     n_sw = bl.get("matchup_switches", 0)
     party, foe = our_party(ctx.emu), _foe(ctx)
-    b = read_battle_mon(ctx.emu)
-    if not party or foe is None or not (0 <= b.party_pos < len(party)):
+    pos = active_pos(ctx)
+    if not party or foe is None or pos is None or not (0 <= pos < len(party)):
         return None
     hp_now = [m.hp for m in read_party(ctx.emu)]
-    pick = team_plan.switch_choice(party, b.party_pos, foe, None, hp_now=hp_now, switches=n_sw,
+    if pos < len(hp_now) and hp_now[pos] <= 0:  # the fighter fainted: the forced list is bring_out's, not a matchup choice
+        return None
+    pick = team_plan.switch_choice(party, pos, foe, None, hp_now=hp_now, switches=n_sw,
                                    trainee=trainee_slot_for(ctx.emu, ctx.train_member))
     if pick is None:
         return None
     from pokeagent.knowledge.kb import table
     chart = {(a, d): e for a, d, e in table(None, "type_chart")}
-    moves, active = table(None, "moves"), party[b.party_pos]
-    cur = hp_now[b.party_pos] if b.party_pos < len(hp_now) else active.hp
+    moves, active = table(None, "moves"), party[pos]
+    cur = hp_now[pos] if pos < len(hp_now) else active.hp
     inc = best_move(foe, active, chart, moves)[0]
     why = (f"thin: foe hits {inc:.0f}x{team_plan.SWITCH_HP_TURNS} vs {cur} HP" if inc * team_plan.SWITCH_HP_TURNS >= cur
            else f"weak: best hit <= {team_plan.WEAK_RATIO:.0%} of foe")
@@ -177,11 +188,11 @@ class SwitchOut(BehaviourBase):
         """The matchup switch in a trainer battle: PKMN -> the better member -> SWITCH, once per
         decision, the per-battle count kept on the battle record (team_plan.MAX_SWITCHES_PER_BATTLE)."""
         st = team_plan.of(ctx)
-        b = read_battle_mon(ctx.emu)
+        pos = active_pos(ctx)
         mu = st.get("matchup")
         if mu and mu.get("battle") != ctx.battles:
             mu = None; st.pop("matchup", None)
-        if mu and b.party_pos == mu["target"]:  # the swap landed
+        if mu and pos == mu["target"]:  # the swap landed
             if ctx.battle_log is not None:
                 ctx.battle_log["matchup_switches"] = ctx.battle_log.get("matchup_switches", 0) + 1
             ctx.log(f"[{mu['rule']}: done after {mu['presses']} presses]", "res")
@@ -196,7 +207,7 @@ class SwitchOut(BehaviourBase):
             return None  # text scrolling / animation: the usual dialog handling runs
         if mu is None:
             names = species_names(ctx.emu)
-            who = names[b.party_pos] if 0 <= b.party_pos < len(names) else "?"
+            who = names[pos] if pos is not None and 0 <= pos < len(names) else "?"
             mu = st["matchup"] = {"battle": ctx.battles, "target": pick[0], "presses": 0, "why": pick[1],
                                   "rule": f"switch_matchup: {who} -> {names[pick[0]]} ({pick[1]})"}
         mu["presses"] += 1
