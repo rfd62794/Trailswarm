@@ -241,4 +241,5 @@ Findings first: the verdict and rule table for the committed fixtures, any propo
 - 2026-11-08 17:54 · robert-claude-laptop · none → Queued — Approved by Robert 2026-11-08: repeatable compatibility check, the gate for Yellow; plan phase 4a, after phase 4
 - 2026-11-11 20:44 · robert-claude-laptop · Queued → Approved
 - 2026-11-11 21:07 · devin-laptop-overseer (delegated) · Approved → Blocked — devin-laptop-overseer: running as a manual devin --cloud session (run laptop-overseer-gamecompat-20261111-01) to bypass the RAM gate; Blocked so the local dispatcher cannot double-claim; moves to Review if the branch lands, back to Approved if it dies; under delegate.envelope
+- 2026-11-11 21:15 · devin-laptop-overseer · devin-laptop-overseer cloud run laptop-overseer-gamecompat-20261111-01: session finished clean, verdict blocked - missing dependency Brain_Compare_And_Run_Reports_Directive.md (Draft, no branch): src/pokeagent/brain/{ledges,compare}.py absent on main 8181b66 and all remote branches. Row stays Blocked; requeue only after that directive merges.
 <!-- queue:end -->
