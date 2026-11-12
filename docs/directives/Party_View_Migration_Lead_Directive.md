@@ -160,3 +160,17 @@ Nothing for the build. After merge, Claude runs the ROM state tests and a hands-
 - Exec(uv run pytest)
 - Exec(git grep)
 - Exec(git status)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 11:38 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: fully specified migration; dispatch only after Party_View and Party_View_Migration_Constants both merge
+<!-- queue:end -->
