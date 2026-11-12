@@ -57,8 +57,9 @@ def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE2
     shuffle at the south end (steps 300-1800 of the 2026-11-07 repro)."""
     if not mx or hp / mx < MIN_HP_FRACTION:
         return None
-    grass = set(patch) if patch is not None else set((maps.get(str(target)) or {}).get("encounters", {}))
-    grass = {f"{t[0]},{t[1]}" if not isinstance(t, str) else t for t in grass}
+    # GrindPoint.patch arrives from JSON as [[x, y]] lists (unhashable), so key each tile as text first
+    src = patch if patch is not None else (maps.get(str(target)) or {}).get("encounters", {})
+    grass = {t if isinstance(t, str) else f"{t[0]},{t[1]}" for t in src}
     what = "Route 24" if target == ROUTE24 else f"map 0x{target:02X}"
     if pos[0] == target:
         if not grass or f"{pos[1]},{pos[2]}" in grass:

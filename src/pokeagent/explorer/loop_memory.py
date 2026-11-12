@@ -122,7 +122,7 @@ class LoopLedger:
 
     def top(self, n: int = 5) -> list[dict]:
         """The n most-vetoed entries (for the shutdown 'ledger' row in loops.jsonl)."""
-        rows = sorted((e, sit, action) for (sit, action), e in self.e.items() if e.vetoes > 0)
+        rows = [(e, sit, action) for (sit, action), e in self.e.items() if e.vetoes > 0]  # _Entry has no order
         rows.sort(key=lambda t: (-t[0].vetoes, -t[0].last))
         return [{"map": sit.map, "x": sit.x, "y": sit.y, "facing": sit.facing, "text": sit.text, "battle": sit.battle,
                  "button": action, "vetoes": e.vetoes, "no_progress": e.count, "veto_until": e.veto_until}
