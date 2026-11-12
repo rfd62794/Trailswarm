@@ -248,3 +248,11 @@ def test_trainee_can_be_slot_zero_and_is_compared_to_the_strongest():
     assert team_plan.trainee_slot([weak, strong], named=0) == 0     # slot 0 is the weakest: it is the trainee
     assert team_plan.trainee_slot([strong, weak], named=1) == 1     # same answer in either order
     assert team_plan.trainee_slot([_mon("BLAZE", 19), strong], named=0) is None   # within TEAM_GAP of the opener
+
+
+def test_single_member_party_has_no_grind_pressure_from_breakers():
+    from pokeagent.knowledge import team_plan
+    solo = [_mon("AQUA", 15)]
+    assert team_plan.grind_pressure(solo, 8, 0, 0, breakers=(0,), lead_level=15) == 0.0   # need met, only a catch helps
+    duo = [_mon("AQUA", 15), _mon("BLAZE", 5)]
+    assert team_plan.grind_pressure(duo, 8, 0, 0, breakers=(1,), lead_level=15) > 0.0     # a real second member still counts
