@@ -139,3 +139,18 @@ def test_a_ledger_row_sums_up_the_run_at_finish(tmp_path):
     rows_ = rows(tmp_path)
     assert rows_[-1]["kind"] == "ledger" and rows_[-1]["top"][0]["button"] == "A"
     assert ctx.mem.data["loops"]["40,5,6,A"]["runs"] == [tmp_path.name]  # folded into shared memory (0x28 = 40)
+
+
+def test_a_in_a_pokecenter_is_never_vetoed_even_with_a_dead_shared_entry(tmp_path):
+    """Robert 2026-11-12: heals failed at the nurse - shared memory had '41,3,3,A' (Viridian counter) active."""
+    import time
+    center = 41  # Viridian Pokecenter
+    emu_mem = {MAP: center, PX: 3, PY: 3}
+    ctx = make_ctx(tmp_path, memory=emu_mem)
+    ctx.mem.m(center)["visited"]["3,3"] = 3
+    now = time.time()
+    ctx.mem.data["loops"] = {f"{center},3,3,A": {"runs": ["r1", "r2", "r3"], "last": now, "clear": 0}}
+    engine = Engine(ctx, selector=Selector([Stub("heal_walk", "A"), Stub("mover", "DOWN")]))
+    for _ in range(LOOP_NO_PROGRESS_N + 3):
+        assert engine.step().button == "A"
+    assert [r for r in rows(tmp_path) if r.get("kind") in ("veto", "veto_exhausted")] == []
