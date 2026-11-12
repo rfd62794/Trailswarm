@@ -88,7 +88,7 @@ def _chain_ctx(tmp_path, monkeypatch, hp, mx=40, frames=16 * 20):
     _road_to_center(ctx)
     monkeypatch.setattr(outside_use, "walk_to_center", lambda c, get=None: (frames, 0, 0x40))
     monkeypatch.setattr(rh, "party_now", lambda emu: [_mon("AQUAMON", 12, hp / mx)])
-    monkeypatch.setattr(rh, "assess", lambda party, wild, walk, kb=None: rr.assess(party, WILD, walk, SYN))
+    monkeypatch.setattr(rh, "assess", lambda party, wild, walk, kb=None, fighter_idx=0: rr.assess(party, WILD, walk, SYN, fighter_idx))
     return ctx
 
 
@@ -161,3 +161,19 @@ def test_route_distance_is_cached_between_evaluations(tmp_path, monkeypatch):
         rh.RetreatHeal._walk_frames(ctx)
         ctx.step += 1
     assert len(calls) == 1
+
+
+def test_trainee_mode_fighter_at_40_percent_retreats_though_the_magikarp_lead_is_full(tmp_path, monkeypatch):
+    mem = {}
+    put_mon(mem, 0, 133, 5, 20, 20)     # slot 0: the Magikarp in training (internal id 133), full HP
+    put_mon(mem, 1, 153, 14, 16, 40)    # the fighter at 40%
+    put_mon(mem, 2, 153, 10, 40, 40)    # healthy lower-level bench: the party total stays above 70%
+    ctx = make_ctx(tmp_path, mem)
+    _road_to_center(ctx)
+    monkeypatch.setattr(outside_use, "walk_to_center", lambda c, get=None: (16 * 20, 0, 0x40))
+    monkeypatch.setattr(rh, "party_now", lambda emu: [_mon("AQUAMON", 5, 1.0), _mon("AQUAMON", 12, 0.4), _mon("AQUAMON", 12, 1.0)])
+    monkeypatch.setattr(rh, "assess", lambda party, wild, walk, kb=None, fighter_idx=0: rr.assess(party, WILD, walk, SYN, fighter_idx))
+    ctx.step = 0
+    for _ in range(5):
+        _beat(ctx)
+    assert of(ctx).get("walk") is not None

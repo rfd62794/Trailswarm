@@ -60,16 +60,17 @@ def _worst_wild(wild: dict, kb) -> list[Combatant]:
     return [f for n, (_, hi, ch) in wild.items() if ch >= MIN_CHANCE and (f := trainer_mon(n, hi, kb))]
 
 
-def assess(party: list[Combatant], wild: dict, walk_frames: float | None, kb=None) -> Verdict:
+def assess(party: list[Combatant], wild: dict, walk_frames: float | None, kb=None, fighter_idx: int = 0) -> Verdict:
     """Retreat verdict. ``party``: current-hp Combatants in party order; ``wild``: encounters.species_on(map);
-    ``walk_frames``: frames to the nearest known Pokecenter (None = unknown: never retreat)."""
+    ``walk_frames``: frames to the nearest known Pokecenter (None = unknown: never retreat);
+    ``fighter_idx``: the party slot that does the fighting (cave_topup.fighter_slot: not the Magikarp in training)."""
     if not party or walk_frames is None or walk_frames > MAX_WALK_FRAMES:
         return Verdict(False, "no party or no reachable Pokecenter")
     total_hp = sum(c.hp for c in party)
     total_max = sum(_max_hp(c, kb) for c in party) or 1
     if total_hp / total_max < PARTY_FLOOR:
         return Verdict(True, f"party at {total_hp / total_max:.0%}, nurse {walk_frames:.0f} frames away")
-    fighter = next((c for c in party if c.hp > 0), None)
+    fighter = party[fighter_idx] if fighter_idx < len(party) and party[fighter_idx].hp > 0 else next((c for c in party if c.hp > 0), None)
     if fighter is None:
         return Verdict(True, "everyone has fainted")
     floor = floor_for(walk_frames)

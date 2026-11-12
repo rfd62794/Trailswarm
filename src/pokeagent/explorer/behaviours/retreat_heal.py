@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import heal_walk
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.behaviours.cave_topup import fighter_slot
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.economy import outside_use
 from pokeagent.explorer.retreat_risk import assess, party_now
@@ -19,7 +20,8 @@ from pokeagent.ramstructs import read_party
 EVERY = 4              # steps between evaluations (HP moves slowly out of battle) (untuned)
 LEAD_GATE = 0.80       # the duel rule runs only with the lead below this HP fraction ...
 PARTY_GATE = 0.70      # ... or the whole party below this: a trainee at 99% never retreats after a grind fight (untuned)
-AFTER_HEAL = 150       # steps after a finished heal with no new precautionary retreat, unless a member has fainted (untuned)
+AFTER_HEAL = 150       # steps after ANY non-abandoned heal_walk end (status_care walks too, intended: they end at a nurse) with no
+                       # new precautionary retreat, unless a member has fainted (untuned)
 ROUTE_EVERY = 12       # steps a cached walk-to-nurse distance stays good on one map (the BFS is the cost) (untuned)
 
 
@@ -40,7 +42,8 @@ class RetreatHeal(BehaviourBase):
         if not party:
             return False
         mx = sum(p.max_hp for p in party) or 1
-        lead = party[0].hp / (party[0].max_hp or 1)
+        lead_mon = party[min(fighter_slot(ctx.emu), len(party) - 1)]   # the fighter, not a Magikarp in training
+        lead = lead_mon.hp / (lead_mon.max_hp or 1)
         if lead >= LEAD_GATE and sum(p.hp for p in party) / mx >= PARTY_GATE:
             return False
         recent = ctx.step - of(ctx).get("healed_at", -10 ** 9) < AFTER_HEAL
@@ -65,7 +68,7 @@ class RetreatHeal(BehaviourBase):
         party = party_now(ctx.emu)
         if not party:
             return None
-        verdict = assess(party, encounters.species_on(ctx.view.m), self._walk_frames(ctx))
+        verdict = assess(party, encounters.species_on(ctx.view.m), self._walk_frames(ctx), None, fighter_slot(ctx.emu))
         if verdict.retreat:
             ctx.log(f"[retreat_heal: {verdict.why}]", "res")
             heal_walk.start(ctx, f"retreat_heal: {verdict.why}", heal_walk.RETREAT_DONE)
