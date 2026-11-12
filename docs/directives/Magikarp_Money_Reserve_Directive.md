@@ -259,7 +259,7 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-magikarp-money-reserve-directive |
 | Base branch | - |
@@ -273,4 +273,5 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 - 2026-11-12 09:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-magikarp-money-reserve-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7840RDCMYNQNVMGVP0ZY29W
 - 2026-11-12 10:06 · dispatcher · launched pid=20300; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-magikarp-money-reserve-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-12 10:27 · devin · In progress → Review — [origin] spent: devin 21 min est. n/a
+- 2026-11-12 16:25 · robert-claude-laptop · Review → Done — note: Merged PR #211 (7a939ac) at f01aca7: verify 2584/0; ROM to_pewter->to_mt_moon PASS (Magikarp bought at 0x44 step 3118, Mt Moon 3138); bedroom->beat_brock PASS at 8943/9000 (2 Brock losses, gym hold lifted after 2500-step L9 stall - watch whether the 600-yen floor starves pre-Brock potions); controller fixes 5694902 (ping-pong), f01aca7 (main merge)
 <!-- queue:end -->
