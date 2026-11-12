@@ -148,3 +148,30 @@ def test_stall_lift_keeps_the_gym_hold_but_ceiling_and_blackouts_release_it():
     assert not stall_keeps_hold("lead L20 is 6+ levels above the route's wild ceiling L5: no XP left to grind")
     assert not stall_keeps_hold("2 blackouts in a row while training")
     assert not stall_keeps_hold("")
+
+
+def test_stall_hold_releases_after_the_cap_or_on_a_blackout():
+    from pokeagent.explorer.grind import STALL_HOLD_CAP, stall_hold_holds
+    why = "2500 steps without a level gain (stuck at L12)"
+    st = {}
+    assert stall_hold_holds(st, why, 1000, 0)
+    assert stall_hold_holds(st, why, 1000 + STALL_HOLD_CAP - 1, 0)
+    assert not stall_hold_holds(st, why, 1000 + STALL_HOLD_CAP, 0)            # the held stall eventually releases
+    st = {}
+    assert stall_hold_holds(st, why, 50, 0)
+    assert not stall_hold_holds(st, why, 60, 1)                               # a blackout while held releases it
+    assert not stall_hold_holds({}, "2 blackouts in a row while training", 0, 0)
+
+
+def test_magikarp_trainee_keeps_the_gated_lead_measure(monkeypatch):
+    """Fighter L30 + Magikarp L5: lead_level = min(30, 5+gap), not the max slot; trainee gains must reset the budget."""
+    from pokeagent.explorer.behaviours import plan_goal as pg
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    monkeypatch.setattr(pg, "trainee_slot", lambda emu: 1)
+    monkeypatch.setattr(pg, "lead_level", lambda emu: 8)
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    ctx = SimpleNamespace(emu=None, step=0, battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: None)
+    party = [SimpleNamespace(level=30)]
+    pg.PlanGoal._budgeted(ctx, goals, 12, None, party)
+    assert ctx.grind._s["beat_brock"]["level"] == 8                           # not best_level == 30
