@@ -263,11 +263,12 @@ The real observation run needs a game copy and an emulator, which a dispatch doe
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 17:18 · robert-claude-laptop · none → Queued — Drafted by Claude at Robert's request 2026-11-08: tool and schema for a measured Red/Blue address table; the real ROM run is Claude's after merge
+- 2026-11-12 16:37 · devin-laptop-overseer (delegated) · Queued → Approved — devin-laptop-overseer: Robert permanent PokeAgent approval + 2026-11-12 all-personal-repos approval; cloud drain; under delegate.band-normal, delegate.rate-limit
 <!-- queue:end -->
