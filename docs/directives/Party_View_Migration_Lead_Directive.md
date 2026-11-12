@@ -164,11 +164,12 @@ Nothing for the build. After merge, Claude runs the ROM state tests and a hands-
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-12 11:38 · agentflow-tick · none → Queued — suggested by heartbeat: Devin: fully specified migration; dispatch only after Party_View and Party_View_Migration_Constants both merge
+- 2026-11-12 16:04 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
