@@ -56,6 +56,16 @@ KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", 
         "Return": "START", "Shift_L": "SELECT", "Shift_R": "SELECT"}
 
 
+def _run_exit_cleanups(steps) -> None:
+    """Headless-exit cleanup: every step runs even when an earlier one raises - a failed
+    ``shutdown(ctx)`` must not skip the console.log drain or the emulator close."""
+    for step in steps:
+        try:
+            step()
+        except Exception:
+            pass
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--rom", default="roms/Pokemon Red.gb")
@@ -313,14 +323,7 @@ def main(argv=None) -> int:
 
     if a.headless:
         def _exit_headless() -> None:
-            try:
-                close_frame_shm(); shutdown(ctx); close_logs(); emu.close()
-            except Exception:
-                pass
-            try:
-                ctl.stop()
-            except Exception:
-                pass
+            _run_exit_cleanups((close_frame_shm, lambda: shutdown(ctx), close_logs, emu.close, ctl.stop))
         run_headless(ctx, engine, jobs=jobs, on_exit=_exit_headless, agent_view=agent_view,
                      frame_pub=frame_pub, frame_every=a.frame_every)
         return 0
