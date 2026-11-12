@@ -75,7 +75,7 @@ def catcher_slot(party: list[Combatant], wild: list[Combatant], chart: dict, mov
 
 def level_band_ok(party: list[Combatant], wild: list[Combatant], chart: dict, moves: dict,
                   band: int = CATCHER_BAND) -> bool:
-    """True when a qualifying member within ``band`` levels BELOW the lead exists (party[0] is the lead)."""
+    """True when a qualifying member within ``band`` levels BELOW the strongest member (the lead) exists."""
     if not party:
         return False
-    return any(m.level <= party[0].level - band and qualifies(m, wild, chart, moves) for m in party)
+    return any(m.level <= max(c.level for c in party) - band and qualifies(m, wild, chart, moves) for m in party)

@@ -45,11 +45,11 @@ def test_use_toss_box_over_the_item_list_is_answered_not_scrolled(tmp_path):
     assert rope_press(ctx, ["POTION", "x 3", "USE", ">TOSS"], 0x14, "POTION").button == "UP"
 
 
-def test_fighter_slot_is_the_lead_without_a_magikarp(tmp_path):
-    """No Magikarp: party_hp reads the LEAD, so that is who gets the potion (a stronger slot 1 would answer 'won't have any effect')."""
+def test_fighter_slot_is_the_strongest_healthy_member_not_slot_0(tmp_path):
+    """The party stands lowest-first: the potion goes to the strongest member (party_hp's fighter), never the weak lead."""
     party = {**PARTY, 0xD164: 7, 0xD165: 4, 0xD16B: 7, 0xD16B + 0x2C: 4}   # a Squirtle line and a Charmander line: no Magikarp
     ctx = make_ctx(tmp_path, memory={0xD35E: 0x3C, **BAG, **party})
-    assert fighter_slot(ctx.emu) == 0                             # slot 1 is level 21, slot 0 level 9: still the lead
+    assert fighter_slot(ctx.emu) == 1                             # slot 1 is level 21, slot 0 level 9
     ctx2 = make_ctx(tmp_path, memory={0xD35E: 0x3C, **BAG, **PARTY})
     assert fighter_slot(ctx2.emu) == 1                            # with a Magikarp in the party: the strongest other member
 

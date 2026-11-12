@@ -40,7 +40,7 @@ class GrindDrill(BehaviourBase):
         # (grind_episode.update), never in applies() - here we only look: an episode is live, or the
         # cheap under-level flag says one could start this step.
         return (grind_episode.active(ctx) is not None
-                or 0 < lead_level(ctx.emu) < getattr(ctx, "train_need", 0))
+                or 0 < (getattr(ctx, "gate_lvl", None) or lead_level(ctx.emu)) < getattr(ctx, "train_need", 0))
 
     def step(self, ctx) -> Decision | None:
         ep = grind_episode.active(ctx)
