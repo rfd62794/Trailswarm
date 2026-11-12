@@ -44,3 +44,28 @@ def test_oak_is_talked_to_only_once_the_parcel_is_in_the_bag():
     assert not GoalTalk().applies(ctx({"oaks_parcel": True, "deliver_parcel": True}, **lab))
     c = ctx({"oaks_parcel": True, "deliver_parcel": False}, **lab)
     assert GoalTalk().applies(c) and GoalTalk().step(c).button == "A"
+
+
+def _gym(visited, blocked=(), **kw):
+    c = ctx({"beat_brock": False}, m=0x36, **kw)
+    c.mem = SimpleNamespace(data={"maps": {"54": {"visited": {k: 1 for k in visited}, "blocked": list(blocked)}}}, temp_blocked=set())
+    return c
+
+
+def test_brock_is_talked_to_from_below_and_never_vetoed():
+    from pokeagent.explorer.retalk_veto import veto
+    assert GOAL_TALKS["beat_brock"][:4] == (0x36, 4, 2, "UP")
+    c = _gym(["4,2"], x=4, y=2)
+    d = GoalTalk().step(c)
+    assert d.button == "A" and d.rule == "goal_talk"
+    d.behaviour = "goal_talk"  # the Selector fills this in
+    assert veto(c, d) is None
+
+
+def test_brock_stand_tile_unmapped_walks_up_the_column_instead_of_idling():
+    c = _gym(["4,4", "4,5", "3,5"], x=4, y=4)
+    d = GoalTalk().step(c)
+    assert d is not None and d.button == "UP"
+    c = _gym(["4,4", "4,5", "3,5"], x=3, y=5)
+    d = GoalTalk().step(c)
+    assert d is not None and d.button in ("RIGHT", "UP")
