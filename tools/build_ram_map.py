@@ -114,6 +114,8 @@ def carry(entries: list[dict], prior: list[dict], curated: bool = False) -> list
                 e[k] = p[k]
         if p.get("verified"):
             e["verified"] = True
+        if p.get("trust"):
+            e["trust"] = p["trust"]
         if p.get("encoding") and p["encoding"] != "bytes":
             e["encoding"] = p["encoding"]
         if p["name"] != e["name"]:
@@ -135,12 +137,72 @@ def write_map(path: Path, entries: list[dict]) -> None:
     path.write_text("[\n" + body + "\n]\n", encoding="utf-8")
 
 
+# The four seed caveat rows: verified entries that are stale in some states. Each clause is
+# appended to the row's existing note as `; valid when ...` and the patch keeps the row's
+# verified/evidence; a rebuild re-applies these from ram_overrides.json.
+CAVEATS = {
+    "wBattleMon": "valid when wIsInBattle != 0 and wBattleMon species byte != 0 (stale at battle start: species 0, HP/level/PP leftovers)",
+    "wPlayerMonNumber": "valid when wIsInBattle != 0 (stale outside battle)",
+    "wGrassRate": "valid when the byte is nonzero; zero means the current map has no grass table",
+    "wGrassMons": "valid when wGrassRate != 0; otherwise the previous map's slots remain",
+}
+
+
+def _with_trust(e: dict) -> dict:
+    """The same row with ``trust`` inserted right after ``verified``, derived when absent."""
+    if "trust" in e:
+        return e
+    out = {}
+    for k, v in e.items():
+        out[k] = v
+        if k == "verified":
+            out["trust"] = "verified" if v else "sym"
+    return out
+
+
+def migrate_trust(map_path: Path, overrides_path: Path) -> list[str]:
+    """Give every row a ``trust`` tier in place, with no sym file: derive it from ``verified``,
+    write the four caveat patches into ram_overrides.json (so a rebuild keeps them), validate,
+    and rewrite the map. Returns trust.validate problems; an empty list means the map was written."""
+    import sys
+    sys.path.insert(0, str(DATA.parents[1]))  # src/
+    from pokeagent.ramlab import trust
+
+    entries = [_with_trust(e) for e in json.loads(map_path.read_text(encoding="utf-8"))]
+    by_name = {e["name"]: e for e in entries}
+    ov = json.loads(overrides_path.read_text(encoding="utf-8")) if overrides_path.exists() else {}
+    for name, clause in CAVEATS.items():
+        patch = ov.setdefault(name, {})
+        note = patch.get("note") or by_name.get(name, {}).get("note", "")
+        if "valid when" not in note:
+            note = f"{note}; {clause}" if note else clause
+        patch["note"], patch["trust"] = note, "caveat"
+    overrides_path.write_text(json.dumps(ov, indent=1) + "\n", encoding="utf-8")
+    apply_overrides(entries, ov)
+    problems = trust.validate(entries)
+    if not problems:
+        write_map(map_path, entries)
+    return problems
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("sym", type=Path)
+    ap.add_argument("sym", type=Path, nargs="?", help="pokered.sym; not needed for --migrate-trust")
     ap.add_argument("--wram", type=Path)
     ap.add_argument("--out", type=Path, default=DATA / "ram_map.json")
+    ap.add_argument("--migrate-trust", action="store_true",
+                    help="add trust tiers + caveat overrides to the existing map (no sym file)")
     args = ap.parse_args()
+    if args.migrate_trust:
+        problems = migrate_trust(args.out, DATA / "ram_overrides.json")
+        if problems:
+            print("trust validation failed:")
+            print("\n".join(f"  - {p}" for p in problems))
+            raise SystemExit(1)
+        print(f"migrated trust tiers -> {args.out}")
+        return
+    if args.sym is None:
+        ap.error("a sym file is required unless --migrate-trust")
     entries = build(parse_sym(args.sym), parse_wram_sizes(args.wram))
     for p, curated in ((DATA / "ram_names.json", True), (args.out, False)):
         if p.exists():
@@ -149,8 +211,7 @@ def main() -> None:
     if ov.exists():
         apply_overrides(entries, json.loads(ov.read_text(encoding="utf-8")))
     entries.sort(key=lambda e: (int(e["addr"], 16), e["name"]))
-    body = ",\n".join(json.dumps(e, separators=(", ", ": ")) for e in entries)
-    args.out.write_text("[\n" + body + "\n]\n", encoding="utf-8")
+    write_map(args.out, entries)
     counts: dict[str, int] = {}
     for e in entries:
         counts[e["region"]] = counts.get(e["region"], 0) + 1

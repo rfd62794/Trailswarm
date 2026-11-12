@@ -62,7 +62,8 @@
  "wBattleMon": {
   "size": 29,
   "encoding": "bytes",
-  "note": "battle_struct (29 bytes): decode_battle_mon"
+  "note": "battle_struct (29 bytes): decode_battle_mon; valid when wIsInBattle != 0 and wBattleMon species byte != 0 (stale at battle start: species 0, HP/level/PP leftovers)",
+  "trust": "caveat"
  },
  "wEnemyMon": {
   "size": 29,
@@ -86,5 +87,17 @@
  },
  "wCurOpponent": {
   "note": "trainer id: 200 + trainer class (201..) in trainer battles, 0 in wild battles; set as the pre-battle text closes, cleared at battle end (ram_discover 2026-11-05)"
+ },
+ "wPlayerMonNumber": {
+  "note": "party index in battle; valid when wIsInBattle != 0 (stale outside battle)",
+  "trust": "caveat"
+ },
+ "wGrassRate": {
+  "note": "encounter rate; valid when the byte is nonzero; zero means the current map has no grass table",
+  "trust": "caveat"
+ },
+ "wGrassMons": {
+  "note": "level,species x10; valid when wGrassRate != 0; otherwise the previous map's slots remain",
+  "trust": "caveat"
  }
 }

@@ -19,6 +19,7 @@ class MapEntry:
     verified: bool = False
     evidence: str = ""
     note: str = ""
+    trust: str = "sym"
 
     def covers(self, addr: int) -> bool:
         return self.addr <= addr < self.addr + self.size
@@ -27,7 +28,15 @@ class MapEntry:
 def load_map() -> list[MapEntry]:
     text = resources.files("pokeagent.data").joinpath("ram_map.json").read_text(encoding="utf-8")
     return [MapEntry(d["name"], int(d["addr"], 16), d["size"], d["region"], d.get("encoding", "bytes"),
-                     d.get("verified", False), d.get("evidence", ""), d.get("note", "")) for d in json.loads(text)]
+                     d.get("verified", False), d.get("evidence", ""), d.get("note", ""),
+                     d.get("trust") or ("verified" if d.get("verified") else "sym"))
+            for d in json.loads(text)]
+
+
+def is_usable(e: MapEntry, *, allow_discovered: bool = False) -> bool:
+    """May callers use this entry by default? sym/verified/caveat yes (a caveat is valid only
+    under the 'valid when' condition in its note); discovered rows are opt-in."""
+    return e.trust != "discovered" or allow_discovered
 
 
 def regions(entries: list[MapEntry]) -> dict[str, int]:
@@ -66,7 +75,7 @@ def decode_value(e: MapEntry, raw: bytes) -> Any:
 
 
 def describe(e: MapEntry, emu: Emulator | None = None) -> str:
-    flag = "verified" if e.verified else "unverified"
+    flag = e.trust
     line = f"0x{e.addr:04X} +{e.size:<4d} {e.name:40s} [{e.region}] {flag}"
     if emu is not None:
         line += f"  = {decode_value(e, emu.read_range(e.addr, min(e.size, 64)))}"
