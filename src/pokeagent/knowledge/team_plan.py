@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import Combatant, at_level, trainer_mon
-from pokeagent.knowledge.readiness import MARGIN, MAX_LEVEL, TEAM_GAP, best_move, fight
+from pokeagent.knowledge.readiness import MARGIN, MAX_LEVEL, TEAM_GAP, TEAM_MIN, best_move, fight
 
 # --- exp-spread band and rotation ----------------------------------------------------
 BAND_BELOW = 4                    # non-lead members are asked to stay within this many levels of the lead's target; untuned
@@ -154,7 +154,8 @@ def trainee_slot(party, named: int | None = None, breakers=(), wild=None, kb=Non
     lowest breaker leads anyway). MAGIKARP never answers here: its own slot wins upstream."""
     if not party:
         return None
-    if named is not None and 0 < named < len(party) and party[named].level <= party[0].level - TEAM_GAP:
+    # order-independent: compared against the strongest member (the opener), and slot 0 may be the trainee
+    if named is not None and 0 <= named < len(party) and party[named].level <= max(c.level for c in party) - TEAM_GAP:
         return named
     foes = []
     for w in wild or ():
@@ -219,7 +220,10 @@ def grind_pressure(team, need: int, next_boss_gap_steps: int = 0, blackouts_rece
         return 0.0
     lead = lead_level if lead_level is not None else max(c.level for c in team)
     gap = max(0, (need or 0) - lead)
-    base = (BREAKER_W * (len(set(breakers)) / len(team))
+    # a party under TEAM_MIN has nobody to spread exp to: a missing second member is a CATCH shortfall, grinding
+    # cannot fix it (romcheck-204-205: one Charmander ground L6 -> L15 on Route 1 for 3800 steps, latch on at 0.61)
+    share = len(set(breakers)) / len(team) if len(team) >= TEAM_MIN else 0.0
+    base = (BREAKER_W * share
             + GAP_W * (min(gap, GAP_CAP) / GAP_CAP)
             + BLACKOUT_W * (min(blackouts_recent, BLACKOUT_CAP) / BLACKOUT_CAP))
     if base <= 0:

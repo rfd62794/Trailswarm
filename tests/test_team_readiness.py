@@ -231,3 +231,28 @@ def test_team_ready_idle_resets_on_a_level_gain():
     assert ctx.team_ready_idle == 9
     PlanGoal._team_ready_idle(ctx, False, 20)
     assert ctx.team_ready_idle == 0
+
+
+def test_verdict_does_not_depend_on_party_order():
+    """run explore-20261112-072650: swapping slots flipped 'raise X to L18' vs 'lead needs L27 (lead L9)'."""
+    a, b = _mon("AQUA", 14), _mon("BLAZE", 9)
+    fwd, rev = team_readiness([a, b], BOSS, "T", SYN), team_readiness([b, a], BOSS, "T", SYN)
+    assert fwd.ready == rev.ready and fwd.lead.required == rev.lead.required
+    assert fwd.lead.lead == rev.lead.lead == "AQUA"
+    assert {(r.name, r.level, r.target) for r in fwd.members} == {(r.name, r.level, r.target) for r in rev.members}
+
+
+def test_trainee_can_be_slot_zero_and_is_compared_to_the_strongest():
+    from pokeagent.knowledge import team_plan
+    weak, strong = _mon("BLAZE", 8), _mon("AQUA", 20)
+    assert team_plan.trainee_slot([weak, strong], named=0) == 0     # slot 0 is the weakest: it is the trainee
+    assert team_plan.trainee_slot([strong, weak], named=1) == 1     # same answer in either order
+    assert team_plan.trainee_slot([_mon("BLAZE", 19), strong], named=0) is None   # within TEAM_GAP of the opener
+
+
+def test_single_member_party_has_no_grind_pressure_from_breakers():
+    from pokeagent.knowledge import team_plan
+    solo = [_mon("AQUA", 15)]
+    assert team_plan.grind_pressure(solo, 8, 0, 0, breakers=(0,), lead_level=15) == 0.0   # need met, only a catch helps
+    duo = [_mon("AQUA", 15), _mon("BLAZE", 5)]
+    assert team_plan.grind_pressure(duo, 8, 0, 0, breakers=(1,), lead_level=15) > 0.0     # a real second member still counts

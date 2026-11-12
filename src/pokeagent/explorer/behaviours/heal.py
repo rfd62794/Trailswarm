@@ -20,8 +20,8 @@ class Heal(BehaviourBase):
                 ctx.log(f"[Mom did not heal us (HP {hp_now}/{mx_now}); not retrying for 150 steps]", "res")
             else:
                 ctx.log(f"[healed at Mom: HP {hp_now}/{mx_now}]", "res")
-                ctx.proc_due.extend(n for n in ("check_health", "open_bag", "save_game") if n not in ctx.proc_done)
-                ctx.proc_done.update({"check_health", "open_bag", "save_game"})
+                ctx.proc_due.extend(n for n in ("check_health", "open_bag") if n not in ctx.proc_done)
+                ctx.proc_done.update({"check_health", "open_bag"})
             ctx.mom_talk_step = None
         return None
 

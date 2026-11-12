@@ -22,6 +22,7 @@ MAX_PRESSES = 40          # one reorder is about 10 presses; more means the menu
 RETRY_AFTER_STEPS = 300   # after an abandoned attempt
 CALM_FRAMES = 8           # the screen must have been still this long before the first press (no cutscene, no fade)
 PACE_FRAMES = 8           # frames to wait between presses
+HOLD_STEPS = 300          # after a reorder, the matchup / exp-rotation lead is not flipped again this soon unless the team changed
 
 
 def species_names(emu) -> list[str]:
@@ -53,6 +54,39 @@ def _opponent(ctx: ExplorerContext) -> list:
     return []
 
 
+def team_sig(ctx: ExplorerContext) -> tuple:
+    """The order-independent team state a lead flip may react to: (species, level, fainted) per member, sorted."""
+    return tuple(sorted((getattr(m, "species", 0), getattr(m, "level", 0), getattr(m, "hp", 1) == 0)
+                        for m in read_party(ctx.emu)))
+
+
+def _opp_key(ctx: ExplorerContext, opp: list | None = None) -> tuple:
+    """The opponent a matchup lead was chosen for (empty when none): trainer_target and its party."""
+    opp = _opponent(ctx) if opp is None else opp
+    return (tuple(ctx.trainer_target) if getattr(ctx, "trainer_target", None) else None, tuple(opp)) if opp else ()
+
+
+def _lead_weak(ctx: ExplorerContext) -> bool:
+    """The lead is alive but under SWITCH_MIN_HP of its max: a fresh lead choice is warranted, not held."""
+    party = read_party(ctx.emu)
+    lead = party[0] if party else None
+    mx = getattr(lead, "max_hp", 0)
+    return bool(mx) and 0 < getattr(lead, "hp", 0) / mx < team_plan.SWITCH_MIN_HP
+
+
+def _held(ctx: ExplorerContext, opp: list | None = None) -> bool:
+    """True while the last reorder is younger than HOLD_STEPS and no level / faint / party change happened since.
+    Run explore-20261112-072650 flipped Charmander<->Pidgey 12-34 steps apart (steps 1320/1332/1366, 2764/2788/2805):
+    the trainer-matchup lead and the grind's exp-rotation lead alternate with trainer_target, each flip ~10 presses."""
+    last = team_plan.of(ctx).get("order_hold")
+    if not last or ctx.step - last[0] >= HOLD_STEPS or last[1] != team_sig(ctx):
+        return False
+    now = _opp_key(ctx, opp)
+    if now and now != last[2]:   # a different trainer / boss is engaged: its matchup lead is not churn
+        return False
+    return not _lead_weak(ctx)
+
+
 def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
     """(src, want, why) for the next reorder, or None when the party order stands: the member at ``src``
     should sit at ``want`` (SWITCH swaps the two slots). Before a known boss/trainer target the lead is
@@ -64,7 +98,7 @@ def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
         theirs = [m for lv, n in opp if (m := trainer_mon(n, lv))]
         if party and theirs:
             src = team_plan.choose_lead(party, theirs, None)
-            if src != 0:
+            if src != 0 and not _held(ctx, opp):
                 names = species_names(ctx.emu)
                 who = names[src] if src < len(names) else f"slot {src + 1}"
                 return (src, 0, f"matchup lead {who} for {theirs[0].name}")
@@ -76,7 +110,7 @@ def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
     brk = team_plan.of(ctx).get("breakers") or ()
     if brk and 0 < lead_level(ctx.emu) < (ctx.train_need or 0):
         s = team_plan.trainee_slot(read_party(ctx.emu), ctx.train_member, brk)
-        if s is not None and s != 0:
+        if s is not None and s != 0 and not _held(ctx):
             return (s, 0, "exp rotation: the lowest band breaker leads the grind")
     return None
 
@@ -113,6 +147,7 @@ class PartyOrder(BehaviourBase):
             if menu_open(text) or (framed and ctx.view.box):
                 return self._press(po, "B", f"reorder_party: {species_names(ctx.emu)}", "closing the party menus")
             ctx.log(f"[reorder_party: {species_names(ctx.emu)}]", "res")
+            team_plan.of(ctx)["order_hold"] = (ctx.step, team_sig(ctx), _opp_key(ctx))
             ctx.party_order = None
             return no_press("party_order_done")
         if po["presses"] >= MAX_PRESSES:
