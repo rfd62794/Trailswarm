@@ -10,6 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.knowledge.damage import PHYSICAL, expected_damage, turns_to_ko
 from pokeagent.knowledge.scoring import ScoreCtx, adjust
+from pokeagent.party_view import read_battle_view
 
 # Gen 1 type ids as stored in wBattleMon/wEnemyMon and the pokedex base stats (6 and 9-19 unused).
 TYPE_IDS = {"NORMAL": 0, "FIGHTING": 1, "FLYING": 2, "POISON": 3, "GROUND": 4, "ROCK": 5, "BUG": 7,
@@ -139,12 +140,13 @@ def move_scores(emu, catching: bool = False) -> dict[str, tuple[float, str]]:
         return {}
     chart = _chart()
     defs, mine = enemy_types(emu), battler_types(emu)
+    bm = read_battle_view(emu).battle_mon  # None while wBattleMon is stale (species 0): moves/PP unknown
     rows = []
-    for slot in range(4):
-        mid, pp = emu.read(0xD01C + slot), emu.read(0xD02D + slot) & 0x3F
-        mv = ROM_KB["moves"].get(str(mid))
-        if mv and mid:
-            rows.append((mv, pp))
+    if bm is not None:
+        for mid, pp in zip(bm.moves, bm.pp):
+            mv = ROM_KB["moves"].get(str(mid))
+            if mv and mid:
+                rows.append((mv, pp & 0x3F))
     ctx = _score_ctx(emu, rows, chart, defs, mine, catching) if any("effect" in mv for mv, _ in rows) else ScoreCtx()
     out = {}
     for mv, pp in rows:

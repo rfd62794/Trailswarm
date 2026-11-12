@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 from pokeagent.game.stores import store_path
+from pokeagent.party_view import read_battle_view
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 
 def schema_id(segment, *, screen=False, spatial=False, combat=False, battle_learning=False, travel_priority=False, potential=False, hold=8, settle=8, maps_digest='', novelty=0.0, menu_controls=False):
@@ -54,11 +56,10 @@ class SpatialObserver:
 
 
 def combat_observation(emu):
-    if not emu.read(0xD057):
+    bm = read_battle_view(emu).battle_mon  # None while wBattleMon is stale (species 0 at battle start)
+    if bm is None:
         return (0,) * 13
-    u16 = lambda a: (emu.read(a) << 8) | emu.read(a + 1)
-    maximum = u16(0xD023)
-    return (emu.read(0xD057), emu.read(0xCFE5), emu.read(0xCFF3),
-            emu.read(0xD022), min(4, 4*u16(0xD015)//maximum) if maximum else 0,
-            *(emu.read(0xD01C+i) for i in range(4)),
-            *(emu.read(0xD02D+i) & 0x3F for i in range(4)))
+    maximum = bm.max_hp
+    return (emu.read(IS_IN_BATTLE), emu.read(0xCFE5), emu.read(0xCFF3),
+            bm.level, min(4, 4*bm.hp//maximum) if maximum else 0,
+            *bm.moves, *(p & 0x3F for p in bm.pp))

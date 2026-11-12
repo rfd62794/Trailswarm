@@ -30,6 +30,7 @@ from pokeagent.explorer.stat_records import record_catch
 from pokeagent.goals import bag_contents, check_goals
 from pokeagent.knowledge import team_plan
 from pokeagent.magikarp import fighter
+from pokeagent.ram_symbols import ENEMY_MON, IS_IN_BATTLE, PARTY_COUNT
 from pokeagent.ramstructs import read_party
 
 PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
@@ -112,7 +113,7 @@ def scan_battle_text(ctx: ExplorerContext) -> None:
             _finalize_pending_effect(ctx)  # a new attack means the last one's result text is done
             ctx.fx_last = {"side": ev[1], "move": ev[2]}
             if ev[1] == "enemy":
-                record_threat(ctx.mem.data, ctx.emu, ctx.emu.read(0xCFE5), ev[2], step=ctx.step)
+                record_threat(ctx.mem.data, ctx.emu, ctx.emu.read(ENEMY_MON), ev[2], step=ctx.step)
         elif ev[0] == "effect" and ctx.fx_last and ctx.fx_last["side"] == "ours":
             _record_observed(ctx, ctx.fx_last["move"], ev[1])
             pe = ctx.pending_effect
@@ -136,7 +137,7 @@ class Battle(BehaviourBase):
                 new_battle(ctx)
                 team_plan.of(ctx).pop("release_pending", None)  # a stale deposit mark never survives into a new fight
                 party_log.of(ctx).start_battle(ctx)  # XP/level logging: the party as the fight begins
-                bflag = ctx.emu.read(0xD057)
+                bflag = ctx.emu.read(IS_IN_BATTLE)
                 if bflag == 1:  # wild: remember this tile spawns pokemon, and what tile ids grass has
                     under = [tm_now[8 * 20 + 8], tm_now[8 * 20 + 9], tm_now[9 * 20 + 8], tm_now[9 * 20 + 9]]
                     ctx.mem.learn_encounter(m, x, y, ctx.emu.read(0xD367), under)
@@ -153,12 +154,12 @@ class Battle(BehaviourBase):
                 return bring
             if ctx.pending_effect and ctx.step - ctx.pending_effect["step"] > PENDING_EFFECT_MAX_STEPS:
                 _finalize_pending_effect(ctx)  # the result text never came: count the hit neutral
-            kind = ctx.emu.read(0xD057)
+            kind = ctx.emu.read(IS_IN_BATTLE)
             hp, mx = party_hp(ctx.emu)
             weak = mx > 0 and hp / mx < 0.4
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
             # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
-            species = ctx.emu.read(0xCFE5)
+            species = ctx.emu.read(ENEMY_MON)
             my_sp, my_lvl = fighter(ctx.emu)[:2]; e_lvl = ctx.emu.read(0xCFF3)
             if ctx.last_battle_hp is not None and hp < ctx.last_battle_hp:
                 taken = ctx.last_battle_hp - hp
@@ -203,7 +204,7 @@ class Battle(BehaviourBase):
             # (2026-11-03: 30-50% of the Forest presses were battle text): run unless a ball could catch it.
             gn = check_goals(ctx.emu, ctx)
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
-                     and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(0xCFE5)))
+                     and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(ENEMY_MON)))
             flee = kind == 1 and bool(weak or hurry or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
             stand = kind == 1 and flee and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
             if stand:
@@ -242,8 +243,8 @@ class Battle(BehaviourBase):
                     ctx.log(f"[duplicate #{ca['species']}: best DVs in party slot {rec['prefer_slot'] + 1}]", "res")
             # Won = still standing where the battle happened with a Pokemon in the party; a loss warps you home.
             trainer = bool(ctx.battle_log and ctx.battle_log.get("kind") == 2) or ctx.trainer_npc is not None
-            won, moved_away = battle_outcome(trainer=trainer, start=ctx.battle_pos or (-1, -1, -1), end=(m, x, y), party_count=ctx.emu.read(0xD163))
-            outcome = outcome_of(trainer=trainer, won=won, moved_away=moved_away, party_count=ctx.emu.read(0xD163))
+            won, moved_away = battle_outcome(trainer=trainer, start=ctx.battle_pos or (-1, -1, -1), end=(m, x, y), party_count=ctx.emu.read(PARTY_COUNT))
+            outcome = outcome_of(trainer=trainer, won=won, moved_away=moved_away, party_count=ctx.emu.read(PARTY_COUNT))
             battle_map = ctx.battle_pos[0] if ctx.battle_pos else m
             npc = ctx.trainer_npc  # the NPC this fight was pinned to; captured before the field is cleared below
             trainer_info = None
@@ -277,7 +278,7 @@ class Battle(BehaviourBase):
                     fh.write(json.dumps(bl) + "\n")
                 # Every battle is a lesson: per enemy species keep fights/wins/fled, HP lost, turns, and the move that
                 # actually did the most damage. The planner reads these to pick fights and set the flee threshold.
-                sp = str(bl.get("enemy_species") or ctx.emu.read(0xCFE5))
+                sp = str(bl.get("enemy_species") or ctx.emu.read(ENEMY_MON))
                 ls = ctx.mem.data.setdefault("battle_lessons", {}).setdefault(sp, {"fights": 0, "wins": 0, "fled": 0, "turns": [], "hp_lost": []})
                 ls["fights"] += 1; ls["wins"] += int(won); ls["fled"] += int(bl["fled"])
                 ls["turns"].append(len(bl["turns"])); del ls["turns"][:-20]

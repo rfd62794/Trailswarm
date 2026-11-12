@@ -16,6 +16,7 @@ from pokeagent.explorer.anomaly_sprites import doorway_tiles, read_sprites, walk
 from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.toss_guard import toss_screen
 from pokeagent.goals import bag_contents
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 WAIT_FRAMES = 90          # emulator frames (no-press waits) spent waiting for a blocking wanderer to move before routing around it
 TEMP_BLOCK_FRAMES = 300   # frames the blocker's tile stays temporarily blocked for routing (never learned as a wall)
@@ -58,7 +59,7 @@ class AnomalyMonitor:
     def build_obs(self, ctx, fr) -> Obs:
         emu, (m, x, y) = ctx.emu, fr.after
         md = ctx.mem.m(m)
-        battle, joy = emu.read(0xD057) != 0, emu.read(JOY_IGNORE)
+        battle, joy = emu.read(IS_IN_BATTLE) != 0, emu.read(JOY_IGNORE)
         candidate = tuple(fr.before) == (m, x, y) and not fr.box_after and not battle and not joy  # a frozen-screen candidate
         sig = hash(emu.read_range(TILEMAP, TILEMAP_LEN) + emu.read_range(*SPRITE_TABLE)) if candidate else 0
         lines = frame_lines(emu.read_range(TILEMAP, TILEMAP_LEN)) if fr.box_after else []

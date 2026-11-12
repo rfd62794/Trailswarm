@@ -8,9 +8,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from pokeagent.ram_symbols import (
+    IS_IN_BATTLE,
+    PARTY_COUNT,
+    PARTY_MON1,
+    PARTY_MON1_HP,
+    PARTY_MON1_MAX_HP,
+    PARTY_MON_SIZE,
+)
+
 BASE = 0xD000  # EFFECT_WINDOW start in explorer.perceive (kept here so the module stays dependency-free)
-A_BATTLE, A_PARTY_N, A_PARTY, A_MAP, A_BAG_N, A_BAG, A_MONEY, A_FLAGS = 0xD057, 0xD163, 0xD16B, 0xD35E, 0xD31D, 0xD31E, 0xD347, 0xD747
-PARTY_STRIDE, A_HP, A_MAXHP, FLAG_BYTES = 44, 0xD16C, 0xD18D, 320
+A_BATTLE, A_PARTY_N, A_PARTY, A_MAP, A_BAG_N, A_BAG, A_MONEY, A_FLAGS = IS_IN_BATTLE, PARTY_COUNT, PARTY_MON1, 0xD35E, 0xD31D, 0xD31E, 0xD347, 0xD747
+# A_HP/A_MAXHP start at the slot-0 struct and stride by PARTY_MON_SIZE: _party_hp walks every slot from there
+PARTY_STRIDE, A_HP, A_MAXHP, FLAG_BYTES = PARTY_MON_SIZE, PARTY_MON1_HP, PARTY_MON1_MAX_HP, 320
 TRAINER_BATTLE = 2  # wIsInBattle: 1 wild, 2 trainer
 
 HEALER, SHOP, PC, GIVER, VENDOR, TRAINER, STORY, BLOCKER, SIGN, INFO = (

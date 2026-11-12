@@ -15,6 +15,8 @@ from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
 from pokeagent.explorer.text_press import fast_a_press
 from pokeagent.goals import GOALS, bag_contents, check_goals, goals_brief
+from pokeagent.party_view import read_battle_view
+from pokeagent.ram_symbols import ENEMY_MON, IS_IN_BATTLE, PARTY_COUNT
 
 
 def settle_position(ctx: ExplorerContext, before, max_frames=600):
@@ -50,19 +52,20 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     elif ctx.episode:
         close_episode(ctx, before, goals_before)  # the agent is back in control: the demonstration is over
     extra: dict = {}
-    flag = ctx.emu.read(0xD057)
+    flag = ctx.emu.read(IS_IN_BATTLE)
     if flag or ctx.in_battle:
-        extra["battle_flag"] = flag  # wIsInBattle 0xD057 (verified = 2 for trainer battles)
+        extra["battle_flag"] = flag  # wIsInBattle (verified = 2 for trainer battles)
         u16 = lambda a: (ctx.emu.read(a) << 8) | ctx.emu.read(a + 1)
+        bm = read_battle_view(ctx.emu).battle_mon  # None while wBattleMon is stale: log zeros, never leftovers
         bl = ctx.battle_log = ctx.battle_log or {"start": ctx.step, "kind": flag, "turns": [],
-                                          "you": [ctx.emu.read(0xD014), ctx.emu.read(0xD022)], "enemy": [ctx.emu.read(0xCFE5), ctx.emu.read(0xCFF3)]}
-        if ctx.emu.read(0xCFE5):
-            bl["enemy_species"] = ctx.emu.read(0xCFE5); bl["enemy"] = [ctx.emu.read(0xCFE5), ctx.emu.read(0xCFF3)]  # filled once the battle data loads
+                                          "you": [bm.species, bm.level] if bm is not None else [0, 0], "enemy": [ctx.emu.read(ENEMY_MON), ctx.emu.read(0xCFF3)]}
+        if ctx.emu.read(ENEMY_MON):
+            bl["enemy_species"] = ctx.emu.read(ENEMY_MON); bl["enemy"] = [ctx.emu.read(ENEMY_MON), ctx.emu.read(0xCFF3)]  # filled once the battle data loads
         lines_b = frame_lines(tm)
         cursor_b = next((ln.replace(">", "").strip() for ln in lines_b if ">" in ln), "")
         if name == "A" and cursor_b:  # a battle choice: what was chosen and the HP situation at that moment
             bl["turns"].append({"step": ctx.step, "chose": cursor_b, "menu": [ln for ln in lines_b if ln.isupper() or ">" in ln][:6],
-                                "hp_you": u16(0xD015), "hp_enemy": u16(0xCFE6)})
+                                "hp_you": bm.hp if bm is not None else 0, "hp_enemy": u16(0xCFE6)})
         extra["battle_turn"] = len(bl["turns"])
     if name in DIRS and not box_before:
         extra["ahead_tiles"] = ahead_tiles(tm, name)  # lets the KB learn which tile ids are walls
@@ -135,7 +138,7 @@ def log_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     mm = ctx.mem.m(after[0])
     gtxt = goals_brief(goals)
     ctx.log(f"--- step {ctx.step}/{ctx.opts.steps}  map=0x{after[0]:02X} pos=({after[1]},{after[2]}) facing {ctx.facing}  "
-        f"party={ctx.emu.read(0xD163)} bag={ctx.emu.read(0xD31D)}  goals: {gtxt}\n"
+        f"party={ctx.emu.read(PARTY_COUNT)} bag={ctx.emu.read(0xD31D)}  goals: {gtxt}\n"
         f"    learned here: {len(mm['visited'])} tiles, {len(mm['blocked'])} walls, {len(mm['warps'])} warps, "
         f"{len(mm.get('interactions', {}))} interactions", "hdr")
     ctx.log(f"{'human:   ' if source == 'human' else 'thinking:'} {why}", "human" if source == "human" else "why")

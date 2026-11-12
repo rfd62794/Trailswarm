@@ -6,7 +6,7 @@ from pokeagent.hexmap import diff as ram_diff
 from pokeagent.knowledge.readiness import TEAM_GAP
 from pokeagent.magikarp import fighter, magikarp_stats, trainee_slot
 from pokeagent.names import load_registry
-from pokeagent.party_view import read_party_view
+from pokeagent.party_view import read_battle_view, read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.screentext import CHARMAP
 
@@ -120,14 +120,15 @@ def wrap_move(move: str, width: int = 22, prefix: str = "move  ") -> list[str]:
 
 def battle_view(emu, move: str = "") -> list[str]:
     """What the agent 'sees' in a battle: not a map. HP/level from RAM (pret/pokered addresses, UNVERIFIED until
-    we watch them move: wBattleMonHP 0xD015/16, wBattleMonMaxHP 0xD023/24, wBattleMonLevel 0xD022,
+    we watch them move: wBattleMonHP, wBattleMonMaxHP, wBattleMonLevel via read_battle_view,
     wEnemyMonHP 0xCFE6/E7, wEnemyMonMaxHP 0xCFF4/F5, wEnemyMonLevel 0xCFF3) plus the on-screen text and menu.
     `move` adds the chosen move's rule string ('EMBER x2 FIRE>GRASS/POISON STAB') when supplied."""
     def u16(a): return (emu.read(a) << 8) | emu.read(a + 1)
     tm = emu.read_range(TILEMAP, TILEMAP_LEN)
     lines = frame_lines(tm)
-    rows = [f"BATTLE kind=0x{emu.read(0xD057):02X}",
-            f"you   L{emu.read(0xD022):<3} HP {u16(0xD015):>3}/{u16(0xD023):<3}",
+    bm = read_battle_view(emu).battle_mon  # None while wBattleMon is stale (species 0): no leftover numbers
+    rows = [f"BATTLE kind=0x{emu.read(IS_IN_BATTLE):02X}",
+            f"you   L{bm.level:<3} HP {bm.hp:>3}/{bm.max_hp:<3}" if bm is not None else "you  (not loaded)",
             f"enemy L{emu.read(0xCFF3):<3} HP {u16(0xCFE6):>3}/{u16(0xCFF4):<3}",
             "(hp addrs unverified)"]
     rows += wrap_move(move)

@@ -7,10 +7,12 @@ Layer rule: adapters/ never import viewer/.
 from __future__ import annotations
 
 from pokeagent.explorer.kb import ROM_KB
+from pokeagent.party_view import read_battle_view
+from pokeagent.ram_symbols import ENEMY_MON, IS_IN_BATTLE
 from pokeagent.world import events as ev
 
-BATTLE_FLAG = 0xD057
-ENEMY_SPECIES = 0xCFE5   # wEnemyMonSpecies (internal id); 0xCFD7 is wPlayerMoveMaxPP, not a species
+BATTLE_FLAG = IS_IN_BATTLE
+ENEMY_SPECIES = ENEMY_MON   # wEnemyMonSpecies (internal id); 0xCFD7 is wPlayerMoveMaxPP, not a species
 STALL_STEPS = 200      # game steps without moving before a stall event
 _DELTA = {(0, -1): "UP", (0, 1): "DOWN", (-1, 0): "LEFT", (1, 0): "RIGHT"}
 _LEARN = (("blocked", "wall"), ("warps", "warp"), ("jumps", "jump"), ("encounters", "encounter"))
@@ -69,13 +71,16 @@ class EventFeed:
 
     def _battle_events(self, emu, dec) -> None:
         on = emu.read(BATTLE_FLAG) != 0
-        hp = (_u16(emu, 0xD015), _u16(emu, 0xD023), _u16(emu, 0xCFE6), _u16(emu, 0xCFF4)) if on else ()
-        if on and not self._battle:
+        # None while wBattleMon is stale (species 0 at battle start): no own mon and an empty hp tuple then,
+        # exactly as when not in battle - a stale block must never feed the event stream.
+        bm = read_battle_view(emu).battle_mon if on else None
+        hp = (bm.hp, bm.max_hp, _u16(emu, 0xCFE6), _u16(emu, 0xCFF4)) if bm is not None else ()
+        if bm is not None and not self._battle:
             self._turn, self._last_hp = 0, hp
             self.bus.emit(ev.BattleStart(species=self._mon(emu.read(ENEMY_SPECIES)), enemy_level=emu.read(0xCFF3),
-                                         own_species=self._mon(emu.read(0xD014)), own_level=emu.read(0xD022),
+                                         own_species=self._mon(bm.species), own_level=bm.level,
                                          hp=hp[0], max_hp=hp[1], enemy_hp=hp[2], enemy_max_hp=hp[3]))
-        elif on and hp != self._last_hp:
+        elif bm is not None and hp != self._last_hp:
             self._turn += 1
             self._last_hp = hp
             self.bus.emit(ev.BattleTurn(turn=self._turn, hp=hp[0], max_hp=hp[1], enemy_hp=hp[2], enemy_max_hp=hp[3],
@@ -84,7 +89,8 @@ class EventFeed:
             last = self._last_hp
             res = "lost" if last and last[0] == 0 else "won" if last and last[2] == 0 else "ended"
             self.bus.emit(ev.BattleEnd(result=res, turns=self._turn))
-        self._battle = on
+        if bm is not None or not on:
+            self._battle = on
 
     def _decision(self, dec, outcome: str) -> None:
         if dec is None:

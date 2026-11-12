@@ -10,6 +10,7 @@ from pokeagent.explorer.behaviours.goto import Goto
 from pokeagent.explorer.decisions import classify_outcome, goal_stage, make_record
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
 from pokeagent.intervene.screen import ScreenRead, read_screen
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 
 class ClaudeDriver:
@@ -20,7 +21,7 @@ class ClaudeDriver:
         ctx = self.ctx
         before = ctx.pos()
         box = box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))
-        battle = ctx.emu.read(0xD057) != 0
+        battle = ctx.emu.read(IS_IN_BATTLE) != 0
         self.presser.press(button, "claude", why)
         self.hold.touch()
         if self.log is None:

@@ -8,8 +8,9 @@ rows (the 2026-11-08 maps.json audit: ~3,209 battle-pattern, ~672 menu-pattern n
 from __future__ import annotations
 
 from pokeagent.explorer.perceive import is_menu
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
-BATTLE_FLAG = 0xD057  # wIsInBattle: 0 overworld, 1 wild, 2 trainer (the flag press.py logs as battle_flag)
+BATTLE_FLAG = IS_IN_BATTLE  # wIsInBattle: 0 overworld, 1 wild, 2 trainer (the flag press.py logs as battle_flag)
 
 
 def battling(ctx) -> bool:

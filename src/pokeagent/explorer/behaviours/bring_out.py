@@ -8,20 +8,17 @@ from __future__ import annotations
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.magikarp import MAGIKARP
-
-PARTY_COUNT, PARTY_SPECIES, PARTY_HP, MON_STRIDE, MENU_ITEM = 0xD163, 0xD164, 0xD16C, 0x2C, 0xCC26
+from pokeagent.party_view import read_battle_view
+from pokeagent.ram_symbols import MENU_ITEM, PARTY_COUNT, PARTY_MON1_HP, PARTY_MON_SIZE, PARTY_SPECIES
 
 
 def able_slot(emu) -> int | None:
     """The party slot to send out: the first non-Magikarp with HP, else any with HP (a Magikarp only splashes, but it ends the
     fight instead of looping); None when everybody has fainted."""
     alive = [i for i in range(min(emu.read(PARTY_COUNT), 6))
-             if (emu.read(PARTY_HP + MON_STRIDE * i) << 8 | emu.read(PARTY_HP + MON_STRIDE * i + 1)) > 0]
+             if (emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i) << 8 | emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i + 1)) > 0]
     real = [i for i in alive if emu.read(PARTY_SPECIES + i) != MAGIKARP]
     return (real or alive or [None])[0]
-
-
-BATTLER_HP = 0xD015  # wBattleMonHP (2 bytes): our active Pokemon in the fight
 
 
 def forced_faint_prompt(ctx: ExplorerContext, lines: list[str]) -> bool:
@@ -34,7 +31,8 @@ def forced_faint_prompt(ctx: ExplorerContext, lines: list[str]) -> bool:
         return False
     if ctx.switch_train is not None:
         return False
-    return (ctx.emu.read(BATTLER_HP) << 8 | ctx.emu.read(BATTLER_HP + 1)) == 0
+    bm = read_battle_view(ctx.emu).battle_mon  # None while wBattleMon is stale (species 0): no battler means no faint
+    return bm is not None and bm.hp == 0
 
 
 def bring_out_press(ctx: ExplorerContext, lines: list[str]) -> Decision | None:

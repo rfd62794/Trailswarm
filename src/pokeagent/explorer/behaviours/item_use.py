@@ -3,7 +3,7 @@
 The old rule pressed A on whatever the bag cursor sat on once the item list was open and POTION was off screen
 (the list shows three rows; 2026-11-05 Mt Moon: ANTIDOTE under the cursor, "It won't have any effect." 500+ times in
 one battle). Here the target row comes from the bag RAM order (wListCount 0xD31D, then id/qty pairs), the cursor
-position from wCurrentMenuItem (0xCC26) plus wListScrollOffset (0xCC36), and the press from their difference.
+position from wCurrentMenuItem plus wListScrollOffset (0xCC36), and the press from their difference.
 An item that "won't have any effect", or that has been tried MAX_ITEM_ATTEMPTS times this battle, is blocked until
 the battle ends, and an open item list we no longer want is closed with B, never confirmed.
 """
@@ -13,12 +13,14 @@ import re
 
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.ram_symbols import MENU_ITEM, PLAYER_MON_NUMBER
 
 MAX_ITEM_ATTEMPTS = 3  # confirmations of one item per battle before it is written off
 POTION = 0x14
 HEAL_NAME = {0x14: "POTION", 0x13: "SUPER POTION"}  # economy.heal_items.HEAL_ITEMS
 BAG_COUNT, BAG_START = 0xD31D, 0xD31E
-MENU_ITEM, LIST_SCROLL, PLAYER_MON = 0xCC26, 0xCC36, 0xCC2F
+LIST_SCROLL = 0xCC36         # wListScrollOffset
+PLAYER_MON = PLAYER_MON_NUMBER  # wPlayerMonNumber (kept: tests/test_item_use.py uses iu.PLAYER_MON)
 _QTY_ROW = re.compile(r"x ?\d+", re.IGNORECASE)
 _NO_EFFECT = re.compile(r"have any\s*effect", re.IGNORECASE)  # the apostrophe glyph does not survive the screen read
 
@@ -81,7 +83,7 @@ def item_step(ctx: ExplorerContext, lines: list[str], cur_line: str, item_id: in
             return Decision("A", "item_use", f"{why}: using {item_name} (bag row {row}, attempt {ctx.item_attempts})")
         return Decision(press, "item_list_scroll", f"item list: row {pos} -> {item_name} at row {row}")
     if party_prompt_open(lines):  # "Use item on which POKeMON?": the one in the fight, not just slot 1
-        slot = emu.read(PLAYER_MON) if party_target is None else party_target  # outside a fight 0xCC2F is stale: the caller says who
+        slot = emu.read(PLAYER_MON) if party_target is None else party_target  # outside a fight wPlayerMonNumber is stale: the caller says who
         return Decision(_toward(emu.read(MENU_ITEM), slot), "item_party_pick", f"{item_name}: picking the active POKeMON")
     if ">ITEM" in cur_line:
         return Decision("A", "item_open", f"{why}: opening ITEM for {item_name}")
