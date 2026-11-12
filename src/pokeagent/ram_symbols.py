@@ -43,7 +43,7 @@ BOX_MON_OT = 0xDD2A           # wBoxMonOT
 BOX_MON_NICKS = 0xDE06        # wBoxMonNicks
 
 # misc state
-MENU_ITEM = 0xCC26            # wMenuItemToExchange
+MENU_ITEM = 0xCC26            # wCurrentMenuItem
 TRAINER_CLASS = 0xD031        # wTrainerClass
 TRAINER_NO = 0xD05D           # wTrainerNo
 SPECIES_MAGIKARP = 133        # internal species id used by the trainee rule
