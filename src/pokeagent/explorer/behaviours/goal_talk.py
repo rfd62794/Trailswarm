@@ -19,6 +19,8 @@ GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain"),
               "beat_brock": (0x36, 4, 2, "UP", "Brock")}
 APPROACH = ("beat_brock",)  # goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
 REQUIRES = {"deliver_parcel": "oaks_parcel"}  # goal -> the goal that must already be met before the talk is wanted
+HOLD_FRESH = 30  # steps a PlanGoal readiness verdict stays good; GoalTalk preempts PlanGoal, so a stale one lets PlanGoal run and refresh it
+APPROACH_CAP = 60  # approach steps per run before giving up on walking towards an unmapped stand tile
 MAX_TALKS = 8  # A presses at the person per run before giving up on the goal (a dialog box in between resets nothing: counted per press)
 
 
@@ -26,8 +28,16 @@ def pending(ctx: ExplorerContext) -> tuple[str, tuple] | None:
     goals = ctx.goals()
     for goal, spec in GOAL_TALKS.items():
         if not goals.get(goal) and ctx.view.m == spec[0] and (goal not in REQUIRES or goals.get(REQUIRES[goal])):
+            if goal in APPROACH and not _hold_clear(ctx):
+                continue  # an unready team inside the gym is pulled out by PlanGoal's hold (or the hold is unknown): not Brock's to walk to
             return goal, spec
     return None
+
+
+def _hold_clear(ctx: ExplorerContext) -> bool:
+    """True only when PlanGoal recently judged the gym hold NOT active (team ready, or its stall hold was released by cap/blackout)."""
+    seen = getattr(ctx, "gym_hold_seen", None)
+    return bool(seen) and seen[1] is False and ctx.step - seen[0] <= HOLD_FRESH
 
 
 class GoalTalk(BehaviourBase):
@@ -60,8 +70,14 @@ def _approach(ctx, g, goal, m, sx, sy, who) -> Decision | None:
     """Stand tile unmapped (the planner's generic 'road north / map edge' target sat 1,500 steps at the gym's south end): head for
     the known tile nearest to it and step on towards it, instead of leaving the leader to exploration."""
     d = ctx.mem.data["maps"].get(str(m), {})
-    blocked = set(d.get("blocked", []))
     v = ctx.view
+    st = ctx.__dict__.setdefault("approach_state", {"steps": 0, "last": None, "bad": set()})
+    if st["last"] and st["last"][:3] == (m, v.x, v.y):
+        st["bad"].add(st["last"][1:])  # the last approach press moved nothing: never press it again from here
+    st["last"] = None
+    if st["steps"] >= APPROACH_CAP:
+        return None
+    blocked = set(d.get("blocked", [])) | {f"{x},{y},{b}" for x, y, b in st["bad"]}
     tiles = [tuple(map(int, k.split(","))) for k in d.get("visited", {})]
     if not tiles:
         return None
@@ -69,7 +85,11 @@ def _approach(ctx, g, goal, m, sx, sy, who) -> Decision | None:
     if (v.x, v.y) == (tx, ty):
         for b, dx, dy in (("UP", 0, -1), ("LEFT", -1, 0), ("RIGHT", 1, 0), ("DOWN", 0, 1)):
             if abs(tx + dx - sx) + abs(ty + dy - sy) < abs(tx - sx) + abs(ty - sy) and f"{tx},{ty},{b}" not in blocked:
+                st["steps"] += 1; st["last"] = (m, tx, ty, b)
                 return Decision(b, "goal_talk_approach", f"goal {goal}: stepping {b} from ({tx},{ty}) towards {who}'s tile ({sx},{sy})")
         return None
     p = g.path((m, v.x, v.y), lambda n: n == (m, tx, ty))
-    return Decision(p[0], "goal_talk_approach", f"goal {goal}: {len(p)} steps to ({tx},{ty}), nearest known tile to {who}") if p else None
+    if not p:
+        return None
+    st["steps"] += 1
+    return Decision(p[0], "goal_talk_approach", f"goal {goal}: {len(p)} steps to ({tx},{ty}), nearest known tile to {who}")

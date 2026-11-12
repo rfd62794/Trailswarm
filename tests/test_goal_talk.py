@@ -47,7 +47,11 @@ def test_oak_is_talked_to_only_once_the_parcel_is_in_the_bag():
 
 
 def _gym(visited, blocked=(), **kw):
+    hold = kw.pop("hold", False)
     c = ctx({"beat_brock": False}, m=0x36, **kw)
+    c.step = 100
+    if hold is not None:
+        c.gym_hold_seen = (100, hold)
     c.mem = SimpleNamespace(data={"maps": {"54": {"visited": {k: 1 for k in visited}, "blocked": list(blocked)}}}, temp_blocked=set())
     return c
 
@@ -69,3 +73,21 @@ def test_brock_stand_tile_unmapped_walks_up_the_column_instead_of_idling():
     c = _gym(["4,4", "4,5", "3,5"], x=3, y=5)
     d = GoalTalk().step(c)
     assert d is not None and d.button in ("RIGHT", "UP")
+
+
+def test_brock_waits_while_the_gym_hold_is_active_unknown_or_stale():
+    assert not GoalTalk().applies(_gym(["4,2"], x=4, y=2, hold=True))
+    assert not GoalTalk().applies(_gym(["4,2"], x=4, y=2, hold=None))   # PlanGoal has not judged readiness yet
+    c = _gym(["4,2"], x=4, y=2); c.step = 100 + goal_talk.HOLD_FRESH + 1
+    assert not GoalTalk().applies(c)
+    assert GoalTalk().applies(_gym(["4,2"], x=4, y=2, hold=False))      # ready, or the stall hold was released
+
+
+def test_approach_gives_up_after_the_cap_and_skips_a_no_move_direction():
+    c = _gym(["4,4", "4,5"], x=4, y=4)
+    assert GoalTalk().step(c).button == "UP"
+    d = GoalTalk().step(c)               # still at (4,4): UP moved nothing, so it is not pressed again
+    assert d is None or d.button != "UP"
+    c = _gym(["4,4", "4,5"], x=4, y=4)
+    c.approach_state = {"steps": goal_talk.APPROACH_CAP, "last": None, "bad": set()}
+    assert GoalTalk().step(c) is None
