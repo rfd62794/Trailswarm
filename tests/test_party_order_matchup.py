@@ -90,3 +90,48 @@ def test_no_opponent_and_no_breakers_leaves_the_order(monkeypatch):
     _patch(monkeypatch, team, boss=[])
     monkeypatch.setattr(po_mod, "trainee_slot", lambda emu: None)
     assert po_mod.want_home(_ctx()) is None
+
+
+# run explore-20261112-072650: Charmander<->Pidgey flipped 12-34 steps apart (matchup lead vs exp rotation).
+def _raw(level, species=1, hp=10):
+    return SimpleNamespace(species=species, level=level, hp=hp)
+
+
+def _rotation_ctx(monkeypatch, raws):
+    team = [_mon("CHARMELEON", 20), _mon("RATTATA", 8)]
+    _patch(monkeypatch, team, boss=[])
+    monkeypatch.setattr(po_mod, "trainee_slot", lambda emu: None)
+    monkeypatch.setattr(po_mod, "read_party", lambda emu: raws)
+    ctx = _ctx(train_need=30)
+    ctx.step, ctx.emu = 100, None
+    team_plan.of(ctx)["breakers"] = (1,)
+    return ctx
+
+
+def test_recent_reorder_holds_the_rotation_flip(monkeypatch):
+    raws = [_raw(20, 1), _raw(8, 2)]
+    ctx = _rotation_ctx(monkeypatch, raws)
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx))   # a reorder 12 steps ago
+    assert po_mod.want_home(ctx) is None
+    ctx.step += po_mod.HOLD_STEPS                                              # the hold has expired
+    assert po_mod.want_home(ctx) is not None
+
+
+def test_level_or_faint_change_releases_the_hold(monkeypatch):
+    raws = [_raw(20, 1), _raw(8, 2)]
+    ctx = _rotation_ctx(monkeypatch, raws)
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po_mod.team_sig(ctx))
+    raws[1] = _raw(9, 2)                                                       # the trainee levelled up
+    assert po_mod.want_home(ctx) is not None
+    raws[1] = _raw(8, 2, hp=0)                                                 # or fainted
+    assert po_mod.want_home(ctx) is not None
+
+
+def test_recent_reorder_holds_the_matchup_flip(monkeypatch):
+    team = [_mon("CHARMELEON", 20), _mon("ODDISH", 20)]
+    _patch(monkeypatch, team)
+    monkeypatch.setattr(po_mod, "read_party", lambda emu: [_raw(20, 1), _raw(20, 2)])
+    ctx = _ctx()
+    ctx.step = 100
+    team_plan.of(ctx)["order_hold"] = (90, po_mod.team_sig(ctx))
+    assert po_mod.want_home(ctx) is None
