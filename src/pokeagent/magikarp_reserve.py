@@ -1,6 +1,6 @@
 """The Magikarp money reserve and the circle-back rule. Pure functions and constants: no emulator, no ctx.
 
-From Pewter on, the salesman's 500 yen (plus one cheap item of margin) is untouchable:
+From Brock's defeat on, the salesman's 500 yen (plus one cheap item of margin) is untouchable:
 ``budget.reserve`` reads ``magikarp_floor`` on every purchase decision, so the money is still there at
 the Mt Moon Pokemon Center (map 0x44). Arriving poor no longer settles the goal - it defers it
 (``explorer.magikarp_deferral``), and ``should_circle_back`` says when the trip back is worth it.
@@ -15,17 +15,20 @@ CIRCLE_BACK_STEP_CAP = 1500     # steps with the goal deferred before it settles
 WEST_OF_MT_MOON = frozenset({0x02, 0x0E, 0x0F})   # Pewter, Route 3, Route 4
 
 
-def reserve_active(st: dict, seen: set) -> bool:
-    """Pewter reached (0x02 in seen), no Magikarp owned or ever owned, goal not skipped, Mt Moon 1F (0x3B) not seen."""
-    return (0x02 in seen
+def reserve_active(st: dict, seen: set, brock_beaten: bool) -> bool:
+    """Brock beaten, no Magikarp owned or ever owned, goal not skipped, Mt Moon 1F (0x3B) not seen.
+
+    Not from Pewter: before Brock the yen buys the potions for the gym fight (Robert 2026-11-12, after a
+    bedroom run lost to Brock twice with the floor already holding 600 yen back)."""
+    return (brock_beaten
             and not st.get("had_magikarp")
             and not st.get("buy_skipped")
             and 0x3B not in seen)
 
 
-def magikarp_floor(st: dict, seen: set) -> int:
+def magikarp_floor(st: dict, seen: set, brock_beaten: bool) -> int:
     """MAGIKARP_PRICE + MAGIKARP_RESERVE_MARGIN while reserve_active, else 0."""
-    return MAGIKARP_PRICE + MAGIKARP_RESERVE_MARGIN if reserve_active(st, seen) else 0
+    return MAGIKARP_PRICE + MAGIKARP_RESERVE_MARGIN if reserve_active(st, seen, brock_beaten) else 0
 
 
 def should_circle_back(money: int, party_count: int, map_id: int, path_len: int | None) -> bool:

@@ -44,16 +44,18 @@ def lst(money):
 # --- the floor ---------------------------------------------------------------------------------------------------
 
 def test_magikarp_floor():
-    assert magikarp_reserve.magikarp_floor({}, {0x02}) == FLOOR                    # Pewter seen, goal live
-    assert magikarp_reserve.magikarp_floor({"had_magikarp": True}, {0x02}) == 0    # owned: settled
-    assert magikarp_reserve.magikarp_floor({"buy_skipped": True}, {0x02}) == 0     # skipped: settled
-    assert magikarp_reserve.magikarp_floor({}, {0x02, 0x3B}) == 0                  # Mt Moon 1F seen: settled
-    assert magikarp_reserve.magikarp_floor({}, set()) == 0                         # before Pewter
-    assert magikarp_reserve.magikarp_floor({}, {0x0D, 0x33}) == 0                  # Route 2 / Forest, Pewter unreached
+    f = magikarp_reserve.magikarp_floor
+    assert f({}, {0x02}, True) == FLOOR                        # Brock beaten, goal live
+    assert f({"had_magikarp": True}, {0x02}, True) == 0        # owned: settled
+    assert f({"buy_skipped": True}, {0x02}, True) == 0         # skipped: settled
+    assert f({}, {0x02, 0x3B}, True) == 0                      # Mt Moon 1F seen: settled
+    assert f({}, set(), False) == 0                            # before Pewter
+    assert f({}, {0x0D, 0x33}, False) == 0                     # Route 2 / Forest
+    assert f({}, {0x02, 0x36}, False) == 0                     # in Pewter, Brock not yet beaten: potions first
 
 
 def test_reserve_blocks_the_buy_that_would_cross_below_the_floor():
-    budget.set_magikarp_floor(magikarp_reserve.magikarp_floor({}, {0x02}))
+    budget.set_magikarp_floor(magikarp_reserve.magikarp_floor({}, {0x02}, True))
     assert budget.magikarp_floor() == FLOOR
     buy = lst(700)
     assert not buy or 700 - shopping.cost(buy) >= FLOOR     # nothing takes the balance below 600
@@ -63,7 +65,7 @@ def test_reserve_blocks_the_buy_that_would_cross_below_the_floor():
 
 def test_the_floor_lifts_once_the_goal_settles_and_buys_again():
     for st, seen in [({"had_magikarp": True}, {0x02}), ({"buy_skipped": True}, {0x02}), ({}, {0x02, 0x3B})]:
-        budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(st, seen))
+        budget.set_magikarp_floor(magikarp_reserve.magikarp_floor(st, seen, True))
         assert budget.magikarp_floor() == 0 and (POKE_BALL, 1) in lst(700)
 
 
@@ -192,3 +194,16 @@ def test_mt_moon_1f_settles_even_while_deferred():
     assert magikarp_goal_settled(emu, st, {0x3B, MT_MOON_CENTER})        # the cave settles the goal for good
     assert not magikarp_reserve.should_circle_back(700, 3, 0x3B, 5)      # never once the cave is entered
     plan_catches([], 1, {}, 0, 0, 0, [], {}, [], 10)                     # sanity: empty plan needs no money path
+
+
+def test_tick_holds_no_reserve_until_brock_is_beaten():
+    """Robert 2026-11-12: before Brock the yen buys the gym potions; the floor starts with the badge."""
+    class Ctx:
+        seen_maps = {0x02, 0x36}
+        def __init__(self, beaten): self.beaten = beaten
+        def goals(self): return {"buy_magikarp": False, "beat_brock": self.beaten}
+        def get(self, k, d=None): return d
+    magikarp_deferral.tick(Ctx(False), 0x02)
+    assert budget.magikarp_floor() == 0
+    magikarp_deferral.tick(Ctx(True), 0x02)
+    assert budget.magikarp_floor() == FLOOR
