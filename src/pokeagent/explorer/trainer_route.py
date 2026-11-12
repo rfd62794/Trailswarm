@@ -101,10 +101,26 @@ def next_target(opts: list[TrainerOption]) -> TrainerOption | None:
                key=lambda o: (o.steps, o.entry.idx), default=None)
 
 
+LEADER_GOALS = {"BROCK": "beat_brock", "MISTY": "beat_misty", "LT.SURGE": "beat_surge", "ERIKA": "beat_erika",
+                "KOGA": "beat_koga", "SABRINA": "beat_sabrina", "BLAINE": "beat_blaine", "GIOVANNI": "beat_giovanni"}
+
+
+def is_goal_leader(ctx, entry: TrainerEntry) -> bool:
+    """The gym leader whose ``beat_*`` goal is still unmet: the agent must walk up to and fight them, so their
+    sight line (which includes the stand tile in front of them) is never avoided or blocked."""
+    goal = LEADER_GOALS.get(entry.cls)
+    try:
+        return bool(goal) and not ctx.goals().get(goal)
+    except Exception:
+        return False
+
+
 def block_sight(ctx, opt: TrainerOption, goal_fn, quiet: bool = False) -> str:
     """Routing-only avoidance: temp-block the sight line for AVOID_BLOCK_FRAMES, but ONLY while a route to
     the goal still exists with those tiles blocked. When the sight line IS the only route nothing is
     blocked and the decision downgrades to ``engage-forced`` (Nugget Bridge is a single lane)."""
+    if is_goal_leader(ctx, opt.entry):
+        return "engage-leader"  # Misty 2026-11-12: 26 blocks of (4,3), the very tile the fight starts from
     tiles = {(opt.entry.map, x, y) for x, y in sight_tiles(opt.entry)}
     now = {t for t, until in ctx.mem.temp_blocked.items() if until > ctx.frame}
     g = WorldGraph(ctx.mem.data["maps"])

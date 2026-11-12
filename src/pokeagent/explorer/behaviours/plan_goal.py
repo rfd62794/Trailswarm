@@ -144,7 +144,7 @@ class PlanGoal(BehaviourBase):
                 st["gate_skip_logged"] = ctx.stage_goal
                 why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
                 ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
-        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: Brock is only walked to when no hold is active
+        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: a gym leader is only walked to when no hold is active
         if hold and st.get("gate_lifted") is not None:
             ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:

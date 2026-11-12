@@ -1,4 +1,4 @@
-"""goal_talk: a goal that is only met by talking to one known person (the S.S. Anne captain's HM01) walks there and talks.
+"""goal_talk: a goal that is only met by talking to one known person (the S.S. Anne captain's HM01, a gym leader) walks there and talks.
 
 Exploration only presses A at a person it has never talked to, so once the captain's text is memorised (``talked`` > 0, shared maps.json)
 nobody ever rubs his back again and the HM is never given (2026-11-07: Cut left on the table, goal "captain done" fired on entering the
@@ -16,8 +16,10 @@ from pokeagent.explorer.world import WorldGraph
 GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain"),
               "deliver_parcel": (0x28, 5, 3, "UP", "Prof. Oak"),
               # Brock stands static at (4,1) in Pewter Gym (0x36; after_victory logs "next BROCK p1 (4,1)"): fought from (4,2) facing up.
-              "beat_brock": (0x36, 4, 2, "UP", "Brock")}
-APPROACH = ("beat_brock",)  # goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
+              "beat_brock": (0x36, 4, 2, "UP", "Brock"),
+              # Misty stands static at (4,2) in Cerulean Gym (0x41; run log "next MISTY p1 (4,2)"): fought from (4,3) facing up.
+              "beat_misty": (0x41, 4, 3, "UP", "Misty")}
+APPROACH = ("beat_brock", "beat_misty")  # gym-leader goals: goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
 REQUIRES = {"deliver_parcel": "oaks_parcel"}  # goal -> the goal that must already be met before the talk is wanted
 HOLD_FRESH = 30  # steps a PlanGoal readiness verdict stays good; GoalTalk preempts PlanGoal, so a stale one lets PlanGoal run and refresh it
 BAD_TTL = 50  # steps a no-move direction stays ruled out (an NPC or a dialog tick is not a wall)
@@ -30,7 +32,7 @@ def pending(ctx: ExplorerContext) -> tuple[str, tuple] | None:
     for goal, spec in GOAL_TALKS.items():
         if not goals.get(goal) and ctx.view.m == spec[0] and (goal not in REQUIRES or goals.get(REQUIRES[goal])):
             if goal in APPROACH and not _hold_clear(ctx):
-                continue  # an unready team inside the gym is pulled out by PlanGoal's hold (or the hold is unknown): not Brock's to walk to
+                continue  # an unready team inside the gym is pulled out by PlanGoal's hold (or the hold is unknown): not the leader's to walk to
             return goal, spec
     return None
 
@@ -80,7 +82,7 @@ class GoalTalk(BehaviourBase):
                 return Decision(facing, "goal_talk_face", f"goal {goal}: facing {who} ({facing})")
             ctx.goal_talk_tries[goal] = ctx.goal_talk_tries.get(goal, 0) + 1
             return Decision("A", "goal_talk", f"goal {goal} is only met by talking to {who}: A (try {ctx.goal_talk_tries[goal]}/{MAX_TALKS})")
-        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
+        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked) - {(m, sx, sy)}  # a temp block on our own stand tile must never shut the path
         p = g.path((m, v.x, v.y), lambda n: n == (m, sx, sy))
         if p:
             return Decision(p[0], "goal_talk_walk", f"goal {goal}: {len(p)} steps to ({sx},{sy}) to talk to {who}")
