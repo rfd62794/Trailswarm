@@ -168,16 +168,19 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
       (a one-mon party is TEAM_MIN-short: not ready, ``weakest`` is None and the text says "no second member").
     - ``weakest`` = the not-useful non-lead member with the lowest level (ties: lowest slot)."""
     from pokeagent.magikarp import EVOLVE_LEVEL  # deferred: keep this pure module free of the emulator import
-    fighters = [c for c in party if c.name != "MAGIKARP"]
+    theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
+    moves = table(kb, "moves")
+    if not theirs or not moves or not any(c.name != "MAGIKARP" for c in party):
+        return None
+    chart = _chart(kb)
+    # The lead is the best opener, NOT whoever happens to sit in slot 0: judging slot 0 made a reorder flip the
+    # verdict ("raise CHARMANDER to L18" vs "lead needs L27 (lead L9)" for PIDGEY; run explore-20261112-072650).
+    lead_i = max((i for i, c in enumerate(party) if c.name != "MAGIKARP"),
+                 key=lambda i: (best_move(party[i], theirs[0], chart, moves)[0] / max(theirs[0].hp, 1), party[i].level, -i))
+    fighters = [party[lead_i]] + [c for i, c in enumerate(party) if i != lead_i and c.name != "MAGIKARP"]
     lead = assess(fighters, boss, label, kb)
     if lead is None:
         return None
-    theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
-    moves = table(kb, "moves")
-    if not theirs or not moves:
-        return None
-    chart = _chart(kb)
-    lead_i = next(i for i, c in enumerate(party) if c.name != "MAGIKARP")
     lead_c = party[lead_i]
     hurt = replace(lead_c, hp=int(lead_c.hp * LEAD_HURT))
     others = [(i, c) for i, c in enumerate(party) if i != lead_i]
