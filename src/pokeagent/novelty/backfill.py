@@ -58,7 +58,7 @@ def milestone_features(milestones: dict, campaign_goals: list) -> dict:
         if isinstance(d.get("item"), int):
             keys.append(f"i:{d['item']}")
         for h in hits if isinstance(hits, list) else []:
-            if isinstance(h, dict) and h.get("run"):
+            if isinstance(h, dict) and h.get("run") and not h.get("skipped"):
                 out.setdefault(h["run"], set()).update(keys)
     return out
 

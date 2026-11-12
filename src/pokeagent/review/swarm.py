@@ -73,10 +73,10 @@ def _attempt(run: Path, meta: dict, stop: str, milestones: dict) -> dict:
     if si is not None:
         a = si.build_attempt(run, meta, stop, milestones)
         return {"solved": a["solved"], "frames": a["frames"], "steps": a["steps"], "est": a["est"]}
-    gf = next((r for r in jsonl(run / "goal_frames.jsonl") if r.get("goal") == stop), None)
+    gf = next((r for r in jsonl(run / "goal_frames.jsonl") if r.get("goal") == stop and not r.get("skipped")), None)
     est = False
     if gf is None and not (run / "goal_frames.jsonl").exists():
-        ms = next((e for e in (milestones or {}).get(stop, []) if e["run"] == run.name), None)
+        ms = next((e for e in (milestones or {}).get(stop, []) if e["run"] == run.name and not e.get("skipped")), None)
         if ms:
             gf, est = {"step": ms["step"], "frame": round(ms["step"] * EST_FRAMES_PER_STEP)}, True
     return {"solved": gf is not None, "frames": gf["frame"] if gf else 0,

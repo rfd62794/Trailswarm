@@ -381,3 +381,38 @@ def test_main_counts_error_separately(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(tool, "check_case", lambda c, i, s: ("error", f"ERROR {c.name}: x"))
     assert tool.main(["--case", CASE.name]) == 1
     assert "0 failed, 1 errored" in capsys.readouterr().out
+
+
+# --- skipped goal rows: settled, not reached ----------------------------------------------------------
+
+def test_skipped_goal_row_fails_as_skipped_not_never_reached(tmp_path):
+    run = make_run(tmp_path, goal_step=None, goal="buy_magikarp")
+    (run / "goal_frames.jsonl").write_text(
+        json.dumps({"goal": "buy_magikarp", "step": 40, "frame": 4210, "skipped": True}) + "\n", encoding="utf-8")
+    v = judge_run(run, "buy_magikarp", 105)
+    assert not v.passed and v.reasons == ["goal buy_magikarp was skipped (not reached)"]
+
+
+def test_the_same_row_without_the_flag_passes(tmp_path):
+    run = make_run(tmp_path, goal_step=None, goal="buy_magikarp")
+    (run / "goal_frames.jsonl").write_text(
+        json.dumps({"goal": "buy_magikarp", "step": 40, "frame": 4210}) + "\n", encoding="utf-8")
+    v = judge_run(run, "buy_magikarp", 105)
+    assert v.passed and v.goal_step == 40
+
+
+def test_reached_rows_drops_skipped_and_non_dicts():
+    from pokeagent.review.load import reached_rows
+    rows = [{"goal": "a", "step": 1}, {"goal": "b", "skipped": True}, "junk", {"goal": "c", "skipped": False}]
+    assert reached_rows(rows) == [rows[0], rows[3]]
+
+
+def test_load_run_goal_frames_excludes_skipped_rows(tmp_path):
+    run = make_run(tmp_path, goal_step=None, goal="buy_magikarp")
+    (run / "goal_frames.jsonl").write_text(
+        json.dumps({"goal": "buy_magikarp", "step": 40, "frame": 4210, "skipped": True}) + "\n"
+        + json.dumps({"goal": "to_route4", "step": 20, "frame": 4000}) + "\n", encoding="utf-8")
+    from pokeagent.review import diff, load
+    data = load.load_run(run)
+    assert [r["goal"] for r in data.goal_frames] == ["to_route4"]
+    assert "buy_magikarp" not in diff._goal_times(data)

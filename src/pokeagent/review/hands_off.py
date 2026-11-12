@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from pokeagent.review.load import jsonl, load_json
+from pokeagent.review.load import jsonl, load_json, reached_rows
 
 
 @dataclass(frozen=True)
@@ -40,8 +40,11 @@ def _press_reasons(rows: list[dict], corrupt: int) -> tuple[list[str], int]:
 
 def _goal_reasons(run_dir: Path, goal: str, budget: int) -> tuple[list[str], int | None]:
     path = run_dir / "goal_frames.jsonl"
-    row = next((r for r in jsonl(path) if r.get("goal") == goal), None)
+    rows = jsonl(path)
+    row = next((r for r in reached_rows(rows) if r.get("goal") == goal), None)
     if row is None:
+        if any(r.get("goal") == goal and r.get("skipped") for r in rows):
+            return [f"goal {goal} was skipped (not reached)"], None
         initial = load_json(run_dir / "meta.json").get("initial_goals") or []
         if isinstance(initial, list) and goal in initial:
             return [f"goal {goal} was already true at the start state (initial_goals)"], None

@@ -39,3 +39,12 @@ def _clear_blackout_tax():
     training.set_blackout_tax({})
     yield
     training.set_blackout_tax({})
+
+
+@pytest.fixture(autouse=True)
+def _clear_magikarp_floor():
+    """budget._magikarp_floor is module-global; no test may leak the Magikarp reserve into another."""
+    from pokeagent.explorer.economy import budget
+    budget.set_magikarp_floor(0)
+    yield
+    budget.set_magikarp_floor(0)

@@ -37,6 +37,11 @@ def jsonl(path: Path, skipped: dict | None = None) -> list[dict]:
     return rows
 
 
+def reached_rows(rows: list[dict]) -> list[dict]:
+    """Rows that count as reached: dict rows without the ``skipped`` flag (a skipped goal settled, not reached)."""
+    return [r for r in rows if isinstance(r, dict) and not r.get("skipped")]
+
+
 def load_json(path: Path) -> dict:
     """One JSON object file; {} when missing or malformed."""
     try:
@@ -108,7 +113,7 @@ def load_run(run_dir: Path) -> RunData:
         event_rows=[r for r in raw_decisions if "event" in r],
         transitions=jsonl(run_dir / "transitions.jsonl", skipped),
         levels=jsonl(run_dir / "levels.jsonl", skipped),
-        goal_frames=jsonl(run_dir / "goal_frames.jsonl", skipped),
+        goal_frames=reached_rows(jsonl(run_dir / "goal_frames.jsonl", skipped)),
         battles=[r for r in jsonl(runs_dir / "battles.jsonl", skipped) if r.get("run") == run_dir.name],
         dossier=load_json(runs_dir / "stalls" / f"{run_dir.name}.json") or None,
         milestones=load_json(runs_dir / "milestones.json"),

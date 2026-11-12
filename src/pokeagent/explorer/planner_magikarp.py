@@ -21,6 +21,8 @@ def salesman_pics(maps: dict) -> set:
 
 
 def magikarp_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: str) -> tuple[str, str] | None:
+    if goals.get("_buy_deferred"):
+        return None  # deferred (poor at 0x44): keep earning west of Mt Moon instead of walking into the center
     if pos[0] != MT_MOON_CENTER:
         p = g.path(pos, lambda n: n[0] == MT_MOON_CENTER)
         if p:

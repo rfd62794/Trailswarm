@@ -107,11 +107,11 @@ def build_attempt(run: Path, meta: dict, stop: str, milestones: dict | None = No
     (steps x calibrated frames per press) and flagged ``est`` - good for solve rates, never trusted as a best.
     The scorecard fields (git_sha/ts/blackouts/stalled/provenance/loops) are additive: runs without them
     grade as unknown."""
-    gf = next((r for r in _jl(run / "goal_frames.jsonl") if r["goal"] == stop), None)
+    gf = next((r for r in _jl(run / "goal_frames.jsonl") if r["goal"] == stop and not r.get("skipped")), None)
     steps = len(_jl(run / "transitions.jsonl"))
     est = False
     if gf is None and not (run / "goal_frames.jsonl").exists():
-        ms = next((e for e in (milestones or {}).get(stop, []) if e["run"] == run.name), None)
+        ms = next((e for e in (milestones or {}).get(stop, []) if e["run"] == run.name and not e.get("skipped")), None)
         if ms:
             gf, est = {"step": ms["step"], "frame": round(ms["step"] * per_step)}, True
     tag = meta.get("tag") or ""
