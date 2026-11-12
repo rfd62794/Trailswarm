@@ -267,3 +267,17 @@ Nothing for the build. After merge, Claude runs `tests/rom/test_event_flags_rom.
 - Exec(uv run python --version)
 - Exec(uv run pytest)
 - Exec(git status)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-12 15:56 · robert-claude-laptop · none → Queued — Approve after Party_View_Migration_Constants (#213), _Lead and Level_Banded_Grind merge
+<!-- queue:end -->
