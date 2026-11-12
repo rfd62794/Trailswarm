@@ -259,12 +259,14 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-magikarp-money-reserve-directive |
 | Base branch | - |
+| Base commit | 779718d27c13bffa91fdd337ac9861b947802eb8 |
 
 **Status log**
 - 2026-11-12 07:53 · robert-claude-laptop · none → Queued — Robert asked 2026-11-12 ("Write it up for Devin"); PR #203 merged 9846704 after 3 review rounds
 - 2026-11-12 07:54 · robert-claude-laptop · Queued → Approved — lint override: line 222 names kb/rom_tables.json only to forbid using it (gitignored, absent in the worktree); not a dependency
+- 2026-11-12 09:54 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-magikarp-money-reserve-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7840RDCMYNQNVMGVP0ZY29W
 <!-- queue:end -->
