@@ -267,11 +267,12 @@ Nothing for the build. After merge, Claude (controller) runs the recheck and the
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-12 15:56 · robert-claude-laptop · none → Queued — Robert 2026-11-12: auto-assume known addresses, verify over time, discover unmapped; merged via PR #212
+- 2026-11-12 15:56 · robert-claude-laptop · Queued → Approved — lint override: Paths it cites under tools/ and src/pokeagent/ramlab that are not on main are new files this directive creates (Scope lists them as new).
 <!-- queue:end -->
