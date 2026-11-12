@@ -190,3 +190,42 @@ def test_hold_cap_releases_even_when_the_budget_never_lifts(tmp_path, monkeypatc
     ctx.step = 100 + STALL_HOLD_CAP
     PlanGoal().step(ctx)
     assert any("gym hold lifted" in ln for ln in lines)                                      # the cap opens the gym
+
+
+def _held_ctx(tmp_path, monkeypatch):
+    ctx = _full_ctx(tmp_path)
+    _gate_patch(monkeypatch)
+    ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}
+    ctx.step = 100
+    PlanGoal().step(ctx)
+    return ctx
+
+
+def test_battle_frames_and_a_readiness_flap_do_not_reset_the_hold_clock(tmp_path, monkeypatch):
+    ctx = _held_ctx(tmp_path, monkeypatch)
+    st = plan_goal.team_plan.of(ctx)
+    assert st["stall_hold"][0] == 100
+    monkeypatch.setattr(plan_goal, "boss_need_for", lambda goals, party: None)     # battle frame: party unread, nv None
+    ctx.step = 200
+    PlanGoal().step(ctx)
+    ready = SimpleNamespace(ready=True, need=15, text="ready", team_score=1.0, weak_slots=(), lead_slot=0)
+    monkeypatch.setattr(plan_goal, "boss_need_for", lambda goals, party: ready)    # one-step flap to ready
+    ctx.step = 300
+    PlanGoal().step(ctx)
+    assert st["stall_hold"][0] == 100                                              # still the first engagement
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")       # the stage moved on: now it clears
+    ctx.step = 400
+    PlanGoal().step(ctx)
+    assert "stall_hold" not in st or st["stall_hold"][0] != 100
+
+
+def test_a_blackout_after_a_win_still_releases_the_hold(tmp_path, monkeypatch):
+    ctx = _held_ctx(tmp_path, monkeypatch)
+    pl = plan_goal.party_log.of(ctx)
+    pl.blackouts += 1                                                              # blackout while held...
+    ctx.blackouts_row = 0                                                          # ...then a win zeroes the row counter
+    lines = []
+    ctx.log = lambda text, tag=None: lines.append(text)
+    ctx.step = 200
+    PlanGoal().step(ctx)
+    assert any("gym hold lifted" in ln for ln in lines)

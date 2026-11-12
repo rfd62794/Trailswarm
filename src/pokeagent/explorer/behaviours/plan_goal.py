@@ -12,7 +12,7 @@ from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
+from pokeagent.explorer import party_log, area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 from pokeagent.grind import stage_maps
@@ -140,12 +140,13 @@ class PlanGoal(BehaviourBase):
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not nv.ready and gym is not None
-        if not hold:
-            st.pop("stall_hold", None)  # the hold clock runs from first engagement (not from a budget lift) until it ends
-            st.pop("lifted_need", None)
+        if st.get("stall_hold_goal") not in (None, ctx.stage_goal):
+            st.pop("stall_hold", None)  # the clock runs from first engagement until the STAGE moves on; a battle frame
+            st.pop("lifted_need", None)  # (party unread, nv None) or a one-step readiness flap must never reset it
+        st["stall_hold_goal"] = ctx.stage_goal
         lifted = st.get("gate_lifted") is not None
         if hold and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]) if lifted else "without a level gain",
-                                         ctx.step, ctx.blackouts_row):
+                                         ctx.step, party_log.of(ctx).blackouts):  # monotonic: a win resets blackouts_row
             hold = False  # budget spent (ceiling/blackout), the hold cap, or a blackout while held: never locked out forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal
