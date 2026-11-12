@@ -216,7 +216,7 @@ Controller (Claude) steps, not Devin's. They must happen before the ROM tests ca
 | Branch | directive/pokeagent-party-ram-state-tests-directive |
 | Base branch | - |
 | Base commit | c18ac0803665ce5c59dcb05c99c5d26304255785 |
-| Head commit | 7f1831afa70e85a7d43f1712e6024c9299605273 |
+| Head commit | 12ca45ed1d7a51b58e4f2434b1f46564bd1d1a36 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**

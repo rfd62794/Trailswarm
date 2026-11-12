@@ -408,7 +408,7 @@ Nothing for the build. After merge, Claude confirms on the laptop that `PartyVie
 | Branch | directive/pokeagent-party-view-directive |
 | Base branch | - |
 | Base commit | 2e3edfaef299aba9fe39f1aee58cca35311633af |
-| Head commit | e5b6a455f1960c6b0cf80a1963a972930bcfb24a |
+| Head commit | 45a097e1c8b23dd421e2c58ea735c8c020e934f0 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
