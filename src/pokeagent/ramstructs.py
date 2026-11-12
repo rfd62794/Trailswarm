@@ -111,18 +111,37 @@ _PARTY_MEMO_CAP = 8     # a live run shares one emulator; the test suite makes t
 
 
 def _party_key(emu) -> tuple | None:
-    """(frames, write-revision) a party read stays valid for: a press ticks frames forward and a
-    RAM write or state load bumps ``_ram_rev``, so either change forces a re-read. An emulator with
-    no frames counter (a stub or mock) bypasses the memo entirely."""
+    """(agent-step marker, write-revision) a party read stays valid for. ``Engine.step`` bumps
+    ``emu.agent_step`` once per decision cycle (and ``begin_press`` bumps it for claude/human
+    presses), so every read inside one step - however many frames the press ticks - shares a single
+    decode; an emulator without the marker keeps the old per-frame key. A RAM write or state load
+    bumps ``_ram_rev`` and forces a re-read either way. An emulator with neither marker nor frames
+    counter (a stub or mock) bypasses the memo entirely."""
     try:
-        return (int(emu.frames), int(getattr(emu, "_ram_rev", 0)))
+        step = getattr(emu, "agent_step", None)
+        if step is None:
+            step = int(emu.frames)
+        return (int(step), int(getattr(emu, "_ram_rev", 0)))
     except (TypeError, ValueError, AttributeError):
         return None
 
 
+def note_agent_step(emu) -> None:
+    """Bump the emulator's agent-step marker once per decision cycle. Only emulators that carry the
+    marker (``PyBoyEmulator.agent_step``) are touched: ``FakeEmulator`` and stubs keep the per-frame
+    memo. Never raises - a marker must not be able to stop a step."""
+    try:
+        if not hasattr(emu, "agent_step"):
+            return
+        emu.agent_step = (getattr(emu, "agent_step", None) or 0) + 1
+    except Exception:
+        pass
+
+
 def _memoized(emu, kind: str, read):
-    """One RAM read per emulator frame for the party block: the baseline profile counted ~6
-    read_party calls per step, all inside one frame window, all decoding identical bytes."""
+    """One RAM read per agent step for the party block: the profile counted ~12 read_party calls per
+    step and ~3 real decodes, because a press ticks enough frames to roll a per-frame key several
+    times inside one decision cycle."""
     key = _party_key(emu)
     if key is None:
         return read()
@@ -148,7 +167,7 @@ def _read_party(emu: Emulator) -> list[PartyMon]:
 
 
 def read_party(emu: Emulator) -> list[PartyMon]:
-    """The party as PartyMon records, one per occupied slot; one RAM read per emulator frame."""
+    """The party as PartyMon records, one per occupied slot; one RAM read per agent step."""
     return list(_memoized(emu, "party", lambda: _read_party(emu)))
 
 

@@ -15,6 +15,7 @@ from pokeagent.explorer.press_interact import record_interaction
 from pokeagent.explorer.press_track import track_progress
 from pokeagent.explorer.text_press import fast_a_press
 from pokeagent.goals import GOALS, bag_contents, check_goals, goals_brief
+from pokeagent.ramstructs import note_agent_step
 
 
 def settle_position(ctx: ExplorerContext, before, max_frames=600):
@@ -42,6 +43,8 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
     name, source = fr.name, fr.source
     ctx.last_press = name
     before = ctx.pos(); ctx.step += 1
+    if source != "agent":
+        note_agent_step(ctx.emu)  # a claude/human press is its own step: party reads must see it
     tm = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
     box_before = box_open(tm)
     goals_before = check_goals(ctx.emu, ctx)

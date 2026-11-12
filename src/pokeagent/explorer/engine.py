@@ -17,6 +17,7 @@ from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
 from pokeagent.novelty.features import Snapshot, read_snapshot
+from pokeagent.ramstructs import note_agent_step
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
 
@@ -42,6 +43,7 @@ class Engine:
 
     def step(self) -> Decision | None:
         ctx = self.ctx
+        note_agent_step(ctx.emu)  # one party decode per decision cycle, not per frame (ramstructs)
         if ctx.bandit is not None:
             ctx.bandit.begin_step()
         seed_initial_goals(ctx)  # before the first decision, not after the first press

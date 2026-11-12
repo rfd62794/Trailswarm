@@ -77,6 +77,9 @@ class Emulator(Protocol):
 class PyBoyEmulator:
     """Real emulator driven through PyBoy; visible window unless headless."""
 
+    agent_step = None  # ramstructs party-memo marker: Engine.step bumps it once per decision cycle;
+                       # stays None for emulators no Engine drives, which keep the per-frame memo
+
     def __init__(self, rom_path: Path, *, headless: bool = True, game: GameSpec = RED) -> None:
         rom_path = Path(rom_path)
         if not rom_path.is_file():
