@@ -156,6 +156,7 @@ def _memoized(emu, kind: str, read):
 1. `src/pokeagent/ram_symbols.py` <!-- new: src/pokeagent/ram_symbols.py --> : one constant per symbol above, defined once.
 2. `src/pokeagent/party_view.py` <!-- new: src/pokeagent/party_view.py --> : `PartySlot`, `PartyView`, `BattleView`, `read_party_view(emu)`, `read_battle_view(emu)`.
 3. Hub rewires (small edits): `ramstructs.py` imports its constants from `ram_symbols` (names stay importable from `ramstructs`); `magikarp.fighter`, `perceive.party_hp`, `perceive.lead_level`, `perceive.true_lead_level` become thin wrappers over `party_view`.
+3b. Emergency routing (section 3.3b): `perceive.party_needs_heal` plus explicit edits to the heal/restock/planning callers of `party_hp`, so that changing `party_hp` to the fighter's HP loses no "a member fainted" trigger.
 4. Tests (synthetic, no ROM): `tests/test_party_view.py` <!-- new: tests/test_party_view.py -->, `tests/test_ram_symbols.py` <!-- new: tests/test_ram_symbols.py -->.
 
 Size rules: both new modules stay under 250 lines; no file you touch crosses 600.
@@ -198,6 +199,10 @@ class PartyView:
     @property
     def lead(self) -> PartySlot | None
     def fighter(self) -> PartySlot | None
+    @property
+    def fainted_slots(self) -> tuple[int, ...]   # indexes of OCCUPIED slots (species != 0) with hp <= 0
+    @property
+    def any_fainted(self) -> bool                # bool(fainted_slots)
 ```
 
 Build `slots` from `ramstructs.read_party(emu)` (that read is already memoized per frame) plus one `emu.read_range` for the nicknames, memoized under a new kind through `ramstructs._memoized`. Do not add a second memo dict. Do not decode party bytes a second way.
@@ -253,6 +258,27 @@ Each of these is a few lines; behaviour for non-fainted-lead parties must not ch
 
 The fix this buys: a fainted lead with a live second mon now reports the second mon's HP and level to every caller of those four functions.
 
+### 3.3b No emergency may be lost (controller requirement, 2026-11-12)
+
+Before this change a fainted lead made `party_hp` return `(0, max)`, and several callers read that as "go heal / do not fight / do not start something". With the fighter's HP, a healthy second mon hides that. Every such caller must keep its trigger through an explicit signal. Measured list of `party_hp(...)` callers on origin/main (`git grep -n "party_hp(" -- src`), each with what to do:
+
+Out-of-battle heal, restock, field-use and planning decisions: the old trigger was "lead HP low or zero". New trigger: `party_needs_heal(emu, below)` = `view.any_fainted or (fighter max_hp > 0 and fighter hp / max_hp < below)` (define it in `perceive.py`, built on `read_party_view`; `below` is the fraction the caller already uses). Callers:
+- `behaviours/restock.py:31` (`hp / mx < 0.5`, "heal first").
+- `behaviours/frontier.py:111,140` (`< 0.4`: the `weak` flag and the explore-burst gate).
+- `behaviours/menu.py:68` (PC heal option, `hp < mx`): use `any_fainted or hp < mx`.
+- `behaviours/plan_goal.py:35`: `hp_now, mx_now` feed `train_route.step` and `_grind_step`, which need numbers, so keep passing the fighter's numbers; where plan_goal only asks "are we hurt" use `party_needs_heal(emu, 1.0)`.
+- `behaviours/team_hunt.py:66` (`hp / mx >= TEAM_HUNT_MIN_HP` gate): not ok when `any_fainted`.
+- `explorer/grind_episode.py:230` (`hp / mx < MIN_HP_FRACTION` with no potion): add `or any_fainted`.
+- `explorer/economy/outside_use.py:77` (field potion): the existing `0 < hp < mx * FIELD_BELOW` already excludes a fainted fighter; keep it on the fighter's HP and add no potion case for a fainted bench mon.
+
+In-battle decisions: the fighter's HP IS the right signal (the verified active slot, or the lead); a fainted bench mon must not make a healthy fighter look weak. Callers: `behaviours/battle.py:157` (`weak = hp / mx < 0.4`), `behaviours/battle.py:267` (HP at battle end), `behaviours/battle_run.py:33` (`hp / mx >= CATCH_MIN_HP`), `bandit/hook.py:30` (shield `hp / mx < FIGHT_FLOOR`), `bandit/hook.py:70` (context key), `behaviours/cave_escape.py:25` (`0 < hp <= mx * CRITICAL_HP`). All stay on `party_hp` (now the fighter's HP); no edit beyond the hub rewire. When the lead fainted and the second mon is fighting this is the intended correction: they judge the mon that is actually fighting.
+
+Log-only: `behaviours/procedures.py:72` (a log line). No change.
+
+`status_care` (`behaviours/status_care.py`, `explorer/status_care.py`) does NOT call `party_hp`: it builds one `MonStatus` per party slot from `read_party` (`_rows`), and `decide` considers `living = [m for m in party if m.hp > 0]` and every sick slot, so a fainted slot 0 already reaches it. Do not change it; pin it with a test (below) so it stays that way.
+
+If you find another reader of `party_hp` / lead HP / `fighter()` that compares it with 0 or uses it for a heal, run, blackout or status decision and is not listed (re-run `git grep -n -E "party_hp\(|fighter\(" -- src`), route it by the same rule and list it in the PR description. The direct 0xD16C readers (`goals.py`, `legs/states.py`, `procedures/predicates.py`) belong to the migration directive, which must keep this rule.
+
 ### 3.4 Unit tests, `tests/test_party_view.py`
 
 All with `FakeEmulator`; build memory with a helper `mem(mons, *, in_battle=0, battle=None, ...)` that writes the exact byte layout pasted in section 1. At least:
@@ -264,13 +290,16 @@ All with `FakeEmulator`; build memory with a helper `mem(mons, *, in_battle=0, b
 - verified active slot: two-mon party, `wIsInBattle` 1, `wBattleMonSpecies` = slot 1's species, `wPlayerMonNumber` = 1 gives `active_slot == 1`; `wPlayerMonNumber` stale 0 but exactly one slot has the species gives that slot; two slots share the species and the number is wrong gives `None`; `wIsInBattle` 0 with a loaded wBattleMon gives `None` (the out-of-battle gate).
 - Magikarp rule: party `[MAGIKARP, mon]` out of battle: `fighter()` is the non-Magikarp mon; in battle with a loaded battle mon: `magikarp.fighter` returns the battle mon's live values; a fainted non-Magikarp with a live one: the live one.
 - `BattleView`: kind 2 with `wEnemyPartyCount` 3 and three structs gives three `EnemyPartyMon`; kind 1 with the same bytes gives `enemy_party == ()`; `participants` from both flag bytes; bit above `count` ignored; kind 3 reads 0.
+- emergencies kept (3.3b), each with slot 0 fainted (HP 0, max 35) and a healthy slot 1 (HP 32/32): `party_needs_heal(emu, 0.5)` is True and `party_hp` is (32, 32); `PartyView.fainted_slots == (0,)` and `any_fainted` is True; a party with an empty slot or no fainted member gives `any_fainted` False; `Restock` (the `hp / mx < 0.5` path) still heals first, `frontier`'s `weak` flag is still True, and `grind_episode`'s hurt check still fires (test each through the helper its existing test file uses); a healthy party leaves all of them False.
+- status_care still triggers: with slot 0 fainted and slot 1 poisoned and low (status byte 0x08), `behaviours.status_care.StatusCare().applies(ctx)` is True and `explorer.status_care.decide(rows, bag, steps_to_heal)` (rows built as `_rows(emu)` does) returns the same `CareDecision` as for a party made of only the poisoned mon; a fainted slot 0 alone still yields the decision `decide` gave before the change (call `decide` directly on hand-built `MonStatus` rows). Model it on `tests/test_status_care_behaviour.py`.
+- in-battle: with slot 0 fainted and slot 1 the verified active slot at 25/32, `party_hp` is (25, 32), so `battle.py`'s `weak` stays False; a fainted bench mon with a healthy active fighter does not make `party_hp` zero.
 - per-frame memo: count `FakeEmulator.read_range` calls (wrap it) across three `read_party_view` calls with no tick or write: the RAM read count of the first call equals the count after the third; after `emu.tick(1)` the next call reads again.
 - `ramstructs.PARTY_COUNT`, `PARTY_MON1`, `PLAYER_MON` and `magikarp.MAGIKARP` are still importable and equal the pasted values.
 - circular import guard: `import pokeagent.party_view` in a fresh interpreter-state test (`importlib.import_module` after popping it from `sys.modules`) succeeds; `party_view` imports only `ram_symbols`, `ramstructs` and the standard library.
 
 ## 4. What NOT to do
 
-- Do not migrate any caller other than the four hub functions in 3.3 and the `ramstructs` / `magikarp` constant imports. `bring_out`, `cave_topup.fighter_slot`, `item_policies/view.fighter_slot_of`, `ram_event_kinds`, `interaction_types`, `xitems_battle`, `item_policies/policy.py`, `menu.py`, `item_use.py` and the duplicate-literal sweep are the next directive's.
+- Do not migrate any caller other than the four hub functions in 3.3, the emergency routing in 3.3b, and the `ramstructs` / `magikarp` constant imports. `bring_out`, `cave_topup.fighter_slot`, `item_policies/view.fighter_slot_of`, `ram_event_kinds`, `interaction_types`, `xitems_battle`, `item_policies/policy.py`, `menu.py`, `item_use.py` and the duplicate-literal sweep are the next directive's.
 - Do not change `ramstructs.active_slot` or any existing test's expected value to make something pass; if an existing test fails, stop and say which one in the PR description.
 - Do not touch `src/pokeagent/data/ram_map.json` or `ram_names.json` (verification flags are earned by ROM tests, not by this PR).
 - Do not run a ROM, an emulator or `tools/`; do not search or glob for a ROM or states; none exist in this worktree.
@@ -330,6 +359,7 @@ Expected: only the files named in section 2.
 
 - [ ] `ram_symbols.py` defines each symbol in section 3.1 once, each equal to the pasted address. <!-- test: tests/test_ram_symbols.py -->
 - [ ] A fainted lead with a live second mon reports the second mon's HP, level and fighter slot through `party_hp`, `lead_level` and `fighter`. <!-- test: tests/test_party_view.py -->
+- [ ] Every heal/restock/planning caller of `party_hp` in 3.3b still triggers when slot 0 has fainted and slot 1 is healthy, and `status_care` still applies for a fainted slot 0 with a poisoned slot 1. <!-- test: tests/test_party_view.py -->
 - [ ] A stale `wBattleMon` (species 0) never feeds `BattleView.battle_mon`, `PartyView.active_slot`, `party_hp` or `fighter`. <!-- test: tests/test_party_view.py -->
 - [ ] `BattleView.enemy_party` is populated only when `kind == 2`; participants come from 0xD058 and 0xCCF5. <!-- test: tests/test_party_view.py -->
 - [ ] One RAM read per frame for each view (memo test). <!-- test: tests/test_party_view.py -->
@@ -338,7 +368,7 @@ Expected: only the files named in section 2.
 
 ## 8. Report
 
-Findings first: any deviation from section 3, any existing test that needed attention (should be none), and whether any `fighter()` / `party_hp` behaviour changed for a healthy lead (it must not). Then the tails of the three pytest commands and the output of the two greps. State plainly that no ROM was available and the real-state check is `Party_RAM_State_Tests_Directive.md`, run by the controller. Name the callers left for `Party_View_Migration_Directive.md`.
+Findings first: the 3.3b list (each `party_hp` caller: routed to `party_needs_heal`, or left on the fighter's HP, and why), any deviation from section 3, any existing test that needed attention (should be none), and whether any `fighter()` / `party_hp` behaviour changed for a healthy lead (it must not). Then the tails of the three pytest commands and the output of the two greps. State plainly that no ROM was available and the real-state check is `Party_RAM_State_Tests_Directive.md`, run by the controller. Name the callers left for `Party_View_Migration_Directive.md`.
 
 ## Required from User
 

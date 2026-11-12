@@ -14,6 +14,8 @@ Audit correction recorded here: `git ls-files baselines runs` lists nothing real
 2. `tests/rom/test_party_states.py` <!-- new: tests/rom/test_party_states.py --> : the field-by-field assertions below; and `tests/rom/party_states_covered.py` <!-- new: tests/rom/party_states_covered.py --> : the `COVERED` table.
 3. `tests/rom/test_party_states_table.py` <!-- new: tests/rom/test_party_states_table.py --> : no-ROM tests of the coverage table (these run in Devin's worktree).
 
+4. `.gitattributes` <!-- new: .gitattributes --> at the repo root (none exists today): exactly the two lines `tests/fixtures/rom_states/*.state binary` and `*.state binary`, so git never line-ending-converts or text-diffs a saved state on Windows.
+
 No other file changes. Specifically `src/pokeagent/data/ram_map.json` is NOT edited by you (see 3.4).
 
 ## 3. The work
@@ -147,7 +149,7 @@ Baseline on `origin/main` (measured 2026-11-12): `2499 passed, 41 skipped, 1 war
 ```
 git status --short
 ```
-Expected: only the five new files under `tests/rom/` (`conftest.py`, `rom_helpers.py`, `party_states_covered.py`, `test_party_states.py`, `test_party_states_table.py`).
+Expected: only the five new files under `tests/rom/` (`conftest.py`, `rom_helpers.py`, `party_states_covered.py`, `test_party_states.py`, `test_party_states_table.py`) plus `.gitattributes`.
 
 ## 6. Rules for this run
 
@@ -165,7 +167,7 @@ Expected: only the five new files under `tests/rom/` (`conftest.py`, `rom_helper
 - [ ] `COVERED` names exactly the asserted symbols, and each name and address matches the pasted block. <!-- test: tests/rom/test_party_states_table.py -->
 - [ ] In this worktree the ROM tests skip with a reason naming `roms/Pokemon Red.gb`; the table tests pass.
 - [ ] Full suite: zero failed; baseline 2499 passed / 41 skipped plus your additions.
-- [ ] No ROM, state, `ram_map.json` or `src/` change.
+- [ ] No ROM, state, `ram_map.json` or `src/` change; `.gitattributes` marks `*.state` binary.
 
 ## 8. Report
 
@@ -175,7 +177,7 @@ Findings first: any pasted value you could not turn into an assertion and why, a
 
 Controller (Claude) steps, not Devin's. They must happen before the ROM tests can do anything:
 
-1. Copy these untracked states into the repo as `tests/fixtures/rom_states/<name>.state` (each about 178 KB; saved states, not ROMs, so they may be committed; the ROM never is):
+1. Copy these untracked states into the repo as `tests/fixtures/rom_states/<name>.state` and COMMIT them (Robert's rule: save states are allowed, ROMs never; each is 178,108 bytes, six about 1 MB). The `.gitattributes` from section 2 marks them binary. A state is a snapshot of RAM, VRAM and CPU state, not a ROM image; measured on `baselines/battle.state`: the ROM header title bytes (`POKEMON RED`) are not present, and only 5 of 443 sampled high-entropy 64-byte ROM chunks appear (tile graphics the game copied into VRAM). Do not commit `roms/` (gitignored), a ROM hash, or any absolute path to a ROM; the only ROM reference in the repo is the relative gitignored path `roms/Pokemon Red.gb`, which `tests/test_golden_red.py` already uses. Before committing run `git ls-files roms` (expect no output) and `git diff --cached --stat` (expect only the six `.state` files, `.gitattributes` and the tests):
    - `baselines/bedroom.state` -> `bedroom.state`
    - `baselines/battle.state` -> `wild_stale_battle.state`
    - `runs/checkpoints/beat_brock.state` -> `fainted_lead_overworld.state`
