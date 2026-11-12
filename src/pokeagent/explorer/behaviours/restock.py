@@ -8,7 +8,7 @@ from pokeagent.explorer.economy import budget, floor, ledger, plan
 from pokeagent.explorer.economy.prices import price, stocked
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer.perceive import party_hp
+from pokeagent.explorer.perceive import party_needs_heal
 from pokeagent.explorer.world import WorldGraph
 from pokeagent.goals import bag_contents
 from pokeagent.ramworld import read_money
@@ -28,8 +28,7 @@ class Restock(BehaviourBase):
         if not st.get("intent"):
             if st.get("tries", 0) >= rs.MAX_TRIES or ctx.step < st.get("next_check", 0):
                 return None
-            hp, mx = party_hp(ctx.emu)
-            if mx and hp / mx < 0.5:
+            if party_needs_heal(ctx.emu, 0.5):
                 return None  # heal first (the planner's Pokecenter trip)
             st["next_check"] = ctx.step + rs.RECHECK_EVERY
             trip = plan.trip_plan(ctx)

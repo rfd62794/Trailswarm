@@ -10,6 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer.economy import heal_items, ledger
 from pokeagent.explorer.economy.prices import HEAL_HP, POTION, price
 from pokeagent.explorer.perceive import party_hp
+from pokeagent.party_view import read_party_view
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import bag_contents
 from pokeagent.legs import grid as G
@@ -77,8 +78,8 @@ def field_wants(ctx, get=None) -> bool:
     hp, mx = party_hp(ctx.emu)
     if not mx or ctx.view.m in POKECENTER_MAPS or heal_items.heal_count(bag_contents(ctx.emu)) <= 0 or ctx.center_intent:
         return False
-    if not (0 < hp < mx * FIELD_BELOW):
-        return False
+    if not (0 < hp < mx * FIELD_BELOW) or read_party_view(ctx.emu).any_fainted:
+        return False  # a fainted bench mon needs the nurse (or a revive): a potion on the fighter fixes nothing
     led = ledger.of(ctx)
     if ctx.step < led.field_check_at:
         return led.field_decision

@@ -7,7 +7,7 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.dialog import goal_menu_choice, learn_decision, offered_starter, yesno_answer
 from pokeagent.explorer.kb import ROM_KB
-from pokeagent.explorer.perceive import frame_lines, is_menu, party_hp
+from pokeagent.explorer.perceive import frame_lines, is_menu, party_needs_heal
 from pokeagent.goals import check_goals
 from pokeagent.explorer.catch_list import upcoming_needs
 from pokeagent.explorer.item_policies.ids import HM_MOVE
@@ -65,8 +65,7 @@ class Menu(BehaviourBase):
         want = goal_menu_choice(goals_now, options)
         heal_opt = next((o for o in options if o.strip().endswith("HEAL") and "POK" not in o), None)
         if heal_opt and not want:  # Pokecenter counter 'HEAL / CANCEL': heal whenever any party member is hurt
-            hp_c, mx_c = party_hp(ctx.emu)
-            if mx_c and hp_c < mx_c:
+            if party_needs_heal(ctx.emu, 1.0):
                 want = heal_opt
         if not want and goals_now.get("potion") and any("WITHDRAW" in o or "DEPOSIT" in o for o in options):
             return Decision("B", "pc_potion_done", "potion already in the bag: nothing else to do at the PC, backing out")

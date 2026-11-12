@@ -4,7 +4,7 @@ from __future__ import annotations
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import grind_episode, train_route
-from pokeagent.explorer.perceive import lead_level, party_hp
+from pokeagent.explorer.perceive import lead_level, party_needs_heal
 from pokeagent.novelty import steer as novelty_steer
 
 REVERSE_PENALTY = 2   # visits added to a direction that undoes the last successful move (choose_local)
@@ -108,7 +108,6 @@ class ExploreBurst(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
-        hp_now, mx_now = party_hp(ctx.emu)
         ctx.goals()
         if ctx.known_maps_at_start is None:
             ctx.known_maps_at_start = {int(k) for k in ctx.mem.data["maps"] if len(ctx.mem.data["maps"][k].get("visited", {})) >= 5}
@@ -117,7 +116,7 @@ class ExploreBurst(BehaviourBase):
             if m not in ctx.known_maps_at_start:
                 ctx.explore_burst = max(ctx.explore_burst, 120)
                 ctx.log(f"[new map 0x{m:02X}: exploration burst, 120 steps before plans resume]", "res")
-        if ctx.explore_burst > 0 and not (mx_now and hp_now / mx_now < 0.4):
+        if ctx.explore_burst > 0 and not party_needs_heal(ctx.emu, 0.4):
             ctx.explore_burst -= 1
             name, why = _memory_step(ctx, m, x, y, grass="neutral")
             return Decision(name, "explore_burst", f"exploring a new discovery ({ctx.explore_burst} left): {why}")
@@ -137,9 +136,8 @@ class Frontier(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
-        hp_now, mx_now = party_hp(ctx.emu)
         goals_now_all = ctx.goals()
-        weak = mx_now and hp_now / mx_now < 0.4
+        weak = party_needs_heal(ctx.emu, 0.4)
         training = (ctx.hunt_grass and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
         ep = grind_episode.active(ctx)
         allowed = frozenset(ep["maps"] | {m}) if ep else None

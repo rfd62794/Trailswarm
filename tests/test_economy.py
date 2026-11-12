@@ -152,6 +152,15 @@ def test_restock_walks_to_a_mart_that_sells_only_super_potion_but_not_one_with_n
     assert d is None and not ctx.restock.get("intent") and ctx.shop_intent is None   # no Potion or Super Potion at all
 
 
+def test_restock_heals_first_when_slot_zero_fainted(tmp_path):
+    """party_needs_heal: a fainted lead behind a healthy slot 1 still gates the Mart trip."""
+    ctx = make_ctx(tmp_path, 1, 11258, m=91, x=3, y=7, party_hp=(32, 32))
+    for a, v in {0xD163: 2, 0xD164: 0x99, 0xD165: 0x9A, 0xD16B: 0x99, 0xD16D: 0,
+                 0xD16B + 44: 0x9A, 0xD16D + 44: 32, 0xD18E + 44: 32}.items():
+        ctx.emu.set(a, v)
+    assert Restock().step(ctx) is None and not ctx.restock.get("intent")   # heal first, like a 0/32 lead
+
+
 def test_mart_visit_at_vermilion_buys_a_super_potion(tmp_path, monkeypatch):
     calls = []
 
@@ -170,10 +179,10 @@ def test_mart_visit_at_vermilion_buys_a_super_potion(tmp_path, monkeypatch):
     monkeypatch.setattr(shopping, "stocked", prices.stocked)
     monkeypatch.setattr(shopping, "ball_need", lambda goals: False)
     monkeypatch.setattr(shopping, "cave_ahead", lambda goals: False)
-    ctx = make_ctx(tmp_path, 1, 6000, m=91, x=2, y=5)
+    ctx = make_ctx(tmp_path, 1, 6000, m=91, x=2, y=5, party_hp=(60, 60))   # a 60-max-HP lead keeps the floor at 3
     ctx.restock, ctx.facing = {"intent": True, "stats_path": str(tmp_path / "none.jsonl")}, "LEFT"
     Restock().step(ctx)
-    assert calls == [(SUPER_POTION, 2)]   # no battle data: floor 3 = 60 HP, and two Super Potions (100 HP) is the least that reaches it
+    assert calls == [(SUPER_POTION, 2)]   # floor 3 = 60 HP, and two Super Potions (100 HP) is the least that reaches it
     assert shop.read_money(ctx.emu) >= budget.reserve({}, 6000)
 
 

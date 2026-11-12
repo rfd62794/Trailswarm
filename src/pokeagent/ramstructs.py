@@ -9,14 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pokeagent.emulator import Emulator
+from pokeagent.ram_symbols import (BATTLE_MON, BATTLE_STRUCT_SIZE, ENEMY_MON, MAX_PARTY,
+                                   PARTY_COUNT, PARTY_MON1, PARTY_MON_SIZE, PLAYER_MON_NUMBER)
 
-PARTY_MON1 = 0xD16B
-PARTY_COUNT = 0xD163
-PARTY_MON_SIZE = 44
-MAX_PARTY = 6
-BATTLE_MON = 0xD014          # wBattleMon (the player's active mon)
-ENEMY_MON = 0xCFE5           # wEnemyMon
-BATTLE_STRUCT_SIZE = 29
 PLAYER_STAT_MODS = 0xCD1A    # wPlayerMonStatMods: atk, def, spd, spc, acc, eva (7 = no change)
 ENEMY_STAT_MODS = 0xCD2E
 ENEMY_BASE_STATS = 0xD002    # wEnemyMonBaseStats: hp, atk, def, spd, spc (valid during a battle)
@@ -173,7 +168,7 @@ def read_pc_items(emu: Emulator) -> list[tuple[int, int]]:
     return decode_item_list(emu.read_range(BOX_COUNT, 1 + 2 * BOX_CAPACITY + 1), BOX_CAPACITY)
 
 
-PLAYER_MON = 0xCC2F    # wPlayerMonNumber: the party slot in the fight
+PLAYER_MON = PLAYER_MON_NUMBER  # wPlayerMonNumber: the party slot in the fight
 
 
 def active_slot(emu: Emulator) -> int | None:

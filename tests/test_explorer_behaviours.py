@@ -129,6 +129,37 @@ def test_guards_and_wait_behaviours(tmp_path):
     assert d.rule == "stall_escalate" and ctx.stalls == 1
 
 
+FAINTED_LEAD = {0xD163: 2, 0xD164: 0x99, 0xD165: 0x9A, 0xD16B: 0x99, 0xD16D: 0,
+                0xD16B + 44: 0x9A, 0xD16D + 44: 32, 0xD18E + 44: 32}   # slot 0 down, slot 1 at 32/32
+
+
+def test_frontier_weak_when_slot_zero_fainted(tmp_path):
+    """weak is party_needs_heal now: a fainted lead drops the explore burst and avoids grass."""
+    ctx = make_ctx(tmp_path, memory=FAINTED_LEAD)
+    ctx.explore_burst = 5
+    assert ExploreBurst().step(ctx) is None            # the burst is dropped while the party needs healing
+    seen = {}
+    ctx.mem.choose_local = lambda *a, **k: (seen.update(k) or ("RIGHT", "x", False))
+    assert Frontier().step(ctx) is not None
+    assert seen.get("grass") == "avoid"
+
+
+def test_heal_needs_every_slot_healed(tmp_path):
+    """Mom heals all-or-nothing: a still-fainted slot after the wait means the heal failed."""
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99, 0xD16D: 35, 0xD18E: 35})
+    ctx.mom_talk_step, ctx.mom_talk_hp, ctx.step = 3, 10, 20     # 17 steps since talking, all slots full
+    lines = []
+    ctx.log = lambda t, tag=None: lines.append(t)
+    Heal().step(ctx)
+    assert ctx.mom_talk_step is None and "healed at Mom" in lines[-1]
+    ctx2 = make_ctx(tmp_path, memory={0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99, 0xD16D: 0, 0xD18E: 35})
+    ctx2.mom_talk_step, ctx2.mom_talk_hp, ctx2.step = 3, 10, 20  # still fainted after the wait
+    lines2 = []
+    ctx2.log = lambda t, tag=None: lines2.append(t)
+    Heal().step(ctx2)
+    assert ctx2.mom_failed_until == ctx2.step + 150 and "did not heal" in lines2[-1]
+
+
 def test_goto_heal_replay_and_procedure_start_conditions(tmp_path):
     ctx = make_ctx(tmp_path)
     assert not applies(Goto(), ctx) and not applies(Heal(), ctx) and not applies(Procedures(), ctx)
@@ -260,7 +291,7 @@ def test_explorer_package_layering_and_size():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "src" / "pokeagent" / "explorer"
-    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names", "grind", "procedures", "fsutil"}  # fsutil: the stdlib-only atomic write helper (retrying replace on Windows); segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress); grind: the grind-point ledger grind_episode chooses from; procedures: the goal-procedure schema/rules the runner and after_victory read
+    allowed = {"emulator", "ram", "screentext", "screencontext", "hexmap", "names", "goals", "navigation", "explorer", "ramstructs", "ramworld", "magikarp", "knowledge", "checkpoint_goals", "bandit", "campaign", "legs", "novelty", "training_progress", "segment_names", "grind", "procedures", "fsutil", "party_view", "ram_symbols"}  # fsutil: the stdlib-only atomic write helper (retrying replace on Windows); segment_names: the start-state name heuristic (state_goal); novelty: the opt-in explorer-role steering and tracker hook; bandit: the opt-in decision-point hooks; campaign: main's hook; legs: par_follow routes on the ROM grid; training_progress: the loop memory's progress signal (explorer.progress); grind: the grind-point ledger grind_episode chooses from; procedures: the goal-procedure schema/rules the runner and after_victory read; party_view/ram_symbols: the typed party/battle RAM view and the named WRAM constants it is built on
     for f in root.rglob("*.py"):
         assert len(f.read_text(encoding="utf-8").splitlines()) <= 300, f"{f.name} is over 300 lines"
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
