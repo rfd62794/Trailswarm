@@ -119,3 +119,79 @@ def test_plan_goal_lifts_the_gate_when_the_budget_is_spent_and_logs_it(monkeypat
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 0
     assert any("grind budget spent for beat_brock" in t and "lifting the training gate" in t for t in logs)
     assert PlanGoal._budgeted(ctx, goals, 12, None) == 0                              # stays lifted for that goal
+
+
+def test_budget_tracks_the_strongest_slot_not_a_weak_lead(monkeypatch):
+    """Run explore-20261111-214628: lead slot L4, Charmander L12 behind it: the budget saw 'stuck at L4' and lifted the gate."""
+    from pokeagent.explorer.grind import best_level, stall_keeps_hold
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    assert best_level(4, [SimpleNamespace(level=4), SimpleNamespace(level=12)]) == 12
+    assert best_level(4, None) == 4
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    ctx = SimpleNamespace(emu=SimpleNamespace(read=lambda a: 4, read_range=lambda a, n: bytes(n)), step=0, battles=0,
+                          blackouts_row=0, grind=None, log=lambda t, tag=None: None)
+    party = [SimpleNamespace(level=4), SimpleNamespace(level=12)]
+    PlanGoal._budgeted(ctx, goals, 17, None, party)
+    ctx.step = 100
+    party[1].level = 13                                                    # the strong slot levels: progress, window resets
+    PlanGoal._budgeted(ctx, goals, 17, None, party)
+    ctx.step = GRIND_STEPS - 1
+    assert PlanGoal._budgeted(ctx, goals, 17, None, party) == 17
+
+
+def test_stall_lift_keeps_the_gym_hold_but_ceiling_and_blackouts_release_it():
+    from pokeagent.explorer.grind import stall_keeps_hold
+    assert stall_keeps_hold("2500 steps without a level gain (stuck at L12)")
+    assert stall_keeps_hold("25 battles without a level gain (stuck at L12)")
+    assert not stall_keeps_hold("lead L20 is 6+ levels above the route's wild ceiling L5: no XP left to grind")
+    assert not stall_keeps_hold("2 blackouts in a row while training")
+    assert not stall_keeps_hold("")
+
+
+def test_stall_hold_releases_after_the_cap_or_on_a_blackout():
+    from pokeagent.explorer.grind import STALL_HOLD_CAP, stall_hold_holds
+    why = "2500 steps without a level gain (stuck at L12)"
+    st = {}
+    assert stall_hold_holds(st, why, 1000, 0)
+    assert stall_hold_holds(st, why, 1000 + STALL_HOLD_CAP - 1, 0)
+    assert not stall_hold_holds(st, why, 1000 + STALL_HOLD_CAP, 0)            # the held stall eventually releases
+    st = {}
+    assert stall_hold_holds(st, why, 50, 0)
+    assert not stall_hold_holds(st, why, 60, 1)                               # a blackout while held releases it
+    assert not stall_hold_holds({}, "2 blackouts in a row while training", 0, 0)
+
+
+def test_magikarp_trainee_keeps_the_gated_lead_measure(monkeypatch):
+    """Fighter L30 + Magikarp L5: lead_level = min(30, 5+gap), not the max slot; trainee gains must reset the budget."""
+    from pokeagent.explorer.behaviours import plan_goal as pg
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    monkeypatch.setattr(pg, "trainee_slot", lambda emu: 1)
+    monkeypatch.setattr(pg, "lead_level", lambda emu: 8)
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    ctx = SimpleNamespace(emu=None, step=0, battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: None)
+    party = [SimpleNamespace(level=30)]
+    pg.PlanGoal._budgeted(ctx, goals, 12, None, party)
+    assert ctx.grind._s["beat_brock"]["level"] == 8                           # not best_level == 30
+
+
+def test_budget_accrues_only_on_grinding_steps(monkeypatch):
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.explorer.grind import grinding_now
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    city = {"2": {"encounters": {}}}; grass = {"13": {"encounters": {"1,1": 3}}}
+    mk = lambda mid, maps: SimpleNamespace(emu=SimpleNamespace(read=lambda a: 9, read_range=lambda a, n: bytes(n)), step=0,
+                                           battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: None,
+                                           view=SimpleNamespace(m=mid), mem=SimpleNamespace(data={"maps": maps}))
+    ctx = mk(2, city)
+    assert not grinding_now(ctx) and grinding_now(mk(13, grass))
+    PlanGoal._budgeted(ctx, goals, 17, None)
+    ctx.step = GRIND_STEPS + 500                                        # wandering the city for the whole budget
+    assert PlanGoal._budgeted(ctx, goals, 17, None) == 17               # nothing spent: the gate stays
+    ctx.view, ctx.mem = SimpleNamespace(m=13), SimpleNamespace(data={"maps": grass})
+    ctx.step += GRIND_STEPS
+    assert PlanGoal._budgeted(ctx, goals, 17, None) == 0                # real grinding steps do spend it

@@ -107,7 +107,7 @@ def test_gym_hold_grinds_instead_of_entering_while_the_budget_lasts(tmp_path, mo
     assert d.button == "DOWN" and d.rule == "plan_goal"      # the hold: grind, do not walk in
 
 
-def test_the_lifted_budget_drops_the_gym_hold(tmp_path, monkeypatch):
+def test_a_spent_stall_budget_keeps_the_gym_hold_so_the_team_leaves_to_grind(tmp_path, monkeypatch):
     ctx = _full_ctx(tmp_path)
     _gate_patch(monkeypatch)
     ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}
@@ -116,8 +116,8 @@ def test_the_lifted_budget_drops_the_gym_hold(tmp_path, monkeypatch):
     lines = []
     ctx.log = lambda text, tag=None: lines.append(text)
     d = PlanGoal().step(ctx)
-    assert (d.button, d.rule) == ("UP", "plan_goal")         # gate lifted: the stage push walks in
-    assert any("gym hold lifted" in ln for ln in lines)      # one line says why the hold stood down
+    assert d.button != "UP"                                  # stalled budget, team not ready: the stage push must not walk in
+    assert not any("gym hold lifted" in ln for ln in lines)  # the hold stands (the gym stays shut until ready)
 
 
 def test_inside_the_gym_not_ready_walks_out_before_anything_else(tmp_path, monkeypatch):
@@ -150,3 +150,82 @@ def test_leader_avoid_blocks_the_guessed_sight_line(tmp_path, monkeypatch):
     assert (0x41, 4, 6) not in ctx.mem.temp_blocked            # ... while the exit walk stays open
     assert team_plan.of(ctx)["avoid_key"] is not None
     PlanGoal._leader_avoid(ctx, 0x03, 4, 5, 0x41)              # off the gym map: a no-op
+
+
+def test_gym_hold_replaces_the_road_to_the_gym_with_the_grind_step(tmp_path, monkeypatch):
+    """Pewter, not ready: the planner's 'goal road north' toward the gym map must not win over the hold."""
+    ctx = _full_ctx(tmp_path, mem_map=0x02)
+    _gate_patch(monkeypatch, grind=("LEFT", "team gate: grinding the party"))
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")
+    monkeypatch.setattr(plan_goal, "plan_step", lambda goals, maps, pos, facing: ("UP", "goal road north: 9 steps to map 0x36"))
+    d = PlanGoal().step(ctx)
+    assert d.button == "LEFT" and "grinding" in d.why
+
+
+def test_a_held_stall_lift_keeps_the_episode_gate_open(tmp_path, monkeypatch):
+    ctx = _full_ctx(tmp_path, mem_map=0x02)
+    _gate_patch(monkeypatch)
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")
+    monkeypatch.setattr(plan_goal, "train_need", lambda c, g, n: n)
+    ctx.mem.data["maps"]["2"] = {"encounters": {"1,1": 3}}          # grass here, so the budget accrues
+    PlanGoal().step(ctx)
+    ctx.step, ctx.battles = 300, 99
+    PlanGoal().step(ctx)
+    assert ctx.train_need == 15                                      # lifted, held, yet the episode gate still reads the need
+
+
+def test_hold_cap_releases_even_when_the_budget_never_lifts(tmp_path, monkeypatch):
+    """No learned encounters, no episode: grinding_now is False so the budget never accrues; the cap still bounds the hold."""
+    from pokeagent.explorer.grind import STALL_HOLD_CAP
+    ctx = _full_ctx(tmp_path)
+    _gate_patch(monkeypatch)
+    ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}   # no "encounters" here
+    ctx.step = 100
+    d = PlanGoal().step(ctx)
+    assert d.button != "UP" and plan_goal.team_plan.of(ctx).get("gate_lifted") is None       # held, budget idle
+    ctx.step = 100 + STALL_HOLD_CAP - 1
+    assert PlanGoal().step(ctx).button != "UP"
+    lines = []
+    ctx.log = lambda text, tag=None: lines.append(text)
+    ctx.step = 100 + STALL_HOLD_CAP
+    PlanGoal().step(ctx)
+    assert any("gym hold lifted" in ln for ln in lines)                                      # the cap opens the gym
+
+
+def _held_ctx(tmp_path, monkeypatch):
+    ctx = _full_ctx(tmp_path)
+    _gate_patch(monkeypatch)
+    ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}
+    ctx.step = 100
+    PlanGoal().step(ctx)
+    return ctx
+
+
+def test_battle_frames_and_a_readiness_flap_do_not_reset_the_hold_clock(tmp_path, monkeypatch):
+    ctx = _held_ctx(tmp_path, monkeypatch)
+    st = plan_goal.team_plan.of(ctx)
+    assert st["stall_hold"][0] == 100
+    monkeypatch.setattr(plan_goal, "boss_need_for", lambda goals, party: None)     # battle frame: party unread, nv None
+    ctx.step = 200
+    PlanGoal().step(ctx)
+    ready = SimpleNamespace(ready=True, need=15, text="ready", team_score=1.0, weak_slots=(), lead_slot=0)
+    monkeypatch.setattr(plan_goal, "boss_need_for", lambda goals, party: ready)    # one-step flap to ready
+    ctx.step = 300
+    PlanGoal().step(ctx)
+    assert st["stall_hold"][0] == 100                                              # still the first engagement
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")       # the stage moved on: now it clears
+    ctx.step = 400
+    PlanGoal().step(ctx)
+    assert "stall_hold" not in st or st["stall_hold"][0] != 100
+
+
+def test_a_blackout_after_a_win_still_releases_the_hold(tmp_path, monkeypatch):
+    ctx = _held_ctx(tmp_path, monkeypatch)
+    pl = plan_goal.party_log.of(ctx)
+    pl.blackouts += 1                                                              # blackout while held...
+    ctx.blackouts_row = 0                                                          # ...then a win zeroes the row counter
+    lines = []
+    ctx.log = lambda text, tag=None: lines.append(text)
+    ctx.step = 200
+    PlanGoal().step(ctx)
+    assert any("gym hold lifted" in ln for ln in lines)
