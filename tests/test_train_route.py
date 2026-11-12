@@ -27,6 +27,13 @@ def test_step_on_target_with_an_explicit_patch():
     assert train_route.step(maps, (35, 11, 35), (), 20, 20, target=35, patch={(11, 35)}) is None
 
 
+def test_step_accepts_a_grind_point_patch_of_json_lists():
+    # GrindPoint.patch is [[x, y]] from JSON; set(patch) raised "unhashable type: 'list'" on every grind step
+    maps = {"35": {"visited": {"10,35": 1, "11,35": 1}, "blocked": [], "warps": {}, "encounters": {}}}
+    r = train_route.step(maps, (35, 10, 35), (), 20, 20, target=35, patch=[[11, 35]])
+    assert r and r[0] == "RIGHT"
+
+
 def test_stay_on_route_episode_set_covers_edge_exits():
     """OutsideSet: every map not in `allowed` plus the recorded presses that leave it - learned warps,
     one-sighting map changes (warp_cand), and paths edges where a run recorded them (PR #165)."""

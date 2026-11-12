@@ -79,6 +79,13 @@ def test_a_printing_box_never_vetoes():
     assert l.top() == []
 
 
+def test_top_ranks_two_vetoed_entries_without_comparing_entries():
+    l = LoopLedger()
+    rec(l, LOOP_NO_PROGRESS_N, button="A")
+    rec(l, LOOP_NO_PROGRESS_N, button="B", step0=50)  # two unequal vetoed entries: a plain sorted() compared _Entry objects and raised
+    assert {r["button"] for r in l.top()} == {"A", "B"}
+
+
 def test_the_ledger_is_bounded():
     l = LoopLedger()
     for i in range(LEDGER_MAX + 10):
