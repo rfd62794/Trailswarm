@@ -54,6 +54,8 @@ class Engine:
             return decision  # nothing to do, or a wait: the step is used without a press
         decision = loop_veto.check(ctx, self.selector, decision)  # a dead (situation, button) is skipped, not re-pressed
         self.last_decision = decision
+        if not decision.button:
+            return decision  # the veto re-chose a wait (e.g. post_talk_settle): pressing "" raised KeyError('')
         why_veto = veto(ctx, decision)
         if why_veto:  # the policy table says this talk teaches nothing: B instead of A (keeps the loop guards counting)
             retalk_memory.note(ctx, decision)  # and the planner must not choose this talk again
