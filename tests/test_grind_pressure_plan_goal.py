@@ -172,3 +172,21 @@ def test_a_held_stall_lift_keeps_the_episode_gate_open(tmp_path, monkeypatch):
     ctx.step, ctx.battles = 300, 99
     PlanGoal().step(ctx)
     assert ctx.train_need == 15                                      # lifted, held, yet the episode gate still reads the need
+
+
+def test_hold_cap_releases_even_when_the_budget_never_lifts(tmp_path, monkeypatch):
+    """No learned encounters, no episode: grinding_now is False so the budget never accrues; the cap still bounds the hold."""
+    from pokeagent.explorer.grind import STALL_HOLD_CAP
+    ctx = _full_ctx(tmp_path)
+    _gate_patch(monkeypatch)
+    ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}   # no "encounters" here
+    ctx.step = 100
+    d = PlanGoal().step(ctx)
+    assert d.button != "UP" and plan_goal.team_plan.of(ctx).get("gate_lifted") is None       # held, budget idle
+    ctx.step = 100 + STALL_HOLD_CAP - 1
+    assert PlanGoal().step(ctx).button != "UP"
+    lines = []
+    ctx.log = lambda text, tag=None: lines.append(text)
+    ctx.step = 100 + STALL_HOLD_CAP
+    PlanGoal().step(ctx)
+    assert any("gym hold lifted" in ln for ln in lines)                                      # the cap opens the gym

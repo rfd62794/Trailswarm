@@ -10,7 +10,7 @@ from pokeagent.explorer.status_care import of as care_state
 from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds
+from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
@@ -140,14 +140,17 @@ class PlanGoal(BehaviourBase):
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not nv.ready and gym is not None
-        if st.get("gate_lifted") is None:
-            st.pop("stall_hold", None)
-        if hold and st.get("gate_lifted") is not None and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]), ctx.step, ctx.blackouts_row):
-            hold = False  # the grind budget is spent: the hold must not lock the run out of the gym forever
+        if not hold:
+            st.pop("stall_hold", None)  # the hold clock runs from first engagement (not from a budget lift) until it ends
+            st.pop("lifted_need", None)
+        lifted = st.get("gate_lifted") is not None
+        if hold and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]) if lifted else "without a level gain",
+                                         ctx.step, ctx.blackouts_row):
+            hold = False  # budget spent (ceiling/blackout), the hold cap, or a blackout while held: never locked out forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal
-                ctx.log(f"[team gate: grind budget spent ({ctx.grind.reason(st['gate_lifted'])}); "
-                        f"gym hold lifted for {ctx.stage_goal}]", "res")
+                why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
+                ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
         if hold and st.get("gate_lifted") is not None:
             ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:
