@@ -16,7 +16,11 @@ from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.knowledge import encounters
 from pokeagent.ramstructs import read_party
 
-EVERY = 4   # steps between evaluations (the route search is the cost; HP moves slowly out of battle) (untuned)
+EVERY = 4              # steps between evaluations (HP moves slowly out of battle) (untuned)
+LEAD_GATE = 0.80       # the duel rule runs only with the lead below this HP fraction ...
+PARTY_GATE = 0.70      # ... or the whole party below this: a trainee at 99% never retreats after a grind fight (untuned)
+AFTER_HEAL = 150       # steps after a finished heal with no new precautionary retreat, unless a member has fainted (untuned)
+ROUTE_EVERY = 12       # steps a cached walk-to-nurse distance stays good on one map (the BFS is the cost) (untuned)
 
 
 class RetreatHeal(BehaviourBase):
@@ -30,15 +34,39 @@ class RetreatHeal(BehaviourBase):
             return False
         return ctx.step % EVERY == 0
 
+    @staticmethod
+    def _hurt(ctx: ExplorerContext, party: list) -> bool:
+        """Below the gates, and past the post-heal cooldown unless somebody has fainted. Pure read of the live party."""
+        if not party:
+            return False
+        mx = sum(p.max_hp for p in party) or 1
+        lead = party[0].hp / (party[0].max_hp or 1)
+        if lead >= LEAD_GATE and sum(p.hp for p in party) / mx >= PARTY_GATE:
+            return False
+        recent = ctx.step - of(ctx).get("healed_at", -10 ** 9) < AFTER_HEAL
+        return not recent or any(p.hp <= 0 for p in party)
+
+    @staticmethod
+    def _walk_frames(ctx: ExplorerContext) -> float | None:
+        """Frames to the nearest known Pokecenter, cached per (map, x, y) for ROUTE_EVERY steps."""
+        st, key = of(ctx), (ctx.view.m, ctx.view.x, ctx.view.y)
+        hit = st.get("retreat_route")
+        if hit and hit[0] == key[0] and (hit[1] == key or ctx.step - hit[2] < ROUTE_EVERY):
+            return hit[3]
+        walk = outside_use.walk_to_center(ctx)
+        frames = walk[0] if walk else None
+        st["retreat_route"] = (key[0], key, ctx.step, frames)
+        return frames
+
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        if all(p.hp >= p.max_hp for p in read_party(ctx.emu)):
-            return None        # a full party never retreats: skip the route search
+        party_raw = read_party(ctx.emu)
+        if not self._hurt(ctx, party_raw):
+            return None
         party = party_now(ctx.emu)
         if not party:
             return None
-        walk = outside_use.walk_to_center(ctx)
-        verdict = assess(party, encounters.species_on(ctx.view.m), walk[0] if walk else None)
+        verdict = assess(party, encounters.species_on(ctx.view.m), self._walk_frames(ctx))
         if verdict.retreat:
             ctx.log(f"[retreat_heal: {verdict.why}]", "res")
-            heal_walk.start(ctx, f"retreat_heal: {verdict.why}")
+            heal_walk.start(ctx, f"retreat_heal: {verdict.why}", heal_walk.RETREAT_DONE)
         return None

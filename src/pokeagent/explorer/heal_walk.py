@@ -23,6 +23,7 @@ WALK_CAP = 400       # steps one walk may take before it is abandoned (untuned f
 COOLDOWN = 300       # steps an abandoned walk waits before a new request may start (untuned first value)
 # The center layout (door (3,7), cross to x=3, nurse at (3,1), press A from (3,3) facing UP) is duplicated from
 # planner.py:44-50 because planner.py is off-limits here; a later shared helper should replace both copies.
+RETREAT_DONE = 0.95  # a precautionary walk (retreat_heal, after_victory) is over once the party is back at this HP fraction
 COUNTER_X, COUNTER_Y = 3, 3   # the nurse (3,1) answers across the counter row, standing at (3,3) facing UP
 
 
@@ -30,21 +31,25 @@ def active(ctx) -> bool:
     return of(ctx).get("walk") is not None
 
 
-def start(ctx, why: str) -> bool:
-    """Request a heal walk. False (nothing started) while one is running or cooling down after an abandon."""
+def start(ctx, why: str, min_frac: float | None = None) -> bool:
+    """Request a heal walk. False (nothing started) while one is running or cooling down after an abandon.
+    ``min_frac``: a precautionary retreat (nobody fainted or poisoned yet) ends only once the whole party's HP is at or above
+    this fraction, i.e. after the nurse; without it a hurt-but-standing party would read as "healed" on the next step."""
     st = of(ctx)
     if st.get("walk") is not None or ctx.step < st.get("walk_cool", 0):
         return False
-    st["walk"] = {"why": why, "steps": 0, "from": ctx.step}
+    st["walk"] = {"why": why, "steps": 0, "from": ctx.step, "min_frac": min_frac}
     ctx.log(f"[heal_walk: start ({why})]", "res")
     record_row(ctx, {"event": "heal_walk_start", "why": why})
     return True
 
 
-def _party_healed(ctx) -> bool:
-    """Nobody fainted and nobody poisoned: what a nurse visit leaves (and all the request was for)."""
+def _party_healed(ctx, min_frac: float | None = None) -> bool:
+    """Nobody fainted and nobody poisoned (and, for a retreat walk, total HP at ``min_frac``): what a nurse visit leaves."""
     party = read_party(ctx.emu)
-    return bool(party) and all(p.hp > 0 and "poison" not in status_kinds(p.status) for p in party)
+    if not (party and all(p.hp > 0 and "poison" not in status_kinds(p.status) for p in party)):
+        return False
+    return min_frac is None or sum(p.hp for p in party) >= min_frac * (sum(p.max_hp for p in party) or 1)
 
 
 def _end(ctx, outcome: str, why: str, abandoned: bool) -> None:
@@ -52,6 +57,8 @@ def _end(ctx, outcome: str, why: str, abandoned: bool) -> None:
     w = st.pop("walk", None) or {}
     if abandoned:
         st["walk_cool"] = ctx.step + COOLDOWN
+    else:
+        st["healed_at"] = ctx.step   # retreat_heal's cooldown: no new precautionary retreat right after a heal
     if ctx.center_intent == "status_care":
         ctx.center_intent = None
     ctx.log(f"[heal_walk: {outcome} after {w.get('steps', 0)} steps ({why})]", "res")
@@ -64,7 +71,7 @@ def step(ctx) -> Decision | None:
     w = st.get("walk")
     if w is None:
         return None
-    if _party_healed(ctx):
+    if _party_healed(ctx, w.get("min_frac")):
         _end(ctx, "healed", w["why"], False)
         return None
     w["steps"] += 1

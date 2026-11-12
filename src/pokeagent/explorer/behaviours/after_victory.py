@@ -73,7 +73,7 @@ class AfterVictory(BehaviourBase):
             led.field_check_at = ctx.step + outside_use.RECHECK_EVERY
             led.field_decision = True
         elif dec.action == "heal":
-            heal_walk.start(ctx, "after_victory")  # a real walk request; StatusCare carries it out press by press
+            heal_walk.start(ctx, "after_victory", heal_walk.RETREAT_DONE)  # a real walk request; StatusCare carries it out press by press
         line = self._line(dec, rows)
         ctx.log(line, "res")
         self._record(ctx, dec)
