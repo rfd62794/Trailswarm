@@ -9,11 +9,12 @@ A record older than ``STALE_S`` counts as absent, so a stopped writer leaves no 
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from pokeagent.mapview.live_schema import SCHEMA, safe_name, valid as _valid
+from pokeagent.fsutil import replace_retry, unique_tmp
+from pokeagent.mapview.live_schema import safe_name
+from pokeagent.mapview.live_schema import valid as _valid
 
 STALE_S = 5.0                  # a record this old counts as gone (the writer stopped)
 
@@ -39,11 +40,12 @@ def write_live(source: Path, record: dict) -> None:
         return
     live = Path(source) / "live"
     stem = safe_name(record["agent"])
-    path, tmp = live / f"{stem}.json", live / f"{stem}.json.tmp"
+    path = live / f"{stem}.json"
+    tmp = unique_tmp(path)
     try:
         live.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps(record), encoding="utf-8")
-        os.replace(tmp, path)
+        replace_retry(tmp, path)
     except Exception:
         tmp.unlink(missing_ok=True)
 

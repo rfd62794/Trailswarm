@@ -6,6 +6,7 @@ import os
 import time
 from pathlib import Path
 
+from pokeagent.fsutil import replace_retry, unique_tmp
 from pokeagent.registry import process_state
 
 
@@ -24,11 +25,11 @@ def register(root: Path, agent_id: str, kind: str, port: int, frame_slot: str, p
             other.unlink(missing_ok=True)
     entry = {"id": agent_id, "kind": kind, "pid": os.getpid() if pid is None else pid, "port": port,
              "frame_slot": frame_slot, "token": token, "started": time.time()}
-    tmp = path.with_suffix(".tmp")
+    tmp = unique_tmp(path)
     tmp.write_text(json.dumps(entry), encoding="utf-8")
     if os.name != "nt":
         os.chmod(tmp, 0o600)
-    os.replace(tmp, path)
+    replace_retry(tmp, path)
     return path
 
 

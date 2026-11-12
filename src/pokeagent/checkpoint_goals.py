@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 from typing import Callable, Iterable
 
+from pokeagent.fsutil import replace_retry
+
 _log = logging.getLogger(__name__)
 
 SUFFIX = ".goals.json"
@@ -37,7 +39,7 @@ def write_completed(state: Path, completed: Iterable[str], respawn: int | None =
     if respawn is not None:
         rec["respawn"] = respawn
     tmp.write_text(json.dumps(rec), encoding="utf-8")
-    os.replace(tmp, sidecar(state))
+    replace_retry(tmp, sidecar(state))
 
 
 # Segments aboard / at the S.S. Anne: a blackout must land in Vermilion (5) or beyond. Pallet 0, Viridian 1, Pewter 2 and
@@ -107,6 +109,7 @@ def stamp_fingerprint(emu, state: Path, source_run: str | None = None, *, inheri
 
 def copy_sidecar(src: Path, dst: Path) -> None:
     import shutil
+
     from pokeagent import statefp
     for side in (sidecar, statefp.sidecar):
         if side(src).exists():

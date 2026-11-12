@@ -3,14 +3,19 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from pathlib import Path
 
+from pokeagent.checkpoint_goals import (
+    completed_goals,
+    read_completed,
+    stamp_fingerprint,
+    write_completed,
+)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import shutdown
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.press_stop import save_end_state, stop_at_map_reached
-from pokeagent.checkpoint_goals import completed_goals, read_completed, stamp_fingerprint, write_completed
+from pokeagent.fsutil import atomic_write_text, replace_retry
 from pokeagent.goals import GOALS, check_goals, is_unverified, store_path
 from pokeagent.segment_names import state_goal
 
@@ -60,7 +65,7 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
-                tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); os.replace(tmp, cp / f"{g}.state")
+                tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp); replace_retry(tmp, cp / f"{g}.state")
                 write_completed(cp / f"{g}.state", completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
                 try:
                     stamp_fingerprint(ctx.emu, cp / f"{g}.state", ctx.run_dir.name,
@@ -79,12 +84,10 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 rec["species_byte"] = ctx.emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
                 rec["wanted"] = ctx.opts.starter
             hist.setdefault(g, []).append(rec)
-            tmp = gp.with_suffix(f".{os.getpid()}.tmp"); tmp.write_text(json.dumps(hist, indent=1))
-            for _try in range(5):  # Windows: another agent may hold the file for a moment
-                try:
-                    os.replace(tmp, gp); break
-                except PermissionError:
-                    time.sleep(0.2)
+            try:  # Windows: another agent or the viewer may hold the file for a moment
+                atomic_write_text(gp, json.dumps(hist, indent=1))
+            except OSError as e:
+                ctx.log(f"[milestones save failed: {e!r}]", "res")
             if ctx.opts.stop_at_goal == g:  # AFTER the milestone is persisted (it used to return before recording it)
                 save_end_state(ctx)
                 ctx.done = True; shutdown(ctx); ctx.log(f"segment done: {g} at step {ctx.step}", "hdr")

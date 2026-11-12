@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pokeagent.explorer.jsonl_buf import FLUSH_EVERY
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, box_open
+from pokeagent.fsutil import where
 
 TAIL = 400  # log lines kept in memory as the run's console tail
 
@@ -102,7 +103,7 @@ def run(ctx, engine, *, jobs, on_exit=None, agent_view=None, frame_pub=None, fra
                 if not ctx.paused and not hold and ctx.frame % pace == 0:
                     engine.step()  # human hold (viewer Steer) pauses agent decisions, not the game
             except Exception as e:  # never let one bad step kill the loop: log it and keep going
-                ctx.log(f"[agent step error: {e!r}]", "res")
+                ctx.log(f"[agent step error: {e!r}{where(e)}]", "res")
             log_tick and log_tick(ctx.step)
     finally:
         try:
