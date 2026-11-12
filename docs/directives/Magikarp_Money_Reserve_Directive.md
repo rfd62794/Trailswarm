@@ -264,7 +264,7 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 | Branch | directive/pokeagent-magikarp-money-reserve-directive |
 | Base branch | - |
 | Base commit | 779718d27c13bffa91fdd337ac9861b947802eb8 |
-| Head commit | 5694902977e4924f2781dab183c072db2a49f190 |
+| Head commit | f01aca709d21435717c10818a5ccd0e83c3b030e |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
