@@ -166,3 +166,17 @@ def test_turn_cap_and_missing_data_skip_without_raising():
     assert _decide(None, rare, 21, 21, rate=45).kind == "skip"
     step = decide(aqua, [aqua], rare, 21, 21, None, 45, POKES, PRICE, {}, {}, turn=0)
     assert step.kind in ("throw", "skip", "switch")                        # empty tables: deterministic, no exception
+
+
+# run explore-20261112-072650 step 1506: a full-HP wild mon whose only safe hit fails just the worst case
+# (max roll AND crit) was thrown at unweakened; a non-crit-safe hit must weaken it first.
+def test_full_hp_weakens_when_only_the_crit_margin_fails():
+    aqua, wild = _mon("AQUA", 14), _wild("RARE", 5)
+    step = _decide(aqua, wild, wild.hp, wild.hp)
+    assert step.kind == "damage_move" and step.move == "TACKLE"
+
+
+def test_full_hp_still_throws_when_a_plain_max_roll_could_ko():
+    wild = _wild("RARE", 3)
+    step = _decide(_mon("BIGLEAD", 30, ("TACKLE",)), wild, wild.hp, wild.hp)
+    assert step.kind != "damage_move"

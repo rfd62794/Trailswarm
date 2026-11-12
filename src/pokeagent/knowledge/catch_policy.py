@@ -26,6 +26,7 @@ STATUS_MIN_GAIN = 0.05         # a status move is worth a turn only if it raises
 WEAKEN_TARGET = 0.35           # stop reducing HP at or below this fraction (the existing catch.py threshold); untuned
 CATCHER_MIN_HP = 0.25          # never switch in a catcher below this HP fraction (= magikarp.CATCHER_MIN_HP)
 MAX_TURNS = 8                  # give up the attempt after this many policy turns on one wild mon
+CRIT_RELAX_ABOVE = 0.5         # above this HP fraction the crit margin is dropped (a non-crit max roll must still not KO); untuned
 CRIT_SAFETY = 2.0              # "could it KO" margin: max-roll damage x this (a crit roughly doubles); untuned
 
 _STATUS_PREFERENCE = {"sleep": 3, "freeze": 3, "paralyse": 2, "burn": 1, "poison": 1}  # bonus table order; burn/poison last (they chip HP)
@@ -119,8 +120,13 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
         if step is not None:
             return step
     if wild_hp / wild_hp_max > WEAKEN_TARGET:
-        okay = [n for n in safe_moves(active, wild, chart, moves)
-                if max_damage(active, move_row(n, moves), wild, chart) * CRIT_SAFETY < wild_hp]
+        safe = safe_moves(active, wild, chart, moves)
+        okay = [n for n in safe if max_damage(active, move_row(n, moves), wild, chart) * CRIT_SAFETY < wild_hp]
+        if not okay and wild_hp / wild_hp_max > CRIT_RELAX_ABOVE:
+            # Full-HP wild mon, every safe move fails only the worst case (max roll AND a crit): that KO is a
+            # fraction of a percent, while throwing unweakened wastes balls (run 072650 step 1506: Charmander L8
+            # Scratch max 9 x2 = 18 >= Weedle 17 HP -> threw at 100%). Accept a hit that cannot KO without a crit.
+            okay = [n for n in safe if max_damage(active, move_row(n, moves), wild, chart) < wild_hp]
         if okay:
             pick = min(okay, key=lambda n: (raw_damage(active, move_row(n, moves), wild, chart), n))
             return CatchStep("damage_move", move=pick, p=p_now,
