@@ -14,6 +14,8 @@ from pokeagent.explorer.item_policies.view import Mon, fighter_slot_of, read_mon
 from pokeagent.goals import GOALS, bag_contents
 from pokeagent.knowledge import trainers
 from pokeagent.knowledge.party import Combatant, our_party, trainer_mon
+from pokeagent.party_view import read_party_view
+from pokeagent.ram_symbols import SPECIES_MAGIKARP
 
 EVOLVE_SCORE_SLACK = 0.02   # an evolved form may score this much below the unevolved one and still count as 'not worse'
 CANDIDATES = frozenset({ids.RARE_CANDY, ids.BICYCLE, *ids.VITAMIN_STAT, *ids.STONES, *ids.REPELS, *ids.HM_BY_TAG.values()})
@@ -58,7 +60,11 @@ def _grind_minutes(ctx, goals: dict, party: list[Combatant]) -> float | None:
         from pokeagent.explorer.training import stage_goal
         atlas = json.loads((Path(ctx.run_dir).parent / "grind_atlas.json").read_text(encoding="utf-8")).get("atlas") or {}
         goal = stage_goal(goals)
-        return rare_candy.atlas_minutes(atlas, party[0].name, goal, party[0].level, rare_candy.STEPS_PER_MIN) if goal and party else None
+        view = read_party_view(ctx.emu)
+        f = view.fighter()   # the lead, or the strongest non-Magikarp while a trainee is in the party
+        pos = sum(1 for s in view.slots[:f.index] if s.species != SPECIES_MAGIKARP) if f is not None else 0
+        c = party[pos] if pos < len(party) else party[0]  # the fighter's entry in the Magikarp-filtered list
+        return rare_candy.atlas_minutes(atlas, c.name, goal, c.level, rare_candy.STEPS_PER_MIN) if goal and party else None
     except (OSError, ValueError, KeyError, IndexError):
         return None
 

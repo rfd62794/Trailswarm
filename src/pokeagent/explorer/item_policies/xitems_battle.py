@@ -6,6 +6,8 @@ from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.behaviours.item_use import close_unwanted_list, item_is_blocked, item_step
 from pokeagent.explorer.item_policies import ids, policy, uselog, xitems
 from pokeagent.goals import bag_contents
+from pokeagent.party_view import read_party_view
+from pokeagent.ram_symbols import SPECIES_MAGIKARP
 
 
 def _decide(ctx, kind: int) -> dict:
@@ -30,7 +32,9 @@ def _decide(ctx, kind: int) -> dict:
     physical = None
     if party and boss:
         moves = table(None, "moves")
-        name = best_move(party[0], boss[0], default_chart(), moves)[1]
+        live = next((c for s, c in zip((s for s in read_party_view(ctx.emu).slots if s.species != SPECIES_MAGIKARP), party)
+                     if not s.fainted), party[0])  # the first living member of the filtered party, else slot 0 as before
+        name = best_move(live, boss[0], default_chart(), moves)[1]
         mv = next((m for m in moves.values() if m["name"] == name), None)
         physical = None if mv is None else mv["type"] in PHYSICAL
     hit = xitems.should_use(kind=kind, bag=bag, score=verdict.score if verdict else None, used_this_battle=0,

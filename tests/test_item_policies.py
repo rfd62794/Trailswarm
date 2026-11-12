@@ -385,6 +385,35 @@ def test_fighter_slot_follows_the_trainee_rule():
     assert fighter_slot_of([]) is None
 
 
+def test_fighter_slot_of_skips_a_fainted_lead():
+    assert fighter_slot_of([mon(0, hp=0), mon(1)]) == 1               # the second mon is the fighter
+    assert fighter_slot_of([mon(0), mon(1)]) == 0                     # healthy lead: unchanged
+    assert fighter_slot_of([mon(0, hp=0), mon(1, hp=0)]) == 0         # all down: slot 0, as the view reports
+    assert fighter_slot_of([mon(0, "MAGIKARP", 9, (), hp=0), mon(1)]) == 1
+
+
+def test_vitamin_goes_to_the_second_when_the_lead_fainted():
+    party = [mon(0, hp=0), mon(1)]
+    assert vitamins.should_use(bag={ids.HP_UP: 1}, party=party)[:2] == (ids.HP_UP, 1)
+    assert vitamins.should_use(bag={ids.HP_UP: 1}, party=[mon(0), mon(1)])[:2] == (ids.HP_UP, 0)
+
+
+def test_candy_goes_to_the_second_when_the_lead_fainted():
+    assert candy([mon(0, hp=0), mon(1)], (24, 22, 2))[1] == 1
+    assert candy([mon(0), mon(1)], (24, 22, 2))[1] == 0
+
+
+def test_hm_teach_fighter_is_the_second_when_the_lead_fainted():
+    fainted = mon(0, "PIDGEY", hp=0)     # fainted and cannot learn CUT anyway
+    assert hm_teach._fighter([fainted, mon(1)]) == 1 and hm_teach._fighter([mon(0), mon(1)]) == 0
+    full = ("TACKLE", "TAIL WHIP", "VINE WHIP", "GROWL")
+    p = plan([fainted, mon(1, "BULBASAUR", moves=full), mon(2, "BULBASAUR", moves=full)])
+    assert p and p.learner == 2        # same overwrite cost: the fighter (slot 1) is spared
+    tm = hm_teach.plan_tm(enabled=True, bag={ids.TM01 + 11: 1}, party=[fainted, mon(1, moves=("TACKLE", "GROWL"))],
+                          can_learn=lambda n, s: True, needed_hm_moves=set(), boss_types=[], info=info, chart=CHART)
+    assert tm and tm.learner == 1      # a TM goes to the fighter: slot 1, not the fainted lead
+
+
 # --- 10. end-to-end UseItems.step: the teach cap and the stone settle -----------------------------------------------------------
 from pokeagent.explorer.behaviours import use_items as ui   # noqa: E402
 from pokeagent.explorer.dialog import learn_decision   # noqa: E402

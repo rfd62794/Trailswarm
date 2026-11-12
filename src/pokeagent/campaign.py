@@ -23,7 +23,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pokeagent.ram_symbols import PARTY_COUNT, PARTY_MON1_MOVES, PARTY_MON_SIZE
+from pokeagent.party_view import read_party_view
+from pokeagent.ram_symbols import PARTY_COUNT
 
 CAMPAIGN_PATH = Path(__file__).with_name("data") / "campaign.json"
 BADGES = 0xD356
@@ -97,8 +98,7 @@ def _flag(emu, flag: dict) -> bool:
 
 def party_knows_move(emu, move_id: int) -> bool:
     """Any of the (up to 6) party members has ``move_id`` in one of its four move slots."""
-    n = min(emu.read(PARTY_COUNT), 6)
-    return any(emu.read(PARTY_MON1_MOVES + PARTY_MON_SIZE * i + s) == move_id for i in range(n) for s in range(4))
+    return any(move_id in s.moves for s in read_party_view(emu).slots)
 
 
 def evaluate(det, emu, st: dict, seen: set, bag: dict) -> bool | None:

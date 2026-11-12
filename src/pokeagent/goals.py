@@ -13,7 +13,8 @@ from pokeagent.game.stores import store_path  # re-exported for the explorer pac
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
 from pokeagent.magikarp import magikarp_goal_settled, team_ready_settled
-from pokeagent.ram_symbols import PARTY_COUNT, PARTY_MON1_HP, PARTY_MON1_MAX_HP, PARTY_MON_SIZE
+from pokeagent.party_view import read_party_view
+from pokeagent.ram_symbols import PARTY_COUNT
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
 GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 26 ids are the hand-coded ones below
@@ -49,16 +50,11 @@ def through_mt_moon(emu, st: dict, m: int, seen: set) -> bool:
 
 
 def party_full(emu) -> bool:
-    """Every party Pokemon at full HP (wPartyMonN HP / MaxHP, PARTY_MON_SIZE bytes apart; count at wPartyCount)."""
+    """Every party Pokemon at full HP (party_view slots; count at wPartyCount)."""
     n = emu.read(PARTY_COUNT)
     if not 0 < n <= 6:
         return False
-    for i in range(n):
-        hp = (emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i) << 8) | emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i + 1)
-        mx = (emu.read(PARTY_MON1_MAX_HP + PARTY_MON_SIZE * i) << 8) | emu.read(PARTY_MON1_MAX_HP + PARTY_MON_SIZE * i + 1)
-        if mx == 0 or hp < mx:
-            return False
-    return True
+    return all(s.max_hp > 0 and s.hp >= s.max_hp for s in read_party_view(emu).slots)
 
 
 def healed_in_cerulean(emu, st: dict, m: int) -> bool:

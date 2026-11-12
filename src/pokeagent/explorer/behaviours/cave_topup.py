@@ -16,8 +16,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.goals import bag_contents
-from pokeagent.magikarp import MAGIKARP
-from pokeagent.ramstructs import read_party
+from pokeagent.party_view import read_party_view
 
 POTION = 0x14
 TOPUP_BELOW = 0.5       # fighter HP fraction under which a potion is drunk outside a fight
@@ -26,13 +25,11 @@ TOPUP_COOLDOWN = 150    # steps before a failed sequence is retried
 
 
 def fighter_slot(emu) -> int:
-    """Party slot of the Pokemon that does the fighting: the lead (slot 0) without a Magikarp, else the strongest non-Magikarp.
+    """Party slot of the Pokemon that does the fighting: the party view's fighter (the lead normally, the strongest
+    non-Magikarp while a Magikarp trainee is in the party), 0 for an empty party.
     Matches ``party_hp`` / ``magikarp.fighter``: the HP that triggered the top-up is the one the potion must go to."""
-    party = read_party(emu)
-    if not any(p.species == MAGIKARP for p in party):
-        return 0
-    real = [(i, p) for i, p in enumerate(party) if p.species != MAGIKARP] or list(enumerate(party))
-    return max(real, key=lambda ip: (ip[1].hp > 0, ip[1].level, ip[1].hp))[0] if real else 0
+    f = read_party_view(emu).fighter()
+    return f.index if f is not None else 0
 
 
 def wants_topup(ctx: ExplorerContext) -> bool:

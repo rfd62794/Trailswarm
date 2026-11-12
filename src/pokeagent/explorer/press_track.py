@@ -6,12 +6,12 @@ import os
 from pokeagent.checkpoint_goals import stamp_fingerprint
 from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
+from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu, true_lead_level
 from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.stat_records import note_stat_exp
 from pokeagent.fsutil import replace_retry
 from pokeagent.goals import GOALS, bag_contents, check_goals, store_path
-from pokeagent.ram_symbols import IS_IN_BATTLE, PARTY_MON1_LEVEL
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 ITEM_NAMES = {0x01: "MASTER BALL", 0x02: "ULTRA BALL", 0x03: "GREAT BALL", 0x04: "POKE BALL", 0x05: "TOWN MAP", 0x06: "BICYCLE",
               0x0B: "ANTIDOTE", 0x0C: "BURN HEAL", 0x0D: "ICE HEAL", 0x0E: "AWAKENING", 0x0F: "PARLYZ HEAL", 0x10: "FULL RESTORE",
@@ -47,7 +47,7 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     ctx.events_prev = ev
     # Team checkpoint: whenever the lead pokemon's level beats the best ever, save a 'team_best' state the
     # explorer agents start from (Robert: trainer agents feed the stronger team to the map-clearing agents).
-    lvl = ctx.emu.read(PARTY_MON1_LEVEL)
+    lvl = true_lead_level(ctx.emu)
     if lvl > ctx.best_level_seen:
         ctx.best_level_seen = lvl
         best = ctx.mem.data.get("team_best_level", 0)
@@ -71,7 +71,7 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
     if ctx.exp_prev is not None and exp_now > ctx.exp_prev:
         tr = ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})
         tr["exp"] += exp_now - ctx.exp_prev
-        lv = str(ctx.emu.read(PARTY_MON1_LEVEL)); tr["by_level"][lv] = tr["by_level"].get(lv, 0) + (exp_now - ctx.exp_prev)
+        lv = str(true_lead_level(ctx.emu)); tr["by_level"][lv] = tr["by_level"].get(lv, 0) + (exp_now - ctx.exp_prev)
     if ctx.exp_prev is not None:
         ctx.mem.data.setdefault("training", {}).setdefault(str(before[0]), {"exp": 0, "steps": 0, "by_level": {}})["steps"] += 1
     ctx.exp_prev = exp_now

@@ -12,6 +12,7 @@ from pokeagent.goals import check_goals
 from pokeagent.explorer.catch_list import upcoming_needs
 from pokeagent.explorer.item_policies.ids import HM_MOVE
 from pokeagent.knowledge import team_plan
+from pokeagent.party_view import read_party_view
 
 
 def yesno_box_up(lines: list[str]) -> bool:
@@ -40,7 +41,8 @@ class Menu(BehaviourBase):
                 ans, why, forget = "YES", "abandon learning: only when we chose not to forget a move", None
                 ctx.forget_move = None
             elif "learn" in context.lower() and ("make room" in ql or "delete" in ql):
-                cur_moves = [ROM_KB["moves"].get(str(ctx.emu.read(0xD173 + i)), {}).get("name", "?") for i in range(4) if ctx.emu.read(0xD173 + i)] if ROM_KB else []
+                learner = read_party_view(ctx.emu).fighter()   # the mon that is learning: its moves are not on screen
+                cur_moves = [ROM_KB["moves"].get(str(mv), {}).get("name", "?") for mv in learner.moves if mv] if ROM_KB and learner is not None else []
                 needed = {HM_MOVE[t] for t in upcoming_needs(check_goals(ctx.emu, ctx)) if t in HM_MOVE}
                 ans, why, forget = learn_decision(context, cur_moves, needed)
                 ctx.forget_move = forget

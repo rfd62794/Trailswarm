@@ -12,7 +12,8 @@ An unknown key makes the predicate FALSE and is logged once - never raised, neve
 from __future__ import annotations
 
 from pokeagent.goals import bag_contents
-from pokeagent.magikarp import fighter, trainee_slot
+from pokeagent.magikarp import fighter
+from pokeagent.party_view import read_party_view
 from pokeagent.ramstructs import read_party
 
 BADGES = 0xD356  # wObtainedBadges (verified)
@@ -74,12 +75,10 @@ def _one(key: str, val, st: dict, log) -> bool:
 
 
 def _party_hp(emu) -> tuple[int, int]:
-    """(fighter hp, fighter max): the lead, or the strongest non-Magikarp while a trainee is out
-    (mirrors perceive.party_hp without importing the explorer layer)."""
-    if trainee_slot(emu) is not None:
-        _, _, hp, mx = fighter(emu)
-        return hp, mx
-    return ((emu.read(0xD16C) << 8) | emu.read(0xD16D)), ((emu.read(0xD18D) << 8) | emu.read(0xD18E))
+    """(hp, max) the hp_frac predicates see: the fighter's numbers normally; (0, fighter max) while any member has
+    fainted (perceive.heal_gate_hp's rule, without importing the explorer layer: a dead lead still reads as hurt)."""
+    _, _, hp, mx = fighter(emu)
+    return (0, mx) if read_party_view(emu).any_fainted else (hp, mx)
 
 
 def beaten_trainers(ctx) -> set:
