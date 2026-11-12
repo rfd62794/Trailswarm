@@ -8,9 +8,8 @@ from pokeagent.explorer.party_menu import MENU_ITEM, is_party_screen, screen_lin
 from pokeagent.explorer.perceive import BATTLE_FLAG, TILEMAP, TILEMAP_LEN, box_open, frame_lines, is_menu
 from pokeagent.intervene.names import norm, species_name
 from pokeagent.knowledge.kb import ROM_KB
-from pokeagent.ramstructs import read_bag, read_battle_mon, read_party
+from pokeagent.ramstructs import PLAYER_MON, active_slot, read_bag, read_battle_mon, read_party  # noqa: F401  (re-exported)
 
-PLAYER_MON = 0xCC2F    # wPlayerMonNumber: the party slot in the fight
 BATTLE_MOVES = 0xD01C  # wBattleMonMoves
 GRID = {"FIGHT": (0, 0), "PKMN": (1, 0), "ITEM": (0, 1), "RUN": (1, 1)}  # the battle menu: FIGHT PKMN / ITEM RUN
 
@@ -84,20 +83,6 @@ def party_names(emu) -> list[str]:
 
 def bag_qty(emu, item_id: int) -> int:
     return next((q for i, q in read_bag(emu) if i == item_id), 0)
-
-
-def active_slot(emu) -> int | None:
-    """0-based party slot of the Pokemon in the fight, VERIFIED: wPlayerMonNumber (0xCC2F) must agree with wBattleMon's species,
-    or that species must sit in exactly one party slot. None when the battle data is not loaded or cannot be matched."""
-    species = read_battle_mon(emu).species
-    party = read_party(emu)
-    if not species:
-        return None
-    slot = emu.read(PLAYER_MON)
-    if slot < len(party) and party[slot].species == species:
-        return slot
-    hits = [i for i, m in enumerate(party) if m.species == species]
-    return hits[0] if len(hits) == 1 else None
 
 
 def party_slot(emu, on) -> int | None:
