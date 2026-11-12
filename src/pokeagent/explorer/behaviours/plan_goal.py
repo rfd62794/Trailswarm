@@ -10,7 +10,7 @@ from pokeagent.explorer.status_care import of as care_state
 from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
-from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, stall_hold_holds
+from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds
 from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import area_grind, grind_episode, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
@@ -148,6 +148,8 @@ class PlanGoal(BehaviourBase):
                 st["gate_skip_logged"] = ctx.stage_goal
                 ctx.log(f"[team gate: grind budget spent ({ctx.grind.reason(st['gate_lifted'])}); "
                         f"gym hold lifted for {ctx.stage_goal}]", "res")
+        if hold and st.get("gate_lifted") is not None:
+            ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:
             self._leader_avoid(ctx, m, x, y, gym)
             if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
@@ -282,11 +284,12 @@ class PlanGoal(BehaviourBase):
         goal = "team_ready" if tr else stage  # the team_ready stage has its own budget key: it must not accrue on the next boss's
         ctx.grind = ctx.grind or GrindBudget()
         why = ctx.grind.update(goal, level=level, step=ctx.step, battles=ctx.battles, blackouts=ctx.blackouts_row,
-                               training=0 < level < need, ceiling=level_ceiling(stage),
+                               training=0 < level < need and grinding_now(ctx), ceiling=level_ceiling(stage),
                                max_battles=GRIND_BATTLES_GYARADOS if tr else GRIND_BATTLES)
         if why:
             ctx.log(f"[readiness] grind budget spent for {goal}: {why}; lifting the training gate", "res")
         if ctx.grind.lifted(goal):
             st["gate_lifted"] = goal
+            st["lifted_need"] = need  # a held gym still wants this level: the episode gate reads it back
             return 0
         return need

@@ -169,6 +169,24 @@ def _reachable(maps, pos, map_id, blocked) -> bool:
     return reachable(maps, pos, map_id, blocked)
 
 
+def _best(ledger, lvl, current_map, maps, blocked, only_maps, use_band):
+    best = None
+    for p in ledger.points.values():
+        lo, hi = p.level_band
+        if use_band and not lo <= lvl <= hi:
+            continue
+        if only_maps is not None and (p.map_id not in only_maps or travel_steps(maps, current_map, p.map_id) >= FAR_TRAVEL):
+            continue
+        if blocked and isinstance(current_map, (tuple, list)) and travel_steps(maps, current_map, p.map_id) < FAR_TRAVEL                 and not _reachable(maps, current_map, p.map_id, blocked):
+            continue
+        xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None)             else p.xp_per_min_prior
+        score = xp - travel_steps(maps, current_map, p.map_id) / atlas.STEPS_PER_MIN - p.blackout_rate * atlas.BLACKOUT_STEPS
+        key = (-score, p.map_id)
+        if best is None or key < best[0]:
+            best = (key, p)
+    return best
+
+
 def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_map, mem=None,
            trainee_slot: int | None = None, blocked=frozenset(), only_maps=None) -> GrindPoint | None:
     """The best point for the trainee's level (``trainee_slot``, else the lead), or None when there is
@@ -182,21 +200,10 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
         else party_levels[0]
     if need_level - lvl <= 0:
         return None
-    maps, best = _maps_of(mem), None
-    for p in ledger.points.values():
-        lo, hi = p.level_band
-        if not lo <= lvl <= hi:
-            continue
-        if only_maps is not None and (p.map_id not in only_maps or travel_steps(maps, current_map, p.map_id) >= FAR_TRAVEL):
-            continue
-        if blocked and isinstance(current_map, (tuple, list)) and travel_steps(maps, current_map, p.map_id) < FAR_TRAVEL                 and not _reachable(maps, current_map, p.map_id, blocked):
-            continue
-        xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None) \
-            else p.xp_per_min_prior
-        score = xp - travel_steps(maps, current_map, p.map_id) / atlas.STEPS_PER_MIN - p.blackout_rate * atlas.BLACKOUT_STEPS
-        key = (-score, p.map_id)
-        if best is None or key < best[0]:
-            best = (key, p)
+    maps = _maps_of(mem)
+    best = _best(ledger, lvl, current_map, maps, blocked, only_maps, True)
+    if best is None and only_maps is not None:  # a stage list with nothing in band: low XP beats no XP
+        best = _best(ledger, lvl, current_map, maps, blocked, only_maps, False)
     return best[1] if best else None
 
 

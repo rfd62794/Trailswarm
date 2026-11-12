@@ -26,6 +26,18 @@ def stall_keeps_hold(reason: str) -> bool:
     return "without a level gain" in (reason or "")
 
 
+def grinding_now(ctx) -> bool:
+    """Is this step spent grinding: a live episode, or standing on a map with learned wild encounters? Only those
+    steps may spend the budget (6,500 frontier steps in Pewter City once 'spent' 2500 without a single fight).
+    A ctx without view/mem (unit fixtures) counts as grinding."""
+    if "_grind_state" in getattr(ctx, "__dict__", {}) and ctx._grind_state.get("episode"):
+        return True
+    view, mem = getattr(ctx, "view", None), getattr(ctx, "mem", None)
+    if view is None or mem is None:
+        return True
+    return bool(((getattr(mem, "data", None) or {}).get("maps", {}).get(str(view.m)) or {}).get("encounters"))
+
+
 STALL_HOLD_CAP = 6000  # plan steps the gym stays shut after a stall lift before the hold gives up
 
 

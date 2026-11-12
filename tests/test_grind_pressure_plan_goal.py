@@ -160,3 +160,15 @@ def test_gym_hold_replaces_the_road_to_the_gym_with_the_grind_step(tmp_path, mon
     monkeypatch.setattr(plan_goal, "plan_step", lambda goals, maps, pos, facing: ("UP", "goal road north: 9 steps to map 0x36"))
     d = PlanGoal().step(ctx)
     assert d.button == "LEFT" and "grinding" in d.why
+
+
+def test_a_held_stall_lift_keeps_the_episode_gate_open(tmp_path, monkeypatch):
+    ctx = _full_ctx(tmp_path, mem_map=0x02)
+    _gate_patch(monkeypatch)
+    monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_brock")
+    monkeypatch.setattr(plan_goal, "train_need", lambda c, g, n: n)
+    ctx.mem.data["maps"]["2"] = {"encounters": {"1,1": 3}}          # grass here, so the budget accrues
+    PlanGoal().step(ctx)
+    ctx.step, ctx.battles = 300, 99
+    PlanGoal().step(ctx)
+    assert ctx.train_need == 15                                      # lifted, held, yet the episode gate still reads the need

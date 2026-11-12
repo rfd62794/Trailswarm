@@ -175,3 +175,23 @@ def test_magikarp_trainee_keeps_the_gated_lead_measure(monkeypatch):
     party = [SimpleNamespace(level=30)]
     pg.PlanGoal._budgeted(ctx, goals, 12, None, party)
     assert ctx.grind._s["beat_brock"]["level"] == 8                           # not best_level == 30
+
+
+def test_budget_accrues_only_on_grinding_steps(monkeypatch):
+    from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+    from pokeagent.explorer.grind import grinding_now
+    from pokeagent.goals import GOALS
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
+    goals = {g: True for g in GOALS[:GOALS.index("to_gym") + 1]}
+    city = {"2": {"encounters": {}}}; grass = {"13": {"encounters": {"1,1": 3}}}
+    mk = lambda mid, maps: SimpleNamespace(emu=SimpleNamespace(read=lambda a: 9, read_range=lambda a, n: bytes(n)), step=0,
+                                           battles=0, blackouts_row=0, grind=None, log=lambda t, tag=None: None,
+                                           view=SimpleNamespace(m=mid), mem=SimpleNamespace(data={"maps": maps}))
+    ctx = mk(2, city)
+    assert not grinding_now(ctx) and grinding_now(mk(13, grass))
+    PlanGoal._budgeted(ctx, goals, 17, None)
+    ctx.step = GRIND_STEPS + 500                                        # wandering the city for the whole budget
+    assert PlanGoal._budgeted(ctx, goals, 17, None) == 17               # nothing spent: the gate stays
+    ctx.view, ctx.mem = SimpleNamespace(m=13), SimpleNamespace(data={"maps": grass})
+    ctx.step += GRIND_STEPS
+    assert PlanGoal._budgeted(ctx, goals, 17, None) == 0                # real grinding steps do spend it

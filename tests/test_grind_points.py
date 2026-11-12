@@ -153,3 +153,12 @@ def test_only_maps_keeps_a_pre_brock_stage_off_mt_moon_and_unreachable_points():
     assert got.map_id == 0x0D
     assert gp.choose(ledger_with(mt_moon), [9], 17, cur, maps, only_maps=stage_maps.allowed("beat_brock")) is None
     assert stage_maps.allowed("beat_misty") is None
+
+
+def test_only_maps_falls_back_past_the_level_band_when_nothing_in_band_fits():
+    from pokeagent.grind import stage_maps
+    route2 = pt(0x0D, band=(2, 6), prior=50.0)                      # wild L2-6: the L9 lead is out of band
+    maps = {"2": {"warps": {"1,1,UP": [0x0D, 3, 3]}}, "13": {"warps": {"3,3,DOWN": [2, 1, 1]}}}
+    led = ledger_with(route2)
+    assert gp.choose(led, [9], 17, 0x02, maps) is None               # unrestricted: band excludes it
+    assert gp.choose(led, [9], 17, 0x02, maps, only_maps=stage_maps.allowed("beat_brock")).map_id == 0x0D
