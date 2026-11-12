@@ -403,11 +403,12 @@ Nothing for the build. After merge, Claude confirms on the laptop that `PartyVie
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-12 08:13 · robert-claude-laptop · none → Queued — Robert 2026-11-12: expand party RAM/ROM detection; PR #207 merged fb27482 after audit + 2 review rounds
+- 2026-11-12 08:16 · robert-claude-laptop · Queued → Approved — lint override: line 382 cites tests/rom/test_party_states.py as a follow-up created by Party_RAM_State_Tests_Directive (queued alongside); D1 does not need it
 <!-- queue:end -->
