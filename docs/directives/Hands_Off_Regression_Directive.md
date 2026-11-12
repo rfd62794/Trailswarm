@@ -237,7 +237,7 @@ Controller verification, not Devin's job and not part of this run. After merge, 
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Done |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -246,4 +246,5 @@ Controller verification, not Devin's job and not part of this run. After merge, 
 - 2026-11-08 19:26 · robert-claude-laptop · none → Queued — Approved by Robert 2026-11-08: repeatable hands-off milestone check that fails on any human press
 - 2026-11-11 21:23 · devin-laptop-overseer (delegated) · Queued → Approved — devin-laptop-overseer: Robert 2026-11-11 permanent full approval (PokeAgent focus) + cloud-drain steer; approving for a manual cloud run; under delegate.band-normal, delegate.rate-limit
 - 2026-11-11 21:23 · devin-laptop-overseer (delegated) · Approved → Blocked — devin-laptop-overseer: claimed for manual devin --cloud run (queue-drain); Review if branch lands, Approved if it dies; under delegate.envelope
+- 2026-11-12 06:47 · robert-claude-laptop · Blocked → Done — note: PR #198 merged d7a3727 (pinned d53d4cd, verify 2466 passed/0 failed/41 skipped, independent review approve incl. controller extensions)
 <!-- queue:end -->
