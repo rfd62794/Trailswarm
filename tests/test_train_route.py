@@ -57,3 +57,10 @@ def test_choose_local_marks_a_one_sighting_edge_as_tried(tmp_path):
     s = train_route.OutsideSet({35, 64}, mem.data["maps"])
     name, _why, _want = mem.choose_local(35, 10, 35, "DOWN", avoid_maps=s)
     assert name != "UP"                                              # the unconfirmed edge counts as leaving
+
+
+def test_survives_replaces_the_hp_fraction_test_when_given():
+    assert train_route.step(MAPS, (3, 10, 36), (), 1, 20, target=35, survives=True) is not None   # 5% HP but the party survives
+    assert train_route.step(MAPS, (3, 10, 36), (), 20, 20, target=35, survives=False) is None     # full HP but nobody survives
+    assert train_route.step(MAPS, (3, 10, 36), (), 0, 0, target=35, survives=True) is None        # mx == 0 still stops
+    assert train_route.step(MAPS, (3, 10, 36), (), 9, 20, target=35) is None                      # legacy: the 0.5 fraction

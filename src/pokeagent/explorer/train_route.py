@@ -49,13 +49,14 @@ class OutsideSet:
         return (map_id, key) in self.exits
 
 
-def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE24, patch=None) -> tuple[str, str] | None:
+def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE24, patch=None,
+         survives: bool | None = None) -> tuple[str, str] | None:
     """The next button toward the target map's grass, or None (on it / no learned way / too hurt).
 
     Off the target the goal is the map itself; on it, the nearest patch tile (encounter-proven grass, or
     the map's learned ``encounters`` when no patch is given), so a run that has seen every tile does not
     shuffle at the south end (steps 300-1800 of the 2026-11-07 repro)."""
-    if not mx or hp / mx < MIN_HP_FRACTION:
+    if not mx or (not survives if survives is not None else hp / mx < MIN_HP_FRACTION):
         return None
     # GrindPoint.patch arrives from JSON as [[x, y]] lists (unhashable), so key each tile as text first
     src = patch if patch is not None else (maps.get(str(target)) or {}).get("encounters", {})

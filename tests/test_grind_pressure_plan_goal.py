@@ -12,7 +12,7 @@ from pokeagent.knowledge import team_plan
 
 
 def _ctx(stage_goal="beat_misty", maps=None):
-    return SimpleNamespace(stage_goal=stage_goal,
+    return SimpleNamespace(stage_goal=stage_goal, emu=None, view=SimpleNamespace(m=0x03),
                            mem=SimpleNamespace(data={"maps": maps or {}}, temp_blocked={}))
 
 
@@ -38,10 +38,11 @@ def test_enters_detects_a_planned_press_into_the_gym():
 
 def test_grind_step_uses_train_route_when_no_episode_starts(monkeypatch):
     ctx = _ctx()
+    monkeypatch.setattr(plan_goal, "party_survives", lambda emu, m: True)
     monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x": False)
-    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: ("UP", "to Route 24 grass"))
+    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx, **kw: ("UP", "to Route 24 grass"))
     assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) == ("UP", "to Route 24 grass")
-    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: None)
+    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx, **kw: None)
     assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) is None
 
 
@@ -49,8 +50,9 @@ def test_real_grind_step_handles_start_returning_a_bool(monkeypatch):
     """grind_episode.start returns bool (never a step): the REAL _grind_step must not index it, and must hand
     back a real train_route decision for BOTH outcomes (True: the episode owns the next tick; False: no episode)."""
     ctx = _ctx()
+    monkeypatch.setattr(plan_goal, "party_survives", lambda emu, m: True)
     seen = []
-    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx: ("UP", "to Route 24 grass"))
+    monkeypatch.setattr(plan_goal.train_route, "step", lambda maps, pos, blocked, hp, mx, **kw: ("UP", "to Route 24 grass"))
     for outcome in (True, False):
         monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x", o=outcome: seen.append(o) or o)
         assert PlanGoal._grind_step(ctx, 0x03, 2, 4, 30, 40) == ("UP", "to Route 24 grass")

@@ -111,7 +111,7 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         return "DOWN", f"goal {stage}: walking out of the Pokecenter by its door"
     hp, mx = goals.get("_hp", (0, 0))
     need, level = goals.get("_train_level", 8), goals.get("_level", 0)
-    if stage in TRAIN_OUTSIDE_STAGES and pos[0] not in CAVE and 0 < level < need and mx and hp / mx >= 0.5:
+    if stage in TRAIN_OUTSIDE_STAGES and pos[0] not in CAVE and 0 < level < need and mx and goals.get("_survives", hp / mx >= 0.5):
         # too weak for the cave (and Route 4's trainers): grind Route 3 first
         return None if pos[0] == ROUTE3 else _back_to(g, pos, stage, ROUTE3, f"Route 3 to train to L{need} (now L{level})")
     if pos[0] in CAVE:  # the whole dungeon is in the ROM: route across floors first, learned walls only delay it
