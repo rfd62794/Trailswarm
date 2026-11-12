@@ -1,0 +1,6 @@
+{"cases": [
+  {"name": "red_bedroom_potion_cold", "game": "red", "state": "bedroom", "memory": "none",
+   "goal": "potion", "budget": 105, "seed": 42},
+  {"name": "red_bedroom_potion_live_memory", "game": "red", "state": "bedroom", "memory": "live",
+   "goal": "potion", "budget": 105, "seed": 42}
+]}
