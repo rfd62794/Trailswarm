@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import pokeagent.brain as brain
+from pokeagent import cli_brain_memory
 from pokeagent.brain import fileops, text
 from pokeagent.explorer import edits as edit_journal
 from pokeagent.game.stores import store_path
@@ -194,6 +195,7 @@ def _add_commands(bsub) -> None:
     common.add_argument("--text", action="store_true", help="human-readable output (default: stable JSON)")
 
     bsub.add_parser("maps", parents=[common], help="per-map and global memory summary").set_defaults(func=_cmd_maps)
+    cli_brain_memory.add_commands(bsub, common)
 
     m = bsub.add_parser("map", parents=[common], help="legend-glyph grid of one map")
     m.add_argument("map", type=_auto_int, help="map id (decimal or 0x..)")

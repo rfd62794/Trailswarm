@@ -16,8 +16,14 @@ def _data():
         "warps": {"3,5,DOWN": [2, 0, 0]}, "warp_cand": {"4,4,LEFT": 1},
         "warp_taken": {"3,5,DOWN": 2},
         "jumps": {"6,6,RIGHT": [8, 6]}, "fails": {"7,7,UP": 2},
-        "interactions": {"3,4,UP": {"count": 1, "text": "HI"}},
-        "npcs": {"slot1:pic9": {"pic": 9, "slot": 1, "last": [4, 4], "trainer": False, "talked": 1}},
+        "interactions": {"3,4,UP": {"count": 1, "text": "HI"},
+                         "2,2,LEFT": {"count": 3, "text": "Wild ZIGZAG fainted!", "pages": ["Take this!", "Wild ZIGZAG fainted!"],
+                                      "done": True, "type": "giver", "type_votes": {"giver": 2, "info": 1},
+                                      "type_conf": 0.67, "type_why": "bag gained"}},
+        "npcs": {"slot1:pic9": {"pic": 9, "slot": 1, "last": [4, 4], "trainer": False, "talked": 1},
+                 "slot2:pic3": {"pic": 3, "slot": 2, "last": [6, 3], "talked": 1,
+                                "results": {"count": 1, "text": "Here you go", "done": True,
+                                            "pages": ["Here you go", "Now saving the game"]}}},
         "encounters": {"5,5": 3}, "outcomes": {"5,5,UP": {"g1": {"n": 2, "progress": 1, "best": 4}}},
     }}}
 
@@ -46,6 +52,12 @@ def _map(data):
     ("npc_forget", "4,4", None, lambda d: "slot1:pic9" not in _map(d)["npcs"]),
     ("tile_kind", "3,4", "wall", lambda d: _map(d)["tile_overrides"]["3,4"] == "wall"),
     ("visited_clear", "3,4", None, lambda d: "3,4" not in _map(d)["visited"]),
+    ("interaction_state_clear", "2,2,LEFT", "done", lambda d: "done" not in _map(d)["interactions"]["2,2,LEFT"]),
+    ("npc_state_clear", "6,3", "done", lambda d: "done" not in _map(d)["npcs"]["slot2:pic3"]["results"]),
+    ("interaction_prune", "2,2,LEFT", "battle_menu",
+     lambda d: _map(d)["interactions"]["2,2,LEFT"]["pages"] == ["Take this!"]
+     and _map(d)["interactions"]["2,2,LEFT"]["text"] == "Take this!"),
+    ("npc_prune", "6,3", "battle_menu", lambda d: _map(d)["npcs"]["slot2:pic3"]["results"]["pages"] == ["Here you go"]),
 ])
 def test_every_direct_op(op, key, value, check):
     data = edits.apply(_data(), [_rec(op, key, value)])
@@ -179,3 +191,49 @@ def test_mapmemory_blackout_tax_roundtrip(tmp_path):
     assert json.loads(maps.read_text())["blackout_tax"] == {"rival_ss_anne": {"steps": 3}}
     reloaded = MapMemory(maps)
     assert reloaded.data["blackout_tax"] == {"rival_ss_anne": {"steps": 3}}
+
+
+NEW_OPS = [("interaction_state_clear", "2,2,LEFT", "done"), ("interaction_state_clear", "2,2,LEFT", "type"),
+           ("npc_state_clear", "6,3", "done"), ("interaction_prune", "2,2,LEFT", "battle_menu"),
+           ("npc_prune", "6,3", "battle_menu")]
+
+
+@pytest.mark.parametrize("op,key,value", NEW_OPS)
+def test_new_ops_undo_restores_prior(op, key, value):
+    original = _data()
+    prior = edits.prior_state(_data(), op, 1, key, value)
+    assert prior is not None
+    rec = _rec(op, key, value, prior=prior, rid="a")
+    changed = edits.apply(_data(), [rec])
+    assert changed != original
+    undo = {"id": "u", "op": "undo", "map": 1, "key": key, "value": "a"}
+    assert edits.apply(_data(), [rec, undo]) == original
+
+
+@pytest.mark.parametrize("op,key,value", NEW_OPS)
+def test_new_ops_are_idempotent(op, key, value):
+    rec = _rec(op, key, value)
+    once = edits.apply(_data(), [rec])
+    twice = edits.apply(json.loads(json.dumps(once)), [rec])
+    assert once == twice
+    assert edits.prior_state(once, op, 1, key, value) is None  # nothing left to change
+    assert edits.apply(_data(), [_rec(op, key, value, rid="x")])["maps"]["1"]["interactions"]["3,4,UP"] == {
+        "count": 1, "text": "HI"}
+    assert edits.apply({"maps": {}}, [rec]) == {"maps": {}}  # missing map: no-op
+
+
+def test_prepare_rejects_bad_values_for_new_ops():
+    for op, key, value in NEW_OPS:
+        assert edits.prepare(op, 1, key, value) == (1, key, value)
+    with pytest.raises(ValueError, match="done"):
+        edits.prepare("interaction_state_clear", 1, "2,2,LEFT", "goal")
+    with pytest.raises(ValueError, match="done"):
+        edits.prepare("npc_state_clear", 1, "6,3", "type")
+    with pytest.raises(ValueError, match="battle_menu"):
+        edits.prepare("interaction_prune", 1, "2,2,LEFT", None)
+    with pytest.raises(ValueError, match="battle_menu"):
+        edits.prepare("npc_prune", 1, "6,3", "all")
+    with pytest.raises(ValueError):
+        edits.prepare("interaction_prune", 1, "2,2", "battle_menu")  # edge key needs FACING
+    with pytest.raises(ValueError):
+        edits.prepare("npc_prune", 1, "6,3,UP", "battle_menu")  # tile key

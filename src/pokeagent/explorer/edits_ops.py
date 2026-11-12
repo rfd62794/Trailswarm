@@ -7,6 +7,8 @@ owns what each op does to a maps.json ``data`` dict. Everything here is pure (no
 """
 from __future__ import annotations
 
+from pokeagent.explorer import edits_ops_notes
+
 
 def map_of(data: dict, map_id) -> dict | None:
     return (data.get("maps") or {}).get(str(map_id))
@@ -137,7 +139,8 @@ def _fw_visited_clear(data, e):
 FORWARD = {"wall_add": _fw_wall_add, "wall_remove": _fw_wall_remove, "warp_remove": _fw_warp_remove,
            "warp_add": _fw_warp_add, "jump_add": _fw_jump_add, "jump_remove": _fw_jump_remove,
            "interaction_clear": _fw_interaction_clear, "npc_trainer": _fw_npc_trainer,
-           "npc_forget": _fw_npc_forget, "tile_kind": _fw_tile_kind, "visited_clear": _fw_visited_clear}
+           "npc_forget": _fw_npc_forget, "tile_kind": _fw_tile_kind, "visited_clear": _fw_visited_clear,
+           **edits_ops_notes.FORWARD}
 
 
 # --- undo: restore the prior state the edit replaced ---
@@ -223,3 +226,5 @@ def invert_edit(data: dict, e: dict) -> None:
             npcs = d.setdefault("npcs", {})
             for nid, entry in prior.items():
                 npcs[nid] = entry
+    elif op in edits_ops_notes.OPS:
+        edits_ops_notes.invert(data, e)
