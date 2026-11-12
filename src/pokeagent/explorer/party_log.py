@@ -17,23 +17,43 @@ from pokeagent.goals import bag_contents
 from pokeagent.ramstructs import read_party
 from pokeagent.ramworld import read_money
 
-Member = tuple  # (species, level, exp, hp, max_hp, moves)
+Member = tuple  # (species, level, exp, hp, max_hp, moves, identity); identity = (ot_id, dv_word), stable across evolution
 
 
 def snapshot(emu) -> list[Member]:
     """The party from RAM (verified party struct: species, level, 3-byte big-endian exp, hp, max hp, move ids)."""
-    return [(m.species, m.level, m.exp, m.hp, m.max_hp, tuple(m.moves)) for m in read_party(emu)]
+    return [(m.species, m.level, m.exp, m.hp, m.max_hp, tuple(m.moves), (m.ot_id, m.dv_word)) for m in read_party(emu)]
 
 
 def rows(snap: list[Member]) -> list[list[int]]:
     return [list(m[:5]) for m in snap]
 
 
+def _match(before: list[Member], after: list[Member]) -> list:
+    """For each ``after`` member, the same mon in ``before`` (or None if newly caught). A party re-order must not read
+    as level-ups/evolutions, so members match by identity (OT id + DVs), preferring the same slot; a snapshot without
+    identity falls back to matching by slot."""
+    used: set[int] = set()
+    out: list = []
+    for i, a in enumerate(after):
+        ident = a[6] if len(a) > 6 else None
+        j = None
+        if ident is None:
+            j = i if i < len(before) else None
+        else:
+            cands = [k for k, b in enumerate(before) if k not in used and len(b) > 6 and b[6] == ident]
+            j = i if i in cands else (cands[0] if cands else None)
+        if j is not None:
+            used.add(j)
+        out.append(before[j] if j is not None else None)
+    return out
+
+
 def diff(before: list[Member], after: list[Member]) -> dict[str, Any]:
     """Compare two snapshots slot by slot (a mon caught in between has no 'before' and counts as 0 gained)."""
     exp_gained, level_ups, evolved, moves_learned = [], [], [], []
-    for i, a in enumerate(after):
-        b = before[i] if i < len(before) else None
+    for i, b in enumerate(_match(before, after)):
+        a = after[i]
         if b is None:
             exp_gained.append(0)
             continue
