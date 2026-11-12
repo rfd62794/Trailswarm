@@ -74,7 +74,9 @@ FULL, HURT = [(20, 20)], [(3, 20)]
     (None, Need(), True),
     ({"type": "info", "pages": ["hi"]}, Need(), False),
     ({"type": "sign", "text": "hi"}, Need(), False),
-    ({"type": "giver", "done": True}, Need(), False),
+    ({"type": "giver", "done": True, "done_run": "r1"}, Need(run_id="r1"), False),
+    ({"type": "giver", "done": True, "done_run": "old-run"}, Need(run_id="r1"), True),  # stale flag from an earlier run
+    ({"type": "giver", "done": True}, Need(run_id="r1"), True),  # legacy flag, no run stamp
     ({"type": "giver", "gave": 0x46}, Need(bag_ids=frozenset({0x46})), False),
     ({"type": "giver"}, Need(), True),
     ({"type": "healer"}, Need(party=FULL), False),
