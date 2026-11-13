@@ -3,9 +3,9 @@ import pytest
 from pokeagent.game import DEFAULT_GAME, GAMES, RED, get_game
 
 
-def test_games_holds_exactly_red():
-    assert GAMES == {"pokemon-red": RED}
-    assert set(GAMES) == {"pokemon-red"}
+def test_games_holds_red():
+    assert GAMES["pokemon-red"] is RED
+    assert set(GAMES) >= {"pokemon-red"}
 
 
 def test_default_game_is_red():

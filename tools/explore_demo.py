@@ -25,6 +25,8 @@ from concurrent.futures import Future
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from pokeagent.game.gate import adopt_rom_game  # noqa: E402
+adopt_rom_game(sys.argv[1:])  # --rom <blue> selects pokemon-blue BEFORE any store path is read at import
 from pokeagent.emulator import Button, PyBoyEmulator  # noqa: E402
 from pokeagent.explorer.context import ExplorerContext, ExplorerOptions  # noqa: E402
 from pokeagent.explorer.decisions import DecisionLog  # noqa: E402

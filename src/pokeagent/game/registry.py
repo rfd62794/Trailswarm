@@ -3,10 +3,12 @@
 Registration is by editing GAMES below; no plugin discovery.
 """
 
+from pokeagent.game.pokemon_blue import BLUE
 from pokeagent.game.pokemon_red import RED
+from pokeagent.game.pokemon_yellow import YELLOW
 from pokeagent.game.spec import GameSpec
 
-GAMES: dict[str, GameSpec] = {RED.key: RED}
+GAMES: dict[str, GameSpec] = {g.key: g for g in (RED, BLUE, YELLOW)}
 DEFAULT_GAME = "pokemon-red"
 
 

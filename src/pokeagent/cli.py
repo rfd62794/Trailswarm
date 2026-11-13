@@ -44,7 +44,7 @@ def _rom_path(args: argparse.Namespace) -> Path:
     env = os.environ.get("POKEAGENT_ROM")
     if env:
         return Path(env)
-    return default_rom()
+    return default_rom(resolve_game(getattr(args, "game", None)))
 
 
 def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
@@ -58,7 +58,7 @@ def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
 
 def _build_emulator(args: argparse.Namespace) -> Emulator:
     """One place that turns args into an Emulator; tests patch this to inject FakeEmulator."""
-    return PyBoyEmulator(_rom_path(args), headless=getattr(args, "headless", True))
+    return PyBoyEmulator(_rom_path(args), headless=getattr(args, "headless", True), game=resolve_game(args.game))
 
 
 def _build_backend(args: argparse.Namespace, log: RunLog):
@@ -67,8 +67,17 @@ def _build_backend(args: argparse.Namespace, log: RunLog):
     return StubBackend()
 
 
+def _gated(spec: GameSpec) -> bool:
+    """True (after printing why) when ``spec`` is prepared but not playable yet."""
+    if spec.playable:
+        return False
+    print(f"error: {spec.key} is {spec.gate}")
+    return True
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     steps = args.steps
     if steps is None:
@@ -120,6 +129,9 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
     print(f"sha1: {sha1}")
     match = sha1 in spec.rom_sha1
     print("match" if match else f"mismatch (expected {spec.rom_sha1[0]})")
+    if not spec.playable:  # gated game: the hash is all we verify; never boot it
+        print(f"{spec.key}: NOT PLAYABLE YET - {spec.gate}")
+        return 0 if match else 1
     try:
         emu = _build_emulator(args)
     except (FileNotFoundError, BackendError) as e:
@@ -137,7 +149,8 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
 
 
 def _cmd_state(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     try:
         emu = _build_emulator(args)
@@ -166,7 +179,8 @@ def _cmd_view(args: argparse.Namespace) -> int:
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     # Imported lazily so cli.py (and its tests) never pay for the mcp import.
     from pokeagent.mcp_server import serve

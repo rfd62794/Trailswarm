@@ -77,11 +77,13 @@ class Emulator(Protocol):
 class PyBoyEmulator:
     """Real emulator driven through PyBoy; visible window unless headless."""
 
-    def __init__(self, rom_path: Path, *, headless: bool = True, game: GameSpec = RED) -> None:
+    def __init__(self, rom_path: Path, *, headless: bool = True, game: GameSpec | None = None) -> None:
+        from pokeagent.game.gate import game_for_rom, require_playable
         rom_path = Path(rom_path)
         if not rom_path.is_file():
             raise FileNotFoundError(f"ROM not found: {rom_path}")
-        self.game = game
+        # no explicit game: the ROM's hash picks it (Blue's ROM must never run under Red's state guard)
+        self.game = require_playable(game or game_for_rom(rom_path) or RED)
         self._headless = headless
         self._pyboy = PyBoy(str(rom_path), window="null" if headless else "SDL2")
         self._pyboy.set_emulation_speed(0 if headless else 1)

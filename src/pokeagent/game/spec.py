@@ -22,6 +22,10 @@ class GameSpec:
     buttons: tuple[str, ...]       # lowercase names of the buttons the game uses, in this order
     memory_family: str             # the family whose memory this game shares; LEGACY_FAMILY = the legacy root
     owns_legacy_paths: bool        # True for the one game (Red) whose per-game stores also stay on today's paths
+    playable: bool = True          # False = prepared but gated: check-rom verifies the ROM, nothing else runs it
+    gate: str = ""                 # why a non-playable game is gated (required when playable is False)
+    ram_table: str = "ram_map.json"   # data/ resource holding this game's pret label map (ram_lookup.load_map)
+    symbols: str = "gen1-rb"       # key into game.symbols.SYMBOL_TABLES: this game's WRAM symbol addresses
 
     def __post_init__(self) -> None:
         if not _KEY_RE.fullmatch(self.key):
@@ -51,6 +55,8 @@ class GameSpec:
             )
         if not _KEY_RE.fullmatch(self.memory_family):
             raise ValueError(f"bad memory_family: {self.memory_family!r}")
+        if not self.playable and not self.gate:
+            raise ValueError(f"{self.key}: a non-playable game needs a gate message")
         if self.owns_legacy_paths and self.memory_family != LEGACY_FAMILY:
             raise ValueError(
                 f"{self.key}: owns_legacy_paths requires memory_family == LEGACY_FAMILY"
