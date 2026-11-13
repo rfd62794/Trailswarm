@@ -92,3 +92,18 @@ def test_gate_state_logs_reason_once_and_trains_floor_target(monkeypatch):
     training.gate_state(ctx, {}, SIM_OK_FLOOR_BAD, nv, None)
     assert [m for m in ctx.logs if m.startswith("[readiness] team floor for beat_misty")] == [
         "[readiness] team floor for beat_misty: need 2 members >= L19, have 1"]
+
+
+def test_an_unmet_floor_survives_one_blackout_and_the_plain_cap():
+    """Review of #226: the stall cap / first blackout lifted the hold even with the floor unmet (Misty at L23)."""
+    from pokeagent.explorer.grind import FLOOR_BLACKOUTS, FLOOR_CAP_MULT, STALL_HOLD_CAP, stall_hold_holds
+    why = "without a level gain"
+    st = {}
+    assert stall_hold_holds(st, why, 0, 0, floor_unmet=True)
+    assert stall_hold_holds(st, why, 10, 1, floor_unmet=True)                      # one blackout: still held
+    assert stall_hold_holds(st, why, STALL_HOLD_CAP + 1, 1, floor_unmet=True)      # past the plain cap: still held
+    assert not stall_hold_holds(st, why, 10, FLOOR_BLACKOUTS, floor_unmet=True)    # repeated blackouts lift it
+    assert not stall_hold_holds(st, why, STALL_HOLD_CAP * FLOOR_CAP_MULT, 0, floor_unmet=True)
+    st2 = {}
+    assert stall_hold_holds(st2, why, 0, 0)
+    assert not stall_hold_holds(st2, why, 10, 1)                                    # floor met: old rule, one blackout lifts

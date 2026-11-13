@@ -138,7 +138,7 @@ class PlanGoal(BehaviourBase):
         st["stall_hold_goal"] = ctx.stage_goal
         lifted = st.get("gate_lifted") is not None
         if hold and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]) if lifted else "without a level gain",
-                                         ctx.step, party_log.of(ctx).blackouts):  # monotonic: a win resets blackouts_row
+                                         ctx.step, party_log.of(ctx).blackouts, ctx.__dict__.get("floor_unmet", False)):  # monotonic blackouts
             hold = False  # budget spent (ceiling/blackout), the hold cap, or a blackout while held: never locked out forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal

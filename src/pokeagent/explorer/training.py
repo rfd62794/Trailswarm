@@ -122,7 +122,10 @@ def gate_state(ctx, goals: dict, party: list | None, nv, team) -> tuple[int | No
     """(train_member, gate_ready): the ONE gym verdict plan_goal holds on and trains from. ready = the whole-party sim passes
     AND the checkpoint's team floor is met; the failing floor reason is logged once per change."""
     floor = floor_for(goals, party)
-    if floor is not None and not floor.met and floor.text != ctx.floor_note:
+    ctx.__dict__["floor_unmet"] = floor is not None and not floor.met  # plan_goal's stall escape reads it (floor must hold)
+    if floor is None or floor.met:
+        ctx.floor_note = None  # met again: a later identical failure is logged afresh
+    elif floor.text != ctx.floor_note:
         ctx.floor_note = floor.text
         ctx.log(f"[readiness] {floor.text}", "res")
     return train_member_for(nv, team, floor), team_floor.ready(nv, floor)
