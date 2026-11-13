@@ -17,6 +17,7 @@ from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle_run import cave_run
 from pokeagent.explorer.behaviours.battle_train import train_fight
+from pokeagent.explorer.behaviours.low_yield import stall_run
 from pokeagent.explorer.behaviours.bring_out import bring_out_press
 from pokeagent.explorer.behaviours.item_use import (
     HEAL_NAME, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
@@ -205,8 +206,9 @@ class Battle(BehaviourBase):
             gn = check_goals(ctx.emu, ctx)
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(ENEMY_MON)))
-            flee = kind == 1 and bool(weak or hurry or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
-            stand = kind == 1 and flee and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
+            skip = stall_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))  # a Harden-only cocoon is a stall, not XP
+            flee = kind == 1 and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
+            stand = kind == 1 and flee and not skip and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
             if stand:
                 flee = weak = hurry = False
             if kind == 1 and not stand:

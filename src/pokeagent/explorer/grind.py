@@ -48,7 +48,7 @@ def stall_hold_holds(st: dict, reason: str, step: int, blackouts: int, floor_unm
     STALL_HOLD_CAP steps since the hold began, or a blackout while held (grinding is losing). With the team level
     floor unmet the escape is FLOOR_CAP_MULT x the cap or FLOOR_BLACKOUTS blackouts: one lost fight at L23 vs Misty
     (needs L33) must not open the gym again. ``st`` carries the hold's start (``st.pop('stall_hold', None)`` resets)."""
-    if not stall_keeps_hold(reason):
+    if not (stall_keeps_hold(reason) or floor_unmet):  # a ceiling lift reads the STRONGEST member: it must not open a gym the floor still shuts
         return False
     start = st.setdefault("stall_hold", (step, blackouts))
     cap, lost = (STALL_HOLD_CAP * FLOOR_CAP_MULT, FLOOR_BLACKOUTS - 1) if floor_unmet else (STALL_HOLD_CAP, 0)

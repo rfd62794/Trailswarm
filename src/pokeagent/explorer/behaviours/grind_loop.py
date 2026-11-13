@@ -8,6 +8,7 @@ no battle (a real stall on the edge) still shakes.
 from __future__ import annotations
 
 WINDOW = 60  # LoopGuard's loop window (non-battle presses)
+MAX_EXEMPT_WINDOWS = 3  # consecutive exempt windows before a shake is forced anyway (review: an exemption must not be unbounded)
 
 
 def note_step(ctx) -> None:
@@ -19,9 +20,26 @@ def note_step(ctx) -> None:
 
 def reset(ctx) -> None:
     ctx.__dict__["battle_hist"] = []
+    ctx.__dict__["exempt_presses"] = 0
+
+
+def mark_live(ctx, planned):
+    """Pass a train_route step through, flagging the run as training. The team_ready stage sets ctx.train_route_live itself,
+    but the gym hold and the grind latch (stage beat_misty, floor unmet) walk to the SAME grass through the SAME
+    train_route.step (its text still says "goal team_ready") without it: the pacing there was shaken (2026-11-13 A/B: #235's
+    exemption never fired, the two 12,000-step runs were byte-identical)."""
+    if planned is not None:
+        ctx.train_route_live = True
+    return planned
 
 
 def paced_in_training(ctx) -> bool:
     """True when the team_ready stage is training and a battle began inside the last WINDOW presses."""
     h = ctx.__dict__.get("battle_hist") or []
-    return bool(ctx.train_route_live) and len(h) >= WINDOW and h[-WINDOW] != ctx.battles
+    live = bool(ctx.train_route_live) or bool((ctx.__dict__.get("_grind_state") or {}).get("episode"))  # a grind episode paces its grass too
+    if not (live and len(h) >= WINDOW and h[-WINDOW] != ctx.battles):
+        return False
+    n = ctx.__dict__["exempt_presses"] = ctx.__dict__.get("exempt_presses", 0) + 1
+    if n > MAX_EXEMPT_WINDOWS * WINDOW:  # 3 windows spared: shake once (the caller resets the count)
+        return False
+    return True
