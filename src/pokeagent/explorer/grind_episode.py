@@ -26,6 +26,7 @@ from pokeagent.explorer import party_log, story_blockers, train_route
 from pokeagent.explorer.economy import heal_items
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.perceive import lead_level, party_hp
+from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.trainer_hooks import run_provenance
 from pokeagent.goals import bag_contents
 from pokeagent.grind import atlas, measure, stage_maps
@@ -229,7 +230,7 @@ def _end_reason(ctx, ep: dict) -> str | None:
     if ctx.step - ep["start_step"] >= GRIND_STEPS:
         return f"{GRIND_STEPS} steps"
     hp, mx = party_hp(ctx.emu)
-    if (mx and hp / mx < train_route.MIN_HP_FRACTION or read_party_view(ctx.emu).any_fainted) \
+    if (mx and not party_survives(ctx.emu, ctx.view.m) or read_party_view(ctx.emu).any_fainted) \
             and not heal_items.heal_count(bag_contents(ctx.emu)):
         return "hurt with no potion"
     pt = ep.get("point")

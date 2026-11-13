@@ -10,6 +10,7 @@ from __future__ import annotations
 from pokeagent.explorer import grind_episode, story_blockers, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.perceive import heal_gate_hp, lead_level
+from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.trainee_gate import trainee_check
 from pokeagent.legs.grass import pace_button, to_grass
 
@@ -67,7 +68,8 @@ class GrindDrill(BehaviourBase):
         pt, pos = ep["point"], (ctx.view.m, ctx.view.x, ctx.view.y)
         hp, mx = heal_gate_hp(ctx.emu)
         if pos[0] != pt.map_id:
-            r = train_route.step(ctx.mem.data["maps"], pos, frozenset(ctx.mem.temp_blocked) | story_blockers.blocked_tiles(ctx), hp, mx, target=pt.map_id, patch=pt.patch)
+            r = train_route.step(ctx.mem.data["maps"], pos, frozenset(ctx.mem.temp_blocked) | story_blockers.blocked_tiles(ctx), hp, mx, target=pt.map_id, patch=pt.patch,
+                                 survives=party_survives(ctx.emu, ctx.view.m))
             return Decision(r[0], "grind_drill", f"grind episode: {r[1]}") if r else None
         g = self._grid(ctx, pt.map_id)
         if g is not None:
