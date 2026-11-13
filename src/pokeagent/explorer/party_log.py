@@ -8,9 +8,11 @@ species = the internal id the game stores), ``exp_gained`` (per member), ``level
 from __future__ import annotations
 
 import json
+import logging
 from collections import Counter
 from typing import Any
 
+from pokeagent.explorer import xp_meter
 from pokeagent.explorer.economy import heal_items, ledger
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.goals import bag_contents
@@ -18,6 +20,9 @@ from pokeagent.ramstructs import read_party
 from pokeagent.ramworld import read_money
 
 Member = tuple  # (species, level, exp, hp, max_hp, moves, identity); identity = (ot_id, dv_word), stable across evolution
+
+
+_warned: set[str] = set()
 
 
 def snapshot(emu) -> list[Member]:
@@ -125,6 +130,13 @@ class PartyLog:
                 for lu in d["level_ups"]:
                     self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
                 self.prev = after
+                try:
+                    xp_meter.of(ctx).on_battle(ctx, before, after)  # XP measurement: its failure never costs the row
+                except Exception as exc:  # noqa: BLE001
+                    msg = f"xp_meter.on_battle failed: {exc!r}"
+                    if msg not in _warned:      # once per distinct message: a broken meter must not flood the log
+                        _warned.add(msg)
+                        logging.getLogger(__name__).warning(msg)
                 self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
                 out.update(d)
             except Exception as exc:  # noqa: BLE001
