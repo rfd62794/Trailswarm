@@ -32,11 +32,15 @@ def _load(name):
 
 class FakeEmu:
     def __init__(self, battle=0, hp=20, mx=20):
-        self.mem = {0xD057: battle, 0xD16C: hp >> 8, 0xD16D: hp & 255, 0xD18D: mx >> 8, 0xD18E: mx & 255}
+        self.mem = {0xD057: battle, 0xD163: 1, 0xD164: 0x99, 0xD16B: 0x99,   # a party of one (species 0x99)
+                    0xD16C: hp >> 8, 0xD16D: hp & 255, 0xD18D: mx >> 8, 0xD18E: mx & 255}
         self.frames, self.saves = 0, 0
 
     def read(self, a):
         return self.mem.get(a, 0)
+
+    def read_range(self, a, n):
+        return bytes(self.mem.get(a + i, 0) for i in range(n))
 
     def save_state(self, path):
         self.saves += 1

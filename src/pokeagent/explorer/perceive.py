@@ -20,8 +20,8 @@ REGISTRY = load_registry()
 
 
 def party_hp(emu) -> tuple[int, int]:
-    """The fighter's HP and max HP: the lead normally, the verified active mon while a Magikarp trainee
-    is out (party_view). (0, 0) for an empty party."""
+    """The fighter's HP and max HP: the verified active mon in a fight, else the strongest healthy
+    non-Magikarp member (party_view.fighter; never slot 0, the weakest). (0, 0) for an empty party."""
     _, _, hp, mx = fighter(emu)
     return hp, mx
 

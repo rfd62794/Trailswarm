@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 from pokeagent.explorer import retreat_risk as rr
 from pokeagent.knowledge.party import trainer_mon
@@ -50,6 +51,18 @@ def test_low_party_total_always_retreats_when_a_nurse_is_known():
 def test_fainted_lead_with_a_healthy_second_is_judged_on_the_second():
     party = [replace(_mon("AQUAMON", 12), hp=0), _mon("AQUAMON", 12, 1.0)]
     assert not rr.assess(party, WILD, 300, SYN).retreat
+
+
+def test_retreat_heal_uses_the_fighter_slot_with_a_magikarp_lead(tmp_path):
+    """Magikarp in slot 0, the strong mon in slot 1: the hurt check judges the fighter, not the trainee in front."""
+    mem = {}
+    put_mon(mem, 0, 133, 5, 20, 20)       # the Magikarp trainee leads, full HP (internal id 133)
+    put_mon(mem, 1, 153, 14, 16, 40)      # the fighter behind it
+    ctx = make_ctx(tmp_path, mem)
+    hurt = [SimpleNamespace(hp=20, max_hp=20), SimpleNamespace(hp=16, max_hp=40)]
+    assert RetreatHeal._hurt(ctx, hurt)                      # slot 1 at 40%: under the 80% lead gate
+    fit = [SimpleNamespace(hp=20, max_hp=20), SimpleNamespace(hp=36, max_hp=40)]
+    assert not RetreatHeal._hurt(ctx, fit)                   # slot 1 at 90%: the gates are not tripped
 
 
 # --- after_victory: a close nurse makes "push" need a healthier party ---

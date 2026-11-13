@@ -12,7 +12,8 @@ import os
 from pathlib import Path
 
 from pokeagent import statefp
-from pokeagent.ram_symbols import IS_IN_BATTLE, PARTY_MON1_HP, PARTY_MON1_MAX_HP
+from pokeagent.party_view import read_party_view
+from pokeagent.ram_symbols import IS_IN_BATTLE
 
 STATES_DIR = Path("runs/legs/states")
 KEEP, MAX_FILES = 3, 2000
@@ -24,12 +25,13 @@ def name(m: int, x: int, y: int, n: int = 0) -> str:
 
 
 def calm(emu, box: bool) -> bool:
-    """Not in battle, no text box, lead HP above half (and a lead exists)."""
+    """Not in battle, no text box, the fighter's HP is above half (a fighter exists). A fainted bench member does not
+    matter; a fainted fighter reads as hurt through its own 0 HP."""
     if box or emu.read(BATTLE_FLAG):
         return False
-    hp = (emu.read(PARTY_MON1_HP) << 8) | emu.read(PARTY_MON1_HP + 1)
-    mx = (emu.read(PARTY_MON1_MAX_HP) << 8) | emu.read(PARTY_MON1_MAX_HP + 1)
-    return mx > 0 and hp > mx * HP_FRACTION
+    view = read_party_view(emu)
+    f = view.fighter()
+    return f is not None and f.max_hp > 0 and f.hp > f.max_hp * HP_FRACTION
 
 
 def route_maps(runs_dir: str | Path = "runs") -> set[int]:
