@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 
-from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+from pokeagent.explorer.training import train_member_for
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.readiness import team_readiness
 from test_team_plan import SYN as BASE, _mon as _base_mon, _sp
@@ -47,7 +47,7 @@ def test_hold_and_train_member_agree():
     nv = team_plan.boss_need(party, HARD, SYN, "MISTY")
     t = team_readiness(party, HARD, "MISTY", SYN)
     assert nv is not None and not nv.ready          # the gate holds
-    slot = PlanGoal._train_member(nv, t)
+    slot = train_member_for(nv, t)
     assert slot != 1                                 # never the Kakuna
     assert slot == (nv.raise_slot if nv.raise_slot is not None else nv.lead_slot)
     assert nv.level_by_slot.get(1) is None           # raising the Kakuna alone cannot flip boss_need
@@ -55,12 +55,12 @@ def test_hold_and_train_member_agree():
 
 def test_train_member_falls_back_to_the_lead_when_no_raise_flips_it():
     nv = team_plan.Need(False, -1.0, 0, {0: None, 1: None}, None, None, 40, (), "x")
-    assert PlanGoal._train_member(nv, None) == 0
+    assert train_member_for(nv, None) == 0
 
 
 def test_open_gate_keeps_the_team_goal_steering():
     nv = team_plan.Need(True, 0.9, 0, {}, None, None, 26, (), "ready")
-    assert PlanGoal._train_member(nv, None) is None
+    assert train_member_for(nv, None) is None
 
 
 def test_a_useful_second_member_is_still_named():

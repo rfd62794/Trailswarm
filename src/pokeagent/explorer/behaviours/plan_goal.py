@@ -11,7 +11,7 @@ from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import heal_gate_hp, lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
-from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
+from pokeagent.explorer.training import boss_need_for, gate_for, train_member_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -75,7 +75,7 @@ class PlanGoal(BehaviourBase):
         if team and team.text != ctx.team_note:
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
-        ctx.train_member = self._train_member(nv, team)
+        ctx.train_member = train_member_for(nv, team)
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
                 ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
@@ -175,15 +175,6 @@ class PlanGoal(BehaviourBase):
         return None
 
     @staticmethod
-    def _train_member(nv, team) -> int | None:
-        """The slot to train, agreeing with the gate hold (``not nv.ready``): while boss_need says not ready it is the
-        member whose raise flips it (``raise_slot``), else the lead/fighter; once the gate is open the hurt-lead
-        sim's weakest member (the second-member goal) steers."""
-        if nv is not None and not nv.ready:
-            return nv.raise_slot if nv.raise_slot is not None else nv.lead_slot
-        return team.weakest.slot if team and team.weakest else None
-
-    @staticmethod
     def _team_need(ctx: ExplorerContext, goals: dict, need: int) -> int:
         """At the team_ready stage, level the trainee until useful ONLY while the plan's top action is the
         Magikarp candidate or the named trainee is a MAGIKARP: the lead reads min(fighter, trainee + TEAM_GAP),
@@ -262,11 +253,8 @@ class PlanGoal(BehaviourBase):
         """Inside the gym while not ready: the first press of the learned route off the map (the
         heal_walk BFS shape), before anything else - frontier would explore toward the leader and
         ``_leader_avoid``'s block_sight is the only guard. None when the learned graph knows no exit."""
-        found = None
-        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):
-            # Second pass ignores temp blocks (_leader_avoid's trainer sight lines): one trainer fight on the way
-            # out beats being trapped in the pocket until the hold cap (Misty gym, ~5400 steps, 2026-11-12).
-            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked
+        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):  # 2nd pass: sight-line blocks off (one fight beats the
+            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked  # pocket: Misty gym ~5400 steps, 2026-11-12)
             found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
             if found and found[1]:
                 break

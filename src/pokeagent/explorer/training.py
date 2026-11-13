@@ -93,6 +93,15 @@ def boss_need_for(goals: dict, party: list | None) -> team_plan.Need | None:
     return _cache[key]
 
 
+def train_member_for(nv, team) -> int | None:
+    """The slot to train, agreeing with the gate hold (``not nv.ready``): while boss_need says not ready it is the member
+    whose raise flips it (``raise_slot``), else the lead/fighter; with the gate open the hurt-lead sim's weakest steers."""
+    if nv is not None and not nv.ready:
+        raise_slot = getattr(nv, "raise_slot", None)
+        return raise_slot if raise_slot is not None else getattr(nv, "lead_slot", None)
+    return team.weakest.slot if team and team.weakest else None
+
+
 def under_level(goals: dict, party: list | None, floor: int = 0) -> tuple[int, int, int] | None:
     """(needed level, current level, gap) when the TEAM fails the next stage's verdict, else None.
     The gate judges the whole party: "under" whenever boss_need says not ready, whichever slot holds
