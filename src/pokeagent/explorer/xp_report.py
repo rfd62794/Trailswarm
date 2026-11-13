@@ -6,8 +6,10 @@ from pokeagent.explorer import xp_spots
 
 def _names(species: int, map_id) -> tuple[str, str]:
     try:
-        from pokeagent.intervene.names import map_name, species_name
-        return str(species_name(species)).upper(), map_name(map_id).upper().replace(" ", "_")
+        from pokeagent.knowledge.encounters import map_name
+        from pokeagent.knowledge.kb import ROM_KB
+        sp = ((ROM_KB or {}).get("name_of_internal") or {}).get(str(species), f"#{species}")
+        return str(sp).upper(), map_name(int(map_id)).upper().replace(" ", "_")
     except Exception:
         return f"#{species}", f"MAP_{map_id}"
 
