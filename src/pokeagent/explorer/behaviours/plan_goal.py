@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import random
-
+from pokeagent.explorer.behaviours import grind_loop
 from pokeagent.bandit.hook import heal_push_on, train_need
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -83,7 +83,7 @@ class PlanGoal(BehaviourBase):
         if team_ready_stage:
             if team is None:
                 ctx.team_ready_nodata = True  # no ROM/boss data: never block the route
-            elif team.ready:
+            elif team.ready and not ctx.__dict__.get("floor_unmet"):  # the sim alone must not settle the stage while the team floor is unmet
                 ctx.team_ready_ok = ctx.had_team_ready = True  # the sim says the party beats the next boss
             else:
                 ctx.team_ready_ok = False
@@ -239,7 +239,7 @@ class PlanGoal(BehaviourBase):
         episode's map set."""
         grind_episode.start(ctx, "the pressure latch")
         kw = {"target": TRAIN_MAP[ctx.stage_goal]} if stage_maps.allowed(ctx.stage_goal) else {}  # pre-Brock: never Route 24
-        return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, survives=party_survives(ctx.emu, ctx.view.m), **kw)
+        return grind_loop.mark_live(ctx, train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, survives=party_survives(ctx.emu, ctx.view.m), **kw))
 
     @staticmethod
     def _gym_road(planned, stage: str | None = None) -> bool:

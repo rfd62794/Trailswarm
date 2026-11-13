@@ -21,7 +21,6 @@ MAX_PRESSES = 40          # one reorder is about 10 presses; more means the menu
 RETRY_AFTER_STEPS = 300   # after an abandoned attempt
 CALM_FRAMES = 8           # the screen must have been still this long before the first press (no cutscene, no fade)
 PACE_FRAMES = 8           # frames to wait between presses
-HOLD_STEPS = 300          # after a reorder, the matchup / exp-rotation lead is not flipped again this soon unless the team changed
 
 
 def species_names(emu) -> list[str]:
@@ -36,9 +35,12 @@ def team_sig(ctx: ExplorerContext) -> tuple:
 
 
 def _held(ctx: ExplorerContext) -> bool:
-    """True while the last reorder is younger than HOLD_STEPS and no level / faint / party change happened since."""
+    """True while no level / faint / membership change happened since the last reorder. There is no expiry: 2026-11-13 laptop
+    run, 31 reorders on one Route 24 grass edge - every grass battle's turn-one switch_out puts the fighter in slot 0, and a
+    300-step expiry sent the party straight back through the menus between battles. The order only matters when the TEAM
+    changed (a level-up, a faint, a catch), so only then is it re-asked."""
     last = team_plan.of(ctx).get("order_hold")
-    return bool(last) and ctx.step - last[0] < HOLD_STEPS and last[1] == team_sig(ctx)
+    return bool(last) and last[1] == team_sig(ctx)
 
 
 def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:

@@ -67,15 +67,18 @@ def test_no_churn_between_two_orders():
     assert po.want_home(_ctx([(CHARMELEON, 9, 30, 30), (0x54, 9, 30, 30)])) is None
 
 
-def test_hold_blocks_a_repeat_until_the_team_changes_or_it_expires():
+def test_hold_blocks_a_repeat_until_the_team_changes_and_never_expires():
     ctx = _ctx([(CHARMELEON, 16, 50, 50), (MAGIKARP, 5, 17, 17)])
     team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po.team_sig(ctx))
     assert po.want_home(ctx) is None                                 # held: a level-neutral reorder is not repeated
     ctx.emu = _emu([(CHARMELEON, 16, 50, 50), (MAGIKARP, 6, 18, 18)])   # the Magikarp levelled: team changed
     assert po.want_home(ctx) is not None
     ctx.emu = _emu([(CHARMELEON, 16, 50, 50), (MAGIKARP, 5, 17, 17)])
-    ctx.step += po.HOLD_STEPS
-    assert po.want_home(ctx) is not None                             # expired
+    for later in (300, 3000, 30000):                                  # a battle's switch-out moved the order: no churn, ever
+        ctx.step += later
+        assert po.want_home(ctx) is None
+    ctx.emu = _emu([(CHARMELEON, 17, 55, 55), (MAGIKARP, 5, 17, 17)])  # the fighter levelled: the team changed
+    assert po.want_home(ctx) is not None
 
 
 def test_only_one_ordering_rule_remains():

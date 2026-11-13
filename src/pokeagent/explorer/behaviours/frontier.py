@@ -147,7 +147,8 @@ class Frontier(BehaviourBase):
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
         goals_now_all = ctx.goals()
         weak = party_needs_heal(ctx.emu, 0.4)
-        training = (ctx.hunt_grass and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
+        floor_hold = bool(ctx.__dict__.get("floor_unmet")) and (getattr(ctx, "gym_hold_seen", None) or (0, False))[1]  # boss held shut by the team floor: find grass, never the leader
+        training = ((ctx.hunt_grass or floor_hold) and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
         ep = grind_episode.active(ctx)
         allowed = frozenset(ep["maps"] | {m}) if ep else None
         picked = _memory_step(ctx, m, x, y,
