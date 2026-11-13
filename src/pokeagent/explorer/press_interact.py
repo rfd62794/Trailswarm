@@ -11,6 +11,7 @@ from pokeagent.explorer.press_frame import PressFrame
 from pokeagent.explorer.world import DUNGEON_MAPS
 
 EXPLORE_RULES = {"frontier", "explore_burst"}  # choose_local's 'at (x,y) ...' reason does not start with 'frontier', so the rule name decides
+EDGE_BLOCK_FRAMES = 200  # a bump on an already-crossed edge: temp block, then retry
 NPC_BLOCK_FRAMES = 240  # how long a person in the way keeps their tile out of routing
 
 
@@ -105,6 +106,8 @@ def record_interaction(ctx: ExplorerContext, fr: PressFrame) -> None:
             tb[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + NPC_BLOCK_FRAMES
             if exploring:
                 ctx.frontier_route, ctx.frontier_target, ctx.frontier_at = [], None, None  # replan around the person
+        if name in DIRS and after == before and not npc_ahead and not box_after and ctx.mem.crossed_edge(before[0], f"{before[1]},{before[2]},{name}"):
+            ctx.mem.temp_blocked[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + EDGE_BLOCK_FRAMES
         if name in DIRS and not box_after and blocked_cap.note(ctx.blocked_streak, before, name, after != before):
             tb = ctx.mem.temp_blocked  # the same tile+direction failed again and again: stop pressing, route around it for a while
             tb[(before[0], before[1] + dx, before[2] + dy)] = ctx.frame + blocked_cap.CAP_BLOCK_FRAMES

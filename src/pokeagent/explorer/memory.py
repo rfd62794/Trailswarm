@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pokeagent.explorer import edits, items, legend, tilekind
 from pokeagent.explorer.memory_nav import NavMixin
-from pokeagent.explorer.memory_purge import purge_enclosed_walls, purge_npc_walls
+from pokeagent.explorer.memory_purge import purge_crossed_edge_walls, purge_enclosed_walls, purge_npc_walls
 from pokeagent.explorer.memory_tiles import TilesMixin
 from pokeagent.explorer.memory_warps import WarpsMixin
 from pokeagent.explorer.perceive import DIRS
@@ -42,6 +42,7 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         self.purge_bad_warps()
         self.purged_npc_walls = purge_npc_walls(self.data)  # false walls learned against wandering NPCs
         self.purged_enclosed_walls = purge_enclosed_walls(self.data)  # ... and behind a full-screen page
+        self.purged_crossed_edges = purge_crossed_edge_walls(self.data)  # ... and on a taken crossing
         self.apply_edits()
 
     def apply_edits(self) -> int:
@@ -120,11 +121,10 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         if (x1, y1) == (x0, y0):
             if npc_ahead:  # a person stands there: not a wall, not even a failed-move count
                 return "no move (a person is in the way) - not a wall"
-            fails = self.m(m0).setdefault("fails", {})  # failures NOT required to be consecutive: alternating
-            fails[key] = fails.get(key, 0) + 1          # presses at a map edge never confirmed a wall before
-            if fails[key] >= 2:
-                confirmed = True
-            if not confirmed:
+            if self.crossed_edge(m0, key):  # crossed before: an NPC or cut-short transition, never a wall
+                return "no move at a crossed edge - temporary, not a wall"
+            fails = self.m(m0).setdefault("fails", {}); fails[key] = fails.get(key, 0) + 1  # NOT required to be consecutive
+            if not (confirmed or fails[key] >= 2):
                 return "no move (turned? fading?) - will retry once before calling it blocked"
             if key not in blocked:
                 blocked.append(key)
