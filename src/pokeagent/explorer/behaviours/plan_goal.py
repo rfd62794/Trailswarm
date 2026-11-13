@@ -13,7 +13,7 @@ from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, gate_state, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
+from pokeagent.explorer import after_heal, party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 from pokeagent.grind import stage_maps
@@ -128,9 +128,9 @@ class PlanGoal(BehaviourBase):
                              "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {}), "_buy_deferred": magikarp_deferral.deferred(ctx)},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         ctx.train_route_live = bool(team_ready_stage and training_live)
-        if planned is None and team_ready_stage and training_live:
+        if (planned is None or after_heal.leaving(planned, m)) and team_ready_stage and training_live:
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu),
-                                         survives=party_survives(ctx.emu, ctx.view.m))  # no planner target: go to the grass
+                                         survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None))  # no planner target: go to the grass
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not gate_ready and gym is not None
@@ -239,7 +239,7 @@ class PlanGoal(BehaviourBase):
         episode's map set."""
         grind_episode.start(ctx, "the pressure latch")
         kw = {"target": TRAIN_MAP[ctx.stage_goal]} if stage_maps.allowed(ctx.stage_goal) else {}  # pre-Brock: never Route 24
-        return grind_loop.mark_live(ctx, train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, survives=party_survives(ctx.emu, ctx.view.m), **kw))
+        return grind_loop.mark_live(ctx, train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None), **kw))
 
     @staticmethod
     def _gym_road(planned, stage: str | None = None) -> bool:

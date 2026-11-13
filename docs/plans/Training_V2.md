@@ -45,3 +45,14 @@ still needs 2 members at L19. It also does nothing about the ~10% shake loop, th
 
 Lever 3 (heal only on the survival floor), then lever 4 (feed `xp_spots` rates into `grind/points.choose`), then lever 2.
 Re-run the laptop measurement after each.
+
+## Slice 3 (2026-11-13 A/B follow-up)
+
+* `grass_pace.py` (via `train_route.step`): ON the grass the step used to be None, so frontier paced the patch edge (no encounter
+  roll off-grass; no battle in the window, so slice 2's exemption never applied). Now it paces INSIDE grass tiles (ROM grid, else
+  encounters + patch).
+* `center_visit.py`: the Pokecenter walk-in + nurse dialog + walk-out is 60+ presses on <=6 tiles; LoopGuard shook at the exit.
+  Exempt inside a Pokecenter, capped 150 presses per visit.
+* `grind_heal.py`: while grinding, retreat_heal's LEAD/PARTY gates and frontier's `weak` (0.4) use `party_survives`; a usable field
+  Potion (`wants_topup`) replaces the Pokecenter trip. `after_heal.py`: the center exit is train_route's walk to the grass.
+Expected laptop A/B (seed 12, 12k steps): SHAKE ~7.9% -> <2%, to-the-Pokecenter 8.7% -> ~5%, walking-to-grass 15.6% -> ~11%.
