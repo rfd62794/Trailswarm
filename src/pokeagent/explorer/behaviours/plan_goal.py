@@ -252,17 +252,14 @@ class PlanGoal(BehaviourBase):
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):
-        """Inside the gym while not ready: the first press of the learned route off the map (the
-        heal_walk BFS shape), before anything else - frontier would explore toward the leader and
-        ``_leader_avoid``'s block_sight is the only guard. None when the learned graph knows no exit."""
-        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):  # 2nd pass: sight-line blocks off (one fight beats the
-            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked  # pocket: Misty gym ~5400 steps, 2026-11-12)
+        """Inside the gym while not ready: the first press of the learned route off the map, before frontier explores toward
+        the leader. A 2nd pass drops sight-line blocks (one fight beats the pocket: Misty gym ~5400 steps, 2026-11-12)."""
+        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):
+            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked
             found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
             if found and found[1]:
-                break
-        if not found or not found[1]:
-            return None
-        return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")
+                return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")
+        return None
 
     @staticmethod
     def _team_ready_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
