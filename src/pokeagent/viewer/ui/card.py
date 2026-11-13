@@ -22,6 +22,7 @@ from pokeagent.viewer.panels.noframe import hint_texture
 from pokeagent.viewer.panels.textimg import SEES_GRID, lines_texture
 from pokeagent.viewer.ui import tags
 from pokeagent.viewer.ui.card_tint import apply_header_tint
+from pokeagent.world.palette import agent_colour, hex_colour
 
 _PAD = 5
 _HEADER_H = 15
@@ -184,7 +185,7 @@ class CardView:
         head = f"{snap.agent_id} · {snap.kind or '?'}"
         seg = f" · {snap.segment.id} {snap.segment.name}".rstrip() if snap.segment.id else ""
         st = f" · step {snap.step}"
-        line = [span(head, driver_color(snap.thinking.driver or snap.kind)), span(seg + st, DIM)]
+        line = [span(head, hex_colour(agent_colour(snap.agent_id))), span(seg + st, DIM)]   # the agent's map colour
         if snap.state != "running":
             line.append(span(f"  [{snap.state}{': ' + snap.stop_reason if snap.stop_reason else ''}]", DIM))
         return [line]

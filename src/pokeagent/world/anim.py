@@ -29,6 +29,12 @@ def place(t: Track, layout: WorldLayout, now: float) -> tuple[float, float, int]
     return x0 + (x1 - x0) * p, y0 + (y1 - y0) * p, 1 + int(p * 4) % 2
 
 
+def trail_alpha(start: int, n: int) -> int:
+    """Alpha (0..255) of the trail segment starting at point ``start`` of ``n``: faint at the tail, opaque at the head."""
+    fade = min(1.0, (start + 8) / max(n, 1))
+    return max(0, min(255, int(30 + 225 * fade * fade)))
+
+
 def trail_points(t: Track, layout: WorldLayout, n: int = 120) -> list[tuple[int, int]]:
     """Cell centres (world px) of the last ``n`` visited cells that are on the layout, oldest first."""
     pts = []

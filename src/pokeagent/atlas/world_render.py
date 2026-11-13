@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 
 from pokeagent.atlas.render import BLOCK_PX, render_blocks, render_map
 from pokeagent.atlas.rom_maps import MapHeader, map_name
+from pokeagent.world import names
 from pokeagent.atlas.tiles import Tileset, load_tileset
 from pokeagent.atlas.world import CELL, LABEL, WorldLayout
 
@@ -40,7 +41,7 @@ def render_world(rom: bytes, headers: dict[int, MapHeader], layout: WorldLayout,
     dr = ImageDraw.Draw(pil)
     for m, p in layout.places.items():
         if p.interior:
-            dr.text((p.x * CELL, (p.y - LABEL) * CELL + 2), f"0x{m:02X} {map_name(m)}", fill=(235, 235, 235))
+            dr.text((p.x * CELL, (p.y - LABEL) * CELL + 2), names.label_for(map_name(m), names.column_px(p.w, CELL)), fill=(235, 245, 200))
     if links:
         for m, (par, x, y) in layout.entrances.items():
             if m in layout.places and par in layout.places and not layout.places[par].interior:

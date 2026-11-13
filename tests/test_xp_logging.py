@@ -123,3 +123,38 @@ def test_backfill_formula_on_synthetic_record(tmp_path):
     kbp.write_text(json.dumps(kb))
     assert xp_backfill.main(["--battles", str(src), "--kb", str(kbp), "--out", str(out)]) == 0
     assert json.loads(out.read_text())["exp_estimate"] == 57
+
+
+def test_xp_meter_failure_never_costs_the_battle_end_row(tmp_path, monkeypatch):
+    from pokeagent.explorer import xp_meter
+
+    def boom(self, ctx, before, after):
+        raise RuntimeError("meter exploded")
+    monkeypatch.setattr(xp_meter.XpMeter, "on_battle", boom)
+    ctx = make_ctx(tmp_path, party((153, 5, 135, 20, 20)))
+    log = party_log.of(ctx)
+    log.start_battle(ctx)
+    for a, v in party((153, 6, 180, 5, 24, (33, 45, 22, 0))).items():
+        ctx.emu.set(a, v)
+    fields = log.end_battle(ctx, won=True, fled=False)
+    assert "party_error" not in fields and fields["exp_gained"] == [45] and fields["level_ups"][0]["to"] == 6
+    line = json.loads((tmp_path / "levels.jsonl").read_text().splitlines()[-1])
+    assert line["cause"] == "battle_end" and line["party"] == [[153, 6, 180, 5, 24]]
+
+
+def test_xp_meter_failure_is_logged_once_per_distinct_message(tmp_path, monkeypatch, caplog):
+    import logging
+    from pokeagent.explorer import xp_meter
+    party_log._warned.clear()
+
+    def boom(self, ctx, before, after):
+        raise RuntimeError("meter exploded")
+    monkeypatch.setattr(xp_meter.XpMeter, "on_battle", boom)
+    ctx = make_ctx(tmp_path, party((153, 5, 135, 20, 20)))
+    log = party_log.of(ctx)
+    with caplog.at_level(logging.WARNING, logger=party_log.__name__):
+        for _ in range(3):
+            log.start_battle(ctx)
+            log.end_battle(ctx, won=True, fled=False)
+    msgs = [r.getMessage() for r in caplog.records if "meter exploded" in r.getMessage()]
+    assert len(msgs) == 1

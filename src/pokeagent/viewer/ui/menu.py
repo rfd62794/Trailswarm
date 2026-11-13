@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from pokeagent.viewer.ui import theme
+
 MENU_STADIUM = "menu_stadium_pane"
 MENU_SWARM = "menu_swarm_page"
 
@@ -20,6 +22,8 @@ def build(win) -> None:
             dpg.add_menu_item(label="Swarm page", check=True, tag=MENU_SWARM,
                               default_value=win.swarm_visible(),
                               callback=lambda s, a, u: win.set_swarm_pref(a))
+            dpg.add_menu_item(label="Save screenshot (F12)", callback=lambda s, a, u: win.save_screenshot())
+            dpg.add_menu_item(label="Light / dark panels", callback=lambda s, a, u: theme.toggle_mode())
             dpg.add_menu_item(label="Save layout", callback=lambda s, a, u: win.save_layout())
             dpg.add_menu_item(label="Reset layout (applies on restart)",
                               callback=lambda s, a, u: win.reset_layout())

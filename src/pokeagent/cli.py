@@ -6,6 +6,7 @@ Usage::
                   [--steps N] [--headless] [--state PATH] [--runs-dir runs]
     pokeagent check-rom [--game KEY] [--rom PATH]
     pokeagent state [--game KEY] [--rom PATH] [--state PATH]
+    pokeagent bytecheck build|scan|staged   (see docs/BYTECHECK.md)
     pokeagent mcp [--game KEY] [--rom PATH] [--state PATH] [--headless] [--idle-fps 60]
 
 The ROM path comes from ``--rom``, else ``$POKEAGENT_ROM``, else
@@ -22,6 +23,7 @@ import sys
 from pathlib import Path
 
 from pokeagent import cli_brain, cli_hex, cli_review
+from pokeagent.bytecheck import cli as cli_bytecheck
 from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
@@ -133,6 +135,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return EXIT_CODES.get(result.stop_reason, 1)
 
 
+def rom_sha1_check(rom: Path, spec: GameSpec) -> tuple[int, str, bool]:
+    """(size, upper-case SHA-1, matches spec.rom_sha1) for a ROM file; shared with bytecheck."""
+    data = rom.read_bytes()
+    sha1 = hashlib.sha1(data).hexdigest().upper()
+    return len(data), sha1, sha1 in spec.rom_sha1
+
+
 def _cmd_check_rom(args: argparse.Namespace) -> int:
     spec = _resolve_game(args)
     if spec is None:
@@ -143,11 +152,9 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
         return 1
     if _explicit_game(args) is None:  # no --game: report against the game the ROM's hash names, as boot does
         spec = game_for_rom(rom) or spec
-    data = rom.read_bytes()
-    sha1 = hashlib.sha1(data).hexdigest().upper()
-    print(f"size: {len(data)} bytes")
+    size, sha1, match = rom_sha1_check(rom, spec)
+    print(f"size: {size} bytes")
     print(f"sha1: {sha1}")
-    match = sha1 in spec.rom_sha1
     print("match" if match else f"mismatch (expected {spec.rom_sha1[0]})")
     if not spec.playable:  # gated game: the hash is all we verify; never boot it
         print(f"{spec.key}: NOT PLAYABLE YET - {spec.gate}")
@@ -284,6 +291,7 @@ def _build_parser() -> argparse.ArgumentParser:
     cli_hex.register(sub)
     cli_brain.register(sub)
     cli_review.register(sub)
+    cli_bytecheck.register(sub)
     return parser
 
 

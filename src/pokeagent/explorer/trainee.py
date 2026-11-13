@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from pokeagent.explorer import party_log
+from pokeagent.explorer import party_log, xp_meter
 from pokeagent.explorer.economy import ledger
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.goals import SIDE_GOALS, check_goals
@@ -12,6 +12,10 @@ from pokeagent.magikarp import magikarp_stats
 
 def record_trainee(ctx: ExplorerContext) -> None:
     """Best effort: a failure here must never end a run."""
+    try:
+        xp_meter.of(ctx).finish(ctx)  # xp_rates.jsonl: last window + per-map summary (own try: never raises)
+    except Exception:
+        pass
     try:
         mp = ctx.run_dir / "meta.json"
         meta = json.loads(mp.read_text())
