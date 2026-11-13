@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import random
 
+from pokeagent.explorer.behaviours import grind_loop
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import grade_replay
@@ -27,10 +28,10 @@ class LoopGuard(BehaviourBase):
         pw = ctx.pos()
         hist = ctx.pos_hist
         if ctx.emu.read(IS_IN_BATTLE) == 0:  # battle presses never move us: counting them made every fight look like a stuck loop
-            hist.append(pw); del hist[:-150]
+            hist.append(pw); del hist[:-150]; grind_loop.note_step(ctx)
         gnow = tuple(sorted(ctx.goal_steps))
         if ctx.shake_goals_150 != gnow:  # a goal landed: restart the 150-press window (it went dead after goal 1)
-            ctx.shake_goals_150 = gnow; hist.clear(); hist.append(pw)
+            ctx.shake_goals_150 = gnow; hist.clear(); hist.append(pw); grind_loop.reset(ctx); grind_loop.note_step(ctx)
         # An unrecognised full-screen page (Pokedex entry opened by a stall escalation's START + menu exploration, 2026-11-05)
         # swallows every direction press while no box or battle is detected: back out with B instead of mashing A / walking.
         if ctx.last_press in DIRS and ctx.dir_fail_pos == pw and ctx.emu.read(IS_IN_BATTLE) == 0 and not ctx.view.box:
@@ -53,10 +54,10 @@ class LoopGuard(BehaviourBase):
         elif len(hist) >= 150 and len(set(hist[-150:])) <= 2 and ctx.emu.read(IS_IN_BATTLE) == 0                 and tuple(sorted(ctx.goal_steps)) == ctx.shake_goals_150:
             # 150 presses on <=2 tiles with no goal progress, EVEN with boxes open: a dialog/answer cycle (A..., DOWN, A,
             # repeat) that never reaches 40 A in a row (Bulbasaur run re-asking the Charmander ball for 1700 steps).
-            ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear()
+            ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear(); grind_loop.reset(ctx)
             ctx.log(f"[dialog cycle detected: 150 presses on <=2 tiles - shaking #{ctx.shakes}]", "res")
-        elif len(hist) >= 60 and len(set(hist[-60:])) <= 6 and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))                 and ctx.emu.read(IS_IN_BATTLE) == 0 and not ctx.explore_burst:
-            ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear()
+        elif len(hist) >= 60 and len(set(hist[-60:])) <= 6 and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))                 and ctx.emu.read(IS_IN_BATTLE) == 0 and not ctx.explore_burst and not grind_loop.paced_in_training(ctx):
+            ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear(); grind_loop.reset(ctx)
             ctx.log(f"[loop detected: 60 presses on {len(set(hist)) or '<=6'} tiles - shaking #{ctx.shakes}]", "res")
         # Endless-A guard (runs BEFORE any box handling): 40 presses in a row that are all A while the position has
         # not changed = a sign/looping dialog. Close the box with B, then walk away.
