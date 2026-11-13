@@ -11,6 +11,7 @@ import json
 from collections import Counter
 from typing import Any
 
+from pokeagent.explorer import xp_meter
 from pokeagent.explorer.economy import heal_items, ledger
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.goals import bag_contents
@@ -125,6 +126,7 @@ class PartyLog:
                 for lu in d["level_ups"]:
                     self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
                 self.prev = after
+                xp_meter.of(ctx).on_battle(ctx, before, after)  # XP measurement (never raises)
                 self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
                 out.update(d)
             except Exception as exc:  # noqa: BLE001

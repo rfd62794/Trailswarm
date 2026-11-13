@@ -247,6 +247,7 @@ class ExplorerContext:
     # --- per-step scratch, rebuilt by refresh() / the battle behaviour ---
     view: Frame = field(default_factory=Frame)
     bv: Any = None  # the battle behaviour's read of the current battle (behaviours.battle.BattleView)
+    xp_meter: Any = None  # explorer.xp_meter.XpMeter, made on first use (per-member XP rates)
     party_log: Any = None  # explorer.party_log.PartyLog, made on first use (XP/level logging)
     econ: Any = None  # explorer.economy.ledger.Ledger, made on first use (income/spend/blackouts, Pokecenters visited)
     shop_intent: Any = None  # ("mart", map|None) while restock walks to a Mart: par_follow treats the trip as a "mart" trip
