@@ -141,6 +141,8 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
     if not rom.is_file():
         print(f"ROM not found: {rom}")
         return 1
+    if _explicit_game(args) is None:  # no --game: report against the game the ROM's hash names, as boot does
+        spec = game_for_rom(rom) or spec
     data = rom.read_bytes()
     sha1 = hashlib.sha1(data).hexdigest().upper()
     print(f"size: {len(data)} bytes")
