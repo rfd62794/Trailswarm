@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from pokeagent.ram_symbols import (
+    CUR_OPPONENT,
     IS_IN_BATTLE,
     PARTY_COUNT,
     PARTY_MON1,
@@ -22,6 +23,8 @@ A_BATTLE, A_PARTY_N, A_PARTY, A_MAP, A_BAG_N, A_BAG, A_MONEY, A_FLAGS = IS_IN_BA
 # A_HP/A_MAXHP start at the slot-0 struct and stride by PARTY_MON_SIZE: _party_hp walks every slot from there
 PARTY_STRIDE, A_HP, A_MAXHP, FLAG_BYTES = PARTY_MON_SIZE, PARTY_MON1_HP, PARTY_MON1_MAX_HP, 320
 TRAINER_BATTLE = 2  # wIsInBattle: 1 wild, 2 trainer
+WILD_BATTLE = 1
+TRAINER_CLASS_MIN = 200  # wCurOpponent >= 200 is 200 + trainer class; below is a wild species id
 
 HEALER, SHOP, PC, GIVER, VENDOR, TRAINER, STORY, BLOCKER, SIGN, INFO = (
     "healer", "shop", "pc", "giver", "vendor", "trainer", "story", "blocker", "sign", "info")
@@ -85,7 +88,11 @@ def read_effects(before: bytes, after: bytes, *, texts=(), menus=(), npc: bool =
         bag_gain = any(q > bag_b.get(i, 0) for i, q in bag_a.items())
         party_gain = _at(after, A_PARTY_N)[0] > _at(before, A_PARTY_N)[0]
         healed = bool(hp_b) and any(h < m for h, m in hp_b) and len(hp_a) >= len(hp_b) and all(h == m for h, m in hp_a)
-        return Effects(money, bag_gain, party_gain, healed, _at(after, A_BATTLE)[0],
+        battle = _at(after, A_BATTLE)[0]
+        opp_b, opp_a = _at(before, CUR_OPPONENT)[0], _at(after, CUR_OPPONENT)[0]
+        if not battle and not opp_b and opp_a:  # the box closes while the intro still fades: wIsInBattle is 0 but wCurOpponent is already set
+            battle = TRAINER_BATTLE if opp_a >= TRAINER_CLASS_MIN else WILD_BATTLE
+        return Effects(money, bag_gain, party_gain, healed, battle,
                        _at(before, A_MAP)[0] != _at(after, A_MAP)[0], _flag_bits(before) != _flag_bits(after),
                        pos_before != pos_after, list(texts), list(menus), npc, repeat_same)
     except (IndexError, ValueError):

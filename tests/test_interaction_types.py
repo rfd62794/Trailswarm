@@ -2,6 +2,7 @@
 import pytest
 
 from pokeagent.explorer import interaction_types as it
+from pokeagent.ram_symbols import CUR_OPPONENT
 from pokeagent.explorer.interaction_policy import Need, decide, nearest_healer, needs_heal
 from pokeagent.explorer.interaction_types import Effects, classify, read_effects, record_type
 
@@ -99,3 +100,20 @@ def test_repeat_policy_table(entry, need, talk):
 def test_heal_decision_needs_healing_and_nearest():
     assert needs_heal([(0, 20)]) and needs_heal([(9, 20)]) and not needs_heal([(10, 20)])
     assert nearest_healer({"mom": 40, "nurse": 12}) == "nurse" and nearest_healer({}) is None
+
+
+def _opp(w, v):
+    b = bytearray(w)
+    b[CUR_OPPONENT - it.BASE] = v
+    return bytes(b)
+
+
+def test_opponent_appearing_with_battle_flag_still_zero_is_a_trainer():
+    """Misty (2026-11-12): the box closed while the intro faded: wIsInBattle 0, wCurOpponent 0 -> 235."""
+    assert kind(win(), _opp(win(), 235)) == "trainer"
+
+
+def test_wild_species_opponent_is_a_wild_battle_not_a_trainer():
+    fx = read_effects(win(), _opp(win(), 21))
+    assert fx.battle == it.WILD_BATTLE and classify(fx)[0] != "trainer"
+    assert read_effects(_opp(win(), 235), _opp(win(), 235)).battle == 0  # already set before: not a new start

@@ -31,6 +31,7 @@ ENEMY_MON_PP = 0xCFFE         # wEnemyMonPP
 
 # battle state / flags
 IS_IN_BATTLE = 0xD057         # wIsInBattle: 0 overworld, 1 wild, 2 trainer
+CUR_OPPONENT = 0xD059         # wCurOpponent: 0 none, species id (wild) or 200 + trainer class; set while the battle intro still fades
 PLAYER_MON_NUMBER = 0xCC2F    # wPlayerMonNumber: party slot currently out
 ENEMY_MON_PARTY_POS = 0xCFE8  # wEnemyMonPartyPos: enemy party slot out (trainer fights)
 PARTY_GAIN_EXP_FLAGS = 0xD058 # wPartyGainExpFlags: bit i = party slot i fought this enemy

@@ -260,7 +260,10 @@ class MapMemory(NavMixin, WarpsMixin, TilesMixin):
         if not near:
             return None
         e = max(near, key=lambda e: (e is faced, e.get("trainer", False), e.get("talked", 0)))
-        e["trainer"] = True
+        res, e["trainer"] = e.get("results"), True
+        if isinstance(res, dict):  # repair an entry typed info/sign before the battle intro showed (shared maps.json)
+            res["type"], v = "trainer", res.setdefault("type_votes", {})
+            v["trainer"] = max(v.values(), default=0) + 1
         return e
 
     def interaction_known(self, map_id, x, y, facing) -> bool:
