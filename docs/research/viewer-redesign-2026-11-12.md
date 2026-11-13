@@ -53,6 +53,14 @@ Layout: DPG docking/tabs, so the Live pane stays visible while other tabs are op
 4. **Foresight and Timelines (lands with the branching producer).** Timelines tab, World branch trails, marathon fork markers; built first against a recorded fixture file so the UI does not wait on the producer.
 5. **Team actions (optional).** DPG-only PC swap and team-search plan controls, gated behind the existing human-hold rule.
 
+## 4b. GUI framework and language choice (Robert 2026-11-12: any GUI method, other languages where they pay)
+**Decision: stay on Dear PyGui for the desktop shell; use other languages only on measured hot paths.**
+- **Dear PyGui (kept).** Already drives `view` and `world`. The map is drawn as a GPU texture, docking and tabs are built in, there is one process with direct access to the Python snapshot, and RAM is lowest of the Python options. Every phase above is panel work, not a rewrite.
+- **imgui-bundle (escape hatch).** Same immediate-mode model, actively maintained, ships ImPlot and a node editor (Timelines tree). Move to it only if DPG blocks a phase: panels port mechanically.
+- **Rejected:** Qt/PySide6 (rewrite, roughly 2x RAM, retained-mode); Tauri/Electron/web shells (web dropped); a Rust egui viewer (a full rewrite in a second language, and the snapshot would have to cross a process boundary).
+- **Other languages, where they pay:** (1) clip/screenshot encoding stays in ffmpeg (C) via subprocess (Media module); (2) map stitch/render and heat layers go to numpy first, and Rust via PyO3 only if a profile still shows it hot; (3) the always-on harness daemons (AgentFlow pulse, tick, mailbox, bridge, memory, collective; about 700 MB today across six Python processes, each doubled by a 5 MB venv launcher shim) consolidate into one Python process first. A Go single-binary port follows only for whatever stays resident and heavy after that (Go 1.27 is already set up on the laptop). That plan lives in AgentFlow, not here.
+- **Blank World capture:** check this before phase 1. GDI capture of a GPU swapchain can read white; the headless DPG snapshot test (phase 1) gives exact screenshots without screen capture.
+
 ## 5. Do not copy
 - W&B/TensorBoard hosted services or chart-first layouts: we watch games; table before charts.
 - TAStudio piano-roll editing and its branch export model: branches are read-only history here.
