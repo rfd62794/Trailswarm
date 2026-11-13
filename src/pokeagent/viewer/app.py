@@ -121,7 +121,7 @@ def merge_sources(current: dict, fresh: dict, missed: dict | None = None) -> tup
 
 
 def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=None) -> list[str]:
-    """Apply a registry re-scan. An agent whose registry entry is gone has exited: forget its card at once
+    """Apply a registry re-scan. An agent whose registry entry is missing from two scans in a row has exited: forget its card
     (``model.prune`` would keep it as 'lost' for 60 s), and its World-view track too (``world``: a WorldModel;
     any track without a live source is dropped, so dots/trails of dead agents never linger). Returns the dropped ids."""
     _added, gone = merge_sources(holder["sources"], fresh, holder.setdefault("missed", {}))
