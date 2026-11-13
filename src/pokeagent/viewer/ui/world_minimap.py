@@ -17,7 +17,7 @@ class Minimap:
         self.on = True
         self.dragging = False
         self._tex = None
-        self._for = None
+        self._for_pyr = None        # the pyramid the texture was built from (held, so identity is stable)
 
     def _geom(self) -> tuple[MiniMap, float, float] | None:
         """The map maths plus the box's top-left corner in canvas pixels (bottom-right of the canvas)."""
@@ -30,12 +30,12 @@ class Minimap:
 
     def _texture(self):
         v = self.view
-        if self._for is not id(v.pyr):
+        if self._for_pyr is not v.pyr:
             if self._tex is not None:
                 dpg.delete_item(self._tex)
             rgb = v.pyr.level(LEVELS[-1])
             self._tex = dpg.add_static_texture(rgb.shape[1], rgb.shape[0], to_gpu(rgb), parent="world_tex")
-            self._for = id(v.pyr)
+            self._for_pyr = v.pyr
         return self._tex
 
     def hit(self, m) -> bool:

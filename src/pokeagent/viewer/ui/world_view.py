@@ -16,11 +16,10 @@ import numpy as np
 from pokeagent.atlas import sprites
 from pokeagent.viewer import ui_scale
 from pokeagent.viewer import roster
-from pokeagent.viewer.ui import tags, world_status
+from pokeagent.viewer.ui import tags, world_layers, world_status
 from pokeagent.viewer.ui.world_minimap import Minimap
 from pokeagent.viewer.ui.world_agents import draw_agents, draw_hover
 from pokeagent.viewer.ui.world_interiors import InteriorLayer
-from pokeagent.world import draw
 from pokeagent.world.follow import Follow
 from pokeagent.world.pyramid import LEVELS, Pyramid, to_gpu
 from pokeagent.world.view import Viewport, locate, pick
@@ -29,7 +28,6 @@ log = logging.getLogger(__name__)
 TEX = "world_tex"
 MAX_UPLOADS = 2         # chunk uploads per frame (a pan never stalls the UI on a burst of 16 MB uploads)
 MAX_TEX = 40            # chunk textures kept on the GPU (about 16 MB each)
-REBUILD_S = 3.0         # layer images are recomposed at most this often
 
 
 class WorldView:
@@ -90,30 +88,10 @@ class WorldView:
             self.status = f"world failed to load: {exc}"
 
     def _want(self) -> tuple:
-        maps = frozenset(t.map for t in self.wm.tracks() if t.placed) if self.npcs else frozenset()
-        return (frozenset(self.layers), maps, self.wm.rev if self.layers else 0)
+        return world_layers.want(self)
 
     def _maybe_rebuild(self, now: float) -> None:
-        want = self._want()
-        if self.world is None or self._building or want == self._built_for or now - self._built_at < REBUILD_S:
-            return
-        self._building, self._built_at = True, now
-
-        def work() -> None:
-            try:
-                w = self.world
-                if not want[0] and not want[1]:
-                    img = w.base
-                else:
-                    img = draw.compose_layers(w.base, w.layout, self.wm.union_model(), w.headers, tuple(sorted(want[0])),
-                                              w.book if want[1] else None, set(want[1]))
-                p = Pyramid(img)
-                for f in (2, 4, 8):
-                    p.level(f)
-                self._pending, self._built_for = p, want
-            finally:
-                self._building = False
-        threading.Thread(target=work, daemon=True, name="world-layers").start()
+        world_layers.maybe_rebuild(self, now)
 
     # -- textures ------------------------------------------------------------------------
     def _chunk_tex(self, f: int, cx: int, cy: int, force: bool = False):
@@ -287,7 +265,7 @@ class WorldView:
         draw_agents(self, now)
         self.mini.draw(dl)
         draw_hover(self)
-        world_status.draw(dl, vp.screen_w, vp.screen_h, world_status.lines("", True, len(self._points)), over_map=True)
+        world_status.draw(dl, vp.screen_w, vp.screen_h, world_status.lines("", True, len(self.wm.tracks())), over_map=True)
         if self.follow_selected and self.selected_id and not self.follow.active and not self._last_mouse:
             self.follow.start(self.selected_id, now)
         if self.follow.active:

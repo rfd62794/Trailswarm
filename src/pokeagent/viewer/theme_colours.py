@@ -16,6 +16,16 @@ def toggle(mode: str) -> str:
     return "light" if mode == "dark" else "dark"
 
 
-def state_rgb(state: str, ok: bool) -> tuple[int, int, int, int]:
+def rgba(hex_colour: str, alpha: int = 255) -> tuple[int, int, int, int]:
+    h = hex_colour.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha
+
+
+def text_rgba(mode: str, key: str = "text") -> tuple[int, int, int, int]:
+    """A text colour of the active mode's palette (``text`` = body, ``dim`` = secondary), readable on that mode's pane."""
+    return rgba(palette(mode)[key])
+
+
+def state_rgb(state: str, ok: bool, mode: str = "dark") -> tuple[int, int, int, int]:
     from pokeagent.viewer.health import RING_COLOUR
-    return (216, 216, 216, 255) if ok else (*RING_COLOUR.get(state, (216, 216, 216)), 255)
+    return text_rgba(mode) if ok else (*RING_COLOUR.get(state, text_rgba(mode)[:3]), 255)

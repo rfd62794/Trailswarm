@@ -189,3 +189,64 @@ def test_draw_agent_label_pill_pixels():
     x, y = lay.to_world(0, 5, 5)
     above = out[y - 30:y - 10, x - 20:x + 40]
     assert (above.sum(axis=2) < 200).any()                                  # the dark pill is there, above the sprite
+
+
+def test_trail_alpha_stays_in_range_for_short_trails():
+    from pokeagent.world.anim import trail_alpha
+    for n in range(1, 130):
+        for a in range(0, n, 8):
+            assert 0 <= trail_alpha(a, n) <= 255
+    assert trail_alpha(0, 2) == 255 and trail_alpha(0, 120) < trail_alpha(112, 120)
+
+
+def test_gb_tint_matches_float_reference_without_float_temporaries():
+    rng = np.random.default_rng(1)
+    img = rng.integers(0, 256, (40, 40, 3), dtype=np.uint8)
+    lum = img[..., 0] * 0.299 + img[..., 1] * 0.587 + img[..., 2] * 0.114
+    ref = np.asarray(GB_GREENS, dtype=np.uint8)[np.clip((lum / 64.0).astype(np.int32), 0, 3)]
+    out = gb_tint(img)
+    assert out.dtype == np.uint8 and (out != ref).mean() < 0.01             # integer weights: only boundary pixels may differ
+
+
+def test_roster_text_colours_follow_the_theme():
+    from pokeagent.viewer.theme_colours import DARK, LIGHT, rgba, state_rgb, text_rgba
+    assert state_rgb("ok", True, "light")[:3] == rgba(LIGHT["text"])[:3] != state_rgb("ok", True, "dark")[:3]
+    assert state_rgb("ok", True, "dark")[:3] == rgba(DARK["text"])[:3]
+    assert text_rgba("light", "dim") == rgba(LIGHT["dim"]) and text_rgba("dark", "dim") == rgba(DARK["dim"])
+    assert state_rgb("stalled", False, "light")[:3] == (255, 60, 60)
+
+
+def test_minimap_texture_uploads_once_per_pyramid(monkeypatch):
+    import sys
+    import types
+    fake = types.SimpleNamespace(calls=0, delete_item=lambda *_a, **_k: None)
+
+    def add_static_texture(*_a, **_k):
+        fake.calls += 1
+        return fake.calls
+    fake.add_static_texture = add_static_texture
+    dpg_pkg = types.ModuleType("dearpygui")
+    dpg_pkg.dearpygui = fake
+    monkeypatch.setitem(sys.modules, "dearpygui", dpg_pkg)
+    monkeypatch.setitem(sys.modules, "dearpygui.dearpygui", fake)
+    from pokeagent.viewer.ui import world_minimap
+    monkeypatch.setattr(world_minimap, "dpg", fake)
+    monkeypatch.setattr(world_minimap, "to_gpu", lambda rgb: rgb)
+
+    class Pyr:
+        def level(self, _f):
+            return np.zeros((4, 4, 3), np.uint8)
+    pyr = Pyr()
+    m = world_minimap.Minimap(types.SimpleNamespace(pyr=pyr))
+    for _ in range(5):
+        m._texture()
+    assert fake.calls == 1
+    m.view.pyr = Pyr()
+    m._texture()
+    assert fake.calls == 2
+
+
+def test_world_status_counts_tracked_agents():
+    from pokeagent.viewer.ui import world_status
+    assert world_status.lines("", True, 0)[0].startswith("waiting")
+    assert world_status.lines("", True, 2) == []

@@ -9,13 +9,6 @@ _DONE = "#5fa85f"
 _AHEAD = "#3f444e"
 
 
-def _seg_index(seg_id: str) -> str:
-    """'S3' -> '3'; anything else (an RL tag, empty) shows as-is."""
-    if seg_id.startswith("S") and seg_id[1:].isdigit():
-        return seg_id[1:]
-    return seg_id or "?"
-
-
 def progress_lines(snap: AgentSnapshot) -> list[Line]:
     out: list[Line] = []
     if snap.goals:

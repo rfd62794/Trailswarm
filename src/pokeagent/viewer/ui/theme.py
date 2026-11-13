@@ -69,6 +69,11 @@ def apply(mode: str | None = None) -> None:
     _bound.append(theme)
 
 
+def mode() -> str:
+    """The active chrome mode (dark | light)."""
+    return _mode
+
+
 def toggle_mode() -> str:
     """Flip dark <-> light and rebind."""
     apply(toggle(_mode))

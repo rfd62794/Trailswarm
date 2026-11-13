@@ -25,8 +25,7 @@ def draw_agents(v, now: float) -> None:
             pts = [vp.to_screen(*p) for p in anim.trail_points(t, lay, 120)]
             n = len(pts)
             for a in range(0, n - 1, 8):
-                fade = (a + 8) / max(n, 1)
-                dpg.draw_polyline(pts[a:a + 9], color=(*col, int(30 + 225 * fade * fade)), thickness=max(3, ui_scale.px(3)), parent=dl)
+                dpg.draw_polyline(pts[a:a + 9], color=(*col, anim.trail_alpha(a, n)), thickness=max(3, ui_scale.px(3)), parent=dl)
         pos = anim.place(t, lay, now)
         if pos is None:
             continue

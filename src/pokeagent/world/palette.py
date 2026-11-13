@@ -27,6 +27,9 @@ def hex_colour(c: tuple[int, int, int]) -> str:
 
 def gb_tint(img: np.ndarray) -> np.ndarray:
     """Map an RGB image onto the four Game Boy greens by luminance (darkest -> #0f380f, lightest -> #9bbc0f)."""
-    lum = img[..., 0] * 0.299 + img[..., 1] * 0.587 + img[..., 2] * 0.114
-    idx = np.clip((lum / 64.0).astype(np.int32), 0, 3)
+    # integer luminance in uint16 (weights /256: 77+150+29), one plane at a time: no float64 whole-image temporaries
+    lum = img[..., 0].astype(np.uint16) * 77
+    lum += img[..., 1].astype(np.uint16) * 150
+    lum += img[..., 2].astype(np.uint16) * 29
+    idx = np.minimum(lum >> 14, 3).astype(np.uint8)            # lum/256 in 0..255, /64 -> 0..3
     return np.asarray(GB_GREENS, dtype=np.uint8)[idx]
