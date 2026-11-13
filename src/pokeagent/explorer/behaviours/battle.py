@@ -260,6 +260,7 @@ class Battle(BehaviourBase):
             ctx.battles_won = ctx.battles_won + (1 if won else 0)
             if won and trainer:
                 from pokeagent.explorer.procedures.state import of as proc_state
+                ctx.__dict__["trainer_win_step"] = ctx.step  # burst_gate: a gain right after this is the fight's aftermath
                 proc_state(ctx)["twins"] += 1  # AfterVictory decides once per TRAINER win, never on a wild one
             record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")

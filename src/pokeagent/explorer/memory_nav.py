@@ -4,6 +4,7 @@ Mixed into MapMemory (moved unchanged from tools/explore_demo.py).
 """
 from __future__ import annotations
 
+from pokeagent.explorer.interaction_types import INFO, SIGN
 from pokeagent.explorer.perceive import DIRS, ahead_tiles, stand_tile
 from pokeagent.explorer.world import WorldGraph, maps_version
 
@@ -15,8 +16,11 @@ class NavMixin:
                avoid_maps: set | None = None, grass: str = "neutral", last_dir: str | None = None,
                tabu: set | None = None, reverse_penalty: int = 2) -> tuple[str, str]:
         """grass: 'seek' (training: prefer grass ahead), 'avoid' (weak: never step into known grass), 'neutral'."""
-        name, why, want_frontier = self.choose_local(map_id, x, y, facing, tilemap, tileset,
-                                                     avoid_maps, grass, last_dir, tabu, reverse_penalty)
+        local = self.choose_local(map_id, x, y, facing, tilemap, tileset,
+                                  avoid_maps, grass, last_dir, tabu, reverse_penalty)
+        if local is None:  # boxed in by a memorised sign: nothing worth pressing (callers treat it as a harmless B)
+            return "B", "every direction known blocked and the tile in front is a memorised sign/info"
+        name, why, want_frontier = local
         if want_frontier:
             step = self.frontier_step(map_id, x, y)
             if step:
@@ -25,7 +29,7 @@ class NavMixin:
 
     def choose_local(self, map_id, x, y, facing: str, tilemap: bytes | None = None, tileset: int = 0,
                      avoid_maps: set | None = None, grass: str = "neutral", last_dir: str | None = None,
-                     tabu: set | None = None, reverse_penalty: int = 2) -> tuple[str, str, bool]:
+                     tabu: set | None = None, reverse_penalty: int = 2) -> tuple[str, str, bool] | None:
         """The per-tile greedy pick. Returns (button, why, want_frontier): want_frontier is True when every
         neighbour was already seen, i.e. the caller should route to a frontier tile instead of wandering.
 
@@ -82,9 +86,17 @@ class NavMixin:
             if best is None or key < best[0]:
                 best = (key, name, base)
         if best is None:
+            if self._memorised_info_ahead(d, x, y, facing, npc_ahead):
+                return None  # retalk_veto would turn this A into a B anyway (that B loop stalled Nugget Bridge)
             return "A", "every direction known blocked: pressing A to look around", False
         why = f"at ({x},{y}) blocked={tried or 'none'}; {best[1]} leads to a tile seen {best[2]}x"
         return best[1], why, best[2] > 0
+
+    @staticmethod
+    def _memorised_info_ahead(d: dict, x: int, y: int, facing: str, npc_ahead: dict | None) -> bool:
+        """The tile in front is an info/sign entry whose conversation is memorised (what retalk_veto vetoes)."""
+        entry = npc_ahead.get("results") if npc_ahead is not None else d.get("interactions", {}).get(f"{x},{y},{facing}")
+        return bool(entry) and entry.get("type") in (INFO, SIGN) and bool(entry.get("pages") or entry.get("text"))
 
     def _mem_version(self) -> tuple:
         """Route-cache validity: the maps fingerprint plus what a goal predicate can read OUTSIDE the

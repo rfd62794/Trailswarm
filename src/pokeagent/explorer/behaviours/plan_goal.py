@@ -12,7 +12,7 @@ from pokeagent.explorer.perceive import heal_gate_hp, lead_level, party_hp, spri
 from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
-from pokeagent.explorer.training import boss_need_for, gate_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
+from pokeagent.explorer.training import boss_need_for, gate_for, train_member_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -76,7 +76,7 @@ class PlanGoal(BehaviourBase):
         if team and team.text != ctx.team_note:
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
-        ctx.train_member = team.weakest.slot if team and team.weakest else None
+        ctx.train_member = train_member_for(nv, team)
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
                 ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
@@ -252,14 +252,14 @@ class PlanGoal(BehaviourBase):
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):
-        """Inside the gym while not ready: the first press of the learned route off the map (the
-        heal_walk BFS shape), before anything else - frontier would explore toward the leader and
-        ``_leader_avoid``'s block_sight is the only guard. None when the learned graph knows no exit."""
-        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
-        found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
-        if not found or not found[1]:
-            return None
-        return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")
+        """Inside the gym while not ready: the first press of the learned route off the map, before frontier explores toward
+        the leader. A 2nd pass drops sight-line blocks (one fight beats the pocket: Misty gym ~5400 steps, 2026-11-12)."""
+        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):
+            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked
+            found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
+            if found and found[1]:
+                return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")
+        return None
 
     @staticmethod
     def _team_ready_idle(ctx: ExplorerContext, training_live: bool, level: int | None = None) -> None:
