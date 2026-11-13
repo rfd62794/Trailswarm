@@ -11,7 +11,7 @@ from pokeagent.explorer.trainee_gate import trainee_ok
 from pokeagent.explorer.perceive import heal_gate_hp, lead_level, party_hp, sprite_snapshot
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
-from pokeagent.explorer.training import boss_need_for, gate_for, train_member_for, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
+from pokeagent.explorer.training import boss_need_for, gate_for, gate_state, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -75,7 +75,7 @@ class PlanGoal(BehaviourBase):
         if team and team.text != ctx.team_note:
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
-        ctx.train_member = train_member_for(nv, team)
+        ctx.train_member, gate_ready = gate_state(ctx, goals_now_all, party_all, nv, team)  # ONE verdict: sim AND team floor
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
                 ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
@@ -106,7 +106,7 @@ class PlanGoal(BehaviourBase):
         ctx.train_need = need  # frontier reads it to seek grass while below the target
         lead = lead_level(ctx.emu)
         pressure = team_plan.grind_pressure(party_all, need, self._boss_gap(ctx, m, x, y), ctx.blackouts_row,
-                                            breakers=st.get("breakers", ()), ready=bool(nv and nv.ready), lead_level=lead)
+                                            breakers=st.get("breakers", ()), ready=gate_ready, lead_level=lead)
         if pressure != st.get("pressure"):
             ctx.log(f"[team_plan: grind pressure {st.get('pressure')} -> {pressure}]", "res")
             st["pressure"] = pressure
@@ -131,7 +131,7 @@ class PlanGoal(BehaviourBase):
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu))  # no planner target: go to the grass
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
-        hold = nv is not None and not nv.ready and gym is not None
+        hold = nv is not None and not gate_ready and gym is not None
         if st.get("stall_hold_goal") not in (None, ctx.stage_goal):
             st.pop("stall_hold", None)  # the clock runs from first engagement until the STAGE moves on; a battle frame
             st.pop("lifted_need", None)  # (party unread, nv None) or a one-step readiness flap must never reset it

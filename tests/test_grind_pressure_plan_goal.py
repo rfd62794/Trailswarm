@@ -90,6 +90,7 @@ def _gate_patch(monkeypatch, *, grind=("DOWN", "team gate: grinding the party"))
     monkeypatch.setattr(plan_goal, "team_for", lambda goals, party: None)
     monkeypatch.setattr(plan_goal, "required_level", lambda goals, floor, party: (15, ""))
     monkeypatch.setattr(plan_goal, "under_level_note", lambda *a: "")
+    monkeypatch.setattr("pokeagent.explorer.training.floor_for", lambda goals, party: None)  # fake nv/party: the team floor is team_floor tests
     monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_misty")
     monkeypatch.setattr(plan_goal, "plan_step", lambda goals, maps, pos, facing: ("UP", "goal beat_misty: 1 steps"))
     monkeypatch.setattr(plan_goal, "our_party", lambda emu: [SimpleNamespace(name="TURTLE", level=5)])

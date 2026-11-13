@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
-from pokeagent.knowledge import team_plan, trainers
+from pokeagent.knowledge import team_floor, team_plan, trainers
 from pokeagent.knowledge.readiness import MARGIN, Readiness, TeamReadiness, assess, team_readiness
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
@@ -93,13 +93,39 @@ def boss_need_for(goals: dict, party: list | None) -> team_plan.Need | None:
     return _cache[key]
 
 
-def train_member_for(nv, team) -> int | None:
-    """The slot to train, agreeing with the gate hold (``not nv.ready``): while boss_need says not ready it is the member
-    whose raise flips it (``raise_slot``), else the lead/fighter; with the gate open the hurt-lead sim's weakest steers."""
+def floor_for(goals: dict, party: list | None) -> team_floor.Floor | None:
+    """The stage's team level floor (knowledge.team_floor) for the whole party; None without data or a floor for the stage."""
+    goal = stage_goal(goals)
+    if goal is None or not party:
+        return None
+    key = ("floor", goal, tuple(party))
+    if key not in _cache:
+        boss = trainers.boss_party(goal, starter_names=[c.name for c in party])
+        _cache.clear() if len(_cache) > 64 else None
+        _cache[key] = team_floor.check(goal, party, boss) if boss else None
+    return _cache[key]
+
+
+def train_member_for(nv, team, floor=None) -> int | None:
+    """The slot to train, agreeing with the gate hold (``not team_floor.ready(nv, floor)``): while the sim says not ready it
+    is the member whose raise flips it (``raise_slot``), else the lead/fighter; when only the FLOOR fails it is the sendable
+    member closest below the floor; with the gate open the hurt-lead sim's weakest steers."""
     if nv is not None and not nv.ready:
         raise_slot = getattr(nv, "raise_slot", None)
         return raise_slot if raise_slot is not None else getattr(nv, "lead_slot", None)
+    if floor is not None and not floor.met and floor.target_slot is not None:
+        return floor.target_slot
     return team.weakest.slot if team and team.weakest else None
+
+
+def gate_state(ctx, goals: dict, party: list | None, nv, team) -> tuple[int | None, bool]:
+    """(train_member, gate_ready): the ONE gym verdict plan_goal holds on and trains from. ready = the whole-party sim passes
+    AND the checkpoint's team floor is met; the failing floor reason is logged once per change."""
+    floor = floor_for(goals, party)
+    if floor is not None and not floor.met and floor.text != ctx.floor_note:
+        ctx.floor_note = floor.text
+        ctx.log(f"[readiness] {floor.text}", "res")
+    return train_member_for(nv, team, floor), team_floor.ready(nv, floor)
 
 
 def under_level(goals: dict, party: list | None, floor: int = 0) -> tuple[int, int, int] | None:
@@ -113,6 +139,9 @@ def under_level(goals: dict, party: list | None, floor: int = 0) -> tuple[int, i
     nv = boss_need_for(goals, party)
     if nv is not None:
         if nv.ready:
+            fl = floor_for(goals, party)
+            if fl is not None and not fl.met and fl.target_slot is not None:  # sim passes, the team floor does not
+                return (fl.level, party[fl.target_slot].level, fl.level - party[fl.target_slot].level)
             return None
         i = nv.raise_slot if nv.raise_slot is not None else nv.lead_slot
         return (needed, party[i].level, needed - party[i].level)
