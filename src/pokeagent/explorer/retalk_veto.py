@@ -6,6 +6,7 @@ needs healing. A hurt party always lets the press through (it may be a healer we
 that vetoed, which goes into the decision log."""
 from __future__ import annotations
 
+from pokeagent.explorer.behaviours.goal_talk import GOAL_TALKS
 from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.interaction_policy import Need, decide, needs_heal
 from pokeagent.explorer.interaction_record import run_id, stats
@@ -33,6 +34,13 @@ def _thing_in_front(ctx) -> bool:
     return ctx.mem.npc_at(v.m, v.x + dx, v.y + dy) is not None
 
 
+def _at_unmet_goal_stand(ctx) -> bool:
+    """True on the stand tile of a GOAL_TALKS goal that is still unmet: the A there is aimed at that person."""
+    v = ctx.view
+    goals = ctx.goals()
+    return any(not goals.get(g) and (v.m, v.x, v.y) == spec[:3] for g, spec in GOAL_TALKS.items())
+
+
 def veto(ctx, decision) -> str | None:
     """None to let the press through, else the policy rule that says talking again is not worth it."""
     if decision.behaviour == "goal_talk":
@@ -43,6 +51,8 @@ def veto(ctx, decision) -> str | None:
         # "busy: A in case text is waiting" must never talk to whoever stands in front: that is how the wrong starter ball
         # got taken (a mash A right after a step towards the ball opened the offer and the next A said YES)
         return "readiness mash would talk to the NPC / ball in front: B instead"
+    if _at_unmet_goal_stand(ctx):
+        return None  # the person in front is the goal's: whatever the memory says, never B here
     entry = entry_in_front(ctx)
     if not entry or entry.get("type") not in VETOABLE:
         return None

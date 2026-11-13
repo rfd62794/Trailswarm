@@ -206,3 +206,13 @@ def test_print_trainer_section_with_real_atlas_rows(capsys):
     rows = [_spot(map_id=35, xp_per_step=0.01, xp_per_min=0.01 * STEPS_PER_MIN).to_dict()]
     _grind_report().print_trainer_section(35, "Route 24", led, GSTRONG, BASE_EXP, SYN, rows, kb=SYN)
     assert "trainers worth saving or taking" in capsys.readouterr().out
+
+
+def test_mark_trainer_retypes_a_mistyped_interaction_entry():
+    from pokeagent.explorer.memory import MapMemory
+    mem = MapMemory.__new__(MapMemory)
+    mem.data = {"maps": {"65": {"npcs": {"slot1:pic29": {"pic": 29, "last": [4, 2], "talked": 1,
+                                                          "results": {"type": "info", "type_votes": {"info": 1}}}}}}}
+    mem.m = lambda mid: mem.data["maps"][str(mid)]
+    e = mem.mark_trainer(65, 4, 3, "UP")
+    assert e["trainer"] and e["results"]["type"] == "trainer"

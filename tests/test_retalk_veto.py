@@ -116,3 +116,15 @@ def test_goal_talk_is_never_vetoed():
     info = {"type": "info", "pages": ["hello"], "count": 2}
     assert veto(ctx_for(info), Decision("A", "x", behaviour="plan_goal")) is not None
     assert veto(ctx_for(info), Decision("A", "goal_talk", behaviour="goal_talk")) is None
+
+
+def test_no_veto_at_the_stand_tile_of_an_unmet_goal_talk():
+    from pokeagent.explorer.behaviours.goal_talk import GOAL_TALKS
+    m, x, y, _, _ = GOAL_TALKS["beat_misty"]
+    info = {"type": "info", "pages": ["hello"], "count": 2}
+    c = ctx_for(info)
+    c.view = NS(m=m, x=x, y=y, box=False, battling=False)
+    c.mem.m = lambda _m: {"interactions": {f"{x},{y},UP": info}}
+    assert veto(c, Decision("A", "x")) is None
+    c.goals = lambda: {"beat_misty": True}  # goal met: the memory veto applies again
+    assert veto(c, Decision("A", "x")) is not None
