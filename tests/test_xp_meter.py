@@ -128,7 +128,7 @@ def test_two_meters_saving_into_one_file_keep_both_sets_of_cells(tmp_path):
     after = xp_spots.XpSpots.load(path).spots
     assert after["36|10-14"]["n"] == 1 and after["35|5-9"]["n"] == 3
     assert after["35|5-9"]["updated"] >= got["35|5-9"]["updated"]
-    assert [p.name for p in tmp_path.iterdir()] == ["xp_spots.json"]        # no temp files left behind
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["xp_spots.json"]  # lock released, no temp files left behind
 
 
 def test_default_ledger_lives_in_the_runs_dir_not_the_cwd(tmp_path, monkeypatch):
@@ -144,3 +144,39 @@ def test_default_ledger_lives_in_the_runs_dir_not_the_cwd(tmp_path, monkeypatch)
     assert list(cwd.iterdir()) == []                                        # nothing written relative to the CWD
     with pytest.raises(TypeError):
         xp_spots.XpSpots()                                                  # a writer must name its path
+
+
+def test_capped_cell_still_takes_newer_rate(tmp_path):
+    path = tmp_path / "xp_spots.json"
+    path.write_text(json.dumps({"schema": 1, "spots": {"35|5-9": {"xp_per_1k": 100.0, "battles_per_1k": 5.0,
+                                                                  "xp_per_battle": 20.0, "n": xp_spots.N_CAP, "updated": 1}}}))
+    sp = xp_spots.XpSpots.load(path)
+    for _ in range(50):
+        sp.record(35, 7, 900.0, 5.0, 20.0)
+    assert sp.spots["35|5-9"]["xp_per_1k"] > 899.0 and sp.spots["35|5-9"]["n"] == xp_spots.N_CAP
+    assert sp.save()
+    got = xp_spots.XpSpots.load(path).spots["35|5-9"]
+    assert got["xp_per_1k"] > 100.0 and got["n"] == xp_spots.N_CAP          # the frozen-at-100 bug: disk now moves toward 900
+    first = got["xp_per_1k"]
+    for _ in range(50):
+        sp.record(35, 7, 900.0, 5.0, 20.0)
+    assert sp.save() and xp_spots.XpSpots.load(path).spots["35|5-9"]["xp_per_1k"] > first
+
+
+def test_concurrent_saves_from_threads_keep_both_updates(tmp_path):
+    import threading
+    path = tmp_path / "xp_spots.json"
+    for _ in range(20):
+        path.unlink(missing_ok=True)
+        a, b = xp_spots.XpSpots.load(path), xp_spots.XpSpots.load(path)
+        a.record(35, 7, 100.0, 5.0, 20.0)
+        b.record(36, 12, 50.0, 2.0, 25.0)
+        gate = threading.Barrier(2)
+
+        def go(x):
+            gate.wait()
+            assert x.save()
+        ts = [threading.Thread(target=go, args=(x,)) for x in (a, b)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        assert set(xp_spots.XpSpots.load(path).spots) == {"35|5-9", "36|10-14"}

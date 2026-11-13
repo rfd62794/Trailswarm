@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from pokeagent.fsutil import atomic_write_text
+from pokeagent.bandit.store import _lock   # the repo's shared-file merge lock (also used by the novelty store)
 
 LEDGER_PATH = Path("runs/xp_spots.json")   # read-only default for reports; writers pass an explicit path
 FILE = "xp_spots.json"
@@ -36,7 +37,7 @@ class XpSpots:
     def __init__(self, spots: dict | None = None, *, path: Path | str) -> None:
         self.spots: dict[str, dict] = spots or {}
         self.path = Path(path)
-        self._base: dict[str, int] = {}     # per cell: window count already merged with the file (the rest is ours to add)
+        self._new: dict[str, int] = {}      # per cell: windows recorded since the last load/save (uncapped, unlike ``n``)
 
     @staticmethod
     def _read(path: Path | str) -> dict[str, dict]:
@@ -50,7 +51,6 @@ class XpSpots:
     @classmethod
     def load(cls, path: Path | str) -> "XpSpots":
         inst = cls(cls._read(path), path=path)
-        inst._base = {k: int(v.get("n", 0)) for k, v in inst.spots.items()}
         return inst
 
     def record(self, map_id: int, level: int, xp_per_1k: float, battles_per_1k: float, xp_per_battle: float) -> dict:
@@ -65,6 +65,7 @@ class XpSpots:
                 c[k] = round(c[k] * (1 - ALPHA) + v * ALPHA, 3) if k in c else round(v, 3)
             c["n"] = min(N_CAP, int(c.get("n", 0)) + 1)
         c["updated"] = int(time.time())
+        self._new[key] = self._new.get(key, 0) + 1
         self.spots[key] = c
         self._bound()
         return c
@@ -89,12 +90,12 @@ class XpSpots:
         return best
 
     def _merge(self, disk: dict[str, dict]) -> None:
-        """Fold what other writers put in the file into our cells: our new windows (n beyond ``_base``) are added to the
+        """Fold what other writers put in the file into our cells: our new windows (``_new``, counted apart from the capped ``n``) are added to the
         file's count and blended into its rates by window count; the newest ``updated`` wins; cells only they hold are kept."""
         merged = {k: dict(v) for k, v in disk.items()}
         for k, mine in self.spots.items():
             d = merged.get(k)
-            delta = max(0, int(mine.get("n", 0)) - self._base.get(k, 0))
+            delta = self._new.get(k, 0)
             if d is None:
                 merged[k] = dict(mine)
             elif delta:
@@ -106,14 +107,15 @@ class XpSpots:
                 d["updated"] = max(int(d.get("updated", 0)), int(mine.get("updated", 0)))
         self.spots = merged
         self._bound()
-        self._base = {k: int(v.get("n", 0)) for k, v in self.spots.items()}
+        self._new = {}
 
     def save(self) -> bool:
         """Merge with the file's current content, then write it atomically (temp file + os.replace)."""
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._merge(self._read(self.path))
-            atomic_write_text(self.path, json.dumps({"schema": SCHEMA, "spots": self.spots}, sort_keys=True))
+            with _lock(self.path):      # read-merge-replace is one transaction across threads/processes
+                self._merge(self._read(self.path))
+                atomic_write_text(self.path, json.dumps({"schema": SCHEMA, "spots": self.spots}, sort_keys=True))
             return True
-        except OSError:
+        except (OSError, RuntimeError):   # RuntimeError: resources.LockBusy
             return False
