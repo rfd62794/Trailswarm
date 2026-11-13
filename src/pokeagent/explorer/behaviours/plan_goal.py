@@ -244,8 +244,9 @@ class PlanGoal(BehaviourBase):
         """The planner's push toward the gym map (the road north / the gym walk / the stage boss itself, e.g.
         "goal beat_misty: N steps toward it"): never taken while the hold stands. Without the stage form the
         Cerulean run walked into Misty's gym, was turned out by the hold, and walked back in (2026-11-12)."""
-        prefixes = ("goal road north", "goal gym") + ((f"goal {stage}",) if stage else ())
-        return bool(planned) and planned[1].startswith(prefixes)
+        why = planned[1] if planned else ""  # a stage step counts only as the learned-world walk at the boss, not a
+        return why.startswith(("goal road north", "goal gym")) or bool(  # Pokecenter exit / _back_to / edge push
+            stage and why.startswith(f"goal {stage}:") and "steps toward it" in why)
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):
