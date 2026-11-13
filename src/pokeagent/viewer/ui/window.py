@@ -205,6 +205,7 @@ class ViewerWindow(CommandHostMixin, HealthLayoutMixin):
         if (vw, vh) == self._last_size or vw < 50 or vh < 50:
             return
         self._last_size = (vw, vh)
+        ui_scale.apply_window_scale(dpg, vw, vh)   # text follows the window size
         dpg.configure_item(self._win, pos=[0, 0], width=vw, height=vh)
         avail = max(80, vh - ui_scale.px(_BAR_H))
         (self.stitched or self.world).fit(vw, avail)

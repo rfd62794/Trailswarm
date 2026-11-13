@@ -7,6 +7,8 @@ keep both under the module size cap. Expects the host to provide ``model``, ``so
 """
 from __future__ import annotations
 
+import time
+
 from pokeagent.viewer import steering, commands
 
 
@@ -55,7 +57,8 @@ class CommandHostMixin:
 
     @property
     def spawn_msg(self) -> str:
-        return self._spawn.message
+        msg, at = getattr(self, "_shot", ("", 0.0))
+        return msg if msg and time.monotonic() - at < 8.0 else self._spawn.message
 
     def spawn_agent(self, kind: str, args: str) -> None:
         self._spawn.spawn(kind, args)
@@ -83,6 +86,12 @@ class CommandHostMixin:
         """P / T: transport hotkeys, focus view only, one toggle per physical press."""
         if self.focus.focused is not None and self._gate.allow(name):
             self.toggle_pause() if name == "pause" else self.cycle_speed()
+
+    def save_screenshot(self) -> None:
+        """F12 / View menu: write the window to runs/screenshots/<mode>-<time>.png and say where."""
+        import dearpygui.dearpygui as dpg
+        from pokeagent.viewer import screenshot
+        self._shot = (f"saved {screenshot.save(dpg, self.root, label=self.focus.mode)}", time.monotonic())
 
     def escape(self) -> None:
         self.leave_focus()

@@ -4,8 +4,9 @@ from __future__ import annotations
 import dearpygui.dearpygui as dpg
 
 from pokeagent.atlas import inplace
-from pokeagent.viewer import ui_scale
-from pokeagent.world import anim, draw
+from pokeagent.viewer import roster, ui_scale
+from pokeagent.viewer.health import OK, ring_alpha, ring_colour
+from pokeagent.world import anim, draw, pill
 from pokeagent.world.view import locate, pick
 
 MIN_SPRITE_PX = 26      # an agent is never drawn smaller than this (1x px; scaled by DPI), however far out you zoom
@@ -24,7 +25,7 @@ def draw_agents(v, now: float) -> None:
             pts = [vp.to_screen(*p) for p in anim.trail_points(t, lay, 120)]
             n = len(pts)
             for a in range(0, n - 1, 8):
-                dpg.draw_polyline(pts[a:a + 9], color=(*col, 60 + 180 * a // max(n, 1)), thickness=max(2, ui_scale.px(2)), parent=dl)
+                dpg.draw_polyline(pts[a:a + 9], color=(*col, anim.trail_alpha(a, n)), thickness=max(3, ui_scale.px(3)), parent=dl)
         pos = anim.place(t, lay, now)
         if pos is None:
             continue
@@ -32,9 +33,10 @@ def draw_agents(v, now: float) -> None:
         cx, cy = vp.to_screen(x + 8, y + 8)
         v._points[t.id] = (x + 8, y + 8)
         half = ui_scale.sprite_px(vp.zoom, 9, MIN_SPRITE_PX / 2)
-        dpg.draw_circle((cx, cy), half + 3, color=(*col, 255), thickness=2, parent=dl)
+        state = v.health_state(t.id)
+        dpg.draw_circle((cx, cy), half + 3, color=(*ring_colour(state, col), ring_alpha(state, now)), thickness=3 if state != OK else 2, parent=dl)
         dpg.draw_image(v._agent_tex(t.facing, phase, col), (cx - half, cy - half), (cx + half, cy + half), parent=dl)
-        dpg.draw_text((cx + half + 4, cy - ui_scale.px(8)), t.id[-8:], color=(255, 255, 255, 255), size=ui_scale.px(14), parent=dl)
+        _label(dl, t.id[-8:], cx, cy - half - 3, vp.zoom, v.selected_id == t.id)
         tag = inplace.badge(lay, t.map)
         if tag:
             dpg.draw_text((cx + half + 4, cy + ui_scale.px(8)), tag, color=(255, 235, 150, 255), size=ui_scale.px(13), parent=dl)
@@ -44,6 +46,15 @@ def draw_agents(v, now: float) -> None:
             dpg.draw_text((cx - ui_scale.px(24), cy - ui_scale.px(52)), t.battle.species or "?", color=(255, 220, 80, 255), size=ui_scale.px(14), parent=dl)
 
 
+def _label(dl, text: str, cx: float, top: float, zoom: float, selected: bool) -> None:
+    """The agent's name on a dark rounded pill above its sprite (readable over busy tiles; scales with zoom)."""
+    size = ui_scale.px(13)
+    pl = pill.pill(cx, top, len(text) * size * 0.55, size, zoom)
+    dpg.draw_rectangle((pl.x0, pl.y0), (pl.x1, pl.y1), rounding=pl.radius, fill=pill.PILL_FILL,
+                       color=(255, 255, 160, 255) if selected else (0, 0, 0, 0), parent=dl)
+    dpg.draw_text((pl.text_x, pl.text_y), text, color=pill.PILL_TEXT, size=max(10, int(pl.font)), parent=dl)
+
+
 def draw_hover(v) -> None:
     m = v._mouse()
     if not m:
@@ -51,7 +62,8 @@ def draw_hover(v) -> None:
     aid = pick(v._points, v.vp, *m)
     t = v.wm.track(aid) if aid else None      # None: the agent exited since _points was built
     if t is not None:
-        lines = [aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
+        row = next((r for r in v.roster_rows() if r.agent_id == aid), None)
+        lines = [row.text() if row else aid, f"step {t.step}  goal: {t.goal or '-'}", "in battle" if t.battle and not t.battle.ended_at else ""]
     else:
         loc = locate(v.vl or v.world.layout, *v.vp.to_world(*m))
         lines = [f"{loc}"] if loc else []

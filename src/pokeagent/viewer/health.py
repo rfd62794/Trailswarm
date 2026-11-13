@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 from pathlib import Path
@@ -267,3 +268,19 @@ class HealthStore:
     def provenance(self, run: str | None) -> str:
         with self._lock:
             return self._prov.get(run or "", "")
+
+
+# -- map marker ring (world view): the agent's colour while healthy, the health colour when not -------------------
+RING_COLOUR = {SLOW: (255, 200, 80), STALLED: (255, 60, 60), ANOMALY: (255, 80, 255)}
+PULSE_HZ = 1.5
+
+
+def ring_colour(state: str, agent_colour: tuple[int, int, int]) -> tuple[int, int, int]:
+    return RING_COLOUR.get(state, agent_colour)
+
+
+def ring_alpha(state: str, now: float) -> int:
+    """255, except a stalled agent's ring pulses between 70 and 255 so it catches the eye."""
+    if state != STALLED:
+        return 255
+    return int(162 + 93 * math.sin(now * 2 * math.pi * PULSE_HZ))

@@ -11,6 +11,9 @@ MIN_SCALE, MAX_SCALE = 0.75, 4.0
 SIDE_FRAC, SIDE_MIN, SIDE_MAX = 0.22, 260, 420   # world side panel: share of the window, clamped (px at 1x)
 ENV = "POKEAGENT_UI_SCALE"
 _scale = 1.0
+_font_installed = False
+REF_W, REF_H = 1280, 800        # the window size at which text is at its design size
+MIN_WIN_SCALE, MAX_WIN_SCALE = 0.85, 1.6
 FONT = "C:/Windows/Fonts/segoeui.ttf"
 log = logging.getLogger(__name__)
 
@@ -60,6 +63,19 @@ def side_panel_width(total_w: int, scale: float | None = None) -> int:
     return int(max(SIDE_MIN * s, min(SIDE_MAX * s, total_w * SIDE_FRAC)))
 
 
+def window_scale(w: float, h: float) -> float:
+    """Text scale from the window size (1.0 at 1280x800): follows the smaller of width/height ratios, clamped."""
+    return max(MIN_WIN_SCALE, min(MAX_WIN_SCALE, min(w / REF_W, h / REF_H) ** 0.5 if min(w, h) > 0 else 1.0))
+
+
+def apply_window_scale(dpg, w: float, h: float) -> float:
+    """Scale the global font with the window. With a crisp scaled font installed only the window factor applies (the DPI factor is
+    already in the font); otherwise DPI x window."""
+    f = window_scale(w, h)
+    dpg.set_global_font_scale(f if _font_installed else _scale * f)
+    return f
+
+
 def sprite_px(zoom: float, base: float, minimum: float, scale: float | None = None) -> float:
     """On-screen sprite size: grows with zoom but never below the (scaled) minimum."""
     return max(base * zoom, minimum * (_scale if scale is None else scale))
@@ -104,6 +120,7 @@ def init() -> float:
 
 def install_font(dpg, scale: float | None = None, size: int = 14) -> None:
     """A crisp scaled font (Segoe UI at size*scale, any scale but 1.0); falls back to the dpg global font scale."""
+    global _font_installed
     s = _scale if scale is None else scale
     if abs(s - 1.0) < 0.01:
         return
@@ -115,6 +132,7 @@ def install_font(dpg, scale: float | None = None, size: int = 14) -> None:
         with dpg.font_registry():
             font = dpg.add_font(FONT, int(round(size * s)))
         dpg.bind_font(font)
+        _font_installed = True
     except Exception as exc:
         log.warning("font load failed (%s); using global font scale %.2f", exc, s)
         dpg.set_global_font_scale(s)

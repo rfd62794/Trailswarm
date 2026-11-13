@@ -48,5 +48,6 @@ def install(host) -> None:
             dpg.add_key_press_handler(dpg_key, callback=handler(button, name))
         dpg.add_key_press_handler(dpg.mvKey_Tab, callback=handler(tab))
         dpg.add_key_press_handler(dpg.mvKey_Escape, callback=handler(host.escape))
+        dpg.add_key_press_handler(dpg.mvKey_F12, callback=handler(host.save_screenshot))
         dpg.add_key_press_handler(dpg.mvKey_P, callback=handler(hotkey, "pause"))
         dpg.add_key_press_handler(dpg.mvKey_T, callback=handler(hotkey, "speed"))
