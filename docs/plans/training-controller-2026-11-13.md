@@ -78,7 +78,7 @@ Absorb / adapt / delete: delete `train_target.py`, `grind_heal.py`, `after_heal.
 1. **Controller as single owner, behaviour-preserving.** Add state/controller/adapters; `tick` computes the same
    `train_route_live`, episode, `gym_hold_seen`, `floor_unmet`, `train_need` values from the existing code, and the old
    attributes read from it. Net lines in plan_goal/context <= 0. A/B gate: identical decisions.jsonl.
-2. **Target.** Reject unreachable / never-visited points; one target per session. Expect phantom-VF starts -> 0.
+2. **Target (highest value: 46% of steps sit under a phantom pin).** Reject unreachable / never-visited points; one target per session. Expect phantom-VF starts -> 0.
 3. **Sustain.** Fold `grind_heal`, the planner heal inputs and `after_heal`; leave-center hint. Expect heal + leave-PC down.
 4. **Roster.** Session-boundary reorders, two-trainee cap, `team_sig` without the fainted bit. Expect reorder sessions ~0.
 5. **Exit + gym hold.** Fold `_end_reason` / stall hold; delete the `gym_hold_seen` / `floor_unmet` flags and dead modules.
@@ -93,7 +93,7 @@ Baseline: Route 24 210 xp/1k, SHAKE 7.2% (862), heal 7.5% + leave-PC 5.4% = 12.9
 - Unit tests: target (rejects unreachable point; stable across ticks; respects stage_maps); roster (lowest trainee leads;
   no order on a fainted flip; cap of two); sustain (survival floor vs Potion vs walk; hint set); exit_rule (floor met for N,
   budget, blackout, timeout); controller (tick idempotent per step; facade queries agree); plus the existing grind_episode,
-  train_route and party_order tests ported. Targeted files only, no full suite.
+  train_route and party_order tests ported. Targeted files on the laptop; the full suite runs in the cloud verify (merge gate).
 
 ## 5. Risks / what NOT to do
 - Do not add lines to context.py, memory.py, plan_goal.py (300) or battle.py (299); state lives in `ctx.__dict__["training"]`.
