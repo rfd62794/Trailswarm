@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from pokeagent.emulator import Button, PyBoyEmulator
 from pokeagent.explorer.perceive import frame_lines
-from pokeagent.statemeta import write_state
+from pokeagent.statemeta import sidecar, write_state
 
 TILEMAP, MAP, PX, PY = 0xC3A0, 0xD35E, 0xD362, 0xD361
 BEDROOM = 0x26
@@ -63,7 +63,8 @@ def main(argv=None) -> int:
             break
     print(f"bedroom reached after {i} presses at ({x},{y}); controllable={moved}")
     if not moved:
-        Path(a.out).unlink(missing_ok=True)
+        for p in (Path(a.out), Path(sidecar(a.out))):  # write_state also wrote a sidecar beside the state
+            p.unlink(missing_ok=True)
         return 1
     print(f"saved {a.out}")
     return 0
