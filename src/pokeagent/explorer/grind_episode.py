@@ -22,14 +22,14 @@ import logging
 import time
 from pathlib import Path
 
-from pokeagent.explorer import party_log, story_blockers, train_route
+from pokeagent.explorer import party_log, story_blockers, train_route, train_target
 from pokeagent.explorer.economy import heal_items
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.perceive import lead_level, party_hp
 from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.trainer_hooks import run_provenance
 from pokeagent.goals import bag_contents
-from pokeagent.grind import atlas, measure, stage_maps
+from pokeagent.grind import atlas, measure
 from pokeagent.grind import points as gp
 from pokeagent.grind.drill import log_episode
 from pokeagent.magikarp import trainee_slot_for
@@ -199,7 +199,7 @@ def _try_start(ctx, st: dict) -> tuple[dict | None, str | None]:
         return None, f"would end at once ({why})"
     pt = gp.choose(_ledger(ctx, st), levels or [lvl], need, (ctx.view.m, ctx.view.x, ctx.view.y), ctx.mem,
                    trainee_slot=slot, blocked=story_blockers.blocked_tiles(ctx),
-                   only_maps=stage_maps.allowed(getattr(ctx, "stage_goal", None)))
+                   only_maps=train_target.only_maps(ctx))
     if pt is None:
         return None, "no grind point fits"
     pt.patch = gp.patch_of(ctx.mem.data.get("maps", {}), pt.map_id) or pt.patch
