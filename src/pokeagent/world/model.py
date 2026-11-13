@@ -208,10 +208,32 @@ class WorldModel:
         return next((t for t in self.tracks() if t.id == agent_id), None)
 
     def forget(self, agent_id: str) -> None:
+        """Drop everything held for an agent (track + trail, cursor, epoch, poll stamp, feed rows). The union of learnings
+        (``_learned``, ``_visits``) is the world's, not the agent's, and stays."""
         with self._lock:
-            self._tracks.pop(agent_id, None)
-            self._since.pop(agent_id, None)
-            self._epoch.pop(agent_id, None)
+            self._forget_locked(agent_id)
+
+    def _forget_locked(self, agent_id: str) -> None:
+        for d in (self._tracks, self._since, self._epoch, self._polled):
+            d.pop(agent_id, None)
+        self._inflight.discard(agent_id)
+        if self._focused == agent_id:
+            self._focused = None
+        if any(a == agent_id for a, _, _ in self._feed):
+            keep = [r for r in self._feed if r[0] != agent_id]
+            self._feed.clear()
+            self._feed.extend(keep)
+
+    def sweep(self, live) -> list[str]:
+        """Forget every agent not in ``live`` (ids). Covers keys a late poll re-created after ``forget`` (a read that was in
+        flight when its agent left still lands an ``ingest``). Returns the dropped ids."""
+        live = set(live)
+        with self._lock:
+            known = set(self._tracks) | set(self._since) | set(self._epoch) | set(self._polled) | {a for a, _, _ in self._feed}
+            gone = sorted(known - live)
+            for aid in gone:
+                self._forget_locked(aid)
+        return gone
 
     @property
     def rev(self) -> int:

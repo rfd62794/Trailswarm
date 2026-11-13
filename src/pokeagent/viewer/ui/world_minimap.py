@@ -38,6 +38,11 @@ class Minimap:
             self._for_pyr = v.pyr
         return self._tex
 
+    def delete(self) -> None:
+        if self._tex is not None:
+            dpg.delete_item(self._tex)
+        self._tex, self._for_pyr = None, None
+
     def hit(self, m) -> bool:
         g = self._geom()
         return bool(g and m and g[0].contains(m[0] - g[1], m[1] - g[2]))
