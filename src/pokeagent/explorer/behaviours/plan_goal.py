@@ -13,7 +13,7 @@ from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, gate_state, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import after_heal, party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
+from pokeagent.explorer import after_heal, party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route, train_target
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 from pokeagent.grind import stage_maps
@@ -130,7 +130,7 @@ class PlanGoal(BehaviourBase):
         ctx.train_route_live = bool(team_ready_stage and training_live)
         if (planned is None or after_heal.leaving(planned, m)) and team_ready_stage and training_live:
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu),
-                                         survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None)) or planned  # to the grass; keep the planner's exit press if no route yet
+                                         survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None), **train_target.route_kw(ctx)) or planned  # to the grass (the live episode's map if one runs); keep the planner's exit press if no route yet
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not gate_ready and gym is not None
