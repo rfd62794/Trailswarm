@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pokeagent.explorer import restock as rs
 from pokeagent.explorer import shop
-from pokeagent.explorer.economy import budget, floor, ledger, plan
+from pokeagent.explorer.economy import budget, floor, ledger, one_trip, plan
 from pokeagent.explorer.economy.prices import price, stocked
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
@@ -36,7 +36,15 @@ class Restock(BehaviourBase):
                 return None
             st["want"] = tuple(i for i, _ in trip.items)  # only a Mart that sells one of these is worth the walk
             marts = self._marts(ctx, st, st.setdefault("failed", set()))
-            if m not in marts and not self._path_to(ctx, lambda n: n[0] in marts):
+            marts = one_trip.usable_marts(st, marts, read_money(ctx.emu), one_trip.heal_critical(trip, bag_contents(ctx.emu)))
+            path = None if m in marts else self._path_to(ctx, lambda n: n[0] in marts)
+            if m not in marts and not path:
+                return None
+            ok, why = one_trip.allow(ctx, trip, m in marts, len(path) if path else None)
+            if not ok:
+                if st.get("skip_why") != why:   # not a failure (no try spent); rechecked every RECHECK_EVERY steps
+                    ctx.log(f"[restock: skipped - {why}]", "res")
+                st["skip_why"] = why
                 return None
             st.update(intent=True, steps=0)
             ctx.shop_intent = ("mart", None)  # par_follow: this is a Mart trip
@@ -141,6 +149,7 @@ class Restock(BehaviourBase):
                 break
         if not ok:
             st.setdefault("failed", set()).add(m)
+        one_trip.note_visit(st, m, read_money(ctx.emu))   # this Mart is done: no second trip for what this visit could have bought
         st["intent"], st["leave"] = False, True
         ctx.shop_intent = None
         return no_press("restock_buy", "Mart visit done")

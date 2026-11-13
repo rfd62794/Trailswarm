@@ -49,7 +49,7 @@ def party_rows(ctx) -> list:
 
 def make_list(ctx, bag: dict, money: int, **kw) -> list:
     return shopping.shopping_list(ctx.goals(), bag, money, party_rows(ctx), battle_stats(ctx), map_id=ctx.view.m,
-                                  ref_money=ledger.of(ctx).reserve_ref(ctx.step), **kw)
+                                  ref_money=ledger.of(ctx).reserve_ref(ctx.step), essentials_first=True, **kw)
 
 
 def trip_plan(ctx) -> TripPlan | None:
