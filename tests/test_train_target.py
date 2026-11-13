@@ -31,8 +31,29 @@ def test_only_maps_is_the_train_target_while_team_ready_trains(tmp_path):
     assert train_target.only_maps(ctx) == frozenset({ROUTE24})
     ctx.train_route_live = False
     assert train_target.only_maps(ctx) is None                   # not training: unrestricted as before
-    ctx.gym_hold_seen = (1, True)                                # the gym hold also trains
-    assert train_target.only_maps(ctx) == frozenset({ROUTE24})
+    ctx.gym_hold_seen = (1, True)                                # the gym hold alone does not narrow (review of 376f738)
+    assert train_target.only_maps(ctx) is None
+
+
+def test_pre_brock_hold_keeps_the_full_pre_brock_set(tmp_path):
+    from pokeagent.grind import stage_maps
+    ctx = _cerulean(tmp_path, _ledger(VF, ROUTE24))
+    ctx.stage_goal, ctx.train_route_live, ctx.gym_hold_seen = "beat_brock", False, (1, True)
+    assert train_target.only_maps(ctx) == stage_maps.allowed("beat_brock")
+    assert VF in (stage_maps.allowed("beat_brock") or {VF})
+
+
+def test_later_gym_hold_is_not_pinned_to_route24(tmp_path):
+    ctx = _cerulean(tmp_path, _ledger(VF, ROUTE24))
+    ctx.stage_goal, ctx.train_route_live, ctx.gym_hold_seen = "beat_surge", False, (1, True)
+    from pokeagent.grind import stage_maps
+    assert train_target.only_maps(ctx) == stage_maps.allowed("beat_surge")   # unchanged by the hold: no Route 24 pin
+
+
+def test_live_episode_without_a_point_keeps_train_route_inside_its_maps(tmp_path, monkeypatch):
+    ctx = _cerulean(tmp_path, _ledger(VF, ROUTE24))
+    monkeypatch.setattr(grind_episode, "active", lambda c: {"maps": frozenset({VF}), "point": None})
+    assert train_target.route_kw(ctx) == {"target": VF}
 
 
 def test_choose_prefers_the_train_target_even_when_another_point_scores_higher(tmp_path):

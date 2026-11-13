@@ -4,8 +4,8 @@ Slice 5 (real-ROM seed 12, Cerulean ping-pong): team_ready walked train_route to
 on Viridian Forest pinned frontier to the episode's maps, so frontier refused the Cerulean (20,0) UP crossing
 and plan_goal walked back, 7.2% of all steps. The rule, both directions:
 
-* a grind episode may START only on the map train_route trains at while team_ready (or the gym hold) is
-  training - Route 24, or the pre-Brock TRAIN_MAP map; no point there -> no episode;
+* a grind episode may START only on the map train_route trains at while team_ready is training (Route 24);
+  no point there -> no episode. The gym hold alone does not narrow episodes;
 * an episode already live (begun before the stage) wins: train_route retargets to the episode's point map.
 """
 from __future__ import annotations
@@ -23,8 +23,10 @@ def stage_target(ctx) -> int:
 
 
 def stage_training(ctx) -> bool:
-    """True while team_ready trains (plan_goal's train_route_live) or the gym hold is up."""
-    return bool(getattr(ctx, "train_route_live", False) or (getattr(ctx, "gym_hold_seen", None) or (0, False))[1])
+    """True while team_ready trains (plan_goal's train_route_live). The gym hold alone does NOT narrow episodes:
+    pre-Brock the Pewter hold must keep the full PRE_BROCK set (Viridian Forest), and later gyms must not be
+    pinned to Route 24 (review of 376f738)."""
+    return bool(getattr(ctx, "train_route_live", False))
 
 
 def only_maps(ctx) -> frozenset | None:
@@ -42,6 +44,9 @@ def route_kw(ctx) -> dict:
     target, then the episode point's map and patch - plan_goal must never walk out of the episode set."""
     ep = grind_episode.active(ctx)
     pt = ep.get("point") if ep else None
-    if pt is None or ROUTE24 in ep["maps"]:
+    if ep is None or ROUTE24 in ep["maps"]:
         return {}
+    if pt is None:  # a live episode without a point still pins frontier to its maps: never walk train_route out of them
+        maps = sorted(ep["maps"])
+        return {"target": maps[0]} if maps else {}
     return {"target": pt.map_id, "patch": pt.patch}
