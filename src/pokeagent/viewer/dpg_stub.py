@@ -1,4 +1,4 @@
-"""A counting stand-in for ``dearpygui.dearpygui`` (no context, no display) for headless tests and tools/viewer_mem_probe.py: every call is accepted, textures are tracked."""
+"""A counting stand-in for ``dearpygui.dearpygui`` (no context, no display) for headless tests: every call is accepted, textures are tracked."""
 from __future__ import annotations
 
 import itertools

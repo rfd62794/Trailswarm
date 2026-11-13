@@ -124,14 +124,28 @@ def test_model_forget_and_prune():
     assert m.ids() == []
 
 
-def test_refresh_sources_forgets_exited_agents_immediately():
+def test_refresh_sources_forgets_exited_agents_on_the_second_missed_scan():
     from pokeagent.viewer.app import refresh_sources
     from pokeagent.viewer.model import ViewerModel
     m = ViewerModel()
     m._last_ok.update({"a": 1.0, "b": 1.0})  # both seen once
     holder = {"sources": {"a": object(), "b": object()}, "entries": {"a": {}, "b": {}}}
+    # one miss (e.g. the registry file was unreadable mid-replace) keeps the agent
+    assert refresh_sources(holder, m, {"a": object()}, {"a": {"id": "a"}}) == [] and "b" in holder["sources"]
     gone = refresh_sources(holder, m, {"a": object()}, {"a": {"id": "a"}})
     assert gone == ["b"] and m.ids() == ["a"] and list(holder["sources"]) == ["a"] and list(holder["entries"]) == ["a"]
+
+
+def test_a_single_missed_scan_then_seen_again_resets_the_streak():
+    from pokeagent.viewer.app import refresh_sources
+    from pokeagent.viewer.model import ViewerModel
+    m = ViewerModel()
+    b = object()
+    holder = {"sources": {"a": object(), "b": b}, "entries": {}}
+    refresh_sources(holder, m, {"a": object()}, {})            # miss
+    refresh_sources(holder, m, {"a": object(), "b": b}, {})    # seen again
+    refresh_sources(holder, m, {"a": object()}, {})            # one new miss: still kept
+    assert "b" in holder["sources"]
 
 
 def test_refresh_sources_drops_dead_agents_from_the_world_view():
@@ -142,5 +156,7 @@ def test_refresh_sources_drops_dead_agents_from_the_world_view():
     for aid in ("a", "b", "old"):
         w.ingest(aid, [])
     holder = {"sources": {"a": object(), "b": object()}, "entries": {}}
+    refresh_sources(holder, ViewerModel(), {"a": object()}, {"a": {"id": "a"}}, w)
+    assert w.ids() == ["a", "b"]                 # "old" had no source: swept; "b" missed once: kept
     refresh_sources(holder, ViewerModel(), {"a": object()}, {"a": {"id": "a"}}, w)
     assert w.ids() == ["a"]

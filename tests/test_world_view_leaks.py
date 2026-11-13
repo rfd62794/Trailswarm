@@ -53,7 +53,8 @@ def test_fifty_agents_come_and_go_and_the_caches_return_to_baseline():
         src = _Src(f"explore-{1000 + i}")
         made.append(src)
         refresh_fresh = {src.agent_id: src}                    # the registry now lists only this agent: the previous one exited
-        app.refresh_sources(holder, model, refresh_fresh, {src.agent_id: {"id": src.agent_id}}, wm)
+        for _scan in range(2):                                 # an exited agent is dropped on its second missed scan
+            app.refresh_sources(holder, model, refresh_fresh, {src.agent_id: {"id": src.agent_id}}, wm)
         srcs = list(holder["sources"].values())
         model.set_wants(None, {src.agent_id: 10.0})
         for _ in range(3):
@@ -61,7 +62,8 @@ def test_fifty_agents_come_and_go_and_the_caches_return_to_baseline():
             model.drain(); wm.drain()
             model._snap_at.clear(); model._frame_at.clear(); wm._polled.clear()   # every loop tick is "due" in this test
         assert set(wm.ids()) == {src.agent_id}                 # only the live agent has a track
-    app.refresh_sources(holder, model, {}, {}, wm)             # the last one exits too
+    app.refresh_sources(holder, model, {}, {}, wm)             # the last one exits too (first missed scan)
+    app.refresh_sources(holder, model, {}, {}, wm)             # second missed scan: dropped
     wm.drain()
     app.refresh_sources(holder, model, {}, {}, wm)             # a read in flight at exit may land late: the next scan sweeps it
     assert _sizes(model, wm)["world"] == base["world"]
