@@ -10,6 +10,8 @@ Context: Red and Blue share the `gen1-pokemon` memory family; Yellow is prepped 
 - Data Crystal, "Pokemon Yellow/RAM map" (edited 2026-07-29, a stub): "Most of the RAM map (but not all) for this game has an offset of -1 from the one on Red and Blue." Confirmed and sharpened below.
 - Bulbapedia returned HTTP 403 to the fetch tool; the Pikachu and gift facts below come from the pokeyellow source instead (stronger). Secondary: Twinfinite and NationalDex Yellow-differences pages (search, 2026-11-12) agree on Pikachu-as-starter and the three gift starters.
 
+**How the counts were made.** The counts in sections 1-4 come from a diff of the pret/pokered (2026-11-12) and pret/pokeyellow (2026-11-01) `.sym` files and source trees: labels by address, map constants and headers, blocks, objects, wild and trainer tables, and event constants. The diff scripts were run locally and are not committed. The counts are approximate. The P1 compat-diff tool will re-derive them and check them against the built ROMs.
+
 ## 1. RAM: one shift, not scattered
 
 Measured on the two `.sym` files: WRAM has 2,594 labels in common. **1,210 sit at the same address (0xC000-0xCF1A) and 1,384 sit exactly 1 byte lower in Yellow (0xCF1B-0xDEE2, starting at `wOnSGB`).** Zero labels moved by any other amount. HRAM: 164 of 169 are identical (incl. `hJoyHeld` 0xFFB4, `hJoyPressed` 0xFFB3); five moved (`hJoyInput` 0xFFF8 to 0xFFF5, `hDisableJoypadPolling` 0xFFF9 to 0xFFF8, `hClearLetterPrintingDelayFlags`, `hUILayoutFlags`, `hFieldMoveMonMenuTopMenuItemX`). Yellow adds 382 WRAM labels, nearly all Pikachu, animated-object, printer, surfing-minigame and CGB palette state, none of which Trailswarm reads today.
@@ -53,7 +55,7 @@ Source: pokeyellow `home/overworld.asm`, `engine/pikachu/*`, `ram/wram.asm`. Pik
 
 ## Design: three buckets
 
-**Transfers as-is (trust `translated`):** map geometry and walls for the maps whose `.blk`, blockset and header are byte-identical (found by the compat tool, not assumed); learned routes through them; "where things are" (Pokemon Centers, gyms, exits) with the Yellow warp-index remap applied; map names and ids (except 0x3F, 0xF8).
+**Transfers as advisory (`translated`):** map geometry and walls for the maps whose `.blk`, blockset and header are byte-identical (found by the compat tool, not assumed); learned routes through them; "where things are" (Pokemon Centers, gyms, exits) with the Yellow warp-index remap applied; map names and ids (except 0x3F, 0xF8).
 **Through mapping tables:** symbol to address (`ram_map_yellow.json`); event name to bit index; warp (map, index) to (map, index); map id (identity table plus two exceptions); sprite object ids per map.
 **Never transfers:** wild-encounter tables and the encounter ledger, trainer parties, gym and team floors, story-event expectations (which flags should be set at a stage), starter and gift logic, save states (they stay `game`-scoped in `stores.py`), and any pixel signature.
 
