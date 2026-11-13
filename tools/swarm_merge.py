@@ -300,7 +300,14 @@ def merge_file_into(shared: Path, own: Path) -> dict:
     from pokeagent.explorer.edits import journal_path_for, read_journal
     with merge_lock(shared):
         dst = json.loads(shared.read_text()) if shared.exists() else {"maps": {}}
-        merge_memory(dst, json.loads(own.read_text()), edits=read_journal(journal_path_for(shared)))
+        agent, edits = json.loads(own.read_text()), read_journal(journal_path_for(shared))
+        from pokeagent.family import family_active, fold_agent_memory  # shared family memory: overlay + provenance
+        from pokeagent.game import resolve_game
+        game = resolve_game(None)
+        if family_active(game, shared):
+            fold_agent_memory(shared, dst, agent, game, merge_memory, edits=edits)
+        else:
+            merge_memory(dst, agent, edits=edits)
         tmp = shared.with_suffix(".json.tmp")
         replace_durably(tmp, json.dumps(dst, indent=1), shared)
     return dst

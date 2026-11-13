@@ -2,6 +2,8 @@
 
 **Size:** S. **Assignee:** devin.
 
+**Resolution 2026-11-13 (branch `feat/blue-family-yellow-prep`):** the `brain/ledges.py` + `brain/compare.py` dependency is NOT waited for. The minimal pieces this check needs were implemented in the `compat` package itself: `compat/ledges.py` (the real classifier: `classify_wall`, `opposite`, `parse_edge`, same contract as below) and `compat/maps.py` (`compare_memory`, same contract, no per-map worst-10 extras beyond what the report prints). If `Brain_Compare_And_Run_Reports_Directive.md` merges later, make those two modules re-exports of the brain ones (the contract is identical, so nothing else changes). Also added: `compat/rom_check.py` and `tools/game_compat_rom.py` (ROM-gated Red-vs-Blue header, symbol and wild-overlay checks). The `Status` row below is left as written; the queue block is the pipeline's.
+
 **Depends on `Brain_Compare_And_Run_Reports_Directive.md` merged** (adjusted 2026-11-08 so the map comparison has one implementation): it provides `src/pokeagent/brain/ledges.py` (`classify_wall`, `opposite`, `parse_edge`) and `src/pokeagent/brain/compare.py` (`compare_memory`). Import them; do not rebuild them. If they are missing, stop and write that in the Status row. Otherwise no dependency on the other Multi_Game directives: this reads files and needs no `GameSpec`. `Family_Shared_Memory_Directive.md` imports `src/pokeagent/compat/ledges.py` from here, so this one merges first (that module is now a one-line re-export of the brain one). It is the gate for Yellow (plan phase 10): Yellow does not join the `gen1-pokemon` memory family until this report passes between Yellow and the Red/Blue family.
 
 ## 1. Why this exists

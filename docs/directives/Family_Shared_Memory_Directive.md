@@ -2,6 +2,8 @@
 
 **Size:** M. **Assignee:** devin.
 
+**Implemented 2026-11-13 on `feat/blue-family-yellow-prep`** (with the compat check's `compat/ledges.py` implemented directly, see `Game_Compat_Check_Directive.md`): `src/pokeagent/family/` (`active, provenance, disagree, overlay, fold, report, kb_overlay`, plus `seed.py` holding the swarm read hook) and the two hooks in `tools/swarm_merge.py` / `tools/swarm_continuous.py`. Blue is registered in the same branch. The queue block is untouched.
+
 **Depends on the amended `Game_Namespaced_Stores_Directive.md` (plan phase 4) being merged, and on `Game_Compat_Check_Directive.md` being merged** (this directive imports its ledge classifier, the module `ledges.py` in the `compat` package, missing on main until that directive merges). Start from a main where the amended phase 4 has added the `stores.py` module of the `game` package (missing before it merges) with `store_path(..., scope=...)` and `LEGACY_FAMILY`. If `git grep -n -e "def store_path" -e "def classify_wall" -- src` finds fewer than two lines at the start, stop and write that in the Status row.
 
 ## 1. Why this exists

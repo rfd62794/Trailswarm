@@ -158,7 +158,8 @@ class Supervisor:
         self.swarm_dir.mkdir(parents=True, exist_ok=True)
         src = self.plan.maps_source(cfg, self.shared) if self.plan else self.shared  # a confirm replays its ORIGINAL memory
         if src.exists():
-            shutil.copy(src, cfg["own"])  # the freshest merged memory: learning compounds
+            from pokeagent.family.seed import seed_own  # family game: overlay-first copy, else shutil.copy
+            seed_own(src, cfg["own"])  # the freshest merged memory: learning compounds
         cfg["hash"], cfg["started_wall"] = self._digest(cfg["own"]), time.time()
         slot.cfg, slot.started = cfg, self.clock()
         if cfg["segment"] and not cfg.get("job") and self.segment_ok and not self.segment_ok(cfg["segment"]):

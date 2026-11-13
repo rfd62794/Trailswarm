@@ -90,3 +90,71 @@ def test_other_subcommands_do_not_gain_the_flag():
         with pytest.raises(SystemExit) as exc:
             cli.main([cmd, "--game", "pokemon-red"])
         assert exc.value.code == 2
+
+
+class _CapturingEmu:
+    def __init__(self, rom, headless=True, game=None):
+        self.game = game
+
+
+def _rom_with_hash(tmp_path, monkeypatch, key):
+    """A fake ROM file whose SHA-1 is registered as ``key``'s (no real ROM involved)."""
+    data = b"fake " + key.encode()
+    rom = tmp_path / "x.gb"
+    rom.write_bytes(data)
+    sha1 = hashlib.sha1(data).hexdigest().upper()
+    monkeypatch.setitem(GAMES, key, dataclasses.replace(GAMES[key], rom_sha1=(sha1,)))
+    return rom
+
+
+def _args(rom, game=None):
+    return cli._build_parser().parse_args(["run", "--rom", str(rom)] + (["--game", game] if game else []))
+
+
+def test_no_game_flag_lets_rom_hash_decide(tmp_path, monkeypatch):
+    monkeypatch.delenv("POKEAGENT_GAME", raising=False)
+    monkeypatch.setattr(cli, "PyBoyEmulator", _CapturingEmu)
+    rom = _rom_with_hash(tmp_path, monkeypatch, "pokemon-blue")
+    assert cli._build_emulator(_args(rom)).game is None  # emulator's game_for_rom then selects BLUE
+    from pokeagent.game.gate import game_for_rom
+    assert game_for_rom(rom).key == "pokemon-blue"
+
+
+def test_explicit_game_conflicting_with_rom_hash_is_refused(tmp_path, monkeypatch):
+    monkeypatch.delenv("POKEAGENT_GAME", raising=False)
+    monkeypatch.setattr(cli, "PyBoyEmulator", _CapturingEmu)
+    rom = _rom_with_hash(tmp_path, monkeypatch, "pokemon-blue")
+    with pytest.raises(cli.BackendError, match="pokemon-blue"):
+        cli._build_emulator(_args(rom, "pokemon-red"))
+    assert cli.main(["run", "--rom", str(rom), "--game", "pokemon-red", "--steps", "1"]) == 1
+
+
+def test_unknown_hash_without_game_falls_back_to_red(tmp_path, monkeypatch):
+    monkeypatch.delenv("POKEAGENT_GAME", raising=False)
+    rom = tmp_path / "unknown.gb"
+    rom.write_bytes(b"nobody registered this")
+    seen = {}
+
+    def fake(rom_path, headless=True, game=None):
+        seen["game"] = game
+        raise FileNotFoundError("stop here")
+    monkeypatch.setattr(cli, "PyBoyEmulator", fake)
+    cli.main(["run", "--rom", str(rom), "--steps", "1"])
+    assert seen["game"] is None
+    # the real constructor's fallback: an unknown hash with no game boots as Red (PyBoy itself is stubbed out)
+    import pokeagent.emulator as emu_mod
+    monkeypatch.setattr(emu_mod, "PyBoy", lambda *a, **k: type("P", (), {"set_emulation_speed": lambda s, v: None})())
+    assert emu_mod.PyBoyEmulator(rom, headless=True).game is RED
+
+
+def test_check_rom_without_game_reports_the_detected_game(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("POKEAGENT_GAME", raising=False)
+    data = b"blue stand-in"
+    blue = dataclasses.replace(GAMES["pokemon-blue"], rom_sha1=(hashlib.sha1(data).hexdigest().upper(),))
+    rom = tmp_path / "b.gb"
+    rom.write_bytes(data)
+    monkeypatch.setattr(cli, "game_for_rom", lambda p: blue)
+    monkeypatch.setattr(cli, "_build_emulator", lambda args: FakeEmulator())
+    cli.main(["check-rom", "--rom", str(rom)])
+    out = capsys.readouterr().out
+    assert "\nmatch\n" in out and "mismatch" not in out

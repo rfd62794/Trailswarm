@@ -28,6 +28,7 @@ from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
 from pokeagent.game import GameSpec, UnknownGame, add_game_argument, resolve_game
+from pokeagent.game.gate import game_for_rom
 from pokeagent.game.paths import default_rom
 from pokeagent.game.state_guard import StateGameMismatch
 from pokeagent.ram import read_state
@@ -46,21 +47,38 @@ def _rom_path(args: argparse.Namespace) -> Path:
     env = os.environ.get("POKEAGENT_ROM")
     if env:
         return Path(env)
-    return default_rom()
+    return default_rom(resolve_game(getattr(args, "game", None)))
 
 
 def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
     """The selected game's spec; prints the error and returns None on an unknown key."""
     try:
-        return resolve_game(args.game)
+        return resolve_game(getattr(args, "game", None))
     except UnknownGame as e:
         print(f"error: {e}")
         return None
 
 
+def _explicit_game(args: argparse.Namespace) -> GameSpec | None:
+    """The game the user chose (--game, else a non-empty $POKEAGENT_GAME); None leaves it to the ROM hash."""
+    if getattr(args, "game", None) is None and not os.environ.get("POKEAGENT_GAME"):
+        return None
+    return resolve_game(getattr(args, "game", None))
+
+
 def _build_emulator(args: argparse.Namespace) -> Emulator:
-    """One place that turns args into an Emulator; tests patch this to inject FakeEmulator."""
-    return PyBoyEmulator(_rom_path(args), headless=getattr(args, "headless", True))
+    """One place that turns args into an Emulator; tests patch this to inject FakeEmulator.
+
+    With no explicit game, ``game=None`` lets the emulator pick by ROM SHA-1 (Red if unknown). An explicit
+    game whose ROM hashes to a DIFFERENT registered game is refused (a Blue ROM must not run under Red's guard).
+    """
+    rom = _rom_path(args)
+    game = _explicit_game(args)
+    if game is not None:
+        actual = game_for_rom(rom)
+        if actual is not None and actual.key != game.key:
+            raise BackendError(f"{rom} is {actual.key} by SHA-1 but the selected game is {game.key}")
+    return PyBoyEmulator(rom, headless=getattr(args, "headless", True), game=game)
 
 
 def _build_backend(args: argparse.Namespace, log: RunLog):
@@ -69,8 +87,17 @@ def _build_backend(args: argparse.Namespace, log: RunLog):
     return StubBackend()
 
 
+def _gated(spec: GameSpec) -> bool:
+    """True (after printing why) when ``spec`` is prepared but not playable yet."""
+    if spec.playable:
+        return False
+    print(f"error: {spec.key} is {spec.gate}")
+    return True
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     steps = args.steps
     if steps is None:
@@ -123,10 +150,15 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
     if not rom.is_file():
         print(f"ROM not found: {rom}")
         return 1
+    if _explicit_game(args) is None:  # no --game: report against the game the ROM's hash names, as boot does
+        spec = game_for_rom(rom) or spec
     size, sha1, match = rom_sha1_check(rom, spec)
     print(f"size: {size} bytes")
     print(f"sha1: {sha1}")
     print("match" if match else f"mismatch (expected {spec.rom_sha1[0]})")
+    if not spec.playable:  # gated game: the hash is all we verify; never boot it
+        print(f"{spec.key}: NOT PLAYABLE YET - {spec.gate}")
+        return 0 if match else 1
     try:
         emu = _build_emulator(args)
     except (FileNotFoundError, BackendError) as e:
@@ -144,7 +176,8 @@ def _cmd_check_rom(args: argparse.Namespace) -> int:
 
 
 def _cmd_state(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     try:
         emu = _build_emulator(args)
@@ -173,7 +206,8 @@ def _cmd_view(args: argparse.Namespace) -> int:
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
-    if _resolve_game(args) is None:
+    spec = _resolve_game(args)
+    if spec is None or _gated(spec):
         return 2
     # Imported lazily so cli.py (and its tests) never pay for the mcp import.
     from pokeagent.mcp_server import serve

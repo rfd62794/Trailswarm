@@ -24,8 +24,13 @@ class MapEntry:
         return self.addr <= addr < self.addr + self.size
 
 
-def load_map() -> list[MapEntry]:
-    text = resources.files("pokeagent.data").joinpath("ram_map.json").read_text(encoding="utf-8")
+def load_map(game=None) -> list[MapEntry]:
+    """The label map; ``game`` (a GameSpec) selects its table, None is Red/Blue's today (``ram_map.json``)."""
+    if game is None:
+        text = resources.files("pokeagent.data").joinpath("ram_map.json").read_text(encoding="utf-8")
+    else:
+        from pokeagent.game.symbols import ram_table_text
+        text = ram_table_text(game)
     return [MapEntry(d["name"], int(d["addr"], 16), d["size"], d["region"], d.get("encoding", "bytes"),
                      d.get("verified", False), d.get("evidence", ""), d.get("note", "")) for d in json.loads(text)]
 

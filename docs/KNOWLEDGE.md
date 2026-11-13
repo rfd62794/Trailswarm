@@ -393,3 +393,10 @@ not the family — and `game/state_guard.py`'s `check_state_game` runs in both e
 before anything is touched: a mismatched label raises `StateGameMismatch` naming both keys, and an
 unlabeled state (no sidecar or no `game_key` — every state written before this change) loads only for
 the legacy owner, so all of today's Red states still load exactly as before.
+
+## Blue, family memory and Yellow prep (2026-11-13)
+
+- `pokemon-blue` is registered in the `gen1-pokemon` family (shares Red's learned stores via `game/stores.py`; its save states are its own: `runs/pokemon-blue/checkpoints`, and a Blue state never loads under Red or the reverse). A ROM's SHA-1 picks the game (`game/gate.py`: `game_for_rom`, `adopt_rom_game` for `explore_demo --rom`).
+- Family memory: `src/pokeagent/family/`. Once a non-Red game folds, `runs/family_provenance.json`, `runs/overlay/<game>/maps.json` and `runs/family_disagreements.jsonl` appear; a Red-only repo never creates them. `kb/overlay/<game>/` holds version-exclusive kb entries.
+- Compat check: `tools/game_compat.py` (map memory + RAM tables, proposed thresholds) and `tools/game_compat_rom.py` (ROM-gated, laptop).
+- Yellow is `playable=False` with its own family `gen1-yellow` and no symbol table; see `docs/plans/Yellow_Prep.md`.
