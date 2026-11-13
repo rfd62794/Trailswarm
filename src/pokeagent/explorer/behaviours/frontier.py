@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer import grind_episode, train_route
+from pokeagent.explorer import grind_episode, grind_heal, train_route
 from pokeagent.explorer.perceive import lead_level, party_needs_heal
 from pokeagent.novelty import steer as novelty_steer
 
@@ -146,7 +146,7 @@ class Frontier(BehaviourBase):
     def step(self, ctx: ExplorerContext) -> Decision | None:
         m, x, y = ctx.view.m, ctx.view.x, ctx.view.y
         goals_now_all = ctx.goals()
-        weak = party_needs_heal(ctx.emu, 0.4)
+        weak = grind_heal.needs_heal(ctx, 0.4)  # while grinding: the survival floor, not a fixed 40%
         floor_hold = bool(ctx.__dict__.get("floor_unmet")) and (getattr(ctx, "gym_hold_seen", None) or (0, False))[1]  # boss held shut by the team floor: find grass, never the leader
         training = ((ctx.hunt_grass or floor_hold) and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
         ep = grind_episode.active(ctx)

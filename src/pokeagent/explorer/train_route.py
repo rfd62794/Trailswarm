@@ -8,6 +8,7 @@ point's map and patch.
 """
 from __future__ import annotations
 
+from pokeagent.explorer import grass_pace
 from pokeagent.explorer.planner_east import ROUTE24
 from pokeagent.explorer.world import WorldGraph
 
@@ -50,7 +51,7 @@ class OutsideSet:
 
 
 def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE24, patch=None,
-         survives: bool | None = None) -> tuple[str, str] | None:
+         survives: bool | None = None, heading: str | None = None) -> tuple[str, str] | None:
     """The next button toward the target map's grass, or None (on it / no learned way / too hurt).
 
     Off the target the goal is the map itself; on it, the nearest patch tile (encounter-proven grass, or
@@ -63,8 +64,11 @@ def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE2
     grass = {t if isinstance(t, str) else f"{t[0]},{t[1]}" for t in src}
     what = "Route 24" if target == ROUTE24 else f"map 0x{target:02X}"
     if pos[0] == target:
-        if not grass or f"{pos[1]},{pos[2]}" in grass:
+        if not grass:
             return None
+        if f"{pos[1]},{pos[2]}" in grass:  # ON the grass: keep walking inside it (frontier paced the edge, 2026-11-13)
+            bl = {(b[1], b[2]) for b in blocked if b[0] == target}
+            return grass_pace.step(target, pos[1:], src, patch, heading, bl)
         goal = (lambda n: n[0] == target and f"{n[1]},{n[2]}" in grass)
     else:
         goal = (lambda n: n[0] == target)

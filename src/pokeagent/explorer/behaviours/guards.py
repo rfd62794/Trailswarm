@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import random
 
+from pokeagent.explorer import center_visit
 from pokeagent.explorer.behaviours import grind_loop
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -56,7 +57,7 @@ class LoopGuard(BehaviourBase):
             # repeat) that never reaches 40 A in a row (Bulbasaur run re-asking the Charmander ball for 1700 steps).
             ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear(); grind_loop.reset(ctx)
             ctx.log(f"[dialog cycle detected: 150 presses on <=2 tiles - shaking #{ctx.shakes}]", "res")
-        elif len(hist) >= 60 and len(set(hist[-60:])) <= 6 and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))                 and ctx.emu.read(IS_IN_BATTLE) == 0 and not ctx.explore_burst and not grind_loop.paced_in_training(ctx):
+        elif len(hist) >= 60 and len(set(hist[-60:])) <= 6 and not box_open(ctx.emu.read_range(TILEMAP, TILEMAP_LEN))                 and ctx.emu.read(IS_IN_BATTLE) == 0 and not ctx.explore_burst and not grind_loop.paced_in_training(ctx) and not center_visit.exempt(ctx):
             ctx.shake = 25; ctx.shakes = ctx.shakes + 1; hist.clear(); grind_loop.reset(ctx)
             ctx.log(f"[loop detected: 60 presses on {len(set(hist)) or '<=6'} tiles - shaking #{ctx.shakes}]", "res")
         # Endless-A guard (runs BEFORE any box handling): 40 presses in a row that are all A while the position has
