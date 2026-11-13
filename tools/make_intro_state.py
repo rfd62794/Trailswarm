@@ -53,12 +53,18 @@ def main(argv=None) -> int:
         print(f"gave up: map={emu.read(MAP):#x} screen={screen(emu)!r}")
         return 1
     x, y = emu.read(PX), emu.read(PY)
-    emu.press(Button.LEFT); emu.press(Button.LEFT)  # first press may only turn
-    moved = (emu.read(PX), emu.read(PY)) != (x, y)
+    # save BEFORE probing, so the state sits exactly where the intro left the player; the probe only proves control
+    write_state(emu, a.out, segment="bedroom", note=f"intro with preset names, {emu.game.key}")
+    moved = False
+    for b in (Button.LEFT, Button.RIGHT, Button.UP, Button.DOWN):  # any one open direction proves control
+        emu.press(b); emu.press(b)  # the first press may only turn
+        if (emu.read(PX), emu.read(PY)) != (x, y):
+            moved = True
+            break
     print(f"bedroom reached after {i} presses at ({x},{y}); controllable={moved}")
     if not moved:
+        Path(a.out).unlink(missing_ok=True)
         return 1
-    write_state(emu, a.out, segment="bedroom", note=f"intro with preset names, {emu.game.key}")
     print(f"saved {a.out}")
     return 0
 
