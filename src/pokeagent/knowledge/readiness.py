@@ -38,6 +38,7 @@ class MemberNeed:
     level: int
     target: int
     useful: bool
+    flips: bool = True        # training this member (to a level the lead can match) can make the hurt-lead sim pass
 
 
 @dataclass(frozen=True)
@@ -162,8 +163,9 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
       least EVOLVE_LEVEL for a Magikarp, which is judged as ``trainer_mon("GYARADOS", max(level, EVOLVE_LEVEL))`` for
       the after-training search). ``sim_needed`` is the member's own level when the hurt-lead sim already passes,
       else the lowest level in current+1 .. MAX_LEVEL at which that member (``at_level``, or the Gyarados projection
-      for a Magikarp) makes it pass with the other members unchanged; ``lead.level`` when no level passes.
-      ``useful`` = ``level >= target``.
+      for a Magikarp) makes it pass with the other members unchanged, searched only up to the lead's level; ``None``
+      when no such level passes - that member ``flips`` nothing and is never ``weakest`` (Misty: a KAKUNA bench
+      member was named "KAKUNA L4 -> L26" for a fight it cannot take part in). ``useful`` = ``level >= target``.
     - ``ready`` = the lead verdict is ready AND the hurt-lead sim passes AND the party has TEAM_MIN members (a one-mon
       party: not ready, ``weakest`` is None, the text says "no second member"). The sim already sends in the best
       switch-in per enemy mon, so a weak bench member the fight never uses cannot block a win (Misty 2026-11-12:
@@ -204,28 +206,32 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
         return fight([hurt] + [grown(c, at[1]) if at and i == at[0] else now(c) for i, c in others],
                      theirs, chart, moves)
 
-    def sim_needed(i: int, c: Combatant) -> int:
-        """The member's own level when the current sim passes, else the lowest level in current+1..MAX_LEVEL that does."""
+    def sim_needed(i: int, c: Combatant) -> int | None:
+        """The member's own level when the current sim passes, else the lowest level in current+1..lead level that
+        does; None when no level the lead could match flips it (a KAKUNA cannot damage a STARMIE at any level)."""
         if hurt_sim() >= MARGIN:
             return c.level
-        return next((L for L in range(c.level + 1, MAX_LEVEL + 1) if hurt_sim((i, L)) >= MARGIN), lead_c.level)
+        return next((L for L in range(c.level + 1, min(lead_c.level, MAX_LEVEL) + 1) if hurt_sim((i, L)) >= MARGIN), None)
 
     rows = [MemberNeed(lead_i, lead_c.name, lead_c.level, lead_c.level, lead.ready)]
+    sim_ok = hurt_sim() >= MARGIN
     for i, c in others:
         floor = EVOLVE_LEVEL if c.name == "MAGIKARP" else 0
-        target = min(lead_c.level, max(lead_c.level - TEAM_GAP, floor, sim_needed(i, c)))
-        rows.append(MemberNeed(i, c.name, c.level, target, c.level >= target))
+        need = sim_needed(i, c)
+        target = min(lead_c.level, max(lead_c.level - TEAM_GAP, floor, need or 0))  # never past the lead: a reachable level
+        # a member only steers training when the hurt-lead sim fails and raising it flips that sim
+        rows.append(MemberNeed(i, c.name, c.level, target, c.level >= target, flips=need is not None and not sim_ok))
     useful = sum(r.useful for r in rows)
-    ready = lead.ready and hurt_sim() >= MARGIN and len(rows) >= TEAM_MIN
-    weakest = None if ready else min((r for r in rows if r.slot != lead_i and not r.useful),
+    ready = lead.ready and sim_ok and len(rows) >= TEAM_MIN
+    weakest = None if ready else min((r for r in rows if r.slot != lead_i and not r.useful and r.flips),
                                      key=lambda r: (r.level, r.slot), default=None)
+    why = f"lead needs L{lead.required}" if not lead.ready else "hurt lead loses"
     if ready:
         text = f"team ready vs {label}: lead L{lead_c.level}, {useful}/{len(rows)} useful"
     elif len(rows) < TEAM_MIN:
         text = f"team not ready vs {label}: no second member (lead L{lead_c.level})"
     elif weakest is not None:
-        text = f"team not ready vs {label}: {weakest.name} L{weakest.level} -> L{weakest.target} (lead L{lead_c.level})"
+        text = f"team not ready vs {label}: {weakest.name} L{weakest.level} -> L{weakest.target} ({why}; lead L{lead_c.level})"
     else:
-        why = f"lead needs L{lead.required}" if not lead.ready else "the hurt lead loses"
         text = f"team not ready vs {label}: {why} (lead L{lead_c.level})"
     return TeamReadiness(ready, lead, tuple(rows), weakest, text)

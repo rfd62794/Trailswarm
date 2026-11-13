@@ -75,7 +75,7 @@ class PlanGoal(BehaviourBase):
         if team and team.text != ctx.team_note:
             ctx.team_note = team.text
             ctx.log(f"[readiness] {team.text}", "res")
-        ctx.train_member = team.weakest.slot if team and team.weakest else None
+        ctx.train_member = self._train_member(nv, team)
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
                 ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
@@ -173,6 +173,15 @@ class PlanGoal(BehaviourBase):
                 return None  # the grind episode pins the run to its maps: this press would leave them
             return Decision(planned[0], "plan_goal", planned[1], driver=driver)
         return None
+
+    @staticmethod
+    def _train_member(nv, team) -> int | None:
+        """The slot to train, agreeing with the gate hold (``not nv.ready``): while boss_need says not ready it is the
+        member whose raise flips it (``raise_slot``), else the lead/fighter; once the gate is open the hurt-lead
+        sim's weakest member (the second-member goal) steers."""
+        if nv is not None and not nv.ready:
+            return nv.raise_slot if nv.raise_slot is not None else nv.lead_slot
+        return team.weakest.slot if team and team.weakest else None
 
     @staticmethod
     def _team_need(ctx: ExplorerContext, goals: dict, need: int) -> int:
