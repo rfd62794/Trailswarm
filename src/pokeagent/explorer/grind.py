@@ -40,7 +40,7 @@ def grinding_now(ctx) -> bool:
 
 STALL_HOLD_CAP = 6000  # plan steps the gym stays shut after a stall lift before the hold gives up
 FLOOR_CAP_MULT = 3     # ... times this while the checkpoint's team level floor is unmet (Robert 2026-11-12: the floor must hold)
-FLOOR_BLACKOUTS = 3    # ... and it takes this many blackouts while held, not one, before a floor failure lifts (untuned)
+FLOOR_BLACKOUTS = 10   # ... and only this many blackouts while held lift it: grinding losses are not a reason to face the leader under-levelled (untuned)
 
 
 def stall_hold_holds(st: dict, reason: str, step: int, blackouts: int, floor_unmet: bool = False) -> bool:

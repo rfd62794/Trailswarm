@@ -100,7 +100,7 @@ def test_an_unmet_floor_survives_one_blackout_and_the_plain_cap():
     why = "without a level gain"
     st = {}
     assert stall_hold_holds(st, why, 0, 0, floor_unmet=True)
-    assert stall_hold_holds(st, why, 10, 1, floor_unmet=True)                      # one blackout: still held
+    assert stall_hold_holds(st, why, 10, 3, floor_unmet=True)                      # three grinding blackouts: still held
     assert stall_hold_holds(st, why, STALL_HOLD_CAP + 1, 1, floor_unmet=True)      # past the plain cap: still held
     assert not stall_hold_holds(st, why, 10, FLOOR_BLACKOUTS, floor_unmet=True)    # repeated blackouts lift it
     assert not stall_hold_holds(st, why, STALL_HOLD_CAP * FLOOR_CAP_MULT, 0, floor_unmet=True)
