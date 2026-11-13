@@ -253,8 +253,14 @@ class PlanGoal(BehaviourBase):
         """Inside the gym while not ready: the first press of the learned route off the map (the
         heal_walk BFS shape), before anything else - frontier would explore toward the leader and
         ``_leader_avoid``'s block_sight is the only guard. None when the learned graph knows no exit."""
-        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked)
-        found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
+        found = None
+        for blocked in (frozenset(ctx.mem.temp_blocked), frozenset()):
+            # Second pass ignores temp blocks (_leader_avoid's trainer sight lines): one trainer fight on the way
+            # out beats being trapped in the pocket until the hold cap (Misty gym, ~5400 steps, 2026-11-12).
+            g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = blocked
+            found = g._bfs_node((m, x, y), lambda n, gm=gym: n[0] != gm, 5000)
+            if found and found[1]:
+                break
         if not found or not found[1]:
             return None
         return (found[1][0], f"team gate: not ready - {len(found[1])} steps out of the gym")

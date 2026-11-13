@@ -5,6 +5,7 @@ import os
 
 from pokeagent.checkpoint_goals import stamp_fingerprint
 from pokeagent.explorer.behaviours.frontier import TABU_LEN
+from pokeagent.explorer.burst_gate import burst_allowed
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import DIRS, frame_lines, is_menu
 from pokeagent.explorer.press_frame import PressFrame
@@ -93,7 +94,7 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
                 extra["item"] = rec
                 if delta > 0 and item == 0x05 and "use_town_map" not in ctx.proc_done:
                     ctx.proc_due.append("use_town_map"); ctx.proc_done.add("use_town_map")
-                if delta > 0:
+                if delta > 0 and burst_allowed(ctx, item, bag_pre, name, box_before, before):
                     ctx.explore_burst = 60  # something new: look around properly before moving on
                 ctx.log(f"*** ITEM {'RECEIVED' if delta > 0 else 'USED/LOST'}: {iname} x{abs(delta)} at map 0x{before[0]:02X} ({before[1]},{before[2]}) ***", "res")
     if name == "A" and box_after and not box_before:  # talked to whatever is in front: tie the text to the NPC there

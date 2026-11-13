@@ -85,13 +85,19 @@ def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=Non
             m, x, y, ctx.facing, ctx.view.tm, ctx.emu.read(0xD367),
             avoid_maps=avoid_maps, grass=grass,
             last_dir=ctx.last_dir, tabu=_tabu(ctx, m), reverse_penalty=reverse_penalty)
-    name, why, want_frontier = pick(REVERSE_PENALTY)
+    first = pick(REVERSE_PENALTY)
+    if first is None:
+        return None  # boxed in by a memorised sign: no explore press (the caller yields or presses B)
+    name, why, want_frontier = first
     if not want_frontier:
         return name, why
     step = _frontier_move(ctx, m, x, y, allowed)
     if step:
         return step
-    p_name, p_why, _ = pick(PATROL_REVERSE_PENALTY)
+    patrol = pick(PATROL_REVERSE_PENALTY)
+    if patrol is None:
+        return None
+    p_name, p_why, _ = patrol
     if allowed is not None and grind_episode.leaves_set(ctx, p_name, allowed):
         # a patrol step must not leave the episode's map set either: the plain pick if it stays, else A in place
         return (name, why) if not grind_episode.leaves_set(ctx, name, allowed) else ("A", "episode boundary: patrol stays on the map set")
@@ -118,7 +124,10 @@ class ExploreBurst(BehaviourBase):
                 ctx.log(f"[new map 0x{m:02X}: exploration burst, 120 steps before plans resume]", "res")
         if ctx.explore_burst > 0 and not party_needs_heal(ctx.emu, 0.4):
             ctx.explore_burst -= 1
-            name, why = _memory_step(ctx, m, x, y, grass="neutral")
+            picked = _memory_step(ctx, m, x, y, grass="neutral")
+            if picked is None:
+                return None  # boxed in by a memorised sign: let the planner move us instead of looping A->B
+            name, why = picked
             return Decision(name, "explore_burst", f"exploring a new discovery ({ctx.explore_burst} left): {why}")
         return None
 
@@ -141,9 +150,12 @@ class Frontier(BehaviourBase):
         training = (ctx.hunt_grass and not weak) or (goals_now_all.get("won_battle") and goals_now_all.get("to_route1") and 0 < lead_level(ctx.emu) < (max(8, ctx.train_need) if goals_now_all.get("to_route2") else 8) and not weak)
         ep = grind_episode.active(ctx)
         allowed = frozenset(ep["maps"] | {m}) if ep else None
-        name, why = _memory_step(ctx, m, x, y,
+        picked = _memory_step(ctx, m, x, y,
                                  avoid_maps=train_route.stay_on_route(m, ctx.train_route_live, ep, ctx.mem.data["maps"]) or
                                  ({0x00} if (training and m == 0x0C) else None),
                                  allowed=allowed,
                                  grass="seek" if training else "avoid" if weak else "neutral")
+        if picked is None:
+            return Decision("B", "frontier", "every direction known blocked; the tile in front is a memorised sign: B")
+        name, why = picked
         return Decision(name, "frontier", why)
