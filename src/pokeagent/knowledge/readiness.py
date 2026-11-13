@@ -166,8 +166,10 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
       else the lowest level in current+1 .. MAX_LEVEL at which that member (``at_level``, or the Gyarados projection
       for a Magikarp) makes it pass with the other members unchanged; ``lead.level`` when no level passes.
       ``useful`` = ``level >= target``.
-    - ``ready`` = the lead verdict is ready AND the hurt-lead sim passes AND at least TEAM_MIN members are useful
-      (a one-mon party is TEAM_MIN-short: not ready, ``weakest`` is None and the text says "no second member").
+    - ``ready`` = the lead verdict is ready AND the hurt-lead sim passes AND the party has TEAM_MIN members (a one-mon
+      party: not ready, ``weakest`` is None, the text says "no second member"). The sim already sends in the best
+      switch-in per enemy mon, so a weak bench member the fight never uses cannot block a win (Misty 2026-11-12:
+      KAKUNA L4 held a lead L25 outside the gym for 6,000 steps); ``useful`` only steers which member to train.
     - ``weakest`` = the not-useful non-lead member with the lowest level (ties: lowest slot)."""
     from pokeagent.magikarp import EVOLVE_LEVEL  # deferred: keep this pure module free of the emulator import
     theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
@@ -216,7 +218,7 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
         target = min(lead_c.level, max(lead_c.level - TEAM_GAP, floor, sim_needed(i, c)))
         rows.append(MemberNeed(i, c.name, c.level, target, c.level >= target))
     useful = sum(r.useful for r in rows)
-    ready = lead.ready and hurt_sim() >= MARGIN and useful >= TEAM_MIN
+    ready = lead.ready and hurt_sim() >= MARGIN and len(rows) >= TEAM_MIN
     weakest = None if ready else min((r for r in rows if r.slot != lead_i and not r.useful),
                                      key=lambda r: (r.level, r.slot), default=None)
     if ready:

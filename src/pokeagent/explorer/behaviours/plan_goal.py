@@ -146,14 +146,14 @@ class PlanGoal(BehaviourBase):
                 st["gate_skip_logged"] = ctx.stage_goal
                 why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
                 ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
-        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: Brock is only walked to when no hold is active
+        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: a gym leader is only walked to when no hold is active
         if hold and st.get("gate_lifted") is not None:
             ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:
             self._leader_avoid(ctx, m, x, y, gym)
             if m == gym:  # inside and not ready: out before anything - frontier would explore toward the leader
                 planned = self._out_step(ctx, m, x, y, gym) or self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))
-            elif self._enters(ctx, m, x, y, planned, gym) or self._gym_road(planned):
+            elif self._enters(ctx, m, x, y, planned, gym) or self._gym_road(planned, ctx.stage_goal):
                 planned = self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))  # the hold owns the step: no road to the gym
         elif st.get("grinding") and need > 0:
             grind = self._grind_step(ctx, m, x, y, *heal_gate_hp(ctx.emu))
@@ -242,9 +242,13 @@ class PlanGoal(BehaviourBase):
         return train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, hp, mx, survives=party_survives(ctx.emu, ctx.view.m), **kw)
 
     @staticmethod
-    def _gym_road(planned) -> bool:
-        """The planner's push toward the gym map (the road north / the gym walk): never taken while the hold stands."""
-        return bool(planned) and planned[1].startswith(("goal road north", "goal gym"))
+    def _gym_road(planned, stage: str | None = None) -> bool:
+        """The planner's push toward the gym map (the road north / the gym walk / the stage boss itself, e.g.
+        "goal beat_misty: N steps toward it"): never taken while the hold stands. Without the stage form the
+        Cerulean run walked into Misty's gym, was turned out by the hold, and walked back in (2026-11-12)."""
+        why = planned[1] if planned else ""  # a stage step counts only as the learned-world walk at the boss, not a
+        return why.startswith(("goal road north", "goal gym")) or bool(  # Pokecenter exit / _back_to / edge push
+            stage and why.startswith(f"goal {stage}:") and "steps toward it" in why)
 
     @staticmethod
     def _out_step(ctx: ExplorerContext, m: int, x: int, y: int, gym: int):

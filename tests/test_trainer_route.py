@@ -150,3 +150,25 @@ def test_trainer_hunt_gates(tmp_path):
         led_all_beaten.mark_beaten(M, i, "flag", 1)
     ctx.trainer_ledger = led_all_beaten
     assert not hunt.applies(ctx)                               # every trainer beaten: nothing to hunt
+
+
+def test_unmet_gym_leader_is_never_sight_blocked(tmp_path):
+    """Misty 2026-11-12: 26 'avoiding MISTY' blocks covered (4,3), the tile her fight starts from."""
+    ctx = make_ctx(tmp_path, memory={MAP: M, PX: 11, PY: 14})
+    ctx.mem = _mem(tmp_path, bypass=True)
+    ctx.refresh()
+    rows = [{"class": "MISTY", "party": 1, "x": 11, "y": 20, "mons": [(14, "PEBBLE")]}]
+    _, opts = _opts(ctx.mem, WEAK, rows=rows)
+    assert opts[0].action == "avoid"
+    ctx.goals = lambda: {"beat_misty": False}
+    assert R.block_sight(ctx, opts[0], lambda n: n == (M, 11, 33)) == "engage-leader"
+    assert not ctx.mem.temp_blocked
+    ctx.goals = lambda: {"beat_misty": True}                       # already beaten: an ordinary trainer again
+    assert R.block_sight(ctx, opts[0], lambda n: n == (M, 11, 33)) == "avoid"
+    ctx.mem.temp_blocked.clear()
+    ctx.goals = lambda: {"beat_brock": False, "beat_misty": True}  # another gym's goal does not exempt her
+    assert R.block_sight(ctx, opts[0], lambda n: n == (M, 11, 33)) == "avoid"
+
+
+def test_leader_goal_table_covers_all_eight_gyms():
+    assert set(R.LEADER_GOALS) == {"BROCK", "MISTY", "LT.SURGE", "ERIKA", "KOGA", "SABRINA", "BLAINE", "GIOVANNI"}

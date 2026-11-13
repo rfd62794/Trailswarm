@@ -51,10 +51,10 @@ def _mon(name, level, moves=None):
 # --- the party verdict -------------------------------------------------------------------------------------------
 
 def test_weak_second_member_names_the_trainee_shortfall():
-    t = team_readiness([_mon("AQUA", 30), _mon("MAGIKARP", 13)], BOSS, "TWO-MON", SYN)
+    t = team_readiness([_mon("AQUA", 26), _mon("MAGIKARP", 13)], BOSS, "TWO-MON", SYN)   # the half-HP L26 lead cannot finish alone
     assert t is not None and t.ready is False
     assert t.weakest is not None and t.weakest.name == "MAGIKARP" and t.weakest.useful is False
-    assert t.weakest.target >= 20 and t.weakest.target >= 30 - TEAM_GAP
+    assert t.weakest.target >= 20 and t.weakest.target >= 26 - TEAM_GAP
     assert t.text.startswith("team not ready vs TWO-MON: MAGIKARP L13 -> L")
 
 
@@ -63,6 +63,14 @@ def test_strong_second_member_makes_the_team_ready():
     assert t is not None and t.ready is True and t.weakest is None
     assert all(m.useful for m in t.members)
     assert t.text == "team ready vs TWO-MON: lead L30, 2/2 useful"
+
+
+def test_weak_bench_member_does_not_block_a_team_that_wins_without_it():
+    """Misty 2026-11-12: KAKUNA L4 behind a lead L25 held the agent outside the gym for 6,000 steps."""
+    t = team_readiness([_mon("AQUA", 30), _mon("MAGIKARP", 13)], BOSS, "TWO-MON", SYN)
+    assert t is not None and t.ready is True and t.weakest is None
+    assert t.members[1].useful is False   # still flagged as a training target, but it is not a gate
+    assert t.text.startswith("team ready vs TWO-MON")
 
 
 def test_one_mon_and_empty_inputs():

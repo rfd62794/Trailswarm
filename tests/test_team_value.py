@@ -84,7 +84,7 @@ def test_useless_member_has_no_gain():
 
 # 3. training cost reduces value; fights_to_reach is hand-checkable
 def test_training_cost_reduces_value():
-    party = [_mon("AQUA", 30)]
+    party = [_mon("AQUA", 26)]   # the hurt L26 lead needs a real second member (a weak bench alone no longer blocks a win)
     hi = member_value(Candidate("BLAZE", 28, "wild:34"), party, [("TWO-MON", BOSS)], xp_per_fight=40, kb=SYN)
     lo = member_value(Candidate("BLAZE", 5, "wild:34"), party, [("TWO-MON", BOSS)], xp_per_fight=40, kb=SYN)
     assert lo.fights > hi.fights and lo.value < hi.value

@@ -129,3 +129,31 @@ def test_fainted_trainee_early_return_marks_the_gym_hold_held():
     src = inspect.getsource(plan_goal)
     i = src.index("never train a fainted trainee")
     assert "gym_hold_seen = (ctx.step, True)" in src[i - 300:i + 200]
+
+
+def _misty(visited, goals=None, **kw):
+    hold = kw.pop("hold", False)
+    c = ctx(goals or {"beat_misty": False}, m=0x41, **kw)
+    c.step = 100
+    c.gym_hold_seen = (100, hold)
+    c.mem = SimpleNamespace(data={"maps": {"65": {"visited": {k: 1 for k in visited}, "blocked": []}}}, temp_blocked=set())
+    return c
+
+
+def test_misty_is_talked_to_from_below_and_is_a_gym_goal():
+    assert GOAL_TALKS["beat_misty"] == (0x41, 4, 3, "UP", "Misty") and "beat_misty" in goal_talk.APPROACH
+    c = _misty(["4,3"], x=4, y=3)
+    assert GoalTalk().applies(c)
+    d = GoalTalk().step(c)
+    assert d.button == "A" and d.rule == "goal_talk"
+    assert not GoalTalk().applies(_misty(["4,3"], {"beat_misty": True}, x=4, y=3))   # beaten: idle
+    assert not GoalTalk().applies(_misty(["4,3"], x=4, y=3, hold=True))              # the gym hold applies to every gym goal
+    c = _misty(["4,5", "4,4"], x=4, y=5)                                             # stand tile unmapped: walk up the column
+    assert GoalTalk().step(c).button == "UP"
+
+
+def test_a_temp_block_on_the_stand_tile_does_not_shut_the_path():
+    c = _misty(["4,3", "4,4", "4,5"], x=4, y=5)
+    c.mem.temp_blocked = {(0x41, 4, 3): 10**9}   # block_sight's sight line covered the tile in front of the leader
+    d = GoalTalk().step(c)
+    assert d.rule == "goal_talk_walk" and d.button == "UP"
