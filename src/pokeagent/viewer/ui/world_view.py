@@ -15,7 +15,9 @@ import numpy as np
 
 from pokeagent.atlas import sprites
 from pokeagent.viewer import ui_scale
-from pokeagent.viewer.ui import tags
+from pokeagent.viewer import roster
+from pokeagent.viewer.ui import tags, world_status
+from pokeagent.viewer.ui.world_minimap import Minimap
 from pokeagent.viewer.ui.world_agents import draw_agents, draw_hover
 from pokeagent.viewer.ui.world_interiors import InteriorLayer
 from pokeagent.world import draw
@@ -56,6 +58,11 @@ class WorldView:
         self._built_at = 0.0
         self._points: dict[str, tuple[float, float]] = {}
         self.follow = Follow()
+        self.health_store = None                # HealthStore (bound by the side panel); ring colour per agent
+        self.selected_id: str | None = None     # last agent clicked on the map
+        self.follow_selected = False            # side panel toggle: keep the camera on the selected agent
+        self.tint = True                        # Game Boy green palette (reloads the map when toggled)
+        self.mini = Minimap(self)
         self._follow_t: float | None = None
         if not dpg.does_item_exist(TEX):
             dpg.add_texture_registry(tag=TEX, show=False)
@@ -149,16 +156,23 @@ class WorldView:
 
     def _click(self) -> None:
         self._down_at = self._mouse()
+        self.mini.dragging = self.mini.hit(self._down_at)
+        if self.mini.dragging:
+            self.mini.jump(self._down_at)
+            self._down_at = None
+            return
         self.interiors.press()
 
     def _release(self) -> None:
         m, d = self._mouse(), self._down_at
+        self.mini.dragging = False
         self.interiors.release()
         self._down_at = self._last_mouse = None
         if m and d and abs(m[0] - d[0]) < 4 and abs(m[1] - d[1]) < 4 and self.world:
             aid = pick(self._points, self.vp, *m)
             if aid:
                 self._on_select(aid)
+                self.selected_id = aid
                 self.follow.start(aid, time.monotonic())
             elif self.side:
                 self.follow.stop()
@@ -166,6 +180,19 @@ class WorldView:
                 self.interiors.selected = loc[0] if loc and self.interiors.plan and loc[0] in self.interiors.plan.anchors else None
                 if loc:
                     self.side.show_tile(*loc)
+
+    def health_state(self, agent_id: str) -> str:
+        return self.health_store.health(agent_id).state if self.health_store is not None else "ok"
+
+    def roster_rows(self) -> list:
+        model = self.side.host[0] if self.side is not None and self.side.host else None
+        return roster.rows(self.wm.tracks(), model.snapshot if model else (lambda _a: None), self.health_state, time.monotonic())
+
+    def set_tint(self, on: bool) -> None:
+        """Game Boy greens on/off: reload the map (the viewport and interior state carry over like any world swap)."""
+        from pokeagent.world.export import load_for_view
+        self.tint = on
+        threading.Thread(target=self._load, args=(lambda: load_for_view(tint=on),), daemon=True, name="world-load").start()
 
     def follow_agent(self, agent_id: str) -> None:
         """Start following (from a card or a mode switch): centre at once when its position is known."""
@@ -182,7 +209,9 @@ class WorldView:
 
     def _drag(self) -> None:
         m = self._mouse()
-        if m and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+        if m and self.mini.dragging and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            self.mini.jump(m)                                  # dragging inside the minimap scrubs the view
+        elif m and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
             if self._last_mouse:
                 d = (m[0] - self._last_mouse[0], m[1] - self._last_mouse[1])
                 if not self.interiors.edit_drag(*d):
@@ -220,7 +249,9 @@ class WorldView:
             self._built_for, self._pending = None, None
             self.status = ""
         if self.pyr is None:
-            dpg.draw_text((20, 20), self.status, size=ui_scale.px(18), parent=dl)
+            world_status.draw(dl, self.vp.screen_w, self.vp.screen_h, world_status.lines(self.status, False, len(self.wm.tracks())))
+            if self.side:
+                self.side.update()
             return
         if self._pending is not None:
             self.pyr, self._pending = self._pending, None
@@ -254,7 +285,11 @@ class WorldView:
         self.vl = self.interiors.layout(vp.zoom, tracks)
         self.interiors.draw(dl)
         draw_agents(self, now)
+        self.mini.draw(dl)
         draw_hover(self)
+        world_status.draw(dl, vp.screen_w, vp.screen_h, world_status.lines("", True, len(self._points)), over_map=True)
+        if self.follow_selected and self.selected_id and not self.follow.active and not self._last_mouse:
+            self.follow.start(self.selected_id, now)
         if self.follow.active:
             dpg.draw_text((12, 8), f"Following {self.follow.agent_id[-8:]} - drag the map or click empty space to stop",
                           size=ui_scale.px(15), parent=dl)

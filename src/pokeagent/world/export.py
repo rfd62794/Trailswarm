@@ -18,10 +18,11 @@ from pokeagent.atlas.world import WorldLayout, build_layout
 from pokeagent.atlas.world_render import render_world
 from pokeagent.game.pokemon_red import RED
 from pokeagent.world.draw import SpriteBook, render_state
+from pokeagent.world.palette import gb_tint
 from pokeagent.world.model import Track
 
 Image.MAX_IMAGE_PIXELS = None
-CACHE = Path("runs") / "atlas" / "world.png"
+CACHE = Path("runs") / "atlas" / "world_v2.png"   # v2: tidy interior labels (the cache holds the untinted render)
 
 # str signature default, forward slashes on every OS; RED-pinned: fixed at def time, POKEAGENT_GAME must not change it
 _DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
@@ -38,9 +39,11 @@ class World:
     source: "World | None" = None          # the full-grid world this one was derived from (to go back to inset mode)
 
 
-def load_world(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None) -> World:
+def load_world(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None,
+               tint: bool = True) -> World:
     """Decode the ROM and stitch Kanto. ``base`` / ``cache`` name a previously rendered world.png (skips the slow render);
-    a fresh render is written to ``cache`` (runs/ is git-ignored: never commit it, it is ROM-derived)."""
+    a fresh render is written to ``cache`` (runs/ is git-ignored: never commit it, it is ROM-derived).
+    ``tint`` (default on) maps the map onto the four Game Boy greens; the cache always holds the untinted render."""
     rom = load(rom_path)
     headers = all_headers(rom)
     layout = build_layout(headers)
@@ -48,12 +51,12 @@ def load_world(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, 
     if src is not None and src.exists():
         img = np.asarray(Image.open(src).convert("RGB"))
         if (img.shape[1], img.shape[0]) == layout.size_px:
-            return World(rom, headers, layout, img, SpriteBook(rom))
+            return World(rom, headers, layout, gb_tint(img) if tint else img, SpriteBook(rom))
     img = render_world(rom, headers, layout, False)
     if cache is not None:
         cache.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(cache)
-    return World(rom, headers, layout, img, SpriteBook(rom))
+    return World(rom, headers, layout, gb_tint(img) if tint else img, SpriteBook(rom))
 
 
 def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track]:
@@ -68,10 +71,11 @@ def fake_tracks(layout: WorldLayout, n: int = 4, now: float = 0.0) -> list[Track
     return out
 
 
-def load_for_view(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None) -> World:
+def load_for_view(rom_path: str | Path = _DEFAULT_ROM, cache: Path | None = CACHE, base: str | Path | None = None,
+                  tint: bool = True) -> World:
     """What the viewer opens with: the full inset world, unless the saved Interiors choice is an in-place mode (then compact)."""
     from pokeagent.atlas.inplace import DEFAULT_MODE
-    w, ov = load_world(rom_path, cache, base), Overrides.load()
+    w, ov = load_world(rom_path, cache, base, tint), Overrides.load()
     return w if (ov.mode or DEFAULT_MODE) == "inset" else compact_world(w, None, ov)
 
 

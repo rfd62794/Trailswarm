@@ -7,7 +7,9 @@ import dearpygui.dearpygui as dpg
 
 from pokeagent.atlas import inplace
 from pokeagent.atlas.overlay import LAYERS
-from pokeagent.viewer.ui import tags
+from pokeagent.viewer import screenshot
+from pokeagent.viewer.ui import tags, theme
+from pokeagent.viewer.ui.world_roster import Roster
 from pokeagent.viewer.ui.health_panel import HealthPanel
 from pokeagent.viewer.ui_scale import get_scale, px
 from pokeagent.world.tileinfo import describe
@@ -30,6 +32,9 @@ class WorldSide:
         with dpg.group(parent=self.panel):
             self.health = HealthPanel()        # badge + expandable HEALTH_PANEL section
             dpg.add_separator()
+            dpg.add_text("Agents")
+            self.roster = Roster(self.panel, view)
+            dpg.add_separator()
             dpg.add_text("Layers (learned by all agents)")
             with dpg.group(horizontal=True):
                 for name in LEARN:
@@ -39,6 +44,14 @@ class WorldSide:
                 dpg.add_checkbox(label="NPCs", callback=lambda s, a, u: setattr(view, "npcs", a))
                 dpg.add_button(label="Fit", callback=lambda s, a, u: view.vp.fit())
                 dpg.add_button(label="1:1", callback=lambda s, a, u: view.vp.one_to_one(get_scale()))
+            with dpg.group(horizontal=True):
+                dpg.add_checkbox(label="minimap", default_value=True, callback=lambda s, a, u: setattr(view.mini, "on", a))
+                dpg.add_checkbox(label="follow selected", callback=lambda s, a, u: self._follow_selected(a))
+                dpg.add_checkbox(label="GB palette", default_value=True, callback=lambda s, a, u: view.set_tint(a))
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="Light/dark", callback=lambda s, a, u: theme.toggle_mode())
+                dpg.add_button(label="Screenshot (F12)", callback=lambda s, a, u: self.screenshot())
+                self.shot = dpg.add_text("", wrap=px(150))
             with dpg.group(horizontal=True):
                 dpg.add_text("Interiors")
                 names = {v: k for k, v in inplace.LABELS.items()}
@@ -64,8 +77,19 @@ class WorldSide:
     def bind(self, model, on_focus) -> None:
         self.host = (model, on_focus)
 
+    def _follow_selected(self, on: bool) -> None:
+        self.view.follow_selected = on
+        if not on:
+            self.view.follow.stop()
+
+    def screenshot(self) -> None:
+        """Save the window to runs/screenshots/ (the path shows beside the button)."""
+        path = screenshot.save(dpg, getattr(self.view, "root", None))
+        dpg.set_value(self.shot, str(path))
+
     def bind_health(self, store, entries) -> None:
         """``store`` is the HealthStore fed by the poll thread; ``entries`` the agent registry dict."""
+        self.view.health_store = store
         self.health.bind(store, entries)
 
     def show_anomaly(self, ref) -> None:
@@ -87,6 +111,7 @@ class WorldSide:
             return
         model, _ = self.host
         self.health.update(model.ids())
+        self.roster.update(self.width)
         rows = self.view.wm.feed(FEED_KINDS[self.kind], 40)
         sig = (self.kind, len(rows), rows[-1][1].get("seq") if rows else 0, rows[-1][0] if rows else "")
         if sig != self._feed_sig:

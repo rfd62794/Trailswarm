@@ -7,17 +7,14 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from pokeagent.atlas import inplace, inplace_render, sprites
-from pokeagent.atlas.overlay import LAYERS, PALETTE, overlay
+from pokeagent.atlas.overlay import LAYERS, overlay
 from pokeagent.atlas.rom_maps import MapHeader
 from pokeagent.atlas.world import CELL, WorldLayout
-from pokeagent.world import anim
+from pokeagent.world import anim, layers as layerdata, pill
+from pokeagent.world.palette import agent_colour  # noqa: F401  (re-exported: one palette for every surface)
 from pokeagent.world.model import Track
 
 LEARN_LAYERS = tuple(l for l in LAYERS if l not in ("trails", "agents"))
-
-
-def agent_colour(agent_id: str, ids: list[str]) -> tuple[int, int, int]:
-    return PALETTE[(sorted(ids).index(agent_id) if agent_id in ids else 0) % len(PALETTE)]
 
 
 class SpriteBook:
@@ -46,8 +43,8 @@ def draw_trails(dr: ImageDraw.ImageDraw, layout: WorldLayout, tracks: list[Track
         pts = anim.trail_points(t, layout, n)
         for j, (cx, cy) in enumerate(pts):
             age = (j + 1) / len(pts)
-            rad = 2 + int(2 * age)
-            dr.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=(r, g, b, int(30 + 200 * age)))
+            rad = 3 + int(3 * age)
+            dr.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=(r, g, b, int(20 + 220 * age * age)))
 
 
 def draw_objects(im: Image.Image, layout: WorldLayout, headers: dict[int, MapHeader], book: SpriteBook, maps: set[int]) -> None:
@@ -74,7 +71,11 @@ def draw_agent(im: Image.Image, dr: ImageDraw.ImageDraw, layout: WorldLayout, t:
     col = agent_colour(t.id, ids)
     im.alpha_composite(book.image(sprites.PLAYER, t.facing, phase, col), (int(x) - 1, int(y) - 1))
     cx, cy = int(x) + CELL // 2, int(y)
-    dr.text((cx + 10, cy - 2), t.id[-6:], fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 255))
+    dr.ellipse([cx - 11, cy - 11, cx + 11, cy + 11], outline=(*col, 255), width=2)         # ring in the agent's colour
+    label = t.id[-8:]
+    pl = pill.pill(cx, cy - 11, dr.textlength(label), 11)
+    dr.rounded_rectangle([pl.x0, pl.y0, pl.x1, pl.y1], radius=pl.radius, fill=pill.PILL_FILL)
+    dr.text((pl.text_x, pl.text_y - 1), label, fill=pill.PILL_TEXT)
     tag = inplace.badge(layout, t.map)
     if tag:
         dr.text((cx - 4, cy + 18), tag, fill=(255, 235, 150, 255), stroke_width=1, stroke_fill=(0, 0, 0, 255))
@@ -119,6 +120,8 @@ def render_state(base: np.ndarray, layout: WorldLayout, tracks: list[Track], boo
         draw_objects(im, layout, headers, book, {t.map for t in tracks if t.placed})
     for t in tracks:
         draw_agent(im, dr, layout, t, ids, book, now)
+    if layers:                                                 # an empty model draws nothing: say so instead of a silent no-op
+        layerdata.draw_legend(dr, layerdata.legend_lines(tuple(layers), model))
     out = im.convert("RGB")
     if scale != 1.0:
         out = out.resize((max(1, int(out.width * scale)), max(1, int(out.height * scale))), Image.LANCZOS)

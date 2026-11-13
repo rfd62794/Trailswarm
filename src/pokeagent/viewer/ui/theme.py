@@ -4,7 +4,7 @@ from __future__ import annotations
 import dearpygui.dearpygui as dpg
 
 from pokeagent.viewer.health import ANOMALY, OK, SLOW, STALLED
-from pokeagent.viewer.panels import BG, PANE, TEXT, DIM
+from pokeagent.viewer.theme_colours import palette, toggle
 
 # card header tint per health state (ok = the header's current plain tint); also the badge colour
 HEADER_COLOUR = {
@@ -14,6 +14,8 @@ HEADER_COLOUR = {
     ANOMALY: (255, 80, 255, 255),   # magenta
 }
 _STATE_THEMES: dict[str, int] = {}
+_mode = "dark"
+_bound: list[int] = []
 
 
 def health_theme(state: str) -> int | None:
@@ -33,20 +35,28 @@ def _rgba(hex_color: str, a: int = 255) -> tuple[int, int, int, int]:
     return int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16), a
 
 
-def apply() -> None:
-    """Register and bind the viewer theme (call after create_context, before setup)."""
+def mode() -> str:
+    return _mode
+
+
+def apply(mode: str | None = None) -> None:
+    """Register and bind the viewer theme (call after create_context, before setup). ``mode``: dark | light (the chrome only;
+    the card panels keep their dark images)."""
+    global _mode
+    _mode = mode or _mode
+    c = palette(_mode)
     with dpg.theme() as theme:
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, _rgba(BG))
-            dpg.add_theme_color(dpg.mvThemeCol_ChildBg, _rgba(PANE))
-            dpg.add_theme_color(dpg.mvThemeCol_Text, _rgba(TEXT))
-            dpg.add_theme_color(dpg.mvThemeCol_Button, _rgba("#2a2d34"))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, _rgba("#3a3f4a"))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, _rgba("#4a5160"))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, _rgba("#141518"))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, _rgba("#23262d"))
-            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarBg, _rgba(BG, 200))
-            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, _rgba(DIM, 160))
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, _rgba(c["bg"]))
+            dpg.add_theme_color(dpg.mvThemeCol_ChildBg, _rgba(c["pane"]))
+            dpg.add_theme_color(dpg.mvThemeCol_Text, _rgba(c["text"]))
+            dpg.add_theme_color(dpg.mvThemeCol_Button, _rgba(c["button"]))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, _rgba(c["button_hover"]))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, _rgba(c["button_active"]))
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, _rgba(c["frame"]))
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, _rgba(c["frame_hover"]))
+            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarBg, _rgba(c["bg"], 200))
+            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, _rgba(c["dim"], 160))
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 3)
             dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 4)
             dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 3)
@@ -54,3 +64,12 @@ def apply() -> None:
             dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 3, 2)
             dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 4, 3)
     dpg.bind_theme(theme)
+    while _bound:
+        dpg.delete_item(_bound.pop())
+    _bound.append(theme)
+
+
+def toggle_mode() -> str:
+    """Flip dark <-> light and rebind."""
+    apply(toggle(_mode))
+    return _mode

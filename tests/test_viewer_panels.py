@@ -96,12 +96,12 @@ def test_progress_strip_and_info():
     strip, info = lines[0], lines[1]
     assert "".join(t for t, _ in strip) == "S1 S2 S3 S4 "
     assert colors(strip) == ["#5fa85f", "#5fa85f", "#e0b050", "#3f444e"]
-    assert "seg 3 / rec 74    step 57" in texts([info])
+    assert "first_pokemon: 43 steps (best 74)" in texts([info]) and "step 57" in texts([info])
 
     rl = AgentSnapshot(agent_id="r", segment=Segment(id="a1c", record=123), step=9)
     rlines = progress_panel.progress_lines(rl)
-    assert "seg a1c / rec 123    step 9" in texts(rlines)
-    assert len(rlines) == 1  # no goals -> no strip
+    assert "a1c: 0 steps (best 123)" in texts(rlines) and "step 9" in texts(rlines)
+    assert len(rlines) == 1  # no goals -> no strip, no sparkline
 
 
 def test_focus_extras():
