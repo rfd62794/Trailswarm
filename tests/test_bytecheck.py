@@ -189,5 +189,36 @@ def test_staged_sav_is_suspect_with_warning(idx, tmp_path, monkeypatch, capsys):
     git("add", "game.sav")
     ip = save_index(idx, tmp_path / "i.npz")
     assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 0
-    out = capsys.readouterr().out
-    assert "SUSPECT" in out and "warning" in out and "game.sav" in out
+    cap = capsys.readouterr()
+    assert "SUSPECT" in cap.out and "game.sav" in cap.out and "warning" in cap.err and "warning" not in cap.out
+
+
+def test_staged_json_with_sav_parses(idx, tmp_path, monkeypatch, capsys):
+    git = _repo(tmp_path, monkeypatch)
+    Path("game.sav").write_bytes(rnd(400, 52))
+    git("add", "game.sav")
+    ip = save_index(idx, tmp_path / "i.npz")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip), "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)          # stdout is pure JSON
+    assert data["verdict"] == "SUSPECT" and any("game.sav" in w for w in data["warnings"])
+
+
+def test_staged_submodule_is_skipped(idx, tmp_path, monkeypatch, capsys):
+    import subprocess
+    sub = tmp_path / "subsrc"
+    sub.mkdir()
+    env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "protocol.file.allow=always"]
+    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    (sub / "f.txt").write_text("x")
+    subprocess.run(["git", "add", "."], cwd=sub, check=True)
+    subprocess.run(["git", *env, "commit", "-qm", "i"], cwd=sub, check=True)
+    main = tmp_path / "main"
+    main.mkdir()
+    monkeypatch.chdir(main)
+    subprocess.run(["git", "init", "-q"], check=True)
+    subprocess.run(["git", *env, "submodule", "add", "-q", str(sub), "vendor"], check=True)
+    ip = save_index(idx, tmp_path / "i.npz")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 0
+    assert "skipped (submodule)" in capsys.readouterr().out
+    assert cli.main(["bytecheck", "staged", "--index", str(ip), "--json"]) == 0
+    assert {"path": "vendor", "reason": "submodule"} in json.loads(capsys.readouterr().out)["skipped"]

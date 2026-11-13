@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import subprocess
 from pathlib import Path
 
@@ -43,7 +44,7 @@ def _cmd_build(args) -> int:
     return 0
 
 
-def _report(items, idx: Index, as_json: bool) -> int:
+def _report(items, idx: Index, as_json: bool, skipped=(), warnings=()) -> int:
     """``items``: (path, profile, data|None). ``data`` None means the content could not be read: that fails loudly."""
     rows, worst, unreadable = [], policy.CLEAN, []
     for path, prof, data in items:
@@ -62,8 +63,14 @@ def _report(items, idx: Index, as_json: bool) -> int:
     if unreadable and worst != policy.LEAK:
         worst = "ERROR"
     if as_json:
-        print(json.dumps({"verdict": worst, "files": rows}, indent=2, sort_keys=True))
+        out = {"verdict": worst, "files": rows, "skipped": [{"path": p, "reason": "submodule"} for p in skipped],
+               "warnings": list(warnings)}
+        print(json.dumps(out, indent=2, sort_keys=True))
     else:
+        for w in warnings:      # never loose stdout text in --json mode; plain mode keeps stdout for verdicts only
+            print(w, file=sys.stderr)
+        for p in skipped:
+            print(f"{'SKIPPED':8} {p}: skipped (submodule)")
         for r in rows:
             if r["verdict"] == "UNREADABLE":
                 print(f"{'ERROR':8} {r['path']} [{r['profile']}] cannot read the staged content: NOT scanned")
@@ -106,6 +113,17 @@ def _staged_files() -> tuple[str, list[str]]:
     return top, [p for p in out.decode().split("\0") if p]
 
 
+def _gitlinks(top: str) -> set[str]:
+    """Staged submodule entries (mode 160000): they have no blob to read."""
+    out = _git(top, "ls-files", "-s", "-z").decode()
+    links = set()
+    for ent in out.split("\0"):
+        meta, _, path = ent.partition("\t")
+        if meta.startswith("160000"):
+            links.add(path)
+    return links
+
+
 def _staged_blob(top: str, path: str) -> bytes | None:
     """The staged (index) content of ``path``; None when it cannot be read."""
     try:
@@ -117,9 +135,12 @@ def _staged_blob(top: str, path: str) -> bytes | None:
 def _cmd_staged(args) -> int:
     try:
         top, files = _staged_files()
+        links = _gitlinks(top)
     except (subprocess.CalledProcessError, OSError) as e:
         print(f"error: cannot list staged files (not a git repository?): {e}")
         return 2
+    skipped = [p for p in files if p in links]
+    files = [p for p in files if p not in links]
     blocked = [p for p in files if p.lower().endswith(BLOCKED_SUFFIXES)]
     if blocked:      # a ROM file never goes into git, whatever the index says (checked before the index is even needed)
         for p in blocked:
@@ -129,13 +150,13 @@ def _cmd_staged(args) -> int:
     idx = _load(args)
     if idx is None:
         return 0 if args.skip_if_no_index else 2
-    if not files:
+    if not files and not skipped:
         print("bytecheck: nothing staged")
         return 0
-    for p in files:
-        if p.lower().endswith(".sav"):
-            print(f"warning: {p} is a save file: treated as SUSPECT, check it holds no ROM bytes")
-    return _report([(p, args.profile or profile_for(p), _staged_blob(top, p)) for p in files], idx, args.json)
+    warnings = [f"warning: {p} is a save file: treated as SUSPECT, check it holds no ROM bytes"
+                for p in files if p.lower().endswith(".sav")]
+    return _report([(p, args.profile or profile_for(p), _staged_blob(top, p)) for p in files], idx, args.json,
+                   skipped=skipped, warnings=warnings)
 
 
 def register(sub) -> None:
