@@ -7,18 +7,16 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.magikarp import MAGIKARP
-from pokeagent.party_view import read_battle_view
-from pokeagent.ram_symbols import MENU_ITEM, PARTY_COUNT, PARTY_MON1_HP, PARTY_MON_SIZE, PARTY_SPECIES
+from pokeagent.party_view import read_battle_view, read_party_view
+from pokeagent.ram_symbols import MENU_ITEM, SPECIES_MAGIKARP
 
 
 def able_slot(emu) -> int | None:
-    """The party slot to send out: the first non-Magikarp with HP, else any with HP (a Magikarp only splashes, but it ends the
-    fight instead of looping); None when everybody has fainted."""
-    alive = [i for i in range(min(emu.read(PARTY_COUNT), 6))
-             if (emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i) << 8 | emu.read(PARTY_MON1_HP + PARTY_MON_SIZE * i + 1)) > 0]
-    real = [i for i in alive if emu.read(PARTY_SPECIES + i) != MAGIKARP]
-    return (real or alive or [None])[0]
+    """The party slot to send out: the first non-Magikarp that is not fainted, else any that is not fainted (a Magikarp only
+    splashes, but it ends the fight instead of looping); None when everybody has fainted."""
+    alive = [s for s in read_party_view(emu).slots if not s.fainted]
+    pick = ([s for s in alive if s.species != SPECIES_MAGIKARP] or alive or [None])[0]
+    return pick.index if pick is not None else None
 
 
 def forced_faint_prompt(ctx: ExplorerContext, lines: list[str]) -> bool:

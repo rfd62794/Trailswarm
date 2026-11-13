@@ -8,9 +8,10 @@ from __future__ import annotations
 from collections import deque
 
 from pokeagent.intervene.names import item_name, species_name
-from pokeagent.intervene.screen import PLAYER_MON, read_screen
+from pokeagent.intervene.screen import read_screen
+from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
-from pokeagent.ramstructs import read_bag, read_battle_mon, read_enemy_mon, read_party
+from pokeagent.ramstructs import read_bag, read_battle_mon, read_enemy_mon
 
 KINDS = {1: "wild", 2: "trainer"}
 
@@ -36,12 +37,14 @@ def _mon(m) -> dict:
 
 def _our_mon(emu) -> dict:
     """Our battler. wBattleMon reads species 0 (stale level/HP from the last fight) until the new battle loads; then the
-    party slot in the fight (wPlayerMonNumber) is the honest source, so the digest never mixes two Pokemon."""
+    party view's verified active slot (else its fighter, else the stale struct) is the honest source, so the digest
+    never mixes two Pokemon."""
     me = read_battle_mon(emu)
     if me.species:
         return _mon(me)
-    party, slot = read_party(emu), emu.read(PLAYER_MON)
-    return _mon(party[slot]) if slot < len(party) else _mon(me)
+    view = read_party_view(emu)
+    p = view.slots[view.active_slot] if view.active_slot is not None else view.fighter()
+    return _mon(p) if p is not None else _mon(me)
 
 
 def build(ctx, emu, tracker: Tracker, box_text: str) -> dict:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pokeagent.goals import bag_contents
 from pokeagent.magikarp import fighter, trainee_slot
+from pokeagent.party_view import read_party_view
 from pokeagent.ramstructs import read_party
 
 BADGES = 0xD356  # wObtainedBadges (verified)
@@ -74,12 +75,17 @@ def _one(key: str, val, st: dict, log) -> bool:
 
 
 def _party_hp(emu) -> tuple[int, int]:
-    """(fighter hp, fighter max): the lead, or the strongest non-Magikarp while a trainee is out
-    (mirrors perceive.party_hp without importing the explorer layer)."""
+    """(hp, max) the hp_frac predicates see: the fighter's numbers while a Magikarp trainee is out; else slot 0's, as
+    before; but a fainted slot 0 reads (0, fighter max) so a dead lead still routes to a heal even though the fighter is
+    another member. A fainted BENCH member changes nothing."""
+    view = read_party_view(emu)
+    if not view.slots:
+        return 0, 0
+    _, _, hp, mx = fighter(emu)
     if trainee_slot(emu) is not None:
-        _, _, hp, mx = fighter(emu)
         return hp, mx
-    return ((emu.read(0xD16C) << 8) | emu.read(0xD16D)), ((emu.read(0xD18D) << 8) | emu.read(0xD18E))
+    s0 = view.slots[0]
+    return (0, mx) if s0.fainted else (s0.hp, s0.max_hp)
 
 
 def beaten_trainers(ctx) -> set:
