@@ -6,6 +6,11 @@ from __future__ import annotations
 
 
 class WarpsMixin:
+    def crossed_edge(self, map_id: int, key: str) -> bool:
+        """True when this tile+direction is a warp/map connection that has EVER been taken (warp_taken > 0)."""
+        d = self.m(map_id)
+        return key in d.get("warps", {}) and d.get("warp_taken", {}).get(key, 0) > 0
+
     def forget_warp(self, map_id: int, key: str, *, tombstone: bool = False):
         """Drop a learned warp that presses disproved. Without `tombstone` it is recoverable: learn() re-adds it after
         two real sightings. With it, bad_warps keeps learn() and the swarm merge from ever bringing it back."""

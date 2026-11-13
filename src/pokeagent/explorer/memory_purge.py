@@ -59,3 +59,18 @@ def purge_enclosed_walls(data: dict) -> int:
                 d.get("fails", {}).pop(k, None)
             removed += len(enclosed)
     return removed
+
+
+def purge_crossed_edge_walls(data: dict) -> int:
+    """Drop 'blocked' entries (and fail counters) on a warp/connection edge that was taken at least once: a bump there was a
+    moving NPC or a cut-short transition (Cerulean (20,0) UP, 2026-11-13), and the crossing may be the only way on."""
+    removed = 0
+    for d in data.get("maps", {}).values():
+        taken, warps = d.get("warp_taken", {}), d.get("warps", {})
+        bad = [k for k in d.get("blocked", []) if k in warps and taken.get(k, 0) > 0]
+        if bad:
+            d["blocked"] = [k for k in d["blocked"] if k not in bad]
+            for k in bad:
+                d.get("fails", {}).pop(k, None)
+            removed += len(bad)
+    return removed
