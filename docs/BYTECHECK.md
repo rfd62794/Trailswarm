@@ -21,13 +21,28 @@ Profiles: `state` (16384 B / 5%, suspect 2048 B / 1%: VRAM and WRAM legitimately
 data and tables), `media` and `export` (256 B / 1%, suspect 64 B / 0.1%), `commit` (128 B / 0.5%,
 suspect 48 B / 0.05%). The CLI picks a profile by extension unless `--profile` is given.
 
+### The `state` profile tolerates long ROM runs on purpose
+A save state legitimately carries ROM-derived data (VRAM tile copies, WRAM tables), so `state` only
+flags a run of 16384 B or more (or 5% coverage). A state holding a long, even multi-KB, ROM run can
+therefore still be CLEAN/SUSPECT; that is deliberate, not a detector gap. Measured against the real ROM
+on 2026-11-13: the committed fixture states are CLEAN, longest run 663 B.
+
+Runs bridge padding: windows dropped as low-entropy (0x00/0xFF-heavy) do not break a run when the
+reference offsets advance by the same amount as the file offsets (gap up to 64 B), so a ROM slice with
+padded gaps reports its true length.
+
 ## Use
 ```
 uv run pokeagent bytecheck build --ref "roms/Pokemon Red.gb"   # checks SHA-1 via check-rom logic
 uv run pokeagent bytecheck scan out/*.png tests/fixtures/rom_states/*.state [--profile state] [--json]
 uv run pokeagent bytecheck staged                              # git-staged files
 ```
-Exit codes: 0 clean/suspect, 1 LEAK (or SHA-1 mismatch on build), 2 usage / no index.
+Exit codes: 0 clean/suspect, 1 LEAK / BLOCKED (or SHA-1 mismatch on build), 2 usage / no index / a staged
+file that could not be read (never passes silently as CLEAN).
+
+`staged` runs git against the repo toplevel (any working directory) and scans the **staged blob**
+(`git show :path`), not the working-tree file. Any staged `.gb`, `.gbc`, `.gba` or `.sgb` is BLOCKED
+(exit 1) whether or not it matches the index, even with no index. A staged `.sav` stays SUSPECT and prints a warning.
 
 The index (hashes + offsets, never ROM bytes) is `runs/bytecheck/index.npz`; `runs/` is gitignored.
 Build it locally; never commit it.
@@ -39,4 +54,4 @@ Build it locally; never commit it.
 exec uv run pokeagent bytecheck staged --skip-if-no-index
 ```
 Without `--skip-if-no-index`, a missing index exits 2 and blocks the commit. Files named
-`.gb/.gbc/.sav` are never CLEAN.
+`.gb/.gbc/.gba/.sgb/.sav` are never CLEAN (the ROM extensions are blocked outright when staged).

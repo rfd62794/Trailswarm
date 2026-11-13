@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pokeagent import cli
-from pokeagent.bytecheck import policy
+from pokeagent.bytecheck import cli as bc_cli, policy
 from pokeagent.bytecheck.fingerprint import build_index, load_index, save_index
 from pokeagent.bytecheck.scan import scan_bytes
 from pokeagent.bytecheck.windows import WINDOW
@@ -99,18 +99,95 @@ def test_png_pixels_scanned(idx, tmp_path):
     assert scan_file(p, idx).longest_run >= 1000
 
 
-def test_staged_without_index(tmp_path, monkeypatch, capsys):
+def _repo(tmp_path, monkeypatch):
+    import subprocess
     monkeypatch.chdir(tmp_path)
+    subprocess.run(["git", "init", "-q"], check=True)
+    return lambda *a: subprocess.run(["git", *a], check=True)
+
+
+def test_staged_without_index(tmp_path, monkeypatch, capsys):
+    _repo(tmp_path, monkeypatch)
     assert cli.main(["bytecheck", "staged", "--index", "nope.npz"]) == 2
     assert "bytecheck build --ref" in capsys.readouterr().out
     assert cli.main(["bytecheck", "staged", "--index", "nope.npz", "--skip-if-no-index"]) == 0
 
 
+def test_padded_rom_slice_keeps_one_long_run():
+    pad = b"\xff" * 40                                   # 40 x 0xFF drops every window with > 24 fill bytes
+    chunks = [rnd(300, 20), pad, rnd(300, 21), pad, rnd(300, 22), pad, rnd(300, 23), pad, rnd(300, 24)]
+    ref = rnd(500, 25) + b"".join(chunks) + rnd(500, 26)
+    i = build_index(ref)
+    piece = ref[500:500 + 2048]
+    assert len(piece) == 2048
+    res = scan_bytes(rnd(700, 27) + piece + rnd(700, 28), i)
+    assert res.longest_run >= 1536, res.longest_run
+    assert res.top_runs[0]["offset"] == 700 and res.top_runs[0]["ref_offset"] == 500
+
+
+
+def test_gap_with_different_ref_delta_is_not_bridged():
+    a, b = rnd(400, 30), rnd(400, 31)
+    ref = a + rnd(40, 32) + b
+    i = build_index(ref)
+    res = scan_bytes(a + b, i)                           # b is not where it was in the reference: two runs, not one
+    assert res.longest_run == 400
+
+
 def test_staged_scans_index_blob(idx, tmp_path, monkeypatch):
-    import subprocess
-    monkeypatch.chdir(tmp_path)
-    subprocess.run(["git", "init", "-q"], check=True)
+    git = _repo(tmp_path, monkeypatch)
     Path("leak.bin").write_bytes(REF[:600])
-    subprocess.run(["git", "add", "leak.bin"], check=True)
+    git("add", "leak.bin")
+    Path("leak.bin").write_bytes(rnd(600, 40))            # the working file is clean now; the index still holds ROM bytes
     ip = save_index(idx, tmp_path / "i.npz")
     assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 1
+    git("add", "leak.bin")                                # restage the clean bytes: now CLEAN
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 0
+
+
+def test_staged_from_subdirectory_resolves_against_toplevel(idx, tmp_path, monkeypatch):
+    git = _repo(tmp_path, monkeypatch)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "leak.bin").write_bytes(REF[:600])
+    git("add", "sub/leak.bin")
+    ip = save_index(idx, tmp_path / "i.npz")
+    monkeypatch.chdir(tmp_path / "sub")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 1
+
+
+def test_staged_unreadable_path_fails_loudly(idx, tmp_path, monkeypatch, capsys):
+    git = _repo(tmp_path, monkeypatch)
+    Path("a.txt").write_text("hello")
+    git("add", "a.txt")
+    ip = save_index(idx, tmp_path / "i.npz")
+    monkeypatch.setattr(bc_cli, "_staged_blob", lambda top, p: None)
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) != 0
+    assert "NOT scanned" in capsys.readouterr().out
+
+
+def test_staged_outside_a_repo_fails(idx, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    ip = save_index(idx, tmp_path / "i.npz")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 2
+
+
+@pytest.mark.parametrize("name", ["a.gb", "b.GBC", "c.gba", "d.sgb"])
+def test_staged_rom_extension_is_blocked_even_if_clean_or_no_index(idx, tmp_path, monkeypatch, capsys, name):
+    git = _repo(tmp_path, monkeypatch)
+    Path(name).write_bytes(rnd(400, 50))                  # matches nothing in the index
+    git("add", name)
+    ip = save_index(idx, tmp_path / "i.npz")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 1
+    assert "BLOCKED" in capsys.readouterr().out
+    assert cli.main(["bytecheck", "staged", "--index", "nope.npz", "--skip-if-no-index"]) == 1
+
+
+def test_staged_sav_is_suspect_with_warning(idx, tmp_path, monkeypatch, capsys):
+    git = _repo(tmp_path, monkeypatch)
+    Path("game.sav").write_bytes(rnd(400, 51))
+    git("add", "game.sav")
+    ip = save_index(idx, tmp_path / "i.npz")
+    assert cli.main(["bytecheck", "staged", "--index", str(ip)]) == 0
+    out = capsys.readouterr().out
+    assert "SUSPECT" in out and "warning" in out and "game.sav" in out

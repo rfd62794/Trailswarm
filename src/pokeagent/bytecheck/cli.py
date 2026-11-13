@@ -9,9 +9,10 @@ from pathlib import Path
 from pokeagent.bytecheck import policy
 from pokeagent.bytecheck.fingerprint import (
     DEFAULT_INDEX, Index, IndexError_, build_index, load_index, save_index)
-from pokeagent.bytecheck.scan import scan_bytes, scan_file
+from pokeagent.bytecheck.scan import scan_blob, scan_bytes
 
-ROM_SUFFIXES = (".gb", ".gbc", ".sav")
+BLOCKED_SUFFIXES = (".gb", ".gbc", ".gba", ".sgb")    # ROM images: never committed
+ROM_SUFFIXES = BLOCKED_SUFFIXES + (".sav",)
 MEDIA_SUFFIXES = (".png", ".gif", ".mp4", ".webm", ".jpg", ".jpeg")
 
 
@@ -42,27 +43,37 @@ def _cmd_build(args) -> int:
     return 0
 
 
-def _report(paths_profiles, idx: Index, as_json: bool) -> int:
-    rows, worst = [], policy.CLEAN
-    for path, prof in paths_profiles:
-        res = scan_file(Path(path), idx) if not str(path).lower().endswith(ROM_SUFFIXES) \
-            else scan_bytes(Path(path).read_bytes(), idx, str(path))
+def _report(items, idx: Index, as_json: bool) -> int:
+    """``items``: (path, profile, data|None). ``data`` None means the content could not be read: that fails loudly."""
+    rows, worst, unreadable = [], policy.CLEAN, []
+    for path, prof, data in items:
+        if data is None:
+            unreadable.append(path)
+            rows.append({"path": path, "profile": prof, "verdict": "UNREADABLE"})
+            continue
+        res = scan_blob(data, idx, str(path)) if not str(path).lower().endswith(ROM_SUFFIXES) \
+            else scan_bytes(data, idx, str(path))
         v = policy.verdict(res, prof)
         if str(path).lower().endswith(ROM_SUFFIXES) and v != policy.LEAK:
             v = policy.SUSPECT      # a ROM/save-looking file name is never CLEAN
         rows.append({**res.to_dict(), "profile": prof, "verdict": v})
         if v == policy.LEAK or (v == policy.SUSPECT and worst == policy.CLEAN):
             worst = v
+    if unreadable and worst != policy.LEAK:
+        worst = "ERROR"
     if as_json:
         print(json.dumps({"verdict": worst, "files": rows}, indent=2, sort_keys=True))
     else:
         for r in rows:
+            if r["verdict"] == "UNREADABLE":
+                print(f"{'ERROR':8} {r['path']} [{r['profile']}] cannot read the staged content: NOT scanned")
+                continue
             print(f"{r['verdict']:8} {r['path']} [{r['profile']}] windows={r['matched_windows']} "
                   f"coverage={r['coverage']:.4%} longest_run={r['longest_run']}B ({r['view']})")
             for run in r["top_runs"][:3]:
                 print(f"           run @{run['offset']} len {run['length']} (ref @{run['ref_offset']})")
         print(f"overall: {worst}")
-    return 1 if worst == policy.LEAK else 0
+    return {policy.LEAK: 1, "ERROR": 2}.get(worst, 0)
 
 
 def _load(args) -> Index | None:
@@ -81,25 +92,50 @@ def _cmd_scan(args) -> int:
     if missing:
         print(f"error: not a file: {', '.join(missing)}")
         return 2
-    return _report([(p, args.profile or profile_for(p)) for p in args.paths], idx, args.json)
+    return _report([(p, args.profile or profile_for(p), Path(p).read_bytes()) for p in args.paths], idx, args.json)
 
 
-def _staged_files() -> list[str]:
-    out = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
-                         capture_output=True, check=True).stdout
-    return [p for p in out.decode().split("\0") if p]
+def _git(top: str, *args: str) -> bytes:
+    return subprocess.run(["git", "-C", top, *args], capture_output=True, check=True).stdout
+
+
+def _staged_files() -> tuple[str, list[str]]:
+    """(repo toplevel, staged paths relative to it) - independent of the current directory."""
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, check=True).stdout.decode().strip()
+    out = _git(top, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+    return top, [p for p in out.decode().split("\0") if p]
+
+
+def _staged_blob(top: str, path: str) -> bytes | None:
+    """The staged (index) content of ``path``; None when it cannot be read."""
+    try:
+        return _git(top, "show", f":0:{path}")
+    except (subprocess.CalledProcessError, OSError):
+        return None
 
 
 def _cmd_staged(args) -> int:
+    try:
+        top, files = _staged_files()
+    except (subprocess.CalledProcessError, OSError) as e:
+        print(f"error: cannot list staged files (not a git repository?): {e}")
+        return 2
+    blocked = [p for p in files if p.lower().endswith(BLOCKED_SUFFIXES)]
+    if blocked:      # a ROM file never goes into git, whatever the index says (checked before the index is even needed)
+        for p in blocked:
+            print(f"BLOCKED  {p}: ROM files must never be committed")
+        print("overall: BLOCKED")
+        return 1
     idx = _load(args)
     if idx is None:
         return 0 if args.skip_if_no_index else 2
-    files = _staged_files()
     if not files:
         print("bytecheck: nothing staged")
         return 0
-    return _report([(p, args.profile or profile_for(p)) for p in files if Path(p).is_file()],
-                   idx, args.json)
+    for p in files:
+        if p.lower().endswith(".sav"):
+            print(f"warning: {p} is a save file: treated as SUSPECT, check it holds no ROM bytes")
+    return _report([(p, args.profile or profile_for(p), _staged_blob(top, p)) for p in files], idx, args.json)
 
 
 def register(sub) -> None:
