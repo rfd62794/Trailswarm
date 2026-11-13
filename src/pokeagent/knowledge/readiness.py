@@ -130,19 +130,21 @@ def matchup_text(c: Combatant, foe: Combatant, chart: dict, moves: dict) -> str:
 
 
 def assess(party: list[Combatant], boss: list[tuple[int, str]], label: str, kb: dict | None = None,
-           margin: float = MARGIN) -> Readiness | None:
+           margin: float = MARGIN, lead_i: int | None = None) -> Readiness | None:
     """Readiness of `party` against `boss` ([(level, species)]); None when data is missing (caller falls back to its table).
-    `margin` is the HP fraction demanded on the mons that fought (MARGIN by default; the blackout tax raises it per stage)."""
+    `margin` is the HP fraction demanded on the mons that fought (MARGIN by default; the blackout tax raises it per stage).
+    The member whose level is raised is ``lead_i``, else the strongest (the party stands lowest-first: slot 0 is the weakest)."""
     theirs = [m for lv, n in boss if (m := trainer_mon(n, lv, kb))]
     moves = table(kb, "moves")
     if not party or not boss or len(theirs) != len(boss) or not moves:
         return None
     chart = _chart(kb)
     score = fight(party, theirs, chart, moves)
-    lead, ready = party[0], score >= margin
+    li = lead_i if lead_i is not None else max(range(len(party)), key=lambda i: (party[i].level, -i))
+    lead, ready = party[li], score >= margin
     required = lead.level if ready else next(
         (L for L in range(lead.level + 1, MAX_LEVEL + 1)
-         if fight([at_level(lead, L, kb), *party[1:]], theirs, chart, moves) >= margin), MAX_LEVEL)
+         if fight([*party[:li], at_level(lead, L, kb), *party[li + 1:]], theirs, chart, moves) >= margin), MAX_LEVEL)
     note = matchup_text(lead, theirs[0], chart, moves)
     text = f"ready vs {label}: {note} -> ok" if ready else f"train to L{required}: {note}"
     return Readiness(ready, required, round(score, 2), lead.name, text)
@@ -178,7 +180,7 @@ def team_readiness(party: list[Combatant], boss: list[tuple[int, str]], label: s
     lead_i = max((i for i, c in enumerate(party) if c.name != "MAGIKARP"),
                  key=lambda i: (best_move(party[i], theirs[0], chart, moves)[0] / max(theirs[0].hp, 1), party[i].level, -i))
     fighters = [party[lead_i]] + [c for i, c in enumerate(party) if i != lead_i and c.name != "MAGIKARP"]
-    lead = assess(fighters, boss, label, kb)
+    lead = assess(fighters, boss, label, kb, lead_i=0)
     if lead is None:
         return None
     lead_c = party[lead_i]

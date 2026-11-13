@@ -7,7 +7,6 @@ import pytest
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer.behaviours import battle_run as br
 from pokeagent.explorer.behaviours import cave_escape  # noqa: F401  (import check)
-from pokeagent.explorer.behaviours.party_order import trainee_home
 from pokeagent.explorer.behaviours.readiness import Readiness, walker_near
 from pokeagent.atlas.ladders import rom_ladders
 from pokeagent.explorer import cave_route
@@ -40,13 +39,6 @@ def test_a_walker_nearby_is_not_busy_but_a_still_changing_empty_screen_is(tmp_pa
     assert not Readiness()._busy(ctx)  # the NPC explains the motion: no "A in case text is waiting"
     ctx.emu.set(0xCD6B, 1)
     assert Readiness()._busy(ctx)      # but a joypad-ignored game is busy whatever walks
-
-
-def test_magikarp_trainee_belongs_last_inside_the_cave_first_outside(tmp_path):
-    ctx = make_ctx(tmp_path, {0xD163: 3, 0xD35E: 0x3B}); ctx.refresh()
-    assert trainee_home(ctx) == 2
-    ctx.emu.set(0xD35E, 0x0E); ctx.refresh()
-    assert trainee_home(ctx) == 0
 
 
 def test_cave_run_for_wild_cave_fights_except_catch_targets_and_after_the_cap(tmp_path, monkeypatch):

@@ -46,6 +46,13 @@ def _label(mons: list) -> str:
     return ", ".join(f"{lv} {n}" for lv, n in mons)
 
 
+def _fighter(party_now: list):
+    """The member that carries the fights: strongest healthy non-Magikarp (the party stands lowest-first, so
+    party_now[0] is the weakest; same rule as cave_topup.fighter_slot). None for an empty party."""
+    real = [c for c in party_now if c.name != "MAGIKARP"] or list(party_now)
+    return max(real, key=lambda c: (c.hp > 0, c.level, c.hp)) if real else None
+
+
 def decide(party_now: list, remaining: list, bag: dict, walk, kb=None) -> VictoryDecision:
     hp_frac, lead_hp_frac, alive = 0.0, 0.0, 0
     mx_all, hp_all = 0, 0
@@ -54,8 +61,9 @@ def decide(party_now: list, remaining: list, bag: dict, walk, kb=None) -> Victor
         mx_all += mx
         hp_all += c.hp
     hp_frac = hp_all / mx_all if mx_all else 0.0
-    if party_now:
-        lead_hp_frac = party_now[0].hp / (_max_hp(party_now[0], kb) or 1)
+    fighter = _fighter(party_now)
+    if fighter is not None:
+        lead_hp_frac = fighter.hp / (_max_hp(fighter, kb) or 1)
     alive = sum(1 for c in party_now if c.hp > 0)
     if not remaining:
         return VictoryDecision("continue", "", None, hp_frac, lead_hp_frac, alive, "path clear: carry on")
@@ -78,8 +86,8 @@ def decide(party_now: list, remaining: list, bag: dict, walk, kb=None) -> Victor
             and not hurt_near):
         return VictoryDecision("push", _label(mons), score, hp_frac, lead_hp_frac, alive,
                                f"margin {score:+.2f} clears {PUSH_MARGIN}{warn}")
-    lead_hp = party_now[0].hp
-    lead_mx = _max_hp(party_now[0], kb)
+    lead_hp = fighter.hp
+    lead_mx = _max_hp(fighter, kb)
     if (heal_items.heal_count(bag) > 0 and lead_mx - lead_hp >= MIN_MISSING
             and (walk is None or potion_beats_walk(walk[0], walk[1], lead_hp, lead_mx))):
         return VictoryDecision("potion", _label(mons), score, hp_frac, lead_hp_frac, alive,

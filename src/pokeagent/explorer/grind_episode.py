@@ -97,7 +97,7 @@ def _slot(ctx) -> int | None:
 def _lvl_of(ctx, levels: list, slot: int | None) -> int:
     if slot is not None and 0 <= slot < len(levels):
         return levels[slot]
-    return levels[0] if levels else lead_level(ctx.emu)
+    return max(levels) if levels else lead_level(ctx.emu)  # the strongest: slot 0 is the weakest in a lowest-first party
 
 
 def _trainee_ok(ctx) -> bool:

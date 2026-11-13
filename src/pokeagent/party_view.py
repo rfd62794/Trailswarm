@@ -58,12 +58,11 @@ class PartyView:
         return self.slots[0]        # everyone is down: report the lead so callers see (0, max)
 
     def fighter(self) -> PartySlot | None:
-        """Whoever is doing the fighting: the lead normally; while a Magikarp is in the party,
-        the verified active slot in a fight or else the strongest non-Magikarp member."""
+        """Whoever is doing the fighting: the verified active slot in a fight, else the strongest healthy
+        member (never a Magikarp while another member exists). The party stands lowest-level-first, so
+        slot 0 is the weakest and is NOT the team's strength."""
         if not self.slots:
             return None
-        if not any(s.species == SPECIES_MAGIKARP for s in self.slots):
-            return self.lead
         if self.active_slot is not None:
             return self.slots[self.active_slot]
         others = [s for s in self.slots if s.species != SPECIES_MAGIKARP] or list(self.slots)
