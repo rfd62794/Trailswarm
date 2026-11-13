@@ -1,4 +1,4 @@
-# Training Controller: one owner for "who trains, where, and when to heal" (2026-11-13, rev 2)
+# Training Controller: one owner for "who trains, where, and when to heal" (2026-11-13, rev 3)
 
 Status: design draft, no code. Evidence: seed 12, heal_cerulean -> beat_misty, 12000 steps,
 `rev-c3/runs/explore-20261113-045255-6868/console.log` (counts = decision lines; one line = one step). All paths are
@@ -75,10 +75,13 @@ class TrainingController:
    grind_episode). Removes the `train_target` import (`behaviours/plan_goal.py:16`, shared line, 0 net) and the `route_kw` kwarg at :133 (about -1). context.py: 0. The cycle is already half-broken by the lazy import at `explorer/grind_episode.py:106`; slice 2 deletes that workaround once Target owns the point choice. Gate: `test_grind_points.py`,
    `test_grind_episode.py`, `test_train_target.py`, `test_training_v2_slice3.py`.
 3. **Sustain (after Target).** First writer move: `tick` becomes sole writer of `train_route_live`. Removes `after_heal` import (:16, 0 net),
-   the :131-133 branch (about -3), the heal inputs in the plan_step dict (`behaviours/plan_goal.py:125`, about -1 to -2), and `grind_heal` calls in `behaviours/retreat_heal.py` and
+   the :131-132 branch (about -2; :133 is counted in slice 2), the heal inputs in the plan_step dict (`behaviours/plan_goal.py:125`, about -1 to -2), and `grind_heal` calls in `behaviours/retreat_heal.py` and
    `behaviours/frontier.py:149`; `planner_east.py:114` and the `planner.py` heal branches read `heal_now()`. plan_goal est. -5, context 0. `explorer/context.py:124` stays until grind_loop's writer is gone. Gate: `test_retreat_heal.py`, `test_frontier_patrol.py`, `test_early_training_gate.py`.
 4. **Roster.** `team_sig` (species, level, fainted: `party_order.py:31-34`) keeps species and level but replaces the fainted bit with a
-   monotonic faint counter (alive->fainted increments, fainted->alive never does). Regression tests: a level-up reorders; a real faint
+   monotonic faint counter (alive->fainted increments, fainted->alive never does). Storage: `team_plan.of(ctx)["faints"]` beside
+   `order_hold` (party_order.py:41), updated by Roster from the previous step's per-slot fainted flags (`faints_prev`); team_sig
+   becomes (species, level) per member + the counter. Reset: never within a run (blackouts and Pokecenter heals do not reset it;
+   a new run starts at 0), so a heal can never undo a faint's reorder trigger. Regression tests: a level-up reorders; a real faint
    (counter +1) reorders; a heal-revive (fainted->alive) does NOT; no 300-step expiry returns (incident `party_order.py:37-42`: 31 reorders). plan_goal/context est. 0. Gate: `test_party_order_ascending.py`,
    `test_party_log_reorder.py`, `test_trainee_gate.py`, `test_trainer_grind.py`.
 5. **Exit + gym hold.** Fold `_end_reason`, stall hold, GrindBudget; delete `gym_hold_seen` (`behaviours/plan_goal.py:82`, :149) and the gate_lifted block (:139-151, :283, :297-298; est. -20), `floor_unmet` (`training.py:125`), then `explorer/context.py` fields :124, :165, :187 (-3) once their last writer is gone, and dead modules. Gate: `test_grind.py`, `test_area_grind.py`, `test_grind_pressure_plan_goal.py`, `test_plan_goal_gym_road.py`.
