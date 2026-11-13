@@ -126,7 +126,10 @@ class PartyLog:
                 for lu in d["level_ups"]:
                     self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
                 self.prev = after
-                xp_meter.of(ctx).on_battle(ctx, before, after)  # XP measurement (never raises)
+                try:
+                    xp_meter.of(ctx).on_battle(ctx, before, after)  # XP measurement: its failure never costs the row
+                except Exception:  # noqa: BLE001
+                    pass
                 self._write(ctx, after, "battle_end", {k: v for k, v in d.items() if k != "exp_gained" and v})
                 out.update(d)
             except Exception as exc:  # noqa: BLE001

@@ -10,6 +10,7 @@ moving slots does not matter. "Switched" = the member gained XP in a battle but 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from collections import Counter, defaultdict
 from typing import Any
 
@@ -93,18 +94,19 @@ class XpMeter:
                    "xp_per_battle": round(a["xp"] / a["battles"], 2) if a["battles"] else 0.0, "kind": "window"}
             rows.append(row)
             self.latest[key] = row["xp_per_1k_steps"]
-            self._ledger(a, level)
+            self._ledger(ctx, a, level)
         self._write(ctx, rows)
         self._console(ctx, rows)
         self.acc, self.map_steps, self.start_step = {}, Counter(), ctx.step
         return rows
 
-    def _ledger(self, a: dict, level: int) -> None:
+    def _ledger(self, ctx, a: dict, level: int) -> None:
         try:
             if a["battles"] == 0:
                 return
             if self.spots is None:
-                self.spots = xp_spots.XpSpots.load()
+                # the shared ledger sits next to the per-run dirs (runs/xp_spots.json), never relative to the CWD
+                self.spots = xp_spots.XpSpots.load(Path(ctx.run_dir).parent / xp_spots.FILE)
             for mp, xp in a["maps"].items():
                 st = self.map_steps.get(mp, 0)
                 if mp is not None and st >= MIN_MAP_STEPS:

@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from pokeagent.explorer import xp_meter, xp_report, xp_spots
 from pokeagent.explorer.context import Frame
 from pokeagent.explorer.perceive import TILEMAP_LEN
@@ -108,3 +110,37 @@ def test_console_line_format_and_rate_limit(tmp_path):
     meter.on_battle(ctx, [mon(176, 9, 1, B)], [mon(176, 9, 99, B)])
     meter._console(ctx, xp_meter_rows := [row]); meter._console(ctx, xp_meter_rows)
     assert len([x for x in ctx.logs if x.startswith("[xp]")]) == 1
+
+
+def test_two_meters_saving_into_one_file_keep_both_sets_of_cells(tmp_path):
+    path = tmp_path / "xp_spots.json"
+    a, b = xp_spots.XpSpots.load(path), xp_spots.XpSpots.load(path)       # two agents, both started from an empty ledger
+    a.record(35, 7, 100.0, 5.0, 20.0)
+    b.record(36, 12, 50.0, 2.0, 25.0)
+    b.record(35, 7, 200.0, 7.0, 30.0)                                       # a cell both measured
+    assert a.save() and b.save()
+    got = xp_spots.XpSpots.load(path).spots
+    assert set(got) == {"35|5-9", "36|10-14"}                               # last writer did not drop the other's cells
+    assert got["35|5-9"]["n"] == 2 and got["36|10-14"]["n"] == 1            # counts summed
+    assert 100.0 < got["35|5-9"]["xp_per_1k"] < 200.0                       # rates blended
+    a.record(35, 7, 100.0, 5.0, 20.0)
+    assert a.save()                                                         # a saves again: b's counts are neither lost nor doubled
+    after = xp_spots.XpSpots.load(path).spots
+    assert after["36|10-14"]["n"] == 1 and after["35|5-9"]["n"] == 3
+    assert after["35|5-9"]["updated"] >= got["35|5-9"]["updated"]
+    assert [p.name for p in tmp_path.iterdir()] == ["xp_spots.json"]        # no temp files left behind
+
+
+def test_default_ledger_lives_in_the_runs_dir_not_the_cwd(tmp_path, monkeypatch):
+    runs, cwd = tmp_path / "runs", tmp_path / "cwd"
+    (runs / "run-1").mkdir(parents=True)
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    ctx, meter = make_ctx(runs / "run-1"), xp_meter.XpMeter(window=500)     # spots=None: resolved from the run's runs dir
+    run(ctx, meter, 1)
+    meter.on_battle(ctx, [mon(176, 9, 200, B)], [mon(176, 9, 262, B)])
+    run(ctx, meter, 499)
+    assert (runs / "xp_spots.json").is_file()
+    assert list(cwd.iterdir()) == []                                        # nothing written relative to the CWD
+    with pytest.raises(TypeError):
+        xp_spots.XpSpots()                                                  # a writer must name its path
