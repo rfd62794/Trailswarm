@@ -1,6 +1,7 @@
 """tools/step_budget.py on a synthetic console.log, and LoopGuard's training-pace exemption."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -72,3 +73,31 @@ def test_old_battle_outside_window_does_not_count():
     feed(c, 10, battle_at=0)
     feed(c, 60)
     assert not grind_loop.paced_in_training(c)
+
+
+def _jl(path, rows):
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def test_training_controller_rows_on_a_synthetic_run(tmp_path):
+    dec = [{"step": s, "rule": "reorder_party: X", "map": 0x40} for s in (10, 12, 15)]       # gaps 2, 3: one session
+    dec += [{"step": 40, "rule": "reorder_party: X", "map": 35}, {"step": 90, "rule": "plan_goal", "map": 35}]
+    _jl(tmp_path / "decisions.jsonl", dec)
+    (tmp_path / "console.log").write_text(
+        "[grind episode] start on VIRIDIAN_FOREST: trainee L5\n[grind episode] start on VIRIDIAN_FOREST: x\n"
+        "[grind episode] start on ROUTE_24: y\n" + block(1, 0x23, "SHAKE"))
+    _jl(tmp_path / "levels.jsonl", [{"step": 5, "party": [[1, 8, 0, 1, 1], [2, 10, 0, 1, 1]], "blackouts": 0},
+                                    {"step": 70, "party": [[1, 19, 0, 1, 1]], "blackouts": 2}])
+    _jl(tmp_path / "xp_rates.jsonl", [{"kind": "window", "map": 35, "xp_per_1k_steps": 1.0},
+                                      {"kind": "map_summary", "map": 35, "xp_per_1k_steps": 210.5}])
+    r = step_budget.run_rows(tmp_path)
+    assert (r["reorder_sessions"], r["reorder_lines"], r["reorder_in_pokecenter"]) == (2, 4, 1)
+    assert r["episode_starts"] == {"VIRIDIAN_FOREST": 2, "ROUTE_24": 1}
+    assert r["blackouts"] == 2 and r["route24_xp_per_1k"] == 210.5
+    assert r["floor_first_step"]["0:19"] == 70 and r["floor_first_step"]["1:10"] == 5
+
+
+def test_run_rows_tolerate_missing_files_and_torn_lines(tmp_path):
+    (tmp_path / "decisions.jsonl").write_text('{"step": 1, "rule": "reorder_party"}\n{"step": 2, "ru')
+    r = step_budget.run_rows(tmp_path)
+    assert r["reorder_sessions"] == 1 and r["episode_starts"] == {} and r["route24_xp_per_1k"] == 0.0
