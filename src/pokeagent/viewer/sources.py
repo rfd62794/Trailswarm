@@ -32,6 +32,14 @@ class HttpShmSource:
         slot = str(entry.get("frame_slot") or "")
         self._pid = entry.get("pid")
         self._sub = FrameSubscriber(slot) if slot else None
+        self._closed = False
+
+    def close(self) -> None:
+        """Detach from the frame slot (idempotent). A source dropped without this keeps its shared-memory handle for the
+        life of the viewer: on Windows the dead agent's section then stays committed, one per agent that ever ran."""
+        self._closed = True
+        if self._sub is not None:
+            self._sub.close()
 
     def snapshot(self) -> AgentSnapshot | None:
         try:
@@ -52,7 +60,7 @@ class HttpShmSource:
             return {"events": []}
 
     def frame(self) -> tuple[bytes, int, int] | None:
-        if self._sub is None:
+        if self._sub is None or self._closed:   # closed: never re-attach (FrameSubscriber.read would reopen the slot)
             return None
         fr = self._sub.read()
         if fr is not None and self._pid is not None and self._sub.owner_pid != self._pid:
@@ -100,6 +108,16 @@ class FakeSource:
     def send(self, cmd: str, **args) -> dict:
         self.sent.append((cmd, args))
         return {"ok": True}
+
+
+def close_source(src) -> None:
+    """Release whatever a source holds (shared-memory handle); never raises, no-op for sources without ``close``."""
+    try:
+        close = getattr(src, "close", None)
+        if callable(close):
+            close()
+    except Exception:
+        pass
 
 
 def discover(root: Path) -> list[HttpShmSource]:

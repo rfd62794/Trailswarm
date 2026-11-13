@@ -45,6 +45,7 @@ class WorldView:
         self.vl = None                          # this frame's view layout (in-place interiors)
         self.status = "loading Kanto from the ROM..."
         self._tex: OrderedDict = OrderedDict()
+        self._tex_pyr: Pyramid | None = None   # the pyramid ``_tex`` chunks were cut from (held: identity stays unique)
         self._sprite_tex: dict = {}
         self._last_mouse: tuple[float, float] | None = None
         self._down_at: tuple[float, float] | None = None
@@ -94,9 +95,29 @@ class WorldView:
         world_layers.maybe_rebuild(self, now)
 
     # -- textures ------------------------------------------------------------------------
+    def _drop_chunks(self) -> None:
+        """Delete every chunk texture (each is ~16 MB of floats, plus DPG's CPU copy)."""
+        while self._tex:
+            dpg.delete_item(self._tex.popitem(last=False)[1])
+
+    def _drop_sprites(self) -> None:
+        for tag in self._sprite_tex.values():
+            dpg.delete_item(tag)
+        self._sprite_tex.clear()
+
+    def _adopt_pyramid(self, pyr: Pyramid | None) -> None:
+        """Make ``pyr`` the drawn pyramid. Chunk textures of any other pyramid are dead weight (a layer rebuild or a world swap
+        replaces the pixels) and would otherwise sit on the GPU until the LRU got round to them - up to MAX_TEX x 16 MB."""
+        if pyr is not self._tex_pyr:
+            self._drop_chunks()
+            self._tex_pyr = pyr
+        self.pyr = pyr
+
     def _chunk_tex(self, f: int, cx: int, cy: int, force: bool = False):
         """The texture of a chunk if it is on the GPU; otherwise upload it - at most MAX_UPLOADS per frame (None = not yet)."""
-        key = (id(self.pyr), f, cx, cy)
+        if self.pyr is not self._tex_pyr:
+            self._adopt_pyramid(self.pyr)
+        key = (f, cx, cy)
         if key in self._tex:
             self._tex.move_to_end(key)
             return self._tex[key]
@@ -116,7 +137,17 @@ class WorldView:
         if key not in self._sprite_tex:
             img = self.world.book.image(sprites.PLAYER, facing, phase, colour)
             self._sprite_tex[key] = dpg.add_static_texture(18, 18, to_gpu_rgba(np.asarray(img)), parent=TEX)
-        return self._sprite_tex[key]
+        return self._sprite_tex[key]       # bounded: facings x phases x the 10-colour agent palette, never per agent id
+
+    def prune_agents(self, live) -> None:
+        """Forget view state about agents that left (selection, follow target, hit-test points)."""
+        live = set(live)
+        if self.selected_id is not None and self.selected_id not in live:
+            self.selected_id = None
+        if self.follow.agent_id is not None and self.follow.agent_id not in live:
+            self.follow.stop()
+        for aid in [a for a in self._points if a not in live]:
+            del self._points[aid]
 
     # -- input ---------------------------------------------------------------------------
     def _mouse(self) -> tuple[float, float] | None:
@@ -220,7 +251,9 @@ class WorldView:
         dpg.delete_item(dl, children_only=True)
         if self._loaded is not None:
             prev_world, prev_vp = self.world, self.vp
-            (self.world, self.pyr), self._loaded = self._loaded, None
+            (self.world, pyr), self._loaded = self._loaded, None
+            self._adopt_pyramid(pyr)
+            self._drop_sprites()                    # drawn from the old world's sprite book (and its tint)
             self.vp = Viewport(*self.world.layout.size_px, self.vp.screen_w, self.vp.screen_h)
             if not (prev_world is not None and self.interiors.swap.restore(prev_world, prev_vp, self.vp)):
                 self.vp.fit()
@@ -232,7 +265,8 @@ class WorldView:
                 self.side.update()
             return
         if self._pending is not None:
-            self.pyr, self._pending = self._pending, None
+            self._adopt_pyramid(self._pending)
+            self._pending = None
         try:
             self._frame(now, dl)
         except Exception as exc:                  # nothing in the World view may kill the window: log once, skip the frame
@@ -242,6 +276,7 @@ class WorldView:
 
     def _frame(self, now: float, dl) -> None:
         self.interiors.tick_world()
+        self.prune_agents(self.wm.ids())
         self._maybe_rebuild(now)
         self._drag()
         t = self.follow.target(self._points, now)
@@ -286,6 +321,10 @@ class WorldView:
             g *= 2
 
     def delete(self) -> None:
+        self._drop_chunks()
+        self._drop_sprites()
+        self.mini.delete()
+        self.interiors.delete()
         for t in (self.area, "world_input"):
             if dpg.does_item_exist(t):
                 dpg.delete_item(t)

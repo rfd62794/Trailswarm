@@ -23,7 +23,8 @@ from pokeagent.world.pyramid import to_gpu
 
 log = logging.getLogger(__name__)
 MAX_RENDER = 8                 # new interior renders per frame: choosing an in-place mode fills in over a few frames
-MAX_TEX = 400                  # interior textures are small (one per anchored interior and scale); trimmed past this
+MAX_TEX = 400                  # interior textures kept at most (count) ...
+MAX_TEX_BYTES = 96 << 20       # ... and at most this many bytes: a texture is float RGBA, 16 bytes a pixel (a 320x288 room is 1.5 MB)
 
 
 class InteriorLayer:
@@ -41,6 +42,8 @@ class InteriorLayer:
         self._rev, self._erev, self._wid = -1, -1, None
         self._walk: dict = {}
         self._tex: dict = {}
+        self._tex_bytes: dict = {}           # key -> bytes of that texture (the budget the cache is trimmed to)
+        self._tex_world = None               # the world ``_tex`` belongs to (held, so ``is`` is a safe identity test)
         self._images: inplace_render.InteriorImages | None = None
         self._used: set = set()
         self._failed: tuple | None = None    # input signature whose planning/drawing raised: skipped until it changes
@@ -107,12 +110,22 @@ class InteriorLayer:
 
     # -- textures (never deleted while a frame may still draw them: trimmed at the start of the next frame) ----------
     def _purge(self, w) -> None:
-        stale = [k for k in self._tex if k[0] != id(w)]
-        if len(self._tex) > MAX_TEX:
-            stale += [k for k in self._tex if k not in self._used and k not in stale]
-        for k in stale:
-            dpg.delete_item(self._tex.pop(k))
+        if w is not self._tex_world:         # a new world (tint, variant swap): every texture is of the old pixels
+            self._drop(list(self._tex))
+            self._tex_world = w
+            self._images = None              # renders of the old world's ROM/headers
+        elif len(self._tex) > MAX_TEX or sum(self._tex_bytes.values()) > MAX_TEX_BYTES:
+            self._drop([k for k in self._tex if k not in self._used])
         self._used = set()
+
+    def _drop(self, keys) -> None:
+        for k in keys:
+            dpg.delete_item(self._tex.pop(k))
+            self._tex_bytes.pop(k, None)
+
+    def delete(self) -> None:
+        self._drop(list(self._tex))
+        self._tex_world = None
 
     def _texture(self, m: int, s: float, depth: int):
         w = self.view.world
@@ -125,6 +138,7 @@ class InteriorLayer:
                 return None                      # over this frame's render budget: not drawn yet
             img = inplace_render.interior_tile(src, s, depth)
             self._tex[key] = dpg.add_static_texture(img.shape[1], img.shape[0], to_gpu(img), parent="world_tex")
+            self._tex_bytes[key] = img.shape[0] * img.shape[1] * 16
         self._used.add(key)
         return self._tex[key]
 

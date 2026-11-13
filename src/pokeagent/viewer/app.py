@@ -22,7 +22,7 @@ from pokeagent.viewer import modes, swarm_rows
 from pokeagent.viewer.model import ViewerModel
 from pokeagent.world.events import BattleEnd, BattleStart, EventBus, Move
 from pokeagent.world.model import WorldModel
-from pokeagent.viewer.sources import HttpShmSource, discover
+from pokeagent.viewer.sources import HttpShmSource, close_source, discover
 
 log = logging.getLogger(__name__)
 
@@ -93,29 +93,42 @@ def _sources_for(root: Path, fake: int) -> tuple[dict, dict]:
     return {aid: HttpShmSource(e) for aid, e in entries.items()}, entries
 
 
-def merge_sources(current: dict, fresh: dict) -> tuple[list[str], list[str]]:
+def merge_sources(current: dict, fresh: dict, missed: dict | None = None) -> tuple[list[str], list[str]]:
     """Reconcile ``current`` (agent_id -> source) with ``fresh`` in place: keep existing sources
-    for agents still present, add new ones, drop vanished ones (poll cadences live in the model)."""
-    gone = [aid for aid in current if aid not in fresh]
+    for agents still present, add new ones, drop vanished ones (poll cadences live in the model).
+    ``missed`` (agent_id -> consecutive misses): when given, an agent is dropped only after two scans in a row
+    miss it, so one unreadable registry file (read during its atomic replace) never drops a live agent."""
+    absent = [aid for aid in current if aid not in fresh]
+    if missed is None:
+        gone = absent
+    else:
+        for aid in [a for a in missed if a not in absent]:
+            missed.pop(aid)                     # seen again (or already dropped): the streak resets
+        for aid in absent:
+            missed[aid] = missed.get(aid, 0) + 1
+        gone = [aid for aid in absent if missed[aid] >= 2]
+        for aid in gone:
+            missed.pop(aid)
     for aid in gone:
-        del current[aid]
+        close_source(current.pop(aid))          # the exited agent's frame-slot handle goes with it
     added = [aid for aid in fresh if aid not in current]
     for aid in added:
         current[aid] = fresh[aid]
+    for aid, src in fresh.items():              # a re-scan builds a source for every agent: the ones not adopted are dropped
+        if current.get(aid) is not src:
+            close_source(src)
     return added, gone
 
 
 def refresh_sources(holder: dict, model, fresh: dict, new_entries: dict, world=None) -> list[str]:
-    """Apply a registry re-scan. An agent whose registry entry is gone has exited: forget its card at once
+    """Apply a registry re-scan. An agent whose registry entry is missing from two scans in a row has exited: forget its card
     (``model.prune`` would keep it as 'lost' for 60 s), and its World-view track too (``world``: a WorldModel;
     any track without a live source is dropped, so dots/trails of dead agents never linger). Returns the dropped ids."""
-    _added, gone = merge_sources(holder["sources"], fresh)
+    _added, gone = merge_sources(holder["sources"], fresh, holder.setdefault("missed", {}))
     for aid in gone:
         model.forget(aid)
     if world is not None:
-        for aid in world.ids():
-            if aid not in holder["sources"]:
-                world.forget(aid)
+        world.sweep(holder["sources"])            # tracks, cursors, poll stamps and feed rows of every agent not live
     holder["entries"].clear()
     holder["entries"].update(new_entries)
     return gone
@@ -191,6 +204,8 @@ def run(root, fps: int = 30, fake: int = 0, web: bool = False, web_port: int = 8
         win.run()
     finally:
         stop.set()
+        for src in list(holder["sources"].values()):
+            close_source(src)
         if stitched is not None:
             stitched.close()
     return 0
