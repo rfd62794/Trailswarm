@@ -164,7 +164,7 @@ Nothing for the build. After merge, Claude runs the ROM state tests and a hands-
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Superseded |
 | Assigned to | devin |
 | Branch | directive/pokeagent-party-view-migration-lead-directive |
 | Base branch | - |
@@ -178,4 +178,5 @@ Nothing for the build. After merge, Claude runs the ROM state tests and a hands-
 - 2026-11-12 17:29 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-lead-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M78Y28H82VE8YJD8PX91CBZ3
 - 2026-11-12 17:39 · dispatcher · launched pid=14620; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-party-view-migration-lead-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (8 declared need(s); 4 external))
 - 2026-11-12 18:04 · devin · In progress → Review — [origin] spent: devin 25 min est. n/a
+- 2026-11-12 20:26 · robert-claude-laptop · Review → Superseded — superseded_by: commit:e2f502a - note: Devin's d665f5b conflicted with #222 (lowest-first party) and used a first-living fighter rule; cloud Claude reworked it onto main as PR #225 (8dc2a25, strongest-healthy rule). Sonnet APPROVE, cloud verify clean, ROM to_pewter->to_mt_moon PASS 2456; merged e2f502a.
 <!-- queue:end -->
