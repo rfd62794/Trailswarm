@@ -39,16 +39,20 @@ def grinding_now(ctx) -> bool:
 
 
 STALL_HOLD_CAP = 6000  # plan steps the gym stays shut after a stall lift before the hold gives up
+FLOOR_CAP_MULT = 3     # ... times this while the checkpoint's team level floor is unmet (Robert 2026-11-12: the floor must hold)
+FLOOR_BLACKOUTS = 10   # ... and only this many blackouts while held lift it: grinding losses are not a reason to face the leader under-levelled (untuned)
 
 
-def stall_hold_holds(st: dict, reason: str, step: int, blackouts: int) -> bool:
+def stall_hold_holds(st: dict, reason: str, step: int, blackouts: int, floor_unmet: bool = False) -> bool:
     """True while a stall lift should keep the gym hold. Hard escapes so the run is never locked out forever:
-    STALL_HOLD_CAP steps since the hold began, or a blackout while held (grinding is losing). ``st`` carries the
-    hold's start (reset when the gate is not lifted: call ``st.pop('stall_hold', None)`` then)."""
+    STALL_HOLD_CAP steps since the hold began, or a blackout while held (grinding is losing). With the team level
+    floor unmet the escape is FLOOR_CAP_MULT x the cap or FLOOR_BLACKOUTS blackouts: one lost fight at L23 vs Misty
+    (needs L33) must not open the gym again. ``st`` carries the hold's start (``st.pop('stall_hold', None)`` resets)."""
     if not stall_keeps_hold(reason):
         return False
     start = st.setdefault("stall_hold", (step, blackouts))
-    return step - start[0] < STALL_HOLD_CAP and blackouts <= start[1]
+    cap, lost = (STALL_HOLD_CAP * FLOOR_CAP_MULT, FLOOR_BLACKOUTS - 1) if floor_unmet else (STALL_HOLD_CAP, 0)
+    return step - start[0] < cap and blackouts - start[1] <= lost
 
 
 def battle_outcome(*, trainer: bool, start: tuple, end: tuple, party_count: int) -> tuple[bool, bool]:

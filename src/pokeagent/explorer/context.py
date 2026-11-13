@@ -105,6 +105,7 @@ class ExplorerContext:
     catch_skip_logged: Any = None        # catch_want key whose policy skip reason was already logged
     catch_turns: tuple = (None, None, 0)  # (catch_want key, turn signature, policy turns) for catch_policy.MAX_TURNS
     readiness_note: str = ""  # last party-readiness verdict logged (plan_goal)
+    floor_note: str = ""  # last failing team-floor reason logged (training.gate_state)
     stage_goal: str | None = None  # current stage goal (training.stage_goal), published by plan_goal each step
     clamp_note: str = ""      # last readiness clamp logged
     under_level_note: str = ""  # last under-level line logged (plan_goal)
