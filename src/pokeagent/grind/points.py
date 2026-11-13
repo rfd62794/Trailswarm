@@ -197,7 +197,7 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
     if not party_levels:
         return None
     lvl = party_levels[trainee_slot] if trainee_slot is not None and 0 <= trainee_slot < len(party_levels) \
-        else party_levels[0]
+        else max(party_levels)  # the strongest: slot 0 is the weakest in a lowest-first party
     if need_level - lvl <= 0:
         return None
     maps = _maps_of(mem)

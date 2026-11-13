@@ -452,3 +452,26 @@ def test_readiness_leaves_a_waiting_text_box_to_the_dialog_behaviour(tmp_path):
     put_box(ctx)
     ctx.refresh()
     assert not Readiness().applies(ctx)  # a box is waiting: advance_dialog presses, readiness does not
+
+
+def test_menu_yields_to_an_item_sequence_in_flight(tmp_path):
+    """Robert 2026-11-12: status_care opened START > ITEM for an ANTIDOTE and menu curiosity chose the POKe BALL."""
+    from pokeagent.explorer import status_care
+    ctx = make_ctx(tmp_path)
+    put_box(ctx, menu=True)
+    assert applies(Menu(), ctx)
+    status_care.of(ctx)["seq"] = {"item": 0x0B, "slot": 0}
+    assert not applies(Menu(), ctx)
+    status_care.of(ctx)["seq"] = None
+    ctx.item_seq = {"pick": None}
+    assert not applies(Menu(), ctx)
+
+
+def test_menu_never_tries_bag_items_out_of_battle(tmp_path, monkeypatch):
+    from pokeagent.explorer.behaviours import menu as menu_mod
+    ctx = make_ctx(tmp_path)
+    put_box(ctx, menu=True)
+    ctx.refresh()
+    monkeypatch.setattr(menu_mod, "frame_lines", lambda tm: [">POKe BALL", "x 5", "ANTIDOTE", "x 1", "CANCEL"])
+    d = Menu().step(ctx)
+    assert (d.button, d.rule) == ("B", "menu_item_list_back")

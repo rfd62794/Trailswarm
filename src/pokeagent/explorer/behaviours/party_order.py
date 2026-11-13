@@ -1,9 +1,10 @@
 """party_order: reorder_party. START -> POKeMON -> member -> SWITCH -> target, verified screen by screen.
 
-Keeps the Magikarp being switch-trained FIRST in the party (it must be the one that gets sent out into battle, then
-swapped out on turn one). Runs whenever it is not first - after buying it, and after anything that reshuffles the party.
-Every press is chosen from the text now on screen (party_menu.reorder_press), the order itself is checked in RAM, and a
-screen that never gets there abandons the attempt and tries again later.
+The party stands LOWEST LEVEL FIRST (Robert 2026-11-12), fainted members last, ties in their current order. Gen 1 sends
+slot 0 into every battle and splits XP among the members that took part, so the weakest lead always earns a share and a
+stronger member is switched in when needed (switch_out). team_plan.ascending_order is the only ordering rule; this
+behaviour just walks the menus. Every press is chosen from the text now on screen (party_menu.reorder_press), the order
+itself is checked in RAM, and a screen that never gets there abandons the attempt and tries again later.
 """
 from __future__ import annotations
 
@@ -11,12 +12,9 @@ from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.party_menu import MENU_ITEM, menu_open, reorder_press, screen_lines
-from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines, lead_level
-from pokeagent.explorer.world import DUNGEON_MAPS
-from pokeagent.knowledge import team_plan, trainers
-from pokeagent.knowledge.party import our_party, trainer_mon
-from pokeagent.magikarp import party_species, trainee_slot
-from pokeagent.ram_symbols import PARTY_COUNT
+from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
+from pokeagent.knowledge import team_plan
+from pokeagent.magikarp import party_species
 from pokeagent.ramstructs import read_party
 
 MAX_PRESSES = 40          # one reorder is about 10 presses; more means the menus are not what we think
@@ -31,89 +29,33 @@ def species_names(emu) -> list[str]:
     return [names.get(str(s), f"#{s}") for s in party_species(emu)]
 
 
-def trainee_home(ctx: ExplorerContext) -> int:
-    """Where the trainee Magikarp belongs: first outside (sent out and swapped on turn one), LAST inside a dungeon, where
-    every fight is a wild one on the way to the exit and the turn-one swap costs ~20 presses a battle (Mt Moon 2026-11-05)."""
-    return max(0, ctx.emu.read(PARTY_COUNT) - 1) if ctx.view.m in DUNGEON_MAPS else 0
-
-
-def _opponent(ctx: ExplorerContext) -> list:
-    """[(level, species)] the matchup lead is chosen for, or []: the strongest unbeaten trainer party on
-    the map while trainer_hunt has named an engage target here, else the stage boss's party while the
-    next unmet goal is a boss stage and the training gate is closed (an open gate keeps the trainee lead)."""
-    t = ctx.trainer_target
-    if t is not None and t[0] == ctx.view.m:
-        from pokeagent.explorer import trainer_ledger
-        mons = [e.mons for e in trainer_ledger.ledger_for(ctx).entries(t[0]) if e.state != "beaten" and e.mons]
-        if mons:
-            return max(mons, key=lambda p: sum(lv for lv, _ in p))
-    from pokeagent.explorer.training import BOSS_LABEL, stage_goal
-    goal = stage_goal(ctx.goals())
-    if goal and goal in BOSS_LABEL and not (0 < lead_level(ctx.emu) < (ctx.train_need or 0)):
-        return trainers.boss_party(goal, starter_names=species_names(ctx.emu)) or (
-            trainers.strongest_on_mt_moon() if goal == "to_mt_moon" else [])
-    return []
-
-
 def team_sig(ctx: ExplorerContext) -> tuple:
-    """The order-independent team state a lead flip may react to: (species, level, fainted) per member, sorted."""
+    """The order-independent team state a reorder may react to: (species, level, fainted) per member, sorted."""
     return tuple(sorted((getattr(m, "species", 0), getattr(m, "level", 0), getattr(m, "hp", 1) == 0)
                         for m in read_party(ctx.emu)))
 
 
-def _opp_key(ctx: ExplorerContext, opp: list | None = None) -> tuple:
-    """The opponent a matchup lead was chosen for (empty when none): trainer_target and its party."""
-    opp = _opponent(ctx) if opp is None else opp
-    return (tuple(ctx.trainer_target) if getattr(ctx, "trainer_target", None) else None, tuple(opp)) if opp else ()
-
-
-def _lead_weak(ctx: ExplorerContext) -> bool:
-    """The lead is alive but under SWITCH_MIN_HP of its max: a fresh lead choice is warranted, not held."""
-    party = read_party(ctx.emu)
-    lead = party[0] if party else None
-    mx = getattr(lead, "max_hp", 0)
-    return bool(mx) and 0 < getattr(lead, "hp", 0) / mx < team_plan.SWITCH_MIN_HP
-
-
-def _held(ctx: ExplorerContext, opp: list | None = None) -> bool:
-    """True while the last reorder is younger than HOLD_STEPS and no level / faint / party change happened since.
-    Run explore-20261112-072650 flipped Charmander<->Pidgey 12-34 steps apart (steps 1320/1332/1366, 2764/2788/2805):
-    the trainer-matchup lead and the grind's exp-rotation lead alternate with trainer_target, each flip ~10 presses."""
+def _held(ctx: ExplorerContext) -> bool:
+    """True while the last reorder is younger than HOLD_STEPS and no level / faint / party change happened since."""
     last = team_plan.of(ctx).get("order_hold")
-    if not last or ctx.step - last[0] >= HOLD_STEPS or last[1] != team_sig(ctx):
-        return False
-    now = _opp_key(ctx, opp)
-    if now and now != last[2]:   # a different trainer / boss is engaged: its matchup lead is not churn
-        return False
-    return not _lead_weak(ctx)
+    return bool(last) and ctx.step - last[0] < HOLD_STEPS and last[1] == team_sig(ctx)
 
 
 def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
-    """(src, want, why) for the next reorder, or None when the party order stands: the member at ``src``
-    should sit at ``want`` (SWITCH swaps the two slots). Before a known boss/trainer target the lead is
-    the matchup pick (team_plan.choose_lead); on a grind the lowest band breaker leads for the shared
-    exp; otherwise the Magikarp trainee's home, exactly as before."""
-    opp = _opponent(ctx)
-    if opp:
-        party = our_party(ctx.emu)
-        theirs = [m for lv, n in opp if (m := trainer_mon(n, lv))]
-        if party and theirs:
-            src = team_plan.choose_lead(party, theirs, None)
-            if src != 0 and not _held(ctx, opp):
-                names = species_names(ctx.emu)
-                who = names[src] if src < len(names) else f"slot {src + 1}"
-                return (src, 0, f"matchup lead {who} for {theirs[0].name}")
-            return None
-    slot = trainee_slot(ctx.emu)
-    if slot is not None:
-        home = trainee_home(ctx)
-        return (slot, home, "trainee home") if slot != home else None
-    brk = team_plan.of(ctx).get("breakers") or ()
-    if brk and 0 < lead_level(ctx.emu) < (ctx.train_need or 0):
-        s = team_plan.trainee_slot(read_party(ctx.emu), ctx.train_member, brk)
-        if s is not None and s != 0 and not _held(ctx):
-            return (s, 0, "exp rotation: the lowest band breaker leads the grind")
-    return None
+    """(src, want, why) for the next reorder, or None when the party order stands. THE one ordering rule
+    (team_plan.ascending_order): lowest level first, fainted members last, ties keep their current order. The
+    weakest member leads (Gen 1 gives XP to every member that took part; the lead always gets a share), and a
+    stronger member is switched in by switch_out / team_plan when the lead is in danger. SWITCH swaps the two slots."""
+    party = read_party(ctx.emu)
+    if len(party) < 2:
+        return None
+    swap = team_plan.next_swap([m.level for m in party], [m.hp <= 0 for m in party])
+    if swap is None or _held(ctx):
+        return None
+    src, want = swap
+    names = species_names(ctx.emu)
+    who = names[src] if src < len(names) else f"slot {src + 1}"
+    return src, want, f"lowest level first: {who} L{party[src].level} -> slot {want + 1}"
 
 
 class PartyOrder(BehaviourBase):
@@ -148,7 +90,7 @@ class PartyOrder(BehaviourBase):
             if menu_open(text) or (framed and ctx.view.box):
                 return self._press(po, "B", f"reorder_party: {species_names(ctx.emu)}", "closing the party menus")
             ctx.log(f"[reorder_party: {species_names(ctx.emu)}]", "res")
-            team_plan.of(ctx)["order_hold"] = (ctx.step, team_sig(ctx), _opp_key(ctx))
+            team_plan.of(ctx)["order_hold"] = (ctx.step, team_sig(ctx))
             ctx.party_order = None
             return no_press("party_order_done")
         if po["presses"] >= MAX_PRESSES:

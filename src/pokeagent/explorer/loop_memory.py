@@ -27,7 +27,11 @@ MAX_RECHOOSE = 3               # times the engine asks the selector for another 
 LEDGER_MAX = 2000              # situations kept in the in-run ledger (oldest dropped)
 ENTRY_IDLE_DROP = LOOP_VETO_STEPS * 4  # an entry with no new press this long is forgotten (bounded memory)
 # behaviours whose repeated presses are legitimate (battle menus, party management, waiting out a busy screen)
-NEVER_VETO = frozenset({"battle", "battle_moves", "battle_text_wait", "catch", "switch_out", "party_order", "settle_wait"})
+# advance_dialog: A in an OPEN text box only pages a dialog on; a box still printing (or the nurse's heal jingle)
+# shows the same text for several presses, and vetoing it stranded heals mid-dialog (663 vetoes in one 9k-step run,
+# 2026-11-12). Restarting dialogs are caught on the behaviour that STARTS the talk, not on the paging.
+NEVER_VETO = frozenset({"battle", "battle_moves", "battle_text_wait", "catch", "switch_out", "party_order", "settle_wait",
+                        "advance_dialog"})
 
 # --- cross-run persistence (all untuned first values) ---
 PROMOTE_FLUSH_STEPS = 500      # steps between folds of this run's veto keys into the shared memory (and at run end)

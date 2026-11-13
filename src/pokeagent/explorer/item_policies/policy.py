@@ -58,7 +58,8 @@ def _grind_minutes(ctx, goals: dict, party: list[Combatant]) -> float | None:
         from pokeagent.explorer.training import stage_goal
         atlas = json.loads((Path(ctx.run_dir).parent / "grind_atlas.json").read_text(encoding="utf-8")).get("atlas") or {}
         goal = stage_goal(goals)
-        return rare_candy.atlas_minutes(atlas, party[0].name, goal, party[0].level, rare_candy.STEPS_PER_MIN) if goal and party else None
+        top = max(party, key=lambda c: c.level) if party else None  # the strongest, not slot 0
+        return rare_candy.atlas_minutes(atlas, top.name, goal, top.level, rare_candy.STEPS_PER_MIN) if goal and top else None
     except (OSError, ValueError, KeyError, IndexError):
         return None
 

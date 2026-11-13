@@ -28,11 +28,9 @@ def read_mons(emu, kb: dict | None = None) -> list[Mon]:
 
 
 def fighter_slot_of(party: list[Mon]) -> int | None:
-    """Party slot that does the fighting: slot 0 without a Magikarp, else the strongest non-Magikarp (None: only Magikarps).
-    Same rule as cave_topup.fighter_slot / magikarp.fighter, on plain data."""
+    """Party slot that does the fighting: the strongest healthy non-Magikarp (None: only Magikarps; the party stands
+    lowest-first, so slot 0 is the weakest). Same rule as cave_topup.fighter_slot / magikarp.fighter, on plain data."""
     if not party:
         return None
     real = [m for m in party if m.species != MAGIKARP]
-    if len(real) == len(party):
-        return 0
     return max(real, key=lambda m: (m.hp > 0, m.level, m.hp)).slot if real else None

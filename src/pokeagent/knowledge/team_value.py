@@ -170,7 +170,7 @@ def member_value(candidate: Candidate, party: list, bosses, xp_per_fight: float 
     """Score one candidate against the next bosses (``bosses`` = [(label, [(level, species)])], already capped
     at BOSS_HORIZON by the caller). Never raises on empty inputs: a zero-value MemberValue comes back."""
     dex = pokedex_value(candidate.species, owned_count, frozenset(owned_species))
-    lead_level = party[0].level if party else 0
+    lead_level = max((c.level for c in party), default=0)  # the strongest, not slot 0 (the party stands lowest-first)
     cand = candidate
     cv = 0.0
     if candidate.source.startswith("wild:"):

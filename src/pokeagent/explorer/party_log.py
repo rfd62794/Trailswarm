@@ -168,7 +168,7 @@ class PartyLog:
     def _count_steps(self, ctx) -> None:
         if ctx.in_battle or ctx.view.battling:
             self.battle_steps += 1
-        elif 0 < lead_level(ctx.emu) < ctx.train_need:  # the training gate plan_goal set: grass-seeking below it
+        elif 0 < (getattr(ctx, "gate_lvl", None) or lead_level(ctx.emu)) < ctx.train_need:  # the training gate plan_goal set: grass-seeking below it
             self.grind_steps += 1
         else:
             self.travel_steps += 1
