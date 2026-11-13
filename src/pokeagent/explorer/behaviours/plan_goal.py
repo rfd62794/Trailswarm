@@ -130,7 +130,7 @@ class PlanGoal(BehaviourBase):
         ctx.train_route_live = bool(team_ready_stage and training_live)
         if (planned is None or after_heal.leaving(planned, m)) and team_ready_stage and training_live:
             planned = train_route.step(ctx.mem.data["maps"], (m, x, y), ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu),
-                                         survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None))  # no planner target: go to the grass
+                                         survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None)) or planned  # to the grass; keep the planner's exit press if no route yet
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
         hold = nv is not None and not gate_ready and gym is not None

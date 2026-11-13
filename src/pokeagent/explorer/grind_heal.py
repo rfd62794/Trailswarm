@@ -13,7 +13,7 @@ Outside a grind nothing changes.
 from __future__ import annotations
 
 from pokeagent.explorer.perceive import party_needs_heal
-from pokeagent.explorer.retreat_risk import party_survives
+from pokeagent.explorer.retreat_risk import PARTY_FLOOR, party_survives
 from pokeagent.party_view import read_party_view
 
 
@@ -26,7 +26,8 @@ def needs_heal(ctx, fraction: float) -> bool:
     """``party_needs_heal(fraction)`` normally; while grinding, "the next wild fight is not survivable" (or a member fainted)."""
     if not grinding(ctx):
         return party_needs_heal(ctx.emu, fraction)
-    return read_party_view(ctx.emu).any_fainted or not party_survives(ctx.emu, ctx.view.m)
+    # PARTY_FLOOR backstop: party_survives may fall back to a bare 15% fighter test with no KB (review of 84e8023)
+    return party_needs_heal(ctx.emu, PARTY_FLOOR) or not party_survives(ctx.emu, ctx.view.m)
 
 
 def potion_instead(ctx) -> bool:

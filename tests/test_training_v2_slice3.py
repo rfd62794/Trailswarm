@@ -83,12 +83,24 @@ def _ctx(grind=True):
 
 def test_grinding_heal_follows_the_survival_floor(monkeypatch):
     monkeypatch.setattr(grind_heal, "read_party_view", lambda e: SimpleNamespace(any_fainted=False))
-    monkeypatch.setattr(grind_heal, "party_needs_heal", lambda e, f: True)   # the old fixed fraction says "hurt"
+    monkeypatch.setattr(grind_heal, "party_needs_heal", lambda e, f: f >= 0.4)   # fighter at ~30%: under 0.4, over PARTY_FLOOR
     monkeypatch.setattr(grind_heal, "party_survives", lambda e, m: True)
     assert grind_heal.needs_heal(_ctx(), 0.4) is False               # grinding: survivable -> no heal, stay in the grass
     assert grind_heal.needs_heal(_ctx(grind=False), 0.4) is True     # not grinding: unchanged
     monkeypatch.setattr(grind_heal, "party_survives", lambda e, m: False)
     assert grind_heal.needs_heal(_ctx(), 0.4) is True
+
+
+def test_grinding_heal_backstops_a_fainted_member_and_the_party_floor(monkeypatch):
+    """Review of 84e8023: party_survives can fall back to a bare 15% fighter test; PARTY_FLOOR (and a faint) always heal."""
+    monkeypatch.setattr(grind_heal, "party_survives", lambda e, m: True)
+    monkeypatch.setattr(grind_heal, "party_needs_heal", lambda e, f: f > grind_heal.PARTY_FLOOR - 1e-9)  # under the floor
+    assert grind_heal.needs_heal(_ctx(), 0.4) is True
+    import pokeagent.explorer.perceive as perceive
+    monkeypatch.setattr(grind_heal, "party_needs_heal", perceive.party_needs_heal)
+    monkeypatch.setattr(perceive, "read_party_view", lambda e: SimpleNamespace(any_fainted=True))
+    monkeypatch.setattr(perceive, "fighter", lambda e: (0, 0, 30, 30))
+    assert grind_heal.needs_heal(_ctx(), 0.4) is True                # a fainted member heals even at full fighter HP
 
 
 def test_retreat_heal_gate_uses_the_floor_while_grinding(monkeypatch):
