@@ -114,12 +114,18 @@ def test_team_ready_detector_never_blocks():
 
 # --- the training-gate seam and the switch-training target --------------------------------------------------------
 
-def test_lead_level_drops_to_the_trainee_band_while_a_magikarp_is_in_the_party():
+def test_lead_level_is_the_strongest_member_not_slot_0_and_not_the_trainee_band():
     emu = FakeEmulator(party_mem([(MAGIKARP, 13, 17, 17), (179, 30, 82, 82)]))
-    assert lead_level(emu) == min(30, 13 + TEAM_GAP) == 19
+    assert lead_level(emu) == 30                                    # the Magikarp no longer caps the gate (Route 3 grind loop)
     emu.memory.update(party_mem([(GYARADOS, 30, 82, 82), (179, 30, 82, 82)]))
-    assert lead_level(emu) == 30                                    # evolved: slot 0's level, as before
-    assert lead_level(FakeEmulator(party_mem([(179, 30, 82, 82), (0x54, 9, 20, 20)]))) == 30  # no Magikarp: unchanged
+    assert lead_level(emu) == 30
+    assert lead_level(FakeEmulator(party_mem([(0x54, 9, 20, 20), (179, 30, 82, 82)]))) == 30  # weak lead first: still the team's 30
+
+
+def test_trainee_band_level_is_only_for_the_team_ready_stage():
+    from pokeagent.explorer.perceive import trainee_band_level
+    emu = FakeEmulator(party_mem([(MAGIKARP, 13, 17, 17), (179, 30, 82, 82)]))
+    assert trainee_band_level(emu) == min(30, 13 + TEAM_GAP) == 19
 
 
 def test_trainee_slot_for_follows_the_magikarp_then_the_named_member():
@@ -136,11 +142,11 @@ def test_trainee_slot_for_follows_the_magikarp_then_the_named_member():
 
 # --- review blockers: team_ready training need, idle settle, true lead level, fighter trainee never flees -------------
 
-def test_true_lead_level_ignores_the_trainee_band():
+def test_true_lead_level_is_the_strongest_healthy_member():
     from pokeagent.explorer.perceive import true_lead_level
     emu = FakeEmulator(party_mem([(MAGIKARP, 13, 17, 17), (179, 30, 82, 82)]))
-    assert lead_level(emu) == 19 and true_lead_level(emu) == 30
-    assert true_lead_level(FakeEmulator(party_mem([(179, 30, 82, 82), (0x54, 9, 20, 20)]))) == 30
+    assert lead_level(emu) == 30 and true_lead_level(emu) == 30
+    assert true_lead_level(FakeEmulator(party_mem([(0x54, 9, 20, 20), (179, 30, 82, 82)]))) == 30
 
 
 def test_bandit_and_drill_key_by_the_true_level():

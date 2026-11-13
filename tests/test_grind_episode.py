@@ -113,7 +113,7 @@ def test_episode_ends_hurt_with_no_potion(tmp_path, monkeypatch):
     ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), make_ledger())
     _start(ctx, monkeypatch, tmp_path)
     ctx.emu.set(HP_LO, 0)
-    ctx.emu.set(HP_HI, 4)                              # 4/20 < 0.5 and no heal items in the bag
+    ctx.emu.set(HP_HI, 2)                              # 2/20 = 10% < the survival margin and no heal items in the bag
     assert grind_episode.update(ctx) is None
     row = json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])
     assert row["reason"] == "hurt with no potion" and row["status"] == "aborted"
@@ -157,7 +157,7 @@ def test_hurt_restart_loop_yields_one_aborted_row_and_no_ledger_change(tmp_path,
     ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), led)
     _start(ctx, monkeypatch, tmp_path)
     ctx.emu.set(HP_LO, 0)
-    ctx.emu.set(HP_HI, 4)
+    ctx.emu.set(HP_HI, 2)
     assert grind_episode.update(ctx) is None                       # aborted end
     rows = (tmp_path / "rows.jsonl").read_text().splitlines()
     assert len(rows) == 1 and json.loads(rows[0])["status"] == "aborted"
@@ -176,7 +176,7 @@ def test_never_starts_into_a_state_that_would_end(tmp_path, monkeypatch):
     """Start-gate: every _end_reason check runs at start too - hurt-with-no-potion can never begin."""
     led = make_ledger()
     led.path = tmp_path / "gp.json"
-    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(4, 20)), led)
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(2, 20)), led)
     _start_blocked_ctx(ctx, monkeypatch, tmp_path)
     assert grind_episode.update(ctx) is None and grind_episode.active(ctx) is None
     assert not (tmp_path / "rows.jsonl").exists()                  # no episode, no row
@@ -392,3 +392,43 @@ def test_live_episode_ends_when_a_blocker_is_recorded_on_the_way(tmp_path, monke
     assert grind_episode.update(ctx) is None                           # the first bump ends it
     assert grind_episode.active(ctx) is None
     assert "story blocker" in (tmp_path / "rows.jsonl").read_text()
+
+
+def test_hurt_stop_reason_consults_party_survives(tmp_path, monkeypatch):
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), make_ledger())
+    _start(ctx, monkeypatch, tmp_path)
+    monkeypatch.setattr(grind_episode, "party_survives", lambda emu, m: False)
+    assert grind_episode.update(ctx) is None                      # full HP, nobody survives, no potion
+    assert json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])["reason"] == "hurt with no potion"
+    ctx2 = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(1, 20)), make_ledger())
+    monkeypatch.setattr(grind_episode, "party_survives", lambda emu, m: True)
+    monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows2.jsonl")
+    monkeypatch.setattr(grind_episode, "LEDGER", tmp_path / "gp2.json")
+    assert grind_episode.update(ctx2) is not None                 # 5% HP but the party survives: it goes on
+
+
+def test_a_fainted_member_is_never_a_survivor_and_still_ends_the_episode(tmp_path, monkeypatch):
+    """party_survives is False with any member down, even next to a healthy one; with no potion the gate stops the episode
+    (the slot-0-fainted test above runs the same path through the real emulator party)."""
+    from dataclasses import replace
+
+    from pokeagent.explorer import retreat_risk as rr
+    from test_after_victory import _mon
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), make_ledger())
+    _start(ctx, monkeypatch, tmp_path)
+    monkeypatch.setattr(rr, "party_now", lambda emu: [replace(_mon("AQUAMON", 12), hp=0), _mon("AQUAMON", 12, 1.0)])
+    assert rr.party_survives(ctx.emu, 35) is False
+    assert grind_episode.update(ctx) is None
+    assert json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])["reason"] == "hurt with no potion"
+
+
+def test_a_fainted_member_stops_the_gates_even_when_party_now_cannot_read_the_species(tmp_path, monkeypatch):
+    """Review of #221: the unreadable-party fallback used party_hp alone and kept grinding with a member down."""
+    from pokeagent.explorer import retreat_risk as rr
+    from pokeagent import party_view
+    ctx = make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20))
+    monkeypatch.setattr(rr, "party_now", lambda emu: [])
+    monkeypatch.setattr(party_view, "read_party_view", lambda emu: type("V", (), {"any_fainted": True})())
+    assert rr.party_survives(ctx.emu, 35) is False
+    monkeypatch.setattr(party_view, "read_party_view", lambda emu: type("V", (), {"any_fainted": False})())
+    assert rr.party_survives(ctx.emu, 35) is True

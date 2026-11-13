@@ -136,9 +136,27 @@ def boss_need(team, boss, kb, label: str = "BOSS") -> Need | None:
 
 
 def level_band(team, need: int) -> dict:
-    """{slot: (lo, hi)} target levels per member: the lead (slot 0) at ``need``, every other member
-    within BAND_BELOW of it - the exp-spread band the rotation keeps."""
-    return {i: (max(1, need if i == 0 else need - BAND_BELOW), need) for i in range(len(team or ()))}
+    """{slot: (lo, hi)} target levels per member: the STRONGEST member (the fighter; the party is ordered
+    lowest-first so slot 0 is the weakest) at ``need``, every other member within BAND_BELOW of it - the
+    exp-spread band the rotation keeps."""
+    top = max(range(len(team or ())), key=lambda i: (team[i].level, -i), default=None)
+    return {i: (max(1, need if i == top else need - BAND_BELOW), need) for i in range(len(team or ()))}
+
+
+def ascending_order(levels, fainted) -> list[int]:
+    """THE party-order rule (the only one): slot indices in the order the party should stand - lowest level
+    first, fainted members last, ties kept in their current order (a stable sort, so nothing churns)."""
+    return sorted(range(len(levels)), key=lambda i: (bool(fainted[i]), levels[i]))
+
+
+def next_swap(levels, fainted) -> tuple[int, int] | None:
+    """(src, want): swap the member at ``src`` into slot ``want`` to move toward ascending_order, or None when
+    the party already stands that way. Selection-sort step: the first misplaced slot takes its rightful member."""
+    want = ascending_order(levels, fainted)
+    for p, src in enumerate(want):
+        if src != p:
+            return src, p
+    return None
 
 
 def band_breakers(team, band) -> tuple:

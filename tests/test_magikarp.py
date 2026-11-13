@@ -200,20 +200,7 @@ def party_ctx(tmp_path, mons) -> ExplorerContext:
     return ctx
 
 
-def test_party_order_matchup_lead_outranks_the_trainee_home(tmp_path, monkeypatch):
-    # gate closed + a boss next: the good lead stays first and the Magikarp stays behind it (7a0363c, deliberate)
-    from pokeagent.explorer.behaviours import party_order
-    from pokeagent.knowledge import team_plan, trainers
-    monkeypatch.setattr(trainers, "boss_party", lambda goal, starter_names=None: [(12, "GEODUDE"), (14, "ONIX")])
-    monkeypatch.setattr(party_order, "our_party", lambda emu: ["ours"])  # the real ones read the ROM tables
-    monkeypatch.setattr(party_order, "trainer_mon", lambda name, lv: object())
-    monkeypatch.setattr(team_plan, "choose_lead", lambda party, theirs, hp: 0)
-    ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51), (MAGIKARP, 5, 17, 17)])
-    ctx.train_need = None
-    assert not PartyOrder().applies(ctx)
-
-
-def test_party_order_triggers_only_when_the_magikarp_is_not_first(tmp_path):
+def test_party_order_triggers_only_when_the_party_is_not_lowest_first(tmp_path):
     ctx = party_ctx(tmp_path, [(STARTER, 18, 51, 51), (MAGIKARP, 5, 17, 17)])
     assert PartyOrder().applies(ctx)
     assert not PartyOrder().applies(party_ctx(tmp_path, [(MAGIKARP, 5, 17, 17), (STARTER, 18, 51, 51)]))

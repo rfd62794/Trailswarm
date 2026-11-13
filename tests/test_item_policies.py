@@ -385,6 +385,34 @@ def test_fighter_slot_follows_the_trainee_rule():
     assert fighter_slot_of([]) is None
 
 
+def test_fighter_slot_of_is_the_strongest_healthy_member():
+    weak, strong = mon(0, level=5), mon(1, level=20)        # the party stands lowest-first: slot 0 is the weakling
+    assert fighter_slot_of([weak, strong]) == 1
+    assert fighter_slot_of([mon(0, level=5), mon(1, level=20, hp=0)]) == 0     # a fainted strong one is skipped
+    assert fighter_slot_of([mon(0, level=5, hp=0), mon(1, level=20, hp=0)]) == 1   # all down: still the highest level
+    assert fighter_slot_of([mon(0, "MAGIKARP", 9, (), hp=0), mon(1)]) == 1
+
+
+def test_vitamin_goes_to_the_strongest_not_the_weakling():
+    party = [mon(0, level=5), mon(1, level=20)]
+    assert vitamins.should_use(bag={ids.HP_UP: 1}, party=party)[:2] == (ids.HP_UP, 1)
+
+
+def test_candy_goes_to_the_strongest_not_the_weakling():
+    assert candy([mon(0, level=5), mon(1, level=20)], (24, 22, 2))[1] == 1
+
+
+def test_hm_teach_fighter_is_the_strongest_not_the_weakling():
+    assert hm_teach._fighter([mon(0, level=5), mon(1, level=20)]) == 1
+    full = ("TACKLE", "TAIL WHIP", "VINE WHIP", "GROWL")
+    p = plan([mon(0, "PIDGEY", level=5), mon(1, "BULBASAUR", level=20, moves=full), mon(2, "BULBASAUR", level=6, moves=full)])
+    assert p and p.learner == 2        # same overwrite cost: the fighter (slot 1, L20) is spared
+    tm = hm_teach.plan_tm(enabled=True, bag={ids.TM01 + 11: 1},
+                          party=[mon(0, level=5, moves=("TACKLE", "GROWL")), mon(1, level=20, moves=("TACKLE", "GROWL"))],
+                          can_learn=lambda n, s: True, needed_hm_moves=set(), boss_types=[], info=info, chart=CHART)
+    assert tm and tm.learner == 1      # a TM goes to the fighter: slot 1, not the L5 weakling
+
+
 # --- 10. end-to-end UseItems.step: the teach cap and the stone settle -----------------------------------------------------------
 from pokeagent.explorer.behaviours import use_items as ui   # noqa: E402
 from pokeagent.explorer.dialog import learn_decision   # noqa: E402

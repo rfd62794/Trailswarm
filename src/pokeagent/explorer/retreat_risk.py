@@ -20,10 +20,10 @@ from pokeagent.knowledge.party import Combatant, our_party, species_row, trainer
 from pokeagent.knowledge.readiness import _chart, duel
 from pokeagent.ramstructs import read_party
 
-FLOOR_NEAR, FLOOR_FAR = 0.55, 0.30      # HP fraction the fighter must keep after the worst likely wild duel (untuned)
-NEAR_FRAMES, FAR_FRAMES = 700, 3000     # walk to the nurse: at or below NEAR the floor is FLOOR_NEAR, at FAR it is FLOOR_FAR
+SURVIVE_NEAR, SURVIVE_FAR = 0.15, 0.05  # HP fraction a party member must keep after the worst wild duel: a variance/crit cushion (untuned)
+NEAR_FRAMES, FAR_FRAMES = 700, 3000     # walk to the nurse: at or below NEAR the margin is SURVIVE_NEAR, at FAR it is SURVIVE_FAR
 MAX_WALK_FRAMES = 4000                  # a nurse farther than this is never worth a retreat (same cap as after_victory)
-PARTY_FLOOR = 0.35                      # whole-party HP fraction below which a known nurse is always walked to (untuned)
+PARTY_FLOOR = 0.20                      # whole-party HP fraction below which a known nurse is always walked to (untuned)
 MIN_CHANCE = 0.05                       # a wild species rarer than this per encounter does not set the risk
 
 
@@ -40,14 +40,14 @@ def party_now(emu) -> list[Combatant]:
     return [replace(c, hp=mons[i].hp) for i, c in enumerate(our_party(emu)) if i < len(mons)]
 
 
-def floor_for(walk_frames: float) -> float:
-    """The HP fraction to keep: FLOOR_NEAR on a short walk, easing down to FLOOR_FAR on a long one."""
+def survive_margin(walk_frames: float) -> float:
+    """The HP fraction a member must keep: SURVIVE_NEAR on a short walk, easing down to SURVIVE_FAR on a long one."""
     if walk_frames <= NEAR_FRAMES:
-        return FLOOR_NEAR
+        return SURVIVE_NEAR
     if walk_frames >= FAR_FRAMES:
-        return FLOOR_FAR
+        return SURVIVE_FAR
     t = (walk_frames - NEAR_FRAMES) / (FAR_FRAMES - NEAR_FRAMES)
-    return FLOOR_NEAR + t * (FLOOR_FAR - FLOOR_NEAR)
+    return SURVIVE_NEAR + t * (SURVIVE_FAR - SURVIVE_NEAR)
 
 
 def _max_hp(c: Combatant, kb) -> int:
@@ -70,17 +70,60 @@ def assess(party: list[Combatant], wild: dict, walk_frames: float | None, kb=Non
     total_max = sum(_max_hp(c, kb) for c in party) or 1
     if total_hp / total_max < PARTY_FLOOR:
         return Verdict(True, f"party at {total_hp / total_max:.0%}, nurse {walk_frames:.0f} frames away")
-    fighter = party[fighter_idx] if fighter_idx < len(party) and party[fighter_idx].hp > 0 else next((c for c in party if c.hp > 0), None)
-    if fighter is None:
+    margin = survive_margin(walk_frames)
+    order = _order(party, fighter_idx)
+    if not order:
         return Verdict(True, "everyone has fainted")
-    floor = floor_for(walk_frames)
-    mx = _max_hp(fighter, kb)
-    left = fighter.hp / mx
-    foes = _worst_wild(wild, kb)
-    if foes and table(kb, "moves"):
-        chart, moves = _chart(kb), table(kb, "moves")
-        left = min(duel(fighter, float(fighter.hp), f, float(f.hp), chart, moves)[0] / mx for f in foes)
-    if left < floor:
-        return Verdict(True, f"{fighter.name} would keep {left:.0%} vs the worst wild fight here (floor {floor:.0%}, "
-                             f"nurse {walk_frames:.0f} frames)")
-    return Verdict(False, f"{fighter.name} keeps {left:.0%} (floor {floor:.0%})")
+    kept = _kept(order, wild, kb)
+    fighter, left = kept[0]
+    if left >= margin:
+        return Verdict(False, f"{fighter.name} keeps {left:.0%} (margin {margin:.0%})")
+    carrier = next(((c, k) for c, k in kept[1:] if k >= margin), None)
+    if carrier:
+        return Verdict(False, f"{fighter.name} would keep {left:.0%} but {carrier[0].name} would carry the fight "
+                              f"({carrier[1]:.0%}, margin {margin:.0%})")
+    best, bk = max(kept, key=lambda ck: ck[1])
+    return Verdict(True, f"no party member keeps {margin:.0%} vs the worst wild fight here (best {best.name} {bk:.0%}, "
+                         f"nurse {walk_frames:.0f} frames)")
+
+
+def _order(party: list[Combatant], fighter_idx: int) -> list[Combatant]:
+    """Living members, the designated fighter first (else the first living one), then the bench in party order."""
+    living = [c for c in party if c.hp > 0]
+    lead = party[fighter_idx] if fighter_idx < len(party) and party[fighter_idx].hp > 0 else None
+    return ([lead] + [c for c in living if c is not lead]) if lead else living
+
+
+def _kept(order: list[Combatant], wild: dict, kb) -> list[tuple[Combatant, float]]:
+    """Each member's HP fraction left after the worst likely wild duel (no wild table/moves: its own HP fraction)."""
+    foes, moves = _worst_wild(wild, kb), table(kb, "moves")
+    out = []
+    for c in order:
+        mx = _max_hp(c, kb)
+        left = c.hp / mx
+        if foes and moves:
+            chart = _chart(kb)
+            left = min(duel(c, float(c.hp), f, float(f.hp), chart, moves)[0] / mx for f in foes)
+        out.append((c, left))
+    return out
+
+
+def survives_next_wild(party: list[Combatant], wild: dict, kb=None, fighter_idx: int = 0, margin: float = SURVIVE_NEAR) -> bool:
+    """True when some living member keeps >= margin after the worst wild duel (the same test as assess; no wild table -> own HP fraction)."""
+    return any(k >= margin for _, k in _kept(_order(party, fighter_idx), wild, kb))
+
+
+def party_survives(emu, map_id: int, kb=None) -> bool:
+    """Emu adapter for the grind gates. Any fainted member -> False (routes to heal exactly as before)."""
+    from pokeagent.explorer.behaviours.cave_topup import fighter_slot
+    from pokeagent.party_view import read_party_view
+    if read_party_view(emu).any_fainted:
+        return False  # read straight from RAM: a member party_now skips (unknown species) still counts
+    party = party_now(emu)
+    if not party:  # species unreadable: the fighter's own HP fraction stands in
+        from pokeagent.explorer.perceive import party_hp
+        hp, mx = party_hp(emu)
+        return not mx or hp / mx >= SURVIVE_NEAR
+    if any(c.hp <= 0 for c in party):
+        return False
+    return survives_next_wild(party, encounters.species_on(map_id), kb, fighter_slot(emu))

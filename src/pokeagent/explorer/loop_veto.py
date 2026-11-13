@@ -19,10 +19,18 @@ import json
 import time
 from pathlib import Path
 
+from pokeagent.explorer.world import POKECENTER_MAPS
 from pokeagent.explorer.loop_memory import (
     LOOP_NO_PROGRESS_N, LOOP_VETO_STEPS, MAX_RECHOOSE, NEVER_VETO, PROBE_EVERY, PROMOTE_FLUSH_STEPS,
     LoopLedger, Situation, active, clean_table, fold_shared, shared_key, situation_of,
 )
+
+
+def _exempt(sit: Situation, button: str) -> bool:
+    """A inside a Pokecenter is the nurse (or the PC): her dialog repeats by design and is the only way to heal.
+    Shared memory had marked the counter tile dead in Viridian and Pewter (3 runs each), so heals failed on
+    sight; nothing in a Pokecenter is vetoed or recorded for A (Robert 2026-11-12, live run)."""
+    return button == "A" and sit.map in POKECENTER_MAPS
 
 
 def _site(sit: Situation) -> dict:
@@ -86,7 +94,7 @@ def check(ctx, selector, decision):
     loops = of(ctx)
     sit = situation_of(ctx)
     loops.sit = sit
-    if not decision.button or decision.behaviour in NEVER_VETO or sit.battle:
+    if not decision.button or decision.behaviour in NEVER_VETO or sit.battle or _exempt(sit, decision.button):
         return decision
     source = None
     if loops.ledger.vetoed(sit, decision.button, ctx.step):
@@ -146,7 +154,7 @@ def record(ctx, decision, reasons: list[str]) -> None:
         loops.row(ctx, {"step": ctx.step, "kind": "probe", "key": key, "ok": progressed,
                         **(_site(sit) if sit is not None else {}), "button": decision.button, "rule": decision.rule,
                         "behaviour": decision.behaviour, "source": "shared"})
-    if sit is not None and decision.behaviour not in NEVER_VETO and not sit.battle:
+    if sit is not None and decision.behaviour not in NEVER_VETO and not sit.battle and not _exempt(sit, decision.button):
         loops.ledger.record(sit, decision.button, progressed, ctx.step)
     if ctx.step % PROMOTE_FLUSH_STEPS == 0:
         fold(ctx, loops)

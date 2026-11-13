@@ -139,7 +139,7 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     beyond_viridian = bool(goals.get("deliver_parcel")) and pos[0] in (0x0D, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x02, 0x36) + EAST_MAPS
     # Training never walks the agent back south. Before Route 2 only the floor level is asked (see training.required_level) and it
     # is met by the fights on the way to Viridian; from Route 2 on, Brock's target is ground out where the agent stands.
-    if (0 < level < goals.get("_train_level", 8) and mx and hp / mx >= 0.5 and goals.get("to_route2")
+    if (0 < level < goals.get("_train_level", 8) and mx and goals.get("_survives", hp / mx >= 0.5) and goals.get("to_route2")
             and pos[0] in GRIND_IN_PLACE):
         return None  # Route 2 / the Forest: roam the grass here and fight what comes (the grind budget still caps it)
     if goals.get("to_viridian") and not goals.get("oaks_parcel"):

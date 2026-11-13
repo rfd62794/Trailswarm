@@ -3,11 +3,10 @@ from __future__ import annotations
 
 from pokeagent.explorer import items, legend, tilekind
 from pokeagent.hexmap import diff as ram_diff
-from pokeagent.knowledge.readiness import TEAM_GAP
-from pokeagent.magikarp import fighter, magikarp_stats, trainee_slot
+from pokeagent.magikarp import fighter
 from pokeagent.names import load_registry
 from pokeagent.party_view import read_battle_view, read_party_view
-from pokeagent.ram_symbols import IS_IN_BATTLE
+from pokeagent.ram_symbols import IS_IN_BATTLE, SPECIES_MAGIKARP as MAGIKARP_ID
 from pokeagent.screentext import CHARMAP
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
@@ -21,8 +20,8 @@ REGISTRY = load_registry()
 
 
 def party_hp(emu) -> tuple[int, int]:
-    """The fighter's HP and max HP: the lead normally, the verified active mon while a Magikarp trainee
-    is out (party_view). (0, 0) for an empty party."""
+    """The fighter's HP and max HP: the verified active mon in a fight, else the strongest healthy
+    non-Magikarp member (party_view.fighter; never slot 0, the weakest). (0, 0) for an empty party."""
     _, _, hp, mx = fighter(emu)
     return hp, mx
 
@@ -42,20 +41,38 @@ def heal_gate_hp(emu) -> tuple[int, int]:
 
 
 def true_lead_level(emu) -> int:
-    """The fighter's real level (party lead, or the strongest non-Magikarp while a trainee is out): bandit features and
-    atlas priors are keyed by this, not by the trainee-band level the training gate sees."""
-    return fighter(emu)[1]
+    """The team's strongest healthy level (not slot 0: the party stands lowest-first): bandit features and atlas
+    priors are keyed by this. Out of battle it is the fighter's level; in a fight, still the strongest member."""
+    view = read_party_view(emu)
+    others = [s for s in view.slots if s.species != MAGIKARP_ID] or list(view.slots)
+    return max(others, key=lambda q: (q.hp > 0, q.level, q.hp)).level if others else 0
 
 
 def lead_level(emu) -> int:
-    """Level the training gate sees: the fighter's (the party lead, or the strongest non-Magikarp while a Magikarp is
-    in training). While a Magikarp trainee is in the party it is min(fighter level, trainee level + TEAM_GAP):
-    the gate stays open (grass-seeking continues) until the trainee is within TEAM_GAP of the level the stage
-    needs. Once it has evolved the function behaves exactly as before."""
-    if trainee_slot(emu) is None:
-        return fighter(emu)[1]
-    stats = magikarp_stats(emu)
-    return min(fighter(emu)[1], stats["level"] + TEAM_GAP) if stats else fighter(emu)[1]
+    """Level the training / readiness gates see: the team's strongest healthy member (true_lead_level), never slot 0 -
+    the party stands lowest-first, and a Magikarp trainee no longer caps it (a Magikarp-lead Route 3 grind loop,
+    2026-11-12: min(fighter, Magikarp + TEAM_GAP) kept the Mt Moon gate shut for 1,500+ steps)."""
+    return true_lead_level(emu)
+
+
+def trainee_band_level(emu) -> int:
+    """The level ONLY the team_ready (Gyarados) stage gates on: min(strongest, Magikarp trainee + TEAM_GAP), so grass-seeking
+    continues until the trainee is within TEAM_GAP of the strongest. Every other gate reads lead_level."""
+    from pokeagent.knowledge.readiness import TEAM_GAP
+    from pokeagent.magikarp import magikarp_stats, trainee_slot
+    stats = magikarp_stats(emu) if trainee_slot(emu) is not None else None
+    return min(lead_level(emu), stats["level"] + TEAM_GAP) if stats else lead_level(emu)
+
+
+def gate_level(ctx, goals: dict) -> int:
+    """The level the training gates see: the team's strongest healthy member (never slot 0 - the party stands lowest-first),
+    except at the team_ready stage, which waits on the Magikarp trainee. Published as ctx.gate_lvl (None = plain lead_level)
+    for the readers outside plan_goal that compare it to train_need."""
+    from pokeagent.goals import GOALS
+    band = next((g for g in GOALS if not goals.get(g)), None) == "team_ready"
+    level = trainee_band_level(ctx.emu) if band else lead_level(ctx.emu)
+    ctx.gate_lvl = level if band else None
+    return level
 
 
 def ahead_tiles(tilemap: bytes, direction: str) -> list[int]:

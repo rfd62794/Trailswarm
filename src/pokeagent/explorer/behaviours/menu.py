@@ -8,10 +8,13 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.dialog import goal_menu_choice, learn_decision, offered_starter, yesno_answer
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import frame_lines, is_menu, party_needs_heal
+from pokeagent.explorer.behaviours.item_use import item_list_open
+from pokeagent.explorer import status_care
 from pokeagent.goals import check_goals
 from pokeagent.explorer.catch_list import upcoming_needs
 from pokeagent.explorer.item_policies.ids import HM_MOVE
 from pokeagent.knowledge import team_plan
+from pokeagent.party_view import read_party_view
 
 
 def yesno_box_up(lines: list[str]) -> bool:
@@ -24,6 +27,9 @@ class Menu(BehaviourBase):
     name = "menu"
 
     def applies(self, ctx: ExplorerContext) -> bool:
+        if ctx.item_seq is not None or status_care.of(ctx).get("seq") is not None:
+            return False  # an item sequence (use_items, status_care) opened this menu and drives it; menu curiosity
+            #               used to pick the row under the cursor - the POKe BALL - before it could scroll to the ANTIDOTE
         return ctx.view.box and is_menu(ctx.view.tm) and ctx.proc is None  # a running procedure drives its own menus
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
@@ -40,7 +46,8 @@ class Menu(BehaviourBase):
                 ans, why, forget = "YES", "abandon learning: only when we chose not to forget a move", None
                 ctx.forget_move = None
             elif "learn" in context.lower() and ("make room" in ql or "delete" in ql):
-                cur_moves = [ROM_KB["moves"].get(str(ctx.emu.read(0xD173 + i)), {}).get("name", "?") for i in range(4) if ctx.emu.read(0xD173 + i)] if ROM_KB else []
+                learner = read_party_view(ctx.emu).fighter()   # the mon that is learning: its moves are not on screen
+                cur_moves = [ROM_KB["moves"].get(str(mv), {}).get("name", "?") for mv in learner.moves if mv] if ROM_KB and learner is not None else []
                 needed = {HM_MOVE[t] for t in upcoming_needs(check_goals(ctx.emu, ctx)) if t in HM_MOVE}
                 ans, why, forget = learn_decision(context, cur_moves, needed)
                 ctx.forget_move = forget
@@ -80,6 +87,8 @@ class Menu(BehaviourBase):
             return Decision("A", "leave_menu", f"menu: cursor on '{cursor}' - leaving this menu")
         if re.match(r"POK.DEX", cursor):  # its entry pages are full-screen, not boxes: nothing backs out of them (Mt Moon B2F, 2026-11-05)
             return Decision("DOWN", "menu_skip_pokedex", "menu open, cursor on POKeDEX - never opening it, moving the cursor down")
+        if item_list_open(lines) and not ctx.view.battling:
+            return Decision("B", "menu_item_list_back", "the bag is open with nothing to use: backing out, never trying items for curiosity")
         if cursor and cursor not in tried:
             return Decision("A", "menu_new_option", f"menu open, cursor on '{cursor}' (new) - choosing it")
         if any(o not in tried for o in options):

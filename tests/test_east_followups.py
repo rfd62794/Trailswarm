@@ -92,3 +92,18 @@ def test_weak_lead_trains_on_route3_before_the_cave(tmp_path):
     assert s and "train" in s[1] and "Route 3" in s[1]
     assert plan_step(goals, mem.data["maps"], (0x0E, 3, 3), "UP") is None  # roam the grass
     assert plan_step({**goals, "_level": 15}, mem.data["maps"], (0x0F, 3, 4), "UP") is None  # strong: on to the cave
+
+
+def test_weak_lead_train_gate_honours_survives_over_hp(tmp_path):
+    mem = MapMemory(tmp_path / "m.json")
+    for m in (0x0E, 0x0F):
+        mem.m(m)["visited"]["3,3"] = 1
+    mem.m(0x0F)["visited"]["3,4"] = 1
+    mem.m(0x0F)["warps"]["3,4,DOWN"] = [0x0E, 3, 3]
+    base = {**BEFORE_MT, "_level": 9, "_train_level": 14}
+    maps = mem.data["maps"]
+    train = lambda g: (plan_step(g, maps, (0x0F, 3, 4), "UP") or ("", ""))[1]
+    assert "Route 3 to train" in train({**base, "_hp": (4, 40), "_survives": True})
+    assert "Route 3 to train" not in train({**base, "_hp": (40, 40), "_survives": False})
+    assert "Route 3 to train" in train({**base, "_hp": (40, 40)})        # key absent: the 0.5 fraction
+    assert "Route 3 to train" not in train({**base, "_hp": (10, 40)})

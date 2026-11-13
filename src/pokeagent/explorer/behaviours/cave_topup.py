@@ -26,11 +26,10 @@ TOPUP_COOLDOWN = 150    # steps before a failed sequence is retried
 
 
 def fighter_slot(emu) -> int:
-    """Party slot of the Pokemon that does the fighting: the lead (slot 0) without a Magikarp, else the strongest non-Magikarp.
-    Matches ``party_hp`` / ``magikarp.fighter``: the HP that triggered the top-up is the one the potion must go to."""
+    """Party slot of the Pokemon that does the fighting: the strongest healthy member that is not a Magikarp (the party
+    stands lowest-first, so slot 0 is the weakest). Matches ``party_hp`` / ``magikarp.fighter``: the HP that triggered
+    the top-up is the one the potion must go to."""
     party = read_party(emu)
-    if not any(p.species == MAGIKARP for p in party):
-        return 0
     real = [(i, p) for i, p in enumerate(party) if p.species != MAGIKARP] or list(enumerate(party))
     return max(real, key=lambda ip: (ip[1].hp > 0, ip[1].level, ip[1].hp))[0] if real else 0
 

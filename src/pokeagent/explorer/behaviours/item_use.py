@@ -13,6 +13,7 @@ import re
 
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import MENU_ITEM, PLAYER_MON_NUMBER
 
 MAX_ITEM_ATTEMPTS = 3  # confirmations of one item per battle before it is written off
@@ -83,7 +84,13 @@ def item_step(ctx: ExplorerContext, lines: list[str], cur_line: str, item_id: in
             return Decision("A", "item_use", f"{why}: using {item_name} (bag row {row}, attempt {ctx.item_attempts})")
         return Decision(press, "item_list_scroll", f"item list: row {pos} -> {item_name} at row {row}")
     if party_prompt_open(lines):  # "Use item on which POKeMON?": the one in the fight, not just slot 1
-        slot = emu.read(PLAYER_MON) if party_target is None else party_target  # outside a fight wPlayerMonNumber is stale: the caller says who
+        if party_target is not None:
+            slot = party_target
+        else:  # outside a fight wPlayerMonNumber is stale: the verified active slot, then the fighter, then the raw read
+            view = read_party_view(emu)
+            f = view.fighter()
+            slot = (view.active_slot if view.active_slot is not None else f.index if f is not None
+                    else emu.read(PLAYER_MON))  # an empty party view keeps the raw read, as before
         return Decision(_toward(emu.read(MENU_ITEM), slot), "item_party_pick", f"{item_name}: picking the active POKeMON")
     if ">ITEM" in cur_line:
         return Decision("A", "item_open", f"{why}: opening ITEM for {item_name}")

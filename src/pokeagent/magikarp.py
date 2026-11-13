@@ -106,8 +106,8 @@ def switch_candidate(emu, trainee: int | None = None) -> int | None:
 
 
 def fighter(emu) -> tuple[int, int, int, int]:
-    """(species, level, hp, max_hp) of whoever is doing the fighting: the party lead normally; while a Magikarp is
-    in the party, the battle's active mon in a fight, or else the strongest non-Magikarp member."""
+    """(species, level, hp, max_hp) of whoever is doing the fighting: the battle's active mon in a fight, or else the
+    strongest healthy non-Magikarp member (the party stands lowest-first, so slot 0 is the weakest)."""
     view = read_party_view(emu)
     if not view.slots:
         return 0, 0, 0, 0

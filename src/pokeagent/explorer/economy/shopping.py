@@ -7,7 +7,7 @@ from __future__ import annotations
 
 
 from pokeagent.explorer import status_care
-from pokeagent.explorer.economy import budget, floor, heal_items
+from pokeagent.explorer.economy import budget, floor, heal_items, one_trip
 from pokeagent.explorer.economy.prices import ANTIDOTE, ESCAPE_ROPE, POKE_BALL, POTION, price, stocked
 
 BALL_MIN, BALL_BUY = 5, 10
@@ -29,10 +29,10 @@ def cave_ahead(goals: dict) -> bool:
 
 def shopping_list(goals: dict, bag: dict, money: int, party, stats, *, map_id: int | None = None, needs_balls: bool | None = None,
                   cave: bool | None = None, potion_scale: float = 1.0, extras: bool = True, ref_money: int = 0, mart: int | None = None,
-                  stock=None, poison_ahead: bool | None = None) -> list[tuple[int, int]]:
+                  stock=None, poison_ahead: bool | None = None, essentials_first: bool = False) -> list[tuple[int, int]]:
     """``[(item_id, qty)]`` in buy order; ``needs_balls`` / ``cave`` / ``poison_ahead`` override the campaign lookups (tests,
     bundles). ``mart`` = the Mart being shopped in: the heal item is then the cheapest one it stocks (``stock(item, mart)``);
-    without it, Potions."""
+    without it, Potions. ``essentials_first``: the Balls leave room for the Potions and the Escape Rope (one visit buys the whole list)."""
     left = budget.spendable(goals, money, ref_money)
     balls, rope = bag.get(POKE_BALL, 0), bag.get(ESCAPE_ROPE, 0)
     target = floor.potion_floor(stats, party, map_id, potion_scale)
@@ -49,7 +49,11 @@ def shopping_list(goals: dict, bag: dict, money: int, party, stats, *, map_id: i
             out[item] = out.get(item, 0) + n
         return n * unit
 
-    left -= add(POKE_BALL, BALL_BUY if want_balls and balls < BALL_MIN else 0)
+    ball_left = left
+    if essentials_first:
+        ball_left -= one_trip.essentials_cost(bag, -(-heal_need // heal_items.POTION_HP), want_rope, price(POTION), price(ESCAPE_ROPE))
+    n_balls = min(BALL_BUY if want_balls and balls < BALL_MIN else 0, max(0, ball_left) // max(1, price(POKE_BALL)))
+    left -= add(POKE_BALL, n_balls)
     if heal_need:
         if mart is None:   # planning, Mart not known yet: Potions; the visit itself re-sizes for the Mart's stock
             left -= add(POTION, -(-heal_need // heal_items.POTION_HP))

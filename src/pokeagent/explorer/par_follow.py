@@ -109,7 +109,7 @@ EXPLORING = ("northernmost", "unexplored")
 def training(ctx) -> bool:
     """The agent is levelling: the lead is below the training target (frontier seeks grass, area_grind / GrindBudget fight on).
     plan_goal clears ``ctx.train_need`` to 0 once the grind budget is spent or the bandit skips the grind."""
-    level = lead_level(ctx.emu)
+    level = (getattr(ctx, "gate_lvl", None) or lead_level(ctx.emu))  # team_ready: the Magikarp trainee band
     return 0 < level < (ctx.train_need or 0)
 
 

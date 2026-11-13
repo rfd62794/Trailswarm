@@ -39,3 +39,22 @@ def test_planner_talks_to_the_nurse_from_the_counter_row():
     assert plan_step(g, {}, (0x29, 3, 3), "UP")[0] == "A"
     assert plan_step(g, {}, (0x29, 3, 3), "LEFT")[0] == "UP"  # face her first
     assert plan_step(g, {}, (0x29, 3, 5), "UP")[0] == "UP"
+
+
+class _Spy(dict):
+    """goals dict that records every key the planner reads."""
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.seen = []
+
+    def get(self, key, default=None):
+        self.seen.append(key)
+        return super().get(key, default)
+
+
+def test_route2_grind_gate_reads_survives_and_falls_back_to_the_fraction():
+    base = {**goals_until("to_route2"), "_level": 9, "_train_level": 13}
+    hurt = _Spy({**base, "_hp": (3, 30), "_survives": True})
+    assert plan_step(hurt, {}, (0x0D, 5, 5), "UP") is None          # 10% HP but the party survives: roam the grass
+    assert "_survives" in hurt.seen
+    assert plan_step({**base, "_hp": (30, 30)}, {}, (0x0D, 5, 5), "UP") is None   # absent: the 0.5 fraction still grinds here

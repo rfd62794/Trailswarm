@@ -13,7 +13,7 @@ STEPS_PER_MIN = 225.0      # grind.atlas.STEPS_PER_MIN (3600 / 16); copied becau
 
 def should_use(*, candies: int, party: list[Mon], gap: tuple[int, int, int] | None, boss_next: bool,
                grind_minutes: float | None) -> tuple[int, int, str] | None:
-    """gap = training.under_level(...) = (needed, current, gap) or None when the lead is already at the level wanted."""
+    """gap = training.under_level(...) = (needed, current, gap) or None when the fighter is already at the level wanted."""
     slot = fighter_slot_of(party)
     if candies <= 0 or gap is None or slot is None:
         return None

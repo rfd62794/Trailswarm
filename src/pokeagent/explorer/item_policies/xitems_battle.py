@@ -30,7 +30,7 @@ def _decide(ctx, kind: int) -> dict:
     physical = None
     if party and boss:
         moves = table(None, "moves")
-        name = best_move(party[0], boss[0], default_chart(), moves)[1]
+        name = best_move(max(party, key=lambda c: c.level), boss[0], default_chart(), moves)[1]
         mv = next((m for m in moves.values() if m["name"] == name), None)
         physical = None if mv is None else mv["type"] in PHYSICAL
     hit = xitems.should_use(kind=kind, bag=bag, score=verdict.score if verdict else None, used_this_battle=0,
