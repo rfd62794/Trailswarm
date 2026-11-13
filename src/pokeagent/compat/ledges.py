@@ -24,20 +24,17 @@ def parse_edge(edge: str) -> tuple[int, int, str]:
 def classify_wall(map_doc: dict, edge: str) -> str:
     """``ledge_exact`` | ``ledge_row`` (HEURISTIC) | ``plain``."""
     x, y, b = parse_edge(edge)
+    jumps = []
     for key, land in (map_doc.get("jumps") or {}).items():
         try:
             _x0, _y0, jb = parse_edge(key)
-            lx, ly = int(land[0]), int(land[1])
+            jumps.append((jb, int(land[0]), int(land[1])))
         except (ValueError, TypeError, IndexError):
             continue
+    for jb, lx, ly in jumps:
         if edge == f"{lx},{ly},{opposite(jb)}":
             return "ledge_exact"
-    for key, land in (map_doc.get("jumps") or {}).items():
-        try:
-            _x0, _y0, jb = parse_edge(key)
-            lx, ly = int(land[0]), int(land[1])
-        except (ValueError, TypeError, IndexError):
-            continue
+    for jb, lx, ly in jumps:
         if b == opposite(jb) and ((y == ly) if jb in VERTICAL else (x == lx)):
             return "ledge_row"
     return "plain"

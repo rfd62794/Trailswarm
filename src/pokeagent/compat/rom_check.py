@@ -18,12 +18,36 @@ from pokeagent.family.kb_overlay import build_overlay
 _OPS = (0xFA, 0xEA, 0x21, 0x11, 0x01, 0x31, 0x08)
 
 
+# MapHeader fields that are raw ROM file offsets: a layout shift moves them without changing the map.
+# Audit of the decoded header (rom_maps.header): the ONLY raw pointer kept is ``blocks_ptr``. The text, script,
+# object and connection-source/dest/window pointers are followed during decoding and never stored; what is stored
+# is what they point to (warps, signs, objects with text *ids*, connection map/offset/length, border block), all
+# of which are compared by value. So ``blocks_ptr`` is excluded from the header compare and its target is
+# compared separately as block CONTENT.
+POINTER_FIELDS = ("blocks_ptr",)
+
+
+def _without_pointers(h) -> dict:
+    d = asdict(h)
+    for f in POINTER_FIELDS:
+        d.pop(f, None)
+    return d
+
+
 def compare_headers(red: bytes, blue: bytes) -> dict:
-    """``{"maps_red", "maps_blue", "different": [map ids], "only_red", "only_blue"}`` over all sane headers."""
+    """``{"maps_red", "maps_blue", "different", "only_red", "only_blue", "block_differences", "pointer_shifts"}``.
+
+    ``different``: map ids whose decoded headers differ ignoring raw pointers. ``block_differences``: ids whose
+    ``w*h`` block bytes (read at each ROM's ``blocks_ptr``) differ. ``pointer_shifts``: how many maps have a
+    different ``blocks_ptr`` but identical content; a benign layout shift, never counted as a difference."""
     r, b = all_headers(red), all_headers(blue)
     common = sorted(set(r) & set(b))
-    return {"maps_red": len(r), "maps_blue": len(b), "different": [i for i in common if asdict(r[i]) != asdict(b[i])],
-            "only_red": sorted(set(r) - set(b)), "only_blue": sorted(set(b) - set(r))}
+    return {"maps_red": len(r), "maps_blue": len(b),
+            "different": [i for i in common if _without_pointers(r[i]) != _without_pointers(b[i])],
+            "only_red": sorted(set(r) - set(b)), "only_blue": sorted(set(b) - set(r)),
+            "block_differences": [i for i in common if r[i].blocks(red) != b[i].blocks(blue)],
+            "pointer_shifts": sum(1 for i in common if r[i].blocks_ptr != b[i].blocks_ptr
+                                  and r[i].blocks(red) == b[i].blocks(blue))}
 
 
 def symbol_operand_counts(rom: bytes, symbols: dict[str, int]) -> dict[str, int]:

@@ -166,3 +166,10 @@ def test_kb_overlay_round_trip_and_base_untouched(tmp_path):
     assert bp.read_bytes() == before
     d = bp.parent / "overlay" / "pokemon-blue"
     assert json.loads((d / "disagreements.json").read_text()) == {"other": 1, "wild": 1}
+
+
+def test_seed_own_is_byte_copy_when_no_overlay(tmp_path):
+    shared, own = tmp_path / "maps.json", tmp_path / "own.json"
+    shared.write_bytes(b'{ "maps":   {"1": {}} }\n')  # odd formatting: json.dumps would rewrite it
+    seed_own(shared, own, BLUE)
+    assert own.read_bytes() == shared.read_bytes()

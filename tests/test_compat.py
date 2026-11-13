@@ -129,3 +129,29 @@ def test_symbol_operand_counts_and_wild_overlay():
     blue = {12: {"grass_rate": 25, "grass": [[3, "RATTATA"]]}, 13: {"grass_rate": 5, "grass": [[4, "ODDISH"]]}}
     assert wild_overlay(red, blue) == {"wild_by_map": {"13": blue[13]}}
     assert wild_overlay(red, red) == {}
+
+
+def _synthetic_rom(blocks_at: int, blocks: bytes = bytes(range(6))) -> bytes:
+    """A 64 KiB ROM with one sane map (id 0, 2x3 blocks, no connections/warps/signs/objects)."""
+    from pokeagent.atlas.rom_maps import BANKS, PTRS
+    rom = bytearray(0x10000)
+    rom[BANKS] = 1
+    hdr, obj = 0x4100, 0x4200
+    rom[PTRS:PTRS + 2] = hdr.to_bytes(2, "little")
+    rom[hdr:hdr + 9] = bytes([0, 2, 3]) + blocks_at.to_bytes(2, "little") + bytes(4)  # tileset,h,w,blocks,text,script
+    rom[hdr + 10:hdr + 12] = obj.to_bytes(2, "little")
+    rom[blocks_at:blocks_at + len(blocks)] = blocks
+    return bytes(rom)
+
+
+def test_compare_headers_pointer_shift_is_not_a_difference():
+    from pokeagent.compat.rom_check import compare_headers
+    h = compare_headers(_synthetic_rom(0x5000), _synthetic_rom(0x5001))
+    assert h["maps_red"] == h["maps_blue"] == 1
+    assert h["different"] == [] and h["block_differences"] == [] and h["pointer_shifts"] == 1
+
+
+def test_compare_headers_reports_real_block_content_difference():
+    from pokeagent.compat.rom_check import compare_headers
+    h = compare_headers(_synthetic_rom(0x5000), _synthetic_rom(0x5001, bytes([9] * 6)))
+    assert h["block_differences"] == [0] and h["pointer_shifts"] == 0 and h["different"] == []

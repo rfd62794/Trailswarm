@@ -26,6 +26,7 @@ from pokeagent.agent import Agent
 from pokeagent.backend import BackendError, ClaudeCliBackend, StubBackend
 from pokeagent.emulator import Emulator, PyBoyEmulator
 from pokeagent.game import GameSpec, UnknownGame, add_game_argument, resolve_game
+from pokeagent.game.gate import game_for_rom
 from pokeagent.game.paths import default_rom
 from pokeagent.game.state_guard import StateGameMismatch
 from pokeagent.ram import read_state
@@ -50,15 +51,32 @@ def _rom_path(args: argparse.Namespace) -> Path:
 def _resolve_game(args: argparse.Namespace) -> GameSpec | None:
     """The selected game's spec; prints the error and returns None on an unknown key."""
     try:
-        return resolve_game(args.game)
+        return resolve_game(getattr(args, "game", None))
     except UnknownGame as e:
         print(f"error: {e}")
         return None
 
 
+def _explicit_game(args: argparse.Namespace) -> GameSpec | None:
+    """The game the user chose (--game, else a non-empty $POKEAGENT_GAME); None leaves it to the ROM hash."""
+    if getattr(args, "game", None) is None and not os.environ.get("POKEAGENT_GAME"):
+        return None
+    return resolve_game(getattr(args, "game", None))
+
+
 def _build_emulator(args: argparse.Namespace) -> Emulator:
-    """One place that turns args into an Emulator; tests patch this to inject FakeEmulator."""
-    return PyBoyEmulator(_rom_path(args), headless=getattr(args, "headless", True), game=resolve_game(args.game))
+    """One place that turns args into an Emulator; tests patch this to inject FakeEmulator.
+
+    With no explicit game, ``game=None`` lets the emulator pick by ROM SHA-1 (Red if unknown). An explicit
+    game whose ROM hashes to a DIFFERENT registered game is refused (a Blue ROM must not run under Red's guard).
+    """
+    rom = _rom_path(args)
+    game = _explicit_game(args)
+    if game is not None:
+        actual = game_for_rom(rom)
+        if actual is not None and actual.key != game.key:
+            raise BackendError(f"{rom} is {actual.key} by SHA-1 but the selected game is {game.key}")
+    return PyBoyEmulator(rom, headless=getattr(args, "headless", True), game=game)
 
 
 def _build_backend(args: argparse.Namespace, log: RunLog):

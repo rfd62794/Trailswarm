@@ -36,8 +36,10 @@ def fold_agent_memory(shared: Path, dst: dict, agent: dict, game, merge: Callabl
                     if key not in lst:
                         lst.append(key)
                         changed_over = True
+            section = (sm or {}).get(sec)
+            shared_val = section.get(key) if isinstance(section, dict) else key
             rows.append({"game": game.key, "map": mid, "section": sec, "key": key, "kind": kind,
-                         "shared": (sm or {}).get(sec, {}).get(key) if isinstance((sm or {}).get(sec), dict) else key,
+                         "shared": shared_val,
                          "overlay": d["value"]})
         if not omap:
             over["maps"].pop(mid, None)

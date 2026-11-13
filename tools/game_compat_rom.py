@@ -41,7 +41,8 @@ def main(argv=None) -> int:
     rw, bw = wild_tables(red), wild_tables(blue)
     ov = rc.wild_overlay(rw, bw)
     diff_maps = sorted(ov.get("wild_by_map", {}), key=int)
-    print(f"headers: {h['maps_red']} red / {h['maps_blue']} blue, different={h['different']}")
+    print(f"headers: {h['maps_red']} red / {h['maps_blue']} blue, different={h['different']}, block_content_differences={h['block_differences']}, "
+          f"pointer_shifts={h['pointer_shifts']} (benign)")
     print(f"symbols: {s['symbols']} checked, mismatched={s['mismatched']}")
     print(f"wild (version-exclusive) maps differing: {len(diff_maps)} {diff_maps}")
     if a.write_overlay:
@@ -49,7 +50,7 @@ def main(argv=None) -> int:
         base = json.loads(base_path.read_text(encoding="utf-8")) if base_path.exists() else {}
         write_overlay(base_path, BLUE.key, {**base, "wild_by_map": {str(k): v for k, v in rw.items()}},
                       {**base, "wild_by_map": {str(k): v for k, v in bw.items()}})
-    ok = not h["different"] and not h["only_red"] and not h["only_blue"] and not s["mismatched"]
+    ok = not h["different"] and not h["block_differences"] and not h["only_red"] and not h["only_blue"] and not s["mismatched"]
     return 0 if ok else 1
 
 
