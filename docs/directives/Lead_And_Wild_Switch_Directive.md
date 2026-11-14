@@ -138,7 +138,7 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
@@ -155,4 +155,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 15:50 · robert-claude-laptop · Review → Blocked — CHANGES-NEEDED (Sonnet review, PR 281 head fdd4ecc). Continue on the same branch. Fix 1: battle.py is 318 lines and fails test_explorer_package_layering_and_size (300 cap); move the new switch helpers (_active_no_damage, sw_out logic) into a small new module under src/pokeagent/explorer/behaviours/, and move can_damage and lead_order out of team_plan.py (326 lines) into a small new module under src/pokeagent/knowledge/. Fix 2: in a real wild Paras L8 fight, a non-trainee Rattata went from 7 HP to 2 HP to fainted with no switch, while switch_choice(wild=True) returns Charmeleon for both HP values; find what blocks it in the behaviour layer and add a behaviour-level test. Out of scope, do not do it here: bring_out still sends the Kakuna in after a faint (that is a follow-up). Full suite must show 0 failed.
 - 2026-11-14 15:50 · robert-claude-laptop · Blocked → Queued — Requeue for the CHANGES-NEEDED fixes listed in the previous status line; continue on the same branch.
 - 2026-11-14 15:50 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 15:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DX7X2EA7M8XS8JR927Q6X4
 <!-- queue:end -->
