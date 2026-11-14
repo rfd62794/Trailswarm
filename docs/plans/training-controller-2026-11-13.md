@@ -30,7 +30,7 @@ writers: `explorer/behaviours/grind_loop.py:32` mark_live (`train_route_live`); 
 ```python
 class TrainingController:
     def observe(self, ctx) -> None            # slice 1: shadow only; called from explorer/engine.py right after selector.choose (plan_goal has run); asserts == old flags
-    def tick(self, ctx) -> None               # slice 3+: sole writer, once per step
+    def tick(self, ctx) -> None               # NOT BUILT (slice 3 result): no per-step tick writer; sustain.publish(ctx, value) is the single writer of train_route_live
     def training(self) -> bool;  def target(self) -> Target | None   # (map_id, patch, center_map), stable per session
     def roster(self) -> Roster | None         # lead_slot, trainees (<=2), order_wanted only at session boundary
     def heal_now(self) -> Sustain             # .go, .use_potion, .why
@@ -61,7 +61,7 @@ class TrainingController:
 | `explorer/after_heal.py`, `grind_heal.py` | adapters | 3 | folded into Sustain |
 | `behaviours/goal_talk.py:60`, `behaviours/frontier.py:150` (gym_hold_seen / floor_unmet readers) | read flags | 5 | `training()` + Exit queries |
 | `explorer/planner_east.py:114` (reads `_survives`/heal keys) | planner | 3 | Sustain (moves with the planner heal rule) |
-| trainee_slot_for sites: `behaviours/catch.py:47`, `behaviours/switch_out.py:37`/`:88`, `explorer/grind_episode.py:92`, `explorer/trainee_gate.py:41`/`:66` (def `magikarp.py:37`) | trainee pick | 4 | `roster()` |
+| trainee_slot_for sites: `behaviours/catch.py:47`, `behaviours/switch_out.py:37`/`:88`, `explorer/grind_episode.py:89`, `explorer/trainee_gate.py:41`/`:66` (def `magikarp.py:37`) | trainee pick | 4 | `roster()` |
 | `gate_lifted`/`lifted_need` writers `behaviours/plan_goal.py:283`/`:297`/`:298` (readers :139-151) | plan_goal | 5 | Exit |
 
 ## 4. Slices (each mergeable, A/B on seed 12; gating tests)
@@ -74,7 +74,7 @@ class TrainingController:
 2. **Target.** Breaks the `train_target` <-> `grind_episode` import cycle (episode start calls Target; Target no longer imports
    grind_episode). Removes the `train_target` import (`behaviours/plan_goal.py:16`, shared line, 0 net) and the `route_kw` kwarg at :133 (about -1). context.py: 0. The cycle is already half-broken by the lazy import at `explorer/grind_episode.py:106`; slice 2 deletes that workaround once Target owns the point choice. Gate: `test_grind_points.py`,
    `test_grind_episode.py`, `test_train_target.py`, `test_training_v2_slice3.py`.
-3. **Sustain (after Target).** First writer move: `tick` becomes sole writer of `train_route_live`. Removes `after_heal` import (:16, 0 net),
+3. **Sustain (after Target).** First writer move: `training_ctl/sustain.py` `publish(ctx, value)` becomes the single writer of `train_route_live`, called at exactly main's old points (timing unchanged; there is NO per-step tick writer, see "Slice 3 result"). The `planner.py` heal branches and `planner_east.py:114` reading `heal_now()` did NOT move: still pending, a later slice. Removes `after_heal` import (:16, 0 net),
    the :131-132 branch (about -2; :133 is counted in slice 2), the heal inputs in the plan_step dict (`behaviours/plan_goal.py:125`, about -1 to -2), and `grind_heal` calls in `behaviours/retreat_heal.py` and
    `behaviours/frontier.py:149`; `planner_east.py:114` and the `planner.py` heal branches read `heal_now()`. plan_goal est. -5, context 0. `explorer/context.py:124` stays until grind_loop's writer is gone. Also in slice 3: the `tools/step_budget.py` bench-xp and 2nd-member-L9 rows (section 5), and the walk-to-grass steps counted separately. Directive: `docs/directives/Training_Controller_Slice3_Sustain_Directive.md` (current line numbers are cited there; those above drifted after slice 2). Gate: `test_retreat_heal.py`, `test_frontier_patrol.py`, `test_early_training_gate.py`.
 4. **Roster.** `team_sig` (species, level, fainted: `party_order.py:31-34`) keeps species and level but replaces the fainted bit with a
@@ -101,7 +101,7 @@ Regression test (added by slice 5, or whichever slice owns Exit): `test_exit_flo
 Runs are deterministic (identical 12000-step runs seen), so one seed-12 A/B per slice is valid; add seed 13 as a sanity check from slice 2.
 Baseline: Route 24 210 xp/1k, SHAKE 7.2%, heal 7.5% + leave-PC 5.4% = 12.9%, 42 reorder sessions, 13 episode starts.
 Slice 1 extends `tools/step_budget.py` with rows: reorder_party (sessions), grind-episode starts by map, blackouts.
-- Training yield (replaces the old "Route 24 xp/1k >= 210" bar, which proved a metric artifact, see "Slice 2 result"): non-lead (bench) xp per 1k RUN steps, from `levels.jsonl` exp deltas, not worse than baseline on each seed; and the step at which the 2nd party slot reaches L9 not later. `tools/step_budget.py` has no bench-xp row today (its `route24_xp_per_1k` reads the `xp_rates.jsonl` map_summary): slice 3 adds the bench-xp row and the 2nd-member-L9 step. SHAKE <= 7.2%, heal + leave-PC < 12.9%: `tools/step_budget.py`.
+- Training yield (replaces the old "Route 24 xp/1k >= 210" bar, which proved a metric artifact, see "Slice 2 result"): non-lead (bench) xp per 1k RUN steps, from `levels.jsonl` exp deltas, not worse than baseline on each seed; and the step at which the 2nd party slot reaches L9 not later. Both are built (slice 3): `bench_xp_per_1k_run_steps` (party-exp-minus-lead deltas, composition changes skipped) and `second_member_l9_step` (relative to start); see "Slice 3 result".
 - Reorder session = a maximal run of reorder_party decision lines with gaps <= 3 steps; target: 0 inside a Pokecenter, <= 5 total.
 - Episode starts on never-visited maps = 0 (step_budget start-by-map row). Floor progress (2 members reach L19 no later; blackouts not up): a `step_budget.py` row reading `levels.jsonl` (step each member first reaches its level; no reader exists, slice 1 adds it).
 - beat_misty is not reached today in 12000 steps, so "no regression" means floor progress above, not a time.
@@ -123,5 +123,13 @@ The last row looked like a regression and is not: `tools/step_budget.py` (~:112)
 
 ## 6. Risks / what NOT to do
 - No lines added to `explorer/context.py`, `explorer/memory.py`, `explorer/behaviours/plan_goal.py`. Do not move writers in slice 1.
-- Moving the writer to run before behaviours (slice 3) changes flag timing: test readers never see last-step values.
+- Do NOT move a writer to a different point in the step (slice 3 lesson): a flag read by guards/behaviours changes decisions if its timing or order changes. A "move" slice must prove `decisions.jsonl` byte-identical on the real ROM (seeds 12/13); behaviour CHANGES go in their own flagged step with an A/B.
 - Do not delete `grind/points.py` or the ledger. Loop guard stays untouched. No ROM run beyond the approved A/B gate; Mart/restock out of scope.
+
+### Slice 3 result (2026-11-14, #259)
+
+The slice ended differently from the plan text above: there is NO per-step tick writer. `training_ctl/sustain.py` `publish(ctx, value)` is the single writer of `ctx.train_route_live`, called at exactly the points main used to write it, so flag timing is unchanged. Real-ROM A/B, seeds 12 and 13, 12000 steps: `decisions.jsonl` BYTE-IDENTICAL to main. Cloud 2924 passed, laptop with ROM 2974 passed, 0 failed. Still pending (a later slice): the `planner.py` heal branches and `planner_east.py:114` reading `heal_now()`.
+
+Lesson: a "move" slice proves `decisions.jsonl` byte-identical on the real ROM, and any timing/ordering change of a flag read by guards or behaviours is avoided; behaviour changes are isolated in their own clearly flagged step with an A/B.
+
+Acceptance metric as built (`tools/step_budget.py`): `bench_xp_per_1k_run_steps` = party exp deltas minus the lead's, per 1k run steps, skipping rows where the party composition changed; and `second_member_l9_step` (relative to the run start; two members >= L9). These replace `route24_xp_per_1k` as the training-yield bar.
