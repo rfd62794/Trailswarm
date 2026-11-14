@@ -182,14 +182,18 @@ Diff stat, test tails (which tests skipped for lack of torch), line counts of ea
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-movement-and-location-models-directive |
 | Base branch | - |
 | Base commit | 8436b01f729e79bf14af444f7d6fd38363213713 |
+| Head commit | 7c43aa3ce755ede419b1f55af8453c852e0b5843 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: movement and location models (directive 3 of 3); needs directive 1 merged
 - 2026-11-14 00:41 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 01:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-movement-and-location-models-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CBM9BRG9GQXDA48J2JMWNF
+- 2026-11-14 01:33 · dispatcher · launched pid=23972; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-movement-and-location-models-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (4 declared need(s), repo-scoped only))
+- 2026-11-14 01:43 · devin · In progress → Review — Done. vision_motion package + tools/motion_train.py + 7 test files, all under line limits (largest: nextpos.py 129/<130, motion_train.py 138/<140). test tail (new files): 24 passed, 2 skipped (torch absent - nextpos_net and location_net tests skip cleanly via importorskip). Full suite: 2894 passed, 57 skipped, 0 failures in 160s. Synthetic run (exit 0): stationary-vs-walking acc 1.000 (6/6,12/12), three-way 1.000 vs majority 0.333; nextpos on synthetic mix: stay acc 0.336/nonstay 0.000, continue 0.680/0.519, count_table 0.680/0.519; 'neural skipped: torch not installed'. blocked_corridor: {window 6, min_expected_move 0.5, n 100/kind; detection_rate 1.0, median_delay 3.0 samples, false_positive_rate {patrol 0.0, paused 0.0, stationary 0.0, wandering 0.0}}. Note: the table's 'last displacement' is the last non-stay displacement of the track so far (a displacement = a tile change); with stationary tracks in training this is what keeps P(nonstay) high on a frozen patrol and low on a dweller - flagged in code docs. Diff stat vs main: only added files under src/pokeagent/vision_motion/ (13 files) plus the one added [dependency-groups] vision line in pyproject.toml; docs/KNOWLEDGE.md paragraph added. runs/vision_models report written and gitignored; no weights/data committed. Line counts: tracks 56, features 40, movement 109, nextpos 129, nextpos_net 51, blocked 54, synthetic 89, split 53, location_data 33, location_baseline 38, location_net 106, report 46, tools/motion_train.py 138. [origin] spent: devin 10 min est. n/a
 <!-- queue:end -->

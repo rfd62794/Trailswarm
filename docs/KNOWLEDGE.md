@@ -413,6 +413,19 @@ Everything under `runs/vision/` is ROM-derived, local only and gitignored; it is
 the cheap local sprite/movement models and is never committed. Implementation: `src/pokeagent/vision/`
 (label sources per game, the record loop, the deduplicating store) — PyBoy-free so tests run without a ROM.
 
+## Sprite model (2026-11-14)
+
+`src/pokeagent/vision_model/` trains a tiny CPU classifier on the `runs/vision/<game>/` dataset: crops
+padded to 16x16, a held-out split by whole areas (never by frame), a nearest-template baseline (per-class
+mean image, smallest squared distance wins) and `TinyNet` — three 3x3 convs (16/32/32) with 2x2 pools, a
+global average pool, and two linear heads for the specific class `(kind, bank, label)` and the 6-way
+coarse class. Training needs torch, an optional dependency group only (`uv sync --group vision`; every
+numpy piece works without it). `uv run --frozen python tools/vision_train.py --game pokemon-red` trains,
+scores both models on held-out areas, times inference and writes `runs/vision_models/<game>/report.json`
+plus `weights.pt`/`classes.json` — all ROM-derived, local and gitignored. A class that appears only on
+held-out areas counts as an error (`unseen_in_train`), and a test crop whose image id also appears in a
+train area is dropped as memorisable (`leak_removed`).
+
 ## Movement and location models (2026-11-14)
 
 `src/pokeagent/vision_motion/` trains two small models on the vision dataset, launched by
