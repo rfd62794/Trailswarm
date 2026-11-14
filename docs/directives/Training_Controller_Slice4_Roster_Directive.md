@@ -188,11 +188,12 @@ Nothing for the build. After merge, Claude runs the seed A/Bs on the laptop.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-14 03:38 · robert-claude-laptop · none → Queued — Training Controller plan approved; slices 1-3 merged; includes Robert's Weedle-over-Kakuna rule (2026-11-14).
+- 2026-11-14 03:39 · robert-claude-laptop · Queued → Approved — lint override: Any cited training_ctl/roster.py and new test files are created by this directive; behaviours/*.py shorthand refers to existing files under src/pokeagent/explorer/.
 <!-- queue:end -->
