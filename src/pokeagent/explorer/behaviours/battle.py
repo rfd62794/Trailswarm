@@ -228,7 +228,7 @@ class Battle(BehaviourBase):
             return None
         if ctx.in_battle:
             ctx.in_battle = False; ctx.last_battle_hp = None; ctx.potion_hp_before = None
-            ctx.no_pp = set(); ctx.all_pp_out = 0; ctx.last_move_choice = None
+            ctx.no_pp = set(); ctx.all_pp_out = 0; ctx.last_move_choice = None; ctx.move_nav = 0
             _finalize_pending_effect(ctx)  # the fight ended before any result text: the hit reads neutral
             team_plan.of(ctx).pop("release_pending", None)  # the catch resolved: the deposit YES dies with the battle
             ca = ctx.pop("catch_attempt")
