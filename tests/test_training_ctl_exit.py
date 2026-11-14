@@ -8,7 +8,11 @@ import inspect
 from types import SimpleNamespace
 
 from pokeagent.explorer.behaviours import plan_goal
+from pokeagent.explorer.behaviours.plan_goal import PlanGoal
+from pokeagent.explorer.grind import STALL_HOLD_CAP
 from pokeagent.explorer.training_ctl import exit_rule
+from pokeagent.knowledge import team_floor
+from test_grind_pressure_plan_goal import _full_ctx, _gate_patch
 
 
 def _ctx(step=0):
@@ -70,3 +74,21 @@ def test_old_writers_are_gone():
         assert "gym_hold_seen =" not in src, mod.__name__
         assert '__dict__["floor_unmet"]' not in src, mod.__name__
         assert '.get("floor_unmet"' not in src, mod.__name__
+
+
+def test_exit_floor_holds_with_empty_ledger(tmp_path, monkeypatch):
+    """tmp_path has no grind_points.json / xp_spots.json / milestones.json and the maps have no learned grass: the sim says
+    READY but the team floor is unmet, so the gym approach must still be held (no UP into the gym) and goal_talk must stay shut."""
+    ctx = _full_ctx(tmp_path)
+    _gate_patch(monkeypatch)
+    nv = SimpleNamespace(ready=True, need=15, text="team ready vs MISTY", team_score=0.4, weak_slots=(), lead_slot=0)
+    monkeypatch.setattr(plan_goal, "boss_need_for", lambda goals, party: nv)
+    unmet = team_floor.Floor(False, 19, 2, 1, 0, "team floor for beat_misty: need 2 members >= L19, have 1")
+    monkeypatch.setattr("pokeagent.explorer.training.floor_for", lambda goals, party: unmet)
+    ctx.mem.data["maps"]["3"] = {"visited": {"2,4": 1}, "warps": {"2,4,UP": [0x41, 4, 6]}}   # the gym door is one press UP, no "encounters"
+    for step in (0, 50, STALL_HOLD_CAP + 1):                                                  # the floor cap is STALL_HOLD_CAP * FLOOR_CAP_MULT
+        ctx.step = step
+        d = PlanGoal().step(ctx)
+        assert d is None or d.button != "UP"
+        assert ctx.gym_hold_seen == (step, True)
+        assert not exit_rule.hold_clear(ctx, 30)                                              # goal_talk's gate stays shut
