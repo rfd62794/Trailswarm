@@ -1,6 +1,6 @@
 """Sustain (training controller slice 3): the heal rule's one owner.
 
-Folded in from the deleted ``explorer/grind_heal.py`` and ``explorer/after_heal.py``: the grinding /
+Folded in from ``explorer/grind_heal.py`` and ``explorer/after_heal.py`` (absorbed; both files go in review): the grinding /
 needs-heal / potion verdicts, the Pokecenter-exit test and plan_goal's straight-to-the-grass walk, plus
 grind_episode's "hurt with no potion" end reason. ``heal_now`` packages them as one frozen record - a
 QUERY: no memo, no ctx write (the bandit's decide/clear side effects run only when ``goals`` is passed,

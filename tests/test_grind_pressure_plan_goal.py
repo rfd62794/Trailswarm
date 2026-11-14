@@ -8,11 +8,12 @@ from types import SimpleNamespace
 from pokeagent.explorer.behaviours import plan_goal
 from pokeagent.explorer.behaviours.plan_goal import PlanGoal
 from pokeagent.explorer.grind import GRIND_BATTLES
+from pokeagent.explorer.training_ctl import sustain
 from pokeagent.knowledge import team_plan
 
 
 def _ctx(stage_goal="beat_misty", maps=None):
-    return SimpleNamespace(stage_goal=stage_goal, emu=None, view=SimpleNamespace(m=0x03),
+    return SimpleNamespace(stage_goal=stage_goal, emu=None, view=SimpleNamespace(m=0x03), step=0,
                            mem=SimpleNamespace(data={"maps": maps or {}}, temp_blocked={}))
 
 
@@ -96,7 +97,7 @@ def _gate_patch(monkeypatch, *, grind=("DOWN", "team gate: grinding the party"))
     monkeypatch.setattr(plan_goal, "stage_goal", lambda goals: "beat_misty")
     monkeypatch.setattr(plan_goal, "plan_step", lambda goals, maps, pos, facing: ("UP", "goal beat_misty: 1 steps"))
     monkeypatch.setattr(plan_goal, "our_party", lambda emu: [SimpleNamespace(name="TURTLE", level=5)])
-    monkeypatch.setattr(plan_goal, "heal_push_on", lambda *a, **k: False)
+    monkeypatch.setattr(sustain, "heal_push_on", lambda *a, **k: False)
     monkeypatch.setattr(plan_goal, "train_need", lambda ctx, goals, need: need)
     monkeypatch.setattr(plan_goal, "level_ceiling", lambda stage: None)
     monkeypatch.setattr(PlanGoal, "_grind_step", staticmethod(lambda *a: grind))

@@ -40,15 +40,16 @@ class Engine:
         self._progress = ProgressTracker()  # presses since the last progress (explorer.progress)
         self._prog_snap: Snapshot | None = None  # the game-state snapshot of the previous press
         self._prog_log: ProgressLog | None = None  # progress.jsonl, opened on first write
-        self._training = TrainingController()  # slice 1: shadow owner of the training flags (never writes)
+        self._training = TrainingController()  # tick owns train_route_live (slice 3); observe() shadows the rest
 
     def step(self) -> Decision | None:
         ctx = self.ctx
         if ctx.bandit is not None:
             ctx.bandit.begin_step()
         seed_initial_goals(ctx)  # before the first decision, not after the first press
+        self._training.tick(ctx)  # slice 3: sole writer of train_route_live, before any behaviour reads it
         decision = self.selector.choose(ctx)
-        self._training.observe(ctx)  # shadow check of the training flags plan_goal just set
+        self._training.observe(ctx)  # shadow check of the training flags (tick wrote train_route_live above)
         party_log.of(ctx).tick(ctx)  # level timeline: out-of-battle level/exp changes, grind/travel step counts
         xp_meter.of(ctx).tick(ctx)  # XP windows: per-member rates, xp_rates.jsonl, spot ledger (measurement only)
         trainer_ledger.tick(ctx)  # trainer ledger: new maps, talk probes, the 50-step flag sync (never raises)

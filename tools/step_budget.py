@@ -18,9 +18,11 @@ from pathlib import Path
 from pokeagent.explorer.world import POKECENTER_MAPS
 
 ROUTE24_MAP = 35                       # 0x23
+WALK_RE = re.compile(r"goal team_ready: \d+ steps to .* grass")
+BATTLE_RE = re.compile(r"BATTLE")
 ACTIVITIES = [   # (label, regex on the text after "thinking: ")
     ("BATTLE ... FIGHT", r"BATTLE.*FIGHT"),
-    ("walking to grass (goal team_ready)", r"goal team_ready: \d+ steps to .* grass"),
+    ("walking to grass (goal team_ready)", WALK_RE.pattern),
     ("to the Pokecenter to heal", r"to the Pokecenter to heal"),
     ("leaving the Pokecenter", r"leaving the Pokecenter"),
     ("SHAKE random walk", r"SHAKE"),
@@ -89,6 +91,56 @@ def episode_starts(console: Path) -> dict:
     return dict(c)
 
 
+def episode_walks(console: Path) -> int:
+    """'goal team_ready: N steps to ... grass' thinking lines inside an episode's start -> first-BATTLE window:
+    the post-heal walk back to the grass at every episode start (about 56 steps in the seed-12 baseline)."""
+    inside, window = 0, False
+    with open(console, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if EPISODE_RE.search(line):
+                window = True                      # a new start re-opens the window ended by the next episode start
+            elif line.startswith("thinking:"):
+                text = line[len("thinking:"):].strip()
+                if BATTLE_RE.search(text):
+                    window = False
+                elif window and WALK_RE.search(text):
+                    inside += 1
+    return inside
+
+
+def bench_xp(levels: list[dict]) -> int:
+    """Bench (non-lead) exp gained over the run: positive exp deltas between consecutive levels.jsonl rows,
+    members matched by SPECIES (slots reorder; a species whose count differs between the two rows is skipped).
+    The species with the largest total is the lead and is excluded."""
+    totals: dict[int, int] = {}
+    prev: dict[int, list] = {}
+    for r in levels:
+        cur: dict[int, list] = {}
+        for mon in r.get("party") or []:
+            cur.setdefault(mon[0], []).append(mon[2])
+        for sp, exps in cur.items():
+            old = prev.get(sp)
+            if old is None or len(old) != len(exps):
+                continue                          # arrived, left, or duplicated: no reliable pairing
+            for a, b in zip(old, exps):
+                if b - a > 0:
+                    totals[sp] = totals.get(sp, 0) + (b - a)
+        prev = cur
+    if not totals:
+        return 0
+    lead_sp = max(totals, key=totals.get)
+    return sum(v for sp, v in totals.items() if sp != lead_sp)
+
+
+def second_member_l9_step(levels: list[dict]) -> int | None:
+    """First levels.jsonl step at which at least two party members are L9+: the floor's leading indicator
+    (slot-keyed floor_first_step stays, but reorders make it unreliable - this is membership-keyed)."""
+    for r in levels:
+        if sum(1 for mon in r.get("party") or [] if mon[1] >= 9) >= 2:
+            return r["step"]
+    return None
+
+
 def floor_progress(levels: list[dict]) -> dict:
     """First step each party slot's level was seen at each level: {"slot:level": step} (a slot keeps its order, so the
     floor check is 'step at which two slots first reach the floor level')."""
@@ -105,11 +157,23 @@ def run_rows(run_dir: Path) -> dict:
     levels = _jsonl(run_dir / "levels.jsonl")
     xp = {r["map"]: r.get("xp_per_1k_steps", 0.0) for r in _jsonl(run_dir / "xp_rates.jsonl") if r.get("kind") == "map_summary"}
     log = run_dir / "console.log"
+    b = budget(log) if log.is_file() else {"steps": 0, "activities": {}}
+    starts = episode_starts(log) if log.is_file() else {}
+    walk_inside = episode_walks(log) if log.is_file() else 0
+    bench = bench_xp(levels)
+    run_steps = levels[-1].get("step", 0) if levels else b["steps"]
     return {"reorder_sessions": len(sessions), "reorder_lines": sum(s["lines"] for s in sessions),
             "reorder_in_pokecenter": sum(1 for s in sessions if s["map"] in POKECENTER_MAPS),
-            "episode_starts": episode_starts(log) if log.is_file() else {},
+            "episode_starts": starts,
             "blackouts": max((r.get("blackouts", 0) for r in levels), default=0),
-            "route24_xp_per_1k": xp.get(ROUTE24_MAP, 0.0), "floor_first_step": floor_progress(levels)}
+            "route24_xp_per_1k": xp.get(ROUTE24_MAP, 0.0),  # per-member-WINDOW steps (xp_meter), not a run-step rate: a time-mix shift moves it (slice-2 A/B artifact) - reported, no longer gated
+            "floor_first_step": floor_progress(levels),
+            "bench_xp_per_1k_run_steps": round(1000 * bench / run_steps, 1) if run_steps else 0.0,
+            "bench_xp_total": bench,
+            "second_member_l9_step": second_member_l9_step(levels),
+            "walk_to_grass_lines": b["activities"].get("walking to grass (goal team_ready)", 0),
+            "walk_to_grass_after_episode_start": walk_inside,
+            "walk_to_grass_per_episode": round(walk_inside / sum(starts.values()), 2) if starts else 0.0}
 
 
 def render(b: dict) -> str:

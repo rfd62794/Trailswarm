@@ -25,6 +25,14 @@ def old_flags(ctx) -> TrainingState:
         train_need=getattr(ctx, "train_need", 0) or 0)
 
 
+def team_ready_live(ctx) -> bool:
+    """tick's half of ``train_route_live``: the team_ready stage is next and the trainee band is still under
+    last step's ``ctx.train_need``. Cheap: no ``our_party``, no ``boss_need_for`` (the grind-walk stamp covers
+    the hold / grind-latch case, which is not the team_ready stage anyway)."""
+    team_ready = next((g for g in GOALS if not ctx.goals().get(g)), None) == "team_ready"
+    return bool(team_ready and 0 < trainee_band_level(ctx.emu) < (getattr(ctx, "train_need", 0) or 0))
+
+
 def derived(ctx) -> TrainingState:
     """The same six values from goals + party through the existing pure functions (stall-hold escapes aside:
     the gym hold is the BASE hold, so an escaped hold shows as a known, logged difference)."""

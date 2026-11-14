@@ -23,18 +23,14 @@ import time
 from pathlib import Path
 
 from pokeagent.explorer import party_log, story_blockers, train_route
-from pokeagent.explorer.economy import heal_items
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
-from pokeagent.explorer.perceive import lead_level, party_hp
-from pokeagent.explorer.retreat_risk import party_survives
+from pokeagent.explorer.perceive import lead_level
 from pokeagent.explorer.trainer_hooks import run_provenance
-from pokeagent.explorer.training_ctl import target
-from pokeagent.goals import bag_contents
+from pokeagent.explorer.training_ctl import sustain, target
 from pokeagent.grind import atlas, measure
 from pokeagent.grind import points as gp
 from pokeagent.grind.drill import log_episode
 from pokeagent.magikarp import trainee_slot_for
-from pokeagent.party_view import read_party_view
 from pokeagent.ramstructs import read_party
 
 log = logging.getLogger(__name__)
@@ -228,9 +224,7 @@ def _end_reason(ctx, ep: dict) -> str | None:
         return f"{GRIND_BATTLES} battles"
     if ctx.step - ep["start_step"] >= GRIND_STEPS:
         return f"{GRIND_STEPS} steps"
-    hp, mx = party_hp(ctx.emu)
-    if (mx and not party_survives(ctx.emu, ctx.view.m) or read_party_view(ctx.emu).any_fainted) \
-            and not heal_items.heal_count(bag_contents(ctx.emu)):
+    if sustain.hurt_no_potion(ctx):
         return "hurt with no potion"
     pt = ep.get("point")
     if pt is not None and ctx.view.m != pt.map_id:  # a story blocker met on the way cuts the point off: the story goal goes first
