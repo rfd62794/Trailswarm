@@ -22,6 +22,7 @@ from pathlib import Path
 from functools import lru_cache
 
 from pokeagent import checkpoint_goals as cg
+from pokeagent import party_rules
 from pokeagent import statefp
 from pokeagent import statelog
 from pokeagent.campaign import agent_capabilities, selectable
@@ -221,9 +222,17 @@ def ckpt(root: Path, name: str) -> Path | None:
     if got is not None:
         return got
     found = [p for p in (d / f"{name}{BEST_SUFFIX}.state", d / f"{name}.state")
-             if p.exists() and not statefp.is_synthetic(p)]   # a tool-edited state is never a segment start
+             if p.exists() and not statefp.is_synthetic(p) and not _violating(p)]   # a tool-edited or gated state is never a segment start
     # a ship-segment state whose blackout lands behind Vermilion loses to one that does not (when both exist)
     return next((p for p in found if not cg.respawn_behind(name, p)), found[0] if found else None)
+
+
+def _violating(p: Path) -> bool:
+    """A state the party gate refuses: recorded or live rule violations; an unknown verdict stays selectable."""
+    try:
+        return party_rules.verdict(statefp.read(p), party_rules.rom_kb()) == "violation"
+    except Exception:  # noqa: BLE001  the scheduler path must never raise on a sidecar
+        return False
 
 
 def refusal(root: Path, name: str) -> str | None:

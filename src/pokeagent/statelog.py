@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pokeagent import checkpoint_goals, statefp
+from pokeagent import checkpoint_goals, party_rules, statefp
 
 # wLastBlackoutMap towns ranked earliest to latest: Pallet 0, Viridian 1, Pewter 2, Cerulean 3, Vermilion 5. Any other
 # map id ranks 5 - a documented simplification: every later town (Lavender, Celadon, ...) is at or past Vermilion.
@@ -88,7 +88,18 @@ def status(entry: Entry) -> str:
     """``fresh`` | ``stale`` | ``retired``: stale = no sidecar or an older ``v`` than the code that reads it."""
     if entry.path.parent.name == "retired":
         return "retired"
-    return "stale" if not entry.fp or _version(entry.fp) < statefp.VERSION or _malformed(entry.fp) else "fresh"
+    if not entry.fp or _version(entry.fp) < statefp.VERSION or _malformed(entry.fp):
+        return "stale"
+    return "stale" if _violates(entry.fp) else "fresh"
+
+
+def _violates(fp: dict) -> bool:
+    """True when the fingerprint breaks a party rule (recorded or live). With no kb the verdict is ``unknown`` and
+    the state is left alone - turning unknown stale would retire every state in a worktree without the tables."""
+    try:
+        return bool(party_rules.violations(fp, party_rules.rom_kb()))
+    except CORRUPT:
+        return False
 
 
 def _malformed(fp: dict) -> bool:
@@ -214,4 +225,8 @@ def bad(entry: Entry) -> str | None:
         return "unreadable fingerprint (malformed field)"
     if behind:
         return f"ship checkpoint respawns behind Vermilion (map {entry.fp['respawn']})"
-    return None
+    try:
+        v = party_rules.violations(entry.fp, party_rules.rom_kb())
+    except CORRUPT:
+        v = []
+    return "party rule: " + "; ".join(v) if v else None
