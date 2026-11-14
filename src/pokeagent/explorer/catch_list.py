@@ -17,6 +17,9 @@ log = logging.getLogger(__name__)
 
 DEX_OWNED, DEX_BYTES, DEX_TARGET = 0xD2F7, 19, 10  # wPokedexOwned (verified in ram_map.json): one bit per species
 HM_MOVE = {"cut": "CUT", "flash": "FLASH", "surf": "SURF", "strength": "STRENGTH"}
+# Never worth a ball (Robert, 2026-11-14): a wild KAKUNA knows only Harden, while a WEEDLE trained to evolve keeps
+# Poison Sting. Evolving a Weedle also registers Kakuna in the Pokedex, so the dex loses nothing.
+NEVER_CATCH = frozenset({"KAKUNA"})
 
 
 _warned = False
@@ -61,7 +64,9 @@ def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned
                  wants: dict[str, str] | None = None) -> str | None:
     """Why a ball should go on ``species`` (a reason string), or None. ``owned``: the species is already in the dex.
     ``wants``: the catch plan's species -> reason map (knowledge.catch_plan via ctx.team_wants); a planned species
-    reports its plan reason after the HM check and before the dex check. None keeps today's behaviour exactly."""
+    reports its plan reason after the HM check and before the dex check. A NEVER_CATCH species is never wanted."""
+    if species in NEVER_CATCH:
+        return None
     for hm in HM_MOVE:
         if hm in upcoming and species in hm_table().get(hm, ()) and not _party_covers(hm, party):
             return f"can learn {hm.upper()} (needed ahead, nobody in the party can)"
