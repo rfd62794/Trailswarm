@@ -1,17 +1,19 @@
-"""``pokeagent states``: the save-state ledger CLI - ``list``, ``check``, ``restamp``, ``retire``.
+"""``pokeagent states``: the save-state ledger CLI - ``list``, ``check``, ``restamp``, ``retire``, ``library``.
 
 Handlers take parsed args and return an exit code so tests call them without a process. The ledger is
 ``pokeagent.statelog`` (pure JSON over the ``.fp.json`` sidecars); ``restamp`` delegates to ``tools/stamp_states.py``
-and needs the ROM unless ``--dry-run``.
+and needs the ROM unless ``--dry-run``. ``library`` builds/lists/validates the save library
+(``runs/states/library.json``) that ``pokeagent.statelib`` maintains.
 """
 from __future__ import annotations
 
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 from pokeagent import checkpoint_goals as cg
-from pokeagent import statefp, statelog
+from pokeagent import party_rules, statefp, statelib, statelog
 from pokeagent.game.paths import default_rom
 from pokeagent.game.stores import store_path
 
@@ -105,13 +107,17 @@ def _legal(args) -> int:
 
 def cmd_check(args) -> int:
     """Exit 1 when a ship state (ship-goal stem, or a fingerprint on a ship map) respawns behind Vermilion or has a
-    missing/stale sidecar; other bad states are listed but do not fail. ``--legal`` runs the legality checker instead."""
+    missing/stale sidecar - or when a state in a checkpoints dir breaks a party rule (``--strict`` fails on any
+    violation and on unknown verdicts; unknowns are listed but never fail without it). ``--legal`` runs the
+    legality checker instead."""
     if getattr(args, "legal", False):
         return _legal(args)
     from pokeagent.explorer.world import SHIP_MAPS
+    strict, kb = getattr(args, "strict", False), _kb_json("rom_tables.json")
     fail, rows = False, []
     for e in _entries(_dirs(args)):
         reason = statelog.bad(e)
+        v = party_rules.verdict(e.fp, kb)
         try:
             ship = e.stem in cg.SHIP_GOALS or e.fp.get("map") in SHIP_MAPS
             behind = e.fp.get("respawn") in cg.BEHIND_VERMILION
@@ -120,6 +126,14 @@ def cmd_check(args) -> int:
         if ship and (behind or statelog.status(e) != "fresh"):
             fail = True
             reason = reason or "ship state with respawn behind Vermilion or a missing/stale sidecar"
+        if v == "violation":
+            rows.append(f"{e.path.name}\tviolation\t{'; '.join(party_rules.violations(e.fp, kb))}")
+            fail = fail or strict or e.path.parent.name == "checkpoints"
+            if reason and reason.startswith("party rule:"):
+                reason = None                                # already reported in the violation row
+        elif v == "unknown":
+            rows.append(f"{e.path.name}\tunknown\tno team recorded or kb tables unavailable")
+            fail = fail or strict
         if reason:
             rows.append(f"{e.path.name}\t{statelog.status(e)}\t{reason}")
     for r in rows:
@@ -134,6 +148,10 @@ def cmd_promote(args) -> int:
     from pokeagent import envelope, lineage
     end, start = Path(args.path), Path(args.start)
     kb, catalog, hm = _kb_json("rom_tables.json"), _kb_json("items.json"), _kb_json("hm_compat.json")
+    vio = party_rules.violations(statefp.read(end) or {}, kb)
+    if vio:
+        print(f"{end.name}\tparty rule: {'; '.join(vio)}")
+        return 1                                             # a violating state cannot become a checkpoint
     rom_bytes = Path(args.rom).read_bytes() if args.rom and Path(args.rom).exists() else None
     emu = make_emulator(Path(args.rom) if args.rom else DEFAULT_ROM)
     try:
@@ -171,9 +189,49 @@ def cmd_retire(args) -> int:
     return 0
 
 
+def cmd_library_build(args) -> int:
+    """``states library build``: index every checkpoint and leg state into the save library and print the counts
+    per tier and per verdict, plus the legs retention would drop (it drops nothing on disk)."""
+    doc, dropped = statelib.build(_dirs(args), root=getattr(args, "root", Path(".")), out=args.out,
+                                  keep_legs=args.keep_legs, kb=_kb_json("rom_tables.json"))
+    tiers = Counter(e["tier"] for e in doc["entries"])
+    verdicts = Counter(e["verdict"] for e in doc["entries"])
+    print(f"{len(doc['entries'])} states {dict(tiers)}; verdicts {dict(verdicts)}; "
+          f"{len(dropped)} leg(s) retention would drop")
+    for e in dropped:
+        print(f"would drop {e['name']} ({e['state']})")
+    return 0
+
+
+def cmd_library_list(args) -> int:
+    """``states library list``: one row per entry - tier, name, segment, build, verdict, readiness, steps, run."""
+    for e in statelib.read(args.lib).get("entries", []):
+        if args.tier and e["tier"] != args.tier or args.segment and e.get("segment") != args.segment \
+                or args.build and e.get("build") != args.build or args.clean_only and e.get("verdict") != "clean":
+            continue
+        m = e.get("metrics") or {}
+        print("\t".join(str(x) for x in (e["tier"], e["name"], e.get("segment"), e.get("build"), e.get("verdict"),
+                                        m.get("readiness"), m.get("steps"), e.get("run"))))
+    return 0
+
+
+def cmd_library_validate(args) -> int:
+    """``states library validate``: re-run the party rules on every entry's sidecar and print a RETIRABLE line
+    (with the nearest clean ancestor) for each state that turns clean -> violation. Exit 1 when any checkpoint is
+    retirable, or any state under ``--strict``. Report-only: nothing is moved, retired or deleted."""
+    entries = statelib.read(args.lib).get("entries", [])
+    root = Path(getattr(args, "root", "."))
+    idx = {e["state"]: statefp.read(root / e["state"]) for e in entries}
+    rep = statelib.revalidate(entries, _kb_json("rom_tables.json"), idx)
+    for line in rep.lines:
+        print(line)
+    print(f"{len(rep.retirable)} retirable state(s)")
+    return 1 if any(args.strict or e["tier"] == "checkpoint" for e in rep.retirable) else 0
+
+
 def add_parser(sub) -> None:
     """``pokeagent states <sub> [--dir D ...]``; a repeatable --dir overrides the two default state dirs."""
-    p = sub.add_parser("states", help="save-state ledger: list, check, restamp, retire")
+    p = sub.add_parser("states", help="save-state ledger: list, check, restamp, retire, library")
     s = p.add_subparsers(dest="states_cmd", required=True)
 
     def dirs(sp):
@@ -186,9 +244,10 @@ def add_parser(sub) -> None:
     dirs(lp)
     lp.set_defaults(func=cmd_list)
 
-    cp = s.add_parser("check", help="fail when a ship state respawns behind Vermilion or is unstamped/stale")
+    cp = s.add_parser("check", help="fail when a ship state respawns behind Vermilion, is unstamped/stale, or a checkpoint breaks a party rule")
     cp.add_argument("--legal", action="store_true", help="run the legality checker on every state (exit 1 on any violation)")
     cp.add_argument("--envelope", action="store_true", help="with --legal: also print the organic-envelope verdicts")
+    cp.add_argument("--strict", action="store_true", help="fail on any party-rule violation and on unknown verdicts")
     cp.add_argument("--rom", type=Path, default=DEFAULT_ROM, metavar="ROM", help="ROM for the emulator and walk-grid check")
     dirs(cp)
     cp.set_defaults(func=cmd_check)
@@ -210,3 +269,28 @@ def add_parser(sub) -> None:
     tp.add_argument("path", type=Path, metavar="PATH")
     tp.add_argument("--why", required=True, metavar="TEXT")
     tp.set_defaults(func=cmd_retire)
+
+    lb = s.add_parser("library", help="the save library: index checkpoints and leg states by team build")
+    ls = lb.add_subparsers(dest="library_cmd", required=True)
+
+    bp = ls.add_parser("build", help="scan the state dirs and write runs/states/library.json")
+    bp.add_argument("--out", type=Path, default=statelib.LIBRARY, metavar="PATH")
+    bp.add_argument("--keep-legs", type=int, default=statelib.library.KEEP_LEGS, metavar="K")
+    bp.add_argument("--root", type=Path, default=Path("."), metavar="R",
+                    help="the repo root the index's state paths are relative to (runs/ lives under it)")
+    dirs(bp)
+    bp.set_defaults(func=cmd_library_build)
+
+    ll = ls.add_parser("list", help="list library entries: tier, name, segment, build, verdict, readiness, steps, run")
+    ll.add_argument("--lib", type=Path, default=statelib.LIBRARY, metavar="PATH")
+    ll.add_argument("--tier", choices=("checkpoint", "leg"), default=None)
+    ll.add_argument("--segment", default=None, metavar="S")
+    ll.add_argument("--build", default=None, metavar="B")
+    ll.add_argument("--clean-only", action="store_true", help="only verdict=clean entries")
+    ll.set_defaults(func=cmd_library_list)
+
+    vp = ls.add_parser("validate", help="re-run the party rules; print RETIRABLE lines with clean ancestors")
+    vp.add_argument("--lib", type=Path, default=statelib.LIBRARY, metavar="PATH")
+    vp.add_argument("--root", type=Path, default=Path("."), metavar="R")
+    vp.add_argument("--strict", action="store_true", help="exit 1 when any state is retirable, not just checkpoints")
+    vp.set_defaults(func=cmd_library_validate)

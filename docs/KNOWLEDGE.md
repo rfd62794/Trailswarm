@@ -441,3 +441,22 @@ baseline and an optional torch CNN (`vision` dependency group, torch imported in
 only) name the map and regress the cell from pixels alone. Splits are honest by construction:
 tracks split by whole held-out areas, thumbnails by whole held-out `(area, cell)` blocks; the
 report never claims "which map" for a map the model never saw. The RAM move-byte labels are provisional: the 0xC206 NPC move byte is unverified in ram_map.json.
+
+## Save library and party gate (2026-11-14)
+
+The curriculum's saved states were quietly carrying a wild-caught KAKUNA that knows only Harden — it can never be
+trained, and every run started from a tainted state inherited it. The fix is a gate plus an index. `statefp`
+fingerprints now record a `team` list (species, level, moves, hp, ot_id, exp per slot) beside the legacy `party`
+summary; `statefp.VERSION` stays 1 and a pre-`team` sidecar simply has no build. `pokeagent.team_fp` derives the
+build key — `LINE:L<level rounded down to 5>` per member sorted by evolution line (Weedle/Kakuna/Beedrill share
+one line), moves excluded — plus HM capability and a best-effort provenance. `pokeagent.party_rules` is the rule
+registry; its first rule, `wild-never-catch`, flags a NEVER_CATCH species whose moves are a subset of Harden —
+a wild Harden-only KAKUNA is a violation, an evolved KAKUNA that kept POISON STING is clean, and a state with no
+team or no kb tables is `unknown` (never treated as clean, never refused either). The stamp-time hook
+(`gate_stamp`) records `fp["rule_violations"]` on every sidecar so no consumer needs a kb; `statelog.status`/`bad`,
+`select`/`pick`, the `seg_store.ckpt` fallback, `states check` and `states promote` all refuse violating states,
+and `press_goals` writes a violating checkpoint to `<goal>.quarantine.state` rather than overwriting a clean one.
+`pokeagent.statelib` maintains `runs/states/library.json` — every checkpoint and leg state indexed by tier,
+segment, build, verdict and metrics — built by `pokeagent states library build`, listed by `states library list`,
+and re-validated by `states library validate` (RETIRABLE lines name the nearest clean ancestor; report-only).
+Retention keeps the best K legs per (segment, build) and never drops a checkpoint.

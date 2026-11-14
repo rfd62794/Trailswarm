@@ -35,7 +35,10 @@ def fingerprint(emu, source_run: str | None = None) -> dict:
         pass
     try:
         from pokeagent.ramstructs import read_bag, read_party
-        fp["party"] = [[m.species, m.level, m.hp, m.max_hp] for m in read_party(emu)]
+        party = read_party(emu)
+        fp["party"] = [[m.species, m.level, m.hp, m.max_hp] for m in party]
+        fp["team"] = [{"species": m.species, "level": m.level, "moves": list(m.moves), "hp": m.hp,
+                       "max_hp": m.max_hp, "ot_id": m.ot_id, "exp": m.exp} for m in party]
         bag = read_bag(emu)
         fp["heal_items"] = sum(q for i, q in bag if i in HEAL_ITEMS)
         fp["bag_slots"] = len(bag)
