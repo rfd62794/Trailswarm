@@ -1,4 +1,4 @@
-"""Go-Explore slice 3 (plan D5): harvest mid-run states into the slice-2 archive.
+"""Go-Explore slice 3 (plan D5), goexplore/cell_dump.py: harvest mid-run states into the slice-2 archive.
 
 ``attach`` wraps ``engine.step`` on the demo's Engine instance (tools/explore_demo.py). Every
 ``CHECK_EVERY`` ctx steps one ``read_snapshot`` gives the whole cell key - block, goals reached,
