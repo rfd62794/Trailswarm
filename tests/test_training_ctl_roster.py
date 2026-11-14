@@ -1,4 +1,5 @@
-"""Training controller slice 4 (Roster): roster.trainee_slot is the one trainee-selection owner."""
+"""Training controller slice 4 (Roster): roster.trainee_slot is the one trainee-selection owner;
+the monotonic faint counter that replaces the fainted bit in party_order.team_sig."""
 from __future__ import annotations
 
 import inspect
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer import grind_episode, trainee_gate
 from pokeagent.explorer.behaviours import catch as catch_behav
+from pokeagent.explorer.behaviours import party_order as po
 from pokeagent.explorer.behaviours import switch_out as so_mod
 from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
@@ -50,3 +52,87 @@ def test_roster_and_its_callers_import_in_a_fresh_process():
                         "pokeagent.explorer.trainee_gate"],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+# --- slice 4b1: the monotonic faint counter in team_sig ------------------------------------------------------
+
+CHARMELEON = 0xB2
+HEALTHY = [(0x54, 9, 20, 20), (CHARMELEON, 16, 50, 50)]
+DOWN = [(0x54, 9, 0, 20), (CHARMELEON, 16, 50, 50)]      # slot 0 fainted
+TRIO = [(0x54, 9, 20, 20), (0x55, 12, 30, 30), (CHARMELEON, 16, 50, 50)]
+TRIO_DOWN = [(0x54, 9, 0, 20), (0x55, 12, 30, 30), (CHARMELEON, 16, 50, 50)]
+
+
+def _order_ctx(mons, step=100):
+    return SimpleNamespace(emu=FakeEmulator(party_mem(mons)), step=step)
+
+
+def test_a_level_up_reorders_again():
+    ctx = _order_ctx([HEALTHY[1], HEALTHY[0]])                                # strong first: a swap is wanted
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 12, po.team_sig(ctx))
+    assert po.want_home(ctx) is None                                          # held
+    ctx.emu = FakeEmulator(party_mem([(CHARMELEON, 16, 50, 50), (0x54, 10, 22, 22)]))
+    ctx.step += 1
+    assert po.team_sig(ctx) != team_plan.of(ctx)["order_hold"][1]             # the team changed
+    assert po.want_home(ctx) is not None                                      # a reorder fires
+
+
+def test_a_real_faint_bumps_the_counter_and_reorders():
+    ctx = _order_ctx(TRIO)
+    team_plan.of(ctx)["order_hold"] = (ctx.step, po.team_sig(ctx))
+    ctx.emu = FakeEmulator(party_mem(TRIO_DOWN))                              # slot 0 faints: it belongs last
+    ctx.step += 1
+    assert roster.note_faints(ctx) == 1                                       # alive -> fainted counted
+    assert not po._held(ctx)
+    assert po.want_home(ctx) is not None                                      # fainted member last: reorder
+
+
+def test_a_heal_revive_keeps_the_hold():
+    ctx = _order_ctx(HEALTHY)
+    po.team_sig(ctx)                                                          # baseline: nobody down
+    ctx.emu = FakeEmulator(party_mem(DOWN))
+    ctx.step += 1
+    sig_fainted = po.team_sig(ctx)                                            # the faint counted
+    team_plan.of(ctx)["order_hold"] = (ctx.step, sig_fainted)
+    ctx.emu = FakeEmulator(party_mem(HEALTHY))                                # the revive: hp 0 -> alive
+    ctx.step += 1
+    assert po.team_sig(ctx) == sig_fainted                                    # monotonic: never back down
+    assert po._held(ctx)                                                      # the 2026-11-13 incident stays dead
+
+
+def test_a_pure_slot_permutation_changes_nothing():
+    ctx = _order_ctx(HEALTHY)
+    sig0, n0 = po.team_sig(ctx), roster.note_faints(ctx)
+    ctx.emu = FakeEmulator(party_mem([HEALTHY[1], HEALTHY[0]]))               # same members, other order
+    ctx.step += 1
+    assert po.team_sig(ctx) == sig0 and roster.note_faints(ctx) == n0
+
+
+def test_the_hold_never_expires():
+    ctx = _order_ctx(HEALTHY)
+    team_plan.of(ctx)["order_hold"] = (ctx.step - 5000, po.team_sig(ctx))
+    assert po._held(ctx)                                                      # no 300-step expiry ever returns
+
+
+def test_note_faints_counts_once_per_step():
+    ctx = _order_ctx(HEALTHY)
+    roster.note_faints(ctx)                                                   # baseline
+    ctx.emu = FakeEmulator(party_mem(DOWN))
+    ctx.step += 1
+    assert roster.note_faints(ctx) == 1
+    assert roster.note_faints(ctx) == 1                                       # same step: the stored value
+    assert team_plan.of(ctx)["faints"] == 1
+
+
+def test_a_member_fainting_twice_counts_twice():
+    ctx = _order_ctx(HEALTHY)
+    roster.note_faints(ctx)
+    ctx.emu = FakeEmulator(party_mem(DOWN))
+    ctx.step += 1
+    assert roster.note_faints(ctx) == 1
+    ctx.emu = FakeEmulator(party_mem(HEALTHY))
+    ctx.step += 1
+    assert roster.note_faints(ctx) == 1                                       # the heal never subtracts
+    ctx.emu = FakeEmulator(party_mem(DOWN))
+    ctx.step += 1
+    assert roster.note_faints(ctx) == 2                                       # a second faint counts again
