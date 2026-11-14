@@ -6,5 +6,6 @@ Verify command: uv run pytest -q -p no:cacheprovider -rfEs
 - ROM-dependent tests skip when `roms/` is absent; ROM checks run on the laptop only. Never commit or publish ROMs,
   save states, recorded datasets or weights (all live under gitignored `roms/` and `runs/`), and never state where a
   game copy came from.
+- Personal project: laptop (and cloud) only. The Office Tower never touches this repo.
 - Work on a branch; merges go through `uv run agentflow merge PokeAgent <PR> --apply` (merge commit, pinned head).
 - Tests never open a window or send GUI input.
