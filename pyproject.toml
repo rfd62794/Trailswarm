@@ -16,6 +16,7 @@ pokeagent = "pokeagent.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]
+vision = ["torch>=2.3"]
 
 [build-system]
 requires = ["hatchling"]

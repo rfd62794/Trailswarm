@@ -412,3 +412,19 @@ PNG crops, `samples.jsonl` one row per unique crop with counts, `thumbs/` frame 
 Everything under `runs/vision/` is ROM-derived, local only and gitignored; it is the data source for
 the cheap local sprite/movement models and is never committed. Implementation: `src/pokeagent/vision/`
 (label sources per game, the record loop, the deduplicating store) — PyBoy-free so tests run without a ROM.
+
+## Movement and location models (2026-11-14)
+
+`src/pokeagent/vision_motion/` trains two small models on the vision dataset, launched by
+`tools/motion_train.py` (`--synthetic` runs the movement pipeline and the blocked-corridor
+fixture without a dataset). Movement: `movement.py` labels each NPC track from the RAM move
+byte (0xFF = stationary, 0xFE = walking; walking splits into patrolling vs wandering by
+trajectory collinearity and reversals — an observed label, weaker than the byte split) and a
+depth-3 threshold-rule classifier decides early from the first 24 samples; `nextpos.py`
+predicts the displacement two samples ahead with a count table `P(next | last displacement,
+dwell bucket)` beside stay/continue baselines; `blocked.py` flags a corridor as blocked when
+the model keeps expecting movement while the NPC holds its tile. Location: a nearest-thumbnail
+baseline and an optional torch CNN (`vision` dependency group, torch imported inside functions
+only) name the map and regress the cell from pixels alone. Splits are honest by construction:
+tracks split by whole held-out areas, thumbnails by whole held-out `(area, cell)` blocks; the
+report never claims "which map" for a map the model never saw.
