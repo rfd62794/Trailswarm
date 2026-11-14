@@ -46,7 +46,7 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | rl/eval-gates-on-main |
 | Base branch | repoman/rl-success-and-context |
@@ -68,4 +68,5 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 - 2026-11-13 23:31 · dispatcher · launched pid=18484; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-13 23:37 · devin · In progress → Blocked — Work complete, held for publish: directive forbids push but Review requires a pushed branch (refused as unpushed). Controller please push directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb and set Review. Commit 16c9593: eval env now has identical obs/action/reward config (subgoals, sub_bonus, options); latest_eval carries version+epsilon; new counted-fake tests prove hold/release frame budget and zero extra ticks under paced and per-frame publishing. uv run pytest -q: 180 passed, 5 skipped. python 3.12.12, git diff --check clean. Not run: ROM probes (roms/ and baselines/ absent) and rl_train.py --help (sandbox refused). Invariance tested with counted fake only. No live seats, controllers or runs files touched.
 - 2026-11-13 23:41 · robert-claude-laptop · Blocked → Review — Devin's commit 16c9593 (old base, 1227 behind) cherry-picked onto main as c0f2d31, PR #247; review + cloud verify running. [origin] spent: devin 5 min est. n/a
+- 2026-11-13 23:54 · robert-claude-laptop · Review → Done — note: Merged as #247 (7e3dba5): Devin's 16c9593 cherry-picked onto main; cloud verify GREEN 2815 passed; laptop rl tests 169 passed with ROM.
 <!-- queue:end -->
