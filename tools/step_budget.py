@@ -109,27 +109,23 @@ def episode_walks(console: Path) -> int:
 
 
 def bench_xp(levels: list[dict]) -> int:
-    """Bench (non-lead) exp gained over the run: positive exp deltas between consecutive levels.jsonl rows,
-    members matched by SPECIES (slots reorder; a species whose count differs between the two rows is skipped).
-    The species with the largest total is the lead and is excluded."""
-    totals: dict[int, int] = {}
-    prev: dict[int, list] = {}
+    """Bench (non-lead) exp gained over the run: the rise of (total party exp minus the lead's exp) between consecutive
+    levels.jsonl rows. The lead is the member with the highest level (ties: highest exp). A row pair is skipped when the
+    party size, the species multiset or the lead's species changed (catch / deposit / evolution / lead swap: whole-member
+    exp jumps), and a negative delta is never counted. Not keyed per species: two members of one species (two KAKUNA)
+    made per-species deltas alternate between them and double-count."""
+    total, prev = 0, None
     for r in levels:
-        cur: dict[int, list] = {}
-        for mon in r.get("party") or []:
-            cur.setdefault(mon[0], []).append(mon[2])
-        for sp, exps in cur.items():
-            old = prev.get(sp)
-            if old is None or len(old) != len(exps):
-                continue                          # arrived, left, or duplicated: no reliable pairing
-            for a, b in zip(old, exps):
-                if b - a > 0:
-                    totals[sp] = totals.get(sp, 0) + (b - a)
+        party = [m for m in (r.get("party") or []) if len(m) >= 3]
+        if not party:
+            prev = None
+            continue
+        lead = max(party, key=lambda m: (m[1], m[2]))
+        cur = (sorted(m[0] for m in party), lead[0], sum(m[2] for m in party) - lead[2])
+        if prev is not None and prev[:2] == cur[:2] and cur[2] > prev[2]:
+            total += cur[2] - prev[2]
         prev = cur
-    if not totals:
-        return 0
-    lead_sp = max(totals, key=totals.get)
-    return sum(v for sp, v in totals.items() if sp != lead_sp)
+    return total
 
 
 def second_member_l9_step(levels: list[dict]) -> int | None:

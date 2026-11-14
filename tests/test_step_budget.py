@@ -136,3 +136,14 @@ def test_second_member_l9_is_relative_to_the_start():
             {"step": 90, "party": [[1, 24, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 9, 0, 1, 1]]}]
     assert step_budget.second_member_l9_step(rows) == 90
     assert step_budget.second_member_l9_step(rows[:2]) is None
+
+
+def test_bench_xp_duplicate_species_and_catch():
+    """Two members of one species (KAKUNA 113) must not alternate-count; a catch / deposit jump is skipped; negatives ignored."""
+    rows = [{"step": 1, "party": [[113, 9, 500, 1, 1], [113, 7, 100, 1, 1], [20, 6, 50, 1, 1]]},
+            {"step": 2, "party": [[20, 6, 60, 1, 1], [113, 7, 100, 1, 1], [113, 9, 530, 1, 1]]},   # reorder; lead +30 (excluded), RATTATA +10
+            {"step": 3, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1]]},     # second KAKUNA +30
+            {"step": 4, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1], [19, 3, 900, 1, 1]]},  # catch: skipped
+            {"step": 5, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1]]},      # deposit: skipped
+            {"step": 6, "party": [[113, 7, 120, 1, 1], [20, 6, 60, 1, 1], [113, 9, 560, 1, 1]]}]      # negative bench delta: ignored
+    assert step_budget.bench_xp(rows) == 40

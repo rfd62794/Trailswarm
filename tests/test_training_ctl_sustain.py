@@ -72,11 +72,12 @@ def test_leaving_and_to_grass(monkeypatch):
 def test_tick_is_the_sole_writer(monkeypatch):
     ctl = TrainingController()
     ctx = SimpleNamespace(train_route_live=False, step=10, train_need=0, goals=lambda: {})
+    ran = lambda: ctx.__dict__.__setitem__("plan_goal_step", ctx.step - 1)   # plan_goal reached its flag write last step
     monkeypatch.setattr(adapters, "team_ready_live", lambda c: True)
-    ctl.tick(ctx)
+    ran(); ctl.tick(ctx)
     assert ctx.train_route_live is True            # the stage verdict: live
     monkeypatch.setattr(adapters, "team_ready_live", lambda c: False)
-    ctl.tick(ctx)
+    ran(); ctl.tick(ctx)
     assert ctx.train_route_live is False           # no stamp, not team_ready
     ctx.__dict__["grind_walk_step"] = ctx.step - 1
     ctl.tick(ctx)
@@ -85,9 +86,45 @@ def test_tick_is_the_sole_writer(monkeypatch):
     ctl.tick(ctx)
     assert ctx.train_route_live is False           # a stale stamp does not
     ctx2 = SimpleNamespace(train_route_live=True, step=10, train_need=0, goals=lambda: {})   # no view
+    ctx2.__dict__["plan_goal_step"] = 9
     monkeypatch.setattr(adapters, "team_ready_live", lambda c: c.view.m)   # blows up inside tick
     ctl.tick(ctx2)                                 # a read failure is logged, never raised ...
     assert ctx2.train_route_live is True           # ... and the flag keeps its last value
+
+
+def test_preempted_plan_goal_keeps_the_flag(monkeypatch):
+    """Main wrote train_route_live only inside plan_goal, so it stayed sticky across steps another behaviour pre-empted it
+    (party_order, restock, box, heal walk). tick must not recompute on those steps."""
+    ctl = TrainingController()
+    ctx = SimpleNamespace(train_route_live=True, step=353, train_need=0, goals=lambda: {})
+    monkeypatch.setattr(adapters, "team_ready_live", lambda c: False)         # inputs now say "not live"
+    for step in (353, 354, 355):                    # plan_goal never ran: no stamp
+        ctx.step = step
+        ctl.tick(ctx)
+        assert ctx.train_route_live is True
+    ctx.__dict__["plan_goal_step"] = 355            # plan_goal ran at 355 and recomputed
+    ctx.step = 356
+    ctl.tick(ctx)
+    assert ctx.train_route_live is False
+    ctx.step = 357
+    monkeypatch.setattr(adapters, "team_ready_live", lambda c: True)
+    ctl.tick(ctx)                                   # the stamp was consumed: a later pre-empted step latches False
+    assert ctx.train_route_live is False
+
+
+def test_shake_exemption_survives_a_preempted_step(monkeypatch):
+    from pokeagent.explorer.behaviours import grind_loop
+    ctl = TrainingController()
+    ctx = SimpleNamespace(train_route_live=False, step=100, train_need=0, goals=lambda: {}, battles=1)
+    ctx.__dict__["battle_hist"] = [0] * grind_loop.WINDOW
+    monkeypatch.setattr(adapters, "team_ready_live", lambda c: True)
+    ctx.__dict__["plan_goal_step"] = 99
+    ctl.tick(ctx)
+    assert grind_loop.paced_in_training(ctx) is True
+    monkeypatch.setattr(adapters, "team_ready_live", lambda c: False)         # next step: party_order pre-empted plan_goal
+    ctx.step = 101
+    ctl.tick(ctx)
+    assert grind_loop.paced_in_training(ctx) is True   # still exempt: no shake mid party_order / box / heal walk
 
 
 def test_engine_ticks_before_choose(tmp_path, monkeypatch):
@@ -104,6 +141,7 @@ def test_engine_ticks_before_choose(tmp_path, monkeypatch):
     monkeypatch.setattr(adapters, "team_ready_live", lambda c: True)
     ctx = real_ctx(tmp_path)
     ctx.refresh()
+    ctx.__dict__["plan_goal_step"] = ctx.step - 1    # plan_goal reached its flag write last step
     Engine(ctx, selector=Spy()).step()
     assert seen == [True] and ctx.train_route_live is True
 
