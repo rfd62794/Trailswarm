@@ -33,11 +33,11 @@ class Harvester:
         self.prev: str | None = None      # last distinct cid this run was checked in
 
     def _parent_for(self, cid: str) -> str | None:
-        """A NEW cell's parent: the previous cell while it is still archived, else the run's return cell;
-        never the cell itself. A replaced entry keeps its parent, so the chain stays acyclic and evict()
+        """A NEW cell's parent: the previous cell while it is still archived, else the run's return cell
+        while IT is archived; never the cell itself. A replaced entry keeps its parent, so the chain stays acyclic and evict()
         (which spares any cell with children) keeps enforcing the cap."""
-        prev = self.prev if self.prev in self.archive.entries else None
-        parent = prev or self.parent
+        live = self.archive.entries   # only an archived cell may be a parent: a dangling one could close a cycle
+        parent = next((c for c in (self.prev, self.parent) if c is not None and c in live), None)
         return None if parent == cid else parent
 
     def tick(self) -> str | None:

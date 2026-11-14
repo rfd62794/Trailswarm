@@ -188,6 +188,20 @@ def test_a_new_cell_is_never_its_own_parent(tmp_path):
     assert h._parent_for("x") is None            # never itself
 
 
+def test_an_unarchived_return_cell_is_not_a_parent(tmp_path):
+    ctx = make_ctx(tmp_path)
+    ctx.emu.set(PX, 20)
+    r = cell_id(from_snapshot(read_snapshot(ctx.emu), 0))
+    h = cell_dump.Harvester(ctx, tmp_path / "arch", parent=r)   # r lives in another root: not archived here
+    ctx.emu.set(PX, 9)
+    a = h.tick()
+    assert h.archive.entries[a].parent is None   # not dangling at r
+    ctx.step += cell_dump.CHECK_EVERY
+    ctx.emu.set(PX, 20)
+    assert h.tick() == r
+    assert h.archive.entries[r].parent == a      # A -> r only: no A <-> r cycle
+
+
 def test_every_written_entry_state_survives_load(tmp_path):
     ctx = make_ctx(tmp_path)
     h = cell_dump.Harvester(ctx, tmp_path / "arch")
