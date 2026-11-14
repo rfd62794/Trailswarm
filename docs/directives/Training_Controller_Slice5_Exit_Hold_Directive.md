@@ -192,7 +192,7 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-training-controller-slice5-exit-h-30a7c4 |
 | Base branch | - |
@@ -203,4 +203,5 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 - 2026-11-14 09:02 · robert-claude-laptop · Queued → Approved — lint override: The directive states all paths are under src/pokeagent/; training_ctl/__init__.py and training_ctl/adapters.py exist at src/pokeagent/explorer/training_ctl/. Reviewed by Claude (controller) 2026-11-14.
 - 2026-11-14 09:13 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7D6FSCSY278PQTX81JVY5FT
 - 2026-11-14 09:18 · dispatcher · launched pid=12596; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (12 declared need(s); 8 external))
+- 2026-11-14 11:52 · agentflow-tick · In progress → Blocked — host shutdown/reboot; last activity 2026-11-14T09:21:46, found gone at 2026-11-14T11:43:15 (boot 2026-11-14T11:41:42, trigger lock-takeover); wip commit failed; wip/pokeagent-training-controller-slice5-exit-h-30a7c4@d84aa46 pushed
 <!-- queue:end -->
