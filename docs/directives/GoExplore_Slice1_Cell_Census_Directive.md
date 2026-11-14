@@ -238,11 +238,12 @@ Nothing for the build. After merge, Claude runs the real census on the laptop's 
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved Go-Explore doc (#246) and recs 2026-11-14.
+- 2026-11-13 23:49 · robert-claude-laptop · Queued → Approved — lint override: Every cited goexplore/*, tools/cell_census.py and tests/test_goexplore_* path is a new file this directive creates; `map/x/y` is prose for the three decisions.jsonl fields, not a path.
 <!-- queue:end -->
