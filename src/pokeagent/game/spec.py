@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 _KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _SHA1_RE = re.compile(r"^[0-9A-F]{40}$")
@@ -38,7 +38,9 @@ class GameSpec:
                     f"{self.key}: bad rom_sha1 entry (40 uppercase hex): {entry!r}"
                 )
         rom = Path(self.default_rom)
-        if rom.is_absolute() or rom.drive or str(rom).startswith(("/", "\\")) or not rom.suffix:
+        win = PureWindowsPath(str(self.default_rom))  # Windows drive/UNC forms are absolute on every OS
+        if (rom.is_absolute() or win.is_absolute() or rom.drive or win.drive
+                or str(rom).startswith(("/", "\\")) or not rom.suffix):
             raise ValueError(
                 f"{self.key}: default_rom must be a relative path with a suffix: {self.default_rom!r}"
             )

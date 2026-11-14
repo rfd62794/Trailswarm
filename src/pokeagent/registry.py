@@ -33,6 +33,8 @@ def process_alive(pid):
         return False
     except PermissionError:
         return True
+    except (OverflowError, OSError):  # pid outside the OS range cannot be a live process
+        return False
 
 
 def process_state(pid):

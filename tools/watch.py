@@ -17,14 +17,13 @@ import json
 import math
 import threading
 import time
-import tkinter as tk
 import urllib.request
 
 from pokeagent.goals import GOALS
 from pathlib import Path
 from typing import Optional
 
-from PIL import Image, ImageTk
+from PIL import Image
 
 from pokeagent.telemetry import FrameSubscriber
 
@@ -152,6 +151,8 @@ def status_line(a: Agent) -> str:
 
 
 def main() -> int:
+    import tkinter as tk  # lazy: status_line() must import on headless hosts without Tk
+    from PIL import ImageTk
     ap = argparse.ArgumentParser()
     ap.add_argument("--ports", default=None, help="e.g. 8800-8807 or 8765,8800 (default: probe 8765 and 8800-8815)")
     ap.add_argument("--fps", type=float, default=15.0, help="polls per second per agent")
@@ -253,7 +254,7 @@ def main() -> int:
 
     root.bind("<Configure>", on_resize)
 
-    def draw(ag: Agent, label: tk.Label, scale: int) -> None:
+    def draw(ag: Agent, label: "tk.Label", scale: int) -> None:
         try:
             if ag.png and ag.raw:
                 im = Image.frombytes("RGB", ag.dims, ag.png)
