@@ -46,7 +46,7 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb |
 | Base branch | repoman/rl-success-and-context |
@@ -64,4 +64,5 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 - 2026-11-13 23:27 · robert-claude-laptop · Queued → Approved — lint override: baselines/battle.state is a gitignored local save state; the directive names it as conditional ("only run ROM probes if both ... already exist in this worktree; otherwise report not run, never search"), so its absence in the worktree is expected, not a typo.
 - 2026-11-13 23:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7C4YFPPA6VCKP6KSRDC4KF8
 - 2026-11-13 23:31 · dispatcher · launched pid=18484; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-13 23:37 · devin · In progress → Blocked — Work complete, held for publish: directive forbids push but Review requires a pushed branch (refused as unpushed). Controller please push directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb and set Review. Commit 16c9593: eval env now has identical obs/action/reward config (subgoals, sub_bonus, options); latest_eval carries version+epsilon; new counted-fake tests prove hold/release frame budget and zero extra ticks under paced and per-frame publishing. uv run pytest -q: 180 passed, 5 skipped. python 3.12.12, git diff --check clean. Not run: ROM probes (roms/ and baselines/ absent) and rl_train.py --help (sandbox refused). Invariance tested with counted fake only. No live seats, controllers or runs files touched.
 <!-- queue:end -->
