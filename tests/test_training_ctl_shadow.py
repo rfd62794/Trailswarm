@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 
 from pokeagent.explorer.training_ctl import adapters
-from pokeagent.explorer.training_ctl.controller import RATE_STEPS, TrainingController
+from pokeagent.explorer.training_ctl.controller import MAX_MISMATCHES, RATE_STEPS, TrainingController
 from pokeagent.explorer.training_ctl.state import TrainingState
 from test_grind_episode import make_ctx
 
@@ -19,7 +19,7 @@ def test_shadow_equals_old_flags_on_a_quiet_ctx(tmp_path):
     ctx = make_ctx(tmp_path, m=3, lvl=6, need=8)
     ctl = TrainingController()
     assert ctl.observe(ctx) is not None
-    assert ctl.mismatches == []
+    assert not ctl.mismatches
     assert ctx.__dict__["training"].diff(adapters.old_flags(ctx)) == {}
 
 
@@ -49,3 +49,24 @@ def test_mismatch_log_is_rate_limited(tmp_path, caplog):
 def test_observe_swallows_read_failures(tmp_path):
     ctl = TrainingController()
     assert ctl.observe(object()) is None
+
+
+def test_mismatches_stay_bounded(tmp_path):
+    ctx = make_ctx(tmp_path, m=3, lvl=6, need=8)
+    ctx.train_route_live = True
+    ctl = TrainingController()
+    for step in range(MAX_MISMATCHES * 3):
+        ctx.step = step
+        ctl.observe(ctx)
+    assert len(ctl.mismatches) == MAX_MISMATCHES
+    assert ctl.mismatches[-1][0] == MAX_MISMATCHES * 3 - 1      # newest kept
+
+
+def test_observe_failure_log_is_rate_limited(caplog):
+    ctl = TrainingController()
+    ctx = type("BadCtx", (), {"step": 0})()                     # no state: every observe raises
+    with caplog.at_level("WARNING"):
+        for step in (1, 2, 3, 1 + RATE_STEPS):
+            ctx.step = step
+            assert ctl.observe(ctx) is None
+    assert len([r for r in caplog.records if "observe failed" in r.message]) == 2

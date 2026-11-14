@@ -1,6 +1,8 @@
 """Thin ctx readers: the OLD flags as a TrainingState, and the same values re-derived through the EXISTING functions.
 
-Both sides are read-only: nothing here writes ctx (gate_level would set ctx.gate_lvl, so trainee_band_level is used)."""
+Neither side writes the training flags on ctx (gate_level would set ctx.gate_lvl, so trainee_band_level is used).
+Not strictly read-only: ctx.goals() (check_goals) mutates sticky state (setdefault seen_maps, seen.add, had_parcel,
+healed_cerulean, through_mt_moon). Those writes are idempotent within a step, so observing does not change decisions."""
 from __future__ import annotations
 
 from pokeagent.explorer import grind_episode, training
