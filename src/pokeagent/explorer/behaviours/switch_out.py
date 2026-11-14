@@ -18,11 +18,12 @@ from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
 from pokeagent.explorer.kb import ROM_KB
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.ramstructs import active_slot
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import our_party, trainer_mon
 from pokeagent.knowledge.readiness import best_move
-from pokeagent.magikarp import MAGIKARP, MAX_RUNS, party_species, switch_candidate, trainee_slot_for
+from pokeagent.magikarp import MAGIKARP, MAX_RUNS, party_species, switch_candidate
 from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.ramstructs import read_battle_mon, read_enemy_mon, read_party
 
@@ -34,7 +35,7 @@ def trainee_out(ctx: ExplorerContext) -> int | None:
     own party_pos AND species agree with the trainee slot (a Magikarp party: identical to the old species match).
     The trainee slot is the exp-spread rotation's pick: a named weak member or the lowest band breaker, never only
     the Magikarp (team_plan.of(ctx)["breakers"] is published by plan_goal each step)."""
-    t = trainee_slot_for(ctx.emu, ctx.train_member, team_plan.of(ctx).get("breakers") or ())
+    t = roster.trainee_slot(ctx, breakers=True)
     if t is None:
         return None
     b, sp = read_battle_mon(ctx.emu), party_species(ctx.emu)
@@ -85,7 +86,7 @@ def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
     if pos < len(hp_now) and hp_now[pos] <= 0:  # the fighter fainted: the forced list is bring_out's, not a matchup choice
         return None
     pick = team_plan.switch_choice(party, pos, foe, None, hp_now=hp_now, switches=n_sw,
-                                   trainee=trainee_slot_for(ctx.emu, ctx.train_member))
+                                   trainee=roster.trainee_slot(ctx))
     if pick is None:
         return None
     from pokeagent.knowledge.kb import table

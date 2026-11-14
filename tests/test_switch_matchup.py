@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from pokeagent.explorer.behaviours import switch_out as so_mod
 from pokeagent.explorer.stats import stat_value
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import Combatant
 
@@ -55,7 +56,7 @@ def _patch(monkeypatch, ctx):
     if ctx._active_hp is not None:
         hp[0] = ctx._active_hp
     monkeypatch.setattr(so_mod, "read_party", lambda emu: [SimpleNamespace(hp=h) for h in hp])
-    monkeypatch.setattr(so_mod, "trainee_slot_for", lambda emu, named: None)
+    monkeypatch.setattr(roster, "trainee_slot", lambda ctx, **kw: None)
 
 
 def test_matchup_pick_fires_in_a_trainer_battle(monkeypatch):
@@ -112,7 +113,7 @@ def _step_ctx(tmp_path, monkeypatch):
                           run_dir=tmp_path, battles=3, stable_frames=10)
     ctx.refresh()
     ctx.battle_log = {"kind": 2}
-    monkeypatch.setattr(so_mod, "trainee_slot_for", lambda *a: None)
+    monkeypatch.setattr(roster, "trainee_slot", lambda *a, **k: None)
     monkeypatch.setattr(so_mod, "matchup_pick", lambda c: (1, "thin: foe hits 30x2 vs 20 HP"))
     return ctx
 

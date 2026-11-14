@@ -3,7 +3,7 @@
 Gen 1 EXP (UNVERIFIED, from memory of pokered GainExperience): only participants still alive when the enemy
 faints share it - a fainted trainee earns nothing while the stage keeps spending steps and battles. The pure gate
 is explorer.status_care.trainee_eligible; this module reads the live party (ramstructs), the trainee slot
-(magikarp.trainee_slot_for over ctx.train_member) and the walk to the nearest known heal.
+(training_ctl.roster.trainee_slot over ctx.train_member) and the walk to the nearest known heal.
 
 Two entry points, on purpose:
 
@@ -25,10 +25,10 @@ from pokeagent.explorer import heal_walk
 from pokeagent.explorer.economy import outside_use
 from pokeagent.explorer.economy.prices import ANTIDOTE, FULL_HEAL, REVIVE
 from pokeagent.explorer.status_care import (MAX_TRIES, Eligibility, MonStatus, of, record_row, status_kinds, trainee_eligible)
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.goals import bag_contents
 from pokeagent.knowledge.kb import table
 from pokeagent.legs import grid as G
-from pokeagent.magikarp import trainee_slot_for
 from pokeagent.ramstructs import read_party
 
 FAINT_LOG_EVERY = 100   # steps between repeated "trainee fainted" log lines (untuned first value)
@@ -38,7 +38,7 @@ _FINE = Eligibility(True, "", "")
 def trainee_check(ctx) -> Eligibility:
     """Eligibility of the run's switch-trainee (the Magikarp, or the slot ctx.train_member names). Pure."""
     party = read_party(ctx.emu)
-    slot = trainee_slot_for(ctx.emu, ctx.train_member)
+    slot = roster.trainee_slot(ctx)
     if slot is None or not 0 <= slot < len(party):
         return Eligibility(True, "no trainee to gate", "")
     mon = party[slot]
@@ -63,7 +63,7 @@ def trainee_ok(ctx) -> Eligibility:
         return elig
     st = of(ctx)
     party = read_party(ctx.emu)
-    slot = trainee_slot_for(ctx.emu, ctx.train_member)
+    slot = roster.trainee_slot(ctx)
     mon = party[slot]
     if mon.hp <= 0:
         if st.get("faint_step") != ctx.step:

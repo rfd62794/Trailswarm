@@ -13,6 +13,7 @@ from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.party_menu import MENU_ITEM, menu_open, reorder_press, screen_lines
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
 from pokeagent.magikarp import party_species
 from pokeagent.ramstructs import read_party
@@ -29,9 +30,11 @@ def species_names(emu) -> list[str]:
 
 
 def team_sig(ctx: ExplorerContext) -> tuple:
-    """The order-independent team state a reorder may react to: (species, level, fainted) per member, sorted."""
-    return tuple(sorted((getattr(m, "species", 0), getattr(m, "level", 0), getattr(m, "hp", 1) == 0)
-                        for m in read_party(ctx.emu)))
+    """The order-independent team state a reorder may react to: (species, level) per member, sorted,
+    plus the run's monotonic faint counter - a heal (fainted -> alive) no longer flips the signature
+    and re-triggers a reorder, a real faint (alive -> fainted) still does."""
+    return (tuple(sorted((getattr(m, "species", 0), getattr(m, "level", 0))
+                         for m in read_party(ctx.emu))), roster.note_faints(ctx))
 
 
 def _held(ctx: ExplorerContext) -> bool:

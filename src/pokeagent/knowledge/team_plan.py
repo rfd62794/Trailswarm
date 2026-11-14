@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import Combatant, at_level, trainer_mon
 from pokeagent.knowledge.readiness import MARGIN, MAX_LEVEL, TEAM_GAP, TEAM_MIN, best_move, fight
+from pokeagent.knowledge.team_value import EVOLUTIONS
 
 # --- exp-spread band and rotation ----------------------------------------------------
 BAND_BELOW = 4                    # non-lead members are asked to stay within this many levels of the lead's target; untuned
@@ -164,6 +165,25 @@ def band_breakers(team, band) -> tuple:
     return tuple(i for i, (lo, _hi) in (band or {}).items() if i < len(team or ()) and team[i].level < lo)
 
 
+def _name_of(c, names: dict) -> str:
+    """A member's species name: ``.name`` when it has one (a Combatant), else the RAM PartyMon's
+    internal id resolved through name_of_internal - matched by name, never by a hard-coded id."""
+    return getattr(c, "name", None) or names.get(str(getattr(c, "species", "")), "")
+
+
+def _our_weedle_line(c, names: dict, kb=None) -> bool:
+    """A WEEDLE, or a KAKUNA that knows POISON STING (evolved from our Weedle; a wild one knows only
+    Harden). RAM members carry move ids, Combatants move names."""
+    name = _name_of(c, names)
+    if name == "WEEDLE":
+        return True
+    if name != "KAKUNA":
+        return False
+    rows = table(kb, "moves")
+    known = {m if isinstance(m, str) else (rows.get(str(m)) or {}).get("name") for m in getattr(c, "moves", ()) or ()}
+    return "POISON STING" in known
+
+
 def trainee_slot(party, named: int | None = None, breakers=(), wild=None, kb=None) -> int | None:
     """The non-Magikarp training lead (the exp-spread rotation). ``named`` = the slot team_readiness's
     weakest member names: it wins when it is a non-lead member at least TEAM_GAP under the lead's level
@@ -172,6 +192,15 @@ def trainee_slot(party, named: int | None = None, breakers=(), wild=None, kb=Non
     lowest breaker leads anyway). MAGIKARP never answers here: its own slot wins upstream."""
     if not party:
         return None
+    # Robert's rule (2026-11-14): a WEEDLE (or the KAKUNA it evolved into) still short of the level it
+    # becomes BEEDRILL and not the strongest member is the trainee - evolved it keeps Poison Sting where a wild KAKUNA knows only
+    # Harden. The lowest-level such Weedle wins. METAPOD/CATERPIE: undecided, deliberately not here.
+    top = max(c.level for c in party)
+    names = table(kb, "name_of_internal")
+    weedles = [i for i, c in enumerate(party) if _our_weedle_line(c, names, kb)
+               and c.level <= top - 1 and c.level < EVOLUTIONS["KAKUNA"][1]]
+    if weedles:
+        return min(weedles, key=lambda i: (party[i].level, i))
     # order-independent: compared against the strongest member (the opener), and slot 0 may be the trainee
     if named is not None and 0 <= named < len(party) and party[named].level <= max(c.level for c in party) - TEAM_GAP:
         return named
