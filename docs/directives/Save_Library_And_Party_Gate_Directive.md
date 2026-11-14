@@ -214,4 +214,5 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-14 14:29 · robert-claude-laptop · Queued → Approved — lint override: statelib/library.py and statelib/validate.py are section-heading short names for files marked new (src/pokeagent/statelib/...) on line 25; runs/states/library.json and runs/segments.json are gitignored runtime outputs the code writes/reads at run time, not files Devin must open. Reviewed by Claude (controller) 2026-11-14.
 - 2026-11-14 14:30 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DRKR3S0WXHT2C3SNDBSGAM
+- 2026-11-14 14:36 · dispatcher · launched pid=16812; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
