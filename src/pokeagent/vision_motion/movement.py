@@ -1,4 +1,5 @@
-"""Movement-type labels from the RAM move byte, and a depth<=3 threshold-rule classifier."""
+"""Movement-type labels from the RAM move byte, and a depth<=3 threshold-rule classifier.
+Labels are provisional: the 0xC206 NPC move byte is unverified in ram_map.json."""
 from __future__ import annotations
 
 import numpy as np

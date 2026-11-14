@@ -91,7 +91,6 @@ class CountTable:
         row = self._row(ctx)
         tot = sum(row.values()) + self.smooth * len(CLASSES)
         return {c: (row.get(c, 0) + self.smooth) / tot for c in CLASSES}
-
     def predict(self, ctx) -> str:
         p = self.probs(ctx)
         return max(CLASSES, key=lambda c: p[c])

@@ -114,7 +114,8 @@ def main(argv=None) -> int:
     if not a.synthetic and not a.root.is_dir():
         print(f"error: dataset {a.root} not found (use --synthetic)", file=sys.stderr)
         return 2
-    rep = {"game": a.game, "seed": a.seed, "split_rule": SPLIT_RULE}
+    rep = {"game": a.game, "seed": a.seed, "split_rule": SPLIT_RULE,
+           "movement_labels": "provisional: 0xC206 move byte unverified in ram_map.json"}
     print(SPLIT_RULE)
     if a.part in ("movement", "both") or a.synthetic:
         r = rep["movement"] = _movement(a)

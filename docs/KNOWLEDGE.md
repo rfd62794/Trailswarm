@@ -440,4 +440,4 @@ the model keeps expecting movement while the NPC holds its tile. Location: a nea
 baseline and an optional torch CNN (`vision` dependency group, torch imported inside functions
 only) name the map and regress the cell from pixels alone. Splits are honest by construction:
 tracks split by whole held-out areas, thumbnails by whole held-out `(area, cell)` blocks; the
-report never claims "which map" for a map the model never saw.
+report never claims "which map" for a map the model never saw. The RAM move-byte labels are provisional: the 0xC206 NPC move byte is unverified in ram_map.json.
