@@ -25,7 +25,7 @@ writers: `explorer/behaviours/grind_loop.py:32` mark_live (`train_route_live`); 
 
 `TrainingState` (frozen dataclasses) at `ctx.__dict__["training"]`; pure sub-system functions; one facade in
 `explorer/training_ctl/`: `state.py` ~50, `target.py` ~90, `roster.py` ~100, `sustain.py` ~90, `exit_rule.py` ~60,
-`controller.py` ~110, `adapters.py` (thin ctx readers) .
+`controller.py` ~110, `adapters.py` ~60 (thin ctx readers).
 
 ```python
 class TrainingController:
@@ -86,6 +86,15 @@ class TrainingController:
    `test_party_log_reorder.py`, `test_trainee_gate.py`, `test_trainer_grind.py`.
 5. **Exit + gym hold.** Fold `_end_reason`, stall hold, GrindBudget; delete `gym_hold_seen` (`behaviours/plan_goal.py:82`, :149) and the gate_lifted block (:139-151, :283, :297-298; est. -20), `floor_unmet` (`training.py:125`), then `explorer/context.py` fields :124, :165, :187 (-3) once their last writer is gone, and dead modules. Gate: `test_grind.py`, `test_area_grind.py`, `test_grind_pressure_plan_goal.py`, `test_plan_goal_gym_road.py`.
 Estimated net removal: plan_goal about -26 total, context -3. Each slice's removals must make plan_goal/context line count net <= 0 (check `wc -l` in review).
+
+## Invariant: the floor holds without a ledger
+
+Known bug: with a fresh `runs/` dir (no `grind_points.json`, `xp_spots.json` or `milestones.json`) the agent walks to Misty below the team level floor. Slice 5 deletes `gym_hold_seen`, `floor_unmet` and the gate_lifted block, which are today's only floor checks, so the plan must replace them with this rule:
+
+- The Exit sub-system must hold the gym approach whenever the team floor is unmet, regardless of whether a grind ledger or learned path exists.
+- An empty ledger means Target falls back to exploring for grass and never releases the hold.
+
+Regression test (added by slice 5, or whichever slice owns Exit): `test_exit_floor_holds_with_empty_ledger` - an empty ledger with the floor unmet produces no goal_talk/gym approach.
 
 ## 5. Acceptance (tools named)
 
