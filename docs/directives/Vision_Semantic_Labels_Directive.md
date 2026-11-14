@@ -232,12 +232,14 @@ Diff stat, test tails (state which tests skipped for lack of torch), line counts
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-vision-semantic-labels-directive |
 | Base branch | - |
+| Base commit | c0735dedfb4336cb17572a2f7789e1af04d641f8 |
 
 **Status log**
 - 2026-11-14 12:39 · robert-claude-laptop · none → Queued
 - 2026-11-14 12:40 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 14:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-semantic-labels-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DR5RGS448M4VHCCHK1WWP4
 <!-- queue:end -->
