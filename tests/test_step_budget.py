@@ -101,3 +101,49 @@ def test_run_rows_tolerate_missing_files_and_torn_lines(tmp_path):
     (tmp_path / "decisions.jsonl").write_text('{"step": 1, "rule": "reorder_party"}\n{"step": 2, "ru')
     r = step_budget.run_rows(tmp_path)
     assert r["reorder_sessions"] == 1 and r["episode_starts"] == {} and r["route24_xp_per_1k"] == 0.0
+    assert r["bench_xp_total"] == 0 and r["bench_xp_per_1k_run_steps"] == 0.0
+    assert r["second_member_l9_step"] is None and r["walk_to_grass_per_episode"] == 0.0
+
+
+def test_slice3_rows_bench_xp_l9_and_walk_to_grass(tmp_path):
+    """bench xp = non-lead per-species exp deltas over run steps; L9 = first step with one more member >= L9 than at the start;
+    walk-to-grass lines inside an episode's start -> first-BATTLE window count separately."""
+    _jl(tmp_path / "levels.jsonl", [{"step": 1, "party": [[1, 5, 100, 1, 1], [2, 6, 50, 1, 1]]},
+                                    {"step": 2, "party": [[2, 6, 60, 1, 1], [1, 5, 140, 1, 1]]},   # reordered: species-keyed
+                                    {"step": 3, "party": [[2, 6, 70, 1, 1], [1, 5, 180, 1, 1], [3, 9, 10, 1, 1]]},
+                                    {"step": 4, "party": [[2, 9, 80, 1, 1], [1, 9, 200, 1, 1], [3, 9, 20, 1, 1]]}])
+    walk = lambda n, i: f"thinking: goal team_ready: {n - i} steps to Route 24's grass\n"
+    (tmp_path / "console.log").write_text(
+        block(1, 0x23, "goal team_ready: 70 steps to Route 24's grass")          # outside any episode: total only
+        + "[grind episode] start on ROUTE_24: trainee L5 -> L15\n"
+        + "".join(walk(56, i) for i in range(56))                              # a 56-line episode walk
+        + "thinking: BATTLE vs RATTATA: FIGHT with TACKLE\n"                     # the window closes
+        + "thinking: goal team_ready: 4 steps to Route 24's grass\n"             # mid-episode: total only
+        + "[grind episode] start on ROUTE_24: trainee L5 -> L15\n"
+        + "".join(walk(3, i) for i in range(3)))                               # a 3-line walk, still open at EOF
+    r = step_budget.run_rows(tmp_path)
+    # species deltas: 1: +40+40+20=100 (lead, excluded), 2: +10*3=30, 3: +10 -> bench 40 over 4 steps
+    assert r["bench_xp_total"] == 40 and r["bench_xp_per_1k_run_steps"] == 10000.0
+    assert r["second_member_l9_step"] == 3            # start: 0 at L9; step 3 has one (species 3 at L9)
+    assert r["walk_to_grass_lines"] == 61             # every walk line, inside windows or not
+    assert r["walk_to_grass_after_episode_start"] == 59 and r["walk_to_grass_per_episode"] == 29.5
+
+
+def test_second_member_l9_is_relative_to_the_start():
+    """heal_cerulean starts with three members at L9+: the row must wait for a fourth, not read 0."""
+    rows = [{"step": 0, "party": [[1, 23, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 8, 0, 1, 1]]},
+            {"step": 50, "party": [[1, 24, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 8, 0, 1, 1]]},
+            {"step": 90, "party": [[1, 24, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 9, 0, 1, 1]]}]
+    assert step_budget.second_member_l9_step(rows) == 90
+    assert step_budget.second_member_l9_step(rows[:2]) is None
+
+
+def test_bench_xp_duplicate_species_and_catch():
+    """Two members of one species (KAKUNA 113) must not alternate-count; a catch / deposit jump is skipped; negatives ignored."""
+    rows = [{"step": 1, "party": [[113, 9, 500, 1, 1], [113, 7, 100, 1, 1], [20, 6, 50, 1, 1]]},
+            {"step": 2, "party": [[20, 6, 60, 1, 1], [113, 7, 100, 1, 1], [113, 9, 530, 1, 1]]},   # reorder; lead +30 (excluded), RATTATA +10
+            {"step": 3, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1]]},     # second KAKUNA +30
+            {"step": 4, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1], [19, 3, 900, 1, 1]]},  # catch: skipped
+            {"step": 5, "party": [[113, 7, 130, 1, 1], [20, 6, 60, 1, 1], [113, 9, 530, 1, 1]]},      # deposit: skipped
+            {"step": 6, "party": [[113, 7, 120, 1, 1], [20, 6, 60, 1, 1], [113, 9, 560, 1, 1]]}]      # negative bench delta: ignored
+    assert step_budget.bench_xp(rows) == 40

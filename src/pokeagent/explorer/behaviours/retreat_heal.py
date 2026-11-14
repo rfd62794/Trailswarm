@@ -6,7 +6,8 @@ None so the walk's first press comes from StatusCare in the same step. Evaluated
 """
 from __future__ import annotations
 
-from pokeagent.explorer import grind_heal, heal_walk
+from pokeagent.explorer import heal_walk
+from pokeagent.explorer.training_ctl import sustain
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.cave_topup import fighter_slot
 from pokeagent.explorer.context import ExplorerContext
@@ -44,8 +45,9 @@ class RetreatHeal(BehaviourBase):
         mx = sum(p.max_hp for p in party) or 1
         lead_mon = party[min(fighter_slot(ctx.emu), len(party) - 1)]   # the fighter, not a Magikarp in training
         lead = lead_mon.hp / (lead_mon.max_hp or 1)
-        if grind_heal.grinding(ctx):   # grinding: the survival floor decides, not LEAD_GATE / PARTY_GATE (grind_heal)
-            if not grind_heal.needs_heal(ctx, 0.0):
+        h = sustain.heal_now(ctx)
+        if h.grinding:   # grinding: the survival floor decides, not LEAD_GATE / PARTY_GATE (sustain)
+            if not h.floor_heal:
                 return False
         elif lead >= LEAD_GATE and sum(p.hp for p in party) / mx >= PARTY_GATE:
             return False
@@ -68,7 +70,7 @@ class RetreatHeal(BehaviourBase):
         party_raw = read_party(ctx.emu)
         if not self._hurt(ctx, party_raw):
             return None
-        if grind_heal.potion_instead(ctx):
+        if sustain.heal_now(ctx).use_potion:
             return None   # a Potion beats the walk (outside_use.field_wants): CaveTopUp drinks it, no Pokecenter trip
         party = party_now(ctx.emu)
         if not party:

@@ -8,6 +8,7 @@ from pokeagent.explorer.behaviours import grind_loop, low_yield, plan_goal
 from pokeagent.explorer.behaviours.guards import LoopGuard
 from pokeagent.explorer.behaviours.plan_goal import PlanGoal
 from pokeagent.explorer.grind import stall_hold_holds
+from pokeagent.explorer.training_ctl.controller import TrainingController
 from pokeagent.knowledge import team_floor
 from test_battle_types import BATTLE, make_ctx
 from test_grind_pressure_plan_goal import _full_ctx, _gate_patch
@@ -46,13 +47,13 @@ def test_exemption_is_capped_at_three_windows(tmp_path):
 
 def test_hold_and_grind_latch_walk_marks_training_live(monkeypatch):
     ctx = SimpleNamespace(train_route_live=False, stage_goal="beat_misty", mem=SimpleNamespace(data={"maps": {}}, temp_blocked=set()),
-                          emu=None, view=SimpleNamespace(m=3))
+                          emu=None, view=SimpleNamespace(m=3), step=10, train_need=0, goals=lambda: {})
     monkeypatch.setattr(plan_goal, "party_survives", lambda emu, m: True)
     monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x": False)
     monkeypatch.setattr(plan_goal.train_route, "step", lambda *a, **k: None)
     assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is None and ctx.train_route_live is False
     monkeypatch.setattr(plan_goal.train_route, "step", lambda *a, **k: ("UP", "goal team_ready: 9 steps to Route 24's grass"))
-    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is not None and ctx.train_route_live is True
+    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is not None and ctx.train_route_live is True   # published in the same step, as main did
 
 
 def test_a_grind_episode_pace_counts_as_training(tmp_path):

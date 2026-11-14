@@ -13,6 +13,7 @@ from pokeagent.explorer.grind import GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.memory import MapMemory
 from pokeagent.explorer.party_log import PartyLog
 from pokeagent.explorer.perceive import TILEMAP_LEN
+from pokeagent.explorer.training_ctl import sustain
 from pokeagent.grind import points as gp
 
 MAP, PX, PY, LEVEL = 0xD35E, 0xD362, 0xD361, 0xD18C
@@ -397,11 +398,11 @@ def test_live_episode_ends_when_a_blocker_is_recorded_on_the_way(tmp_path, monke
 def test_hurt_stop_reason_consults_party_survives(tmp_path, monkeypatch):
     ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(20, 20)), make_ledger())
     _start(ctx, monkeypatch, tmp_path)
-    monkeypatch.setattr(grind_episode, "party_survives", lambda emu, m: False)
+    monkeypatch.setattr(sustain, "party_survives", lambda emu, m: False)
     assert grind_episode.update(ctx) is None                      # full HP, nobody survives, no potion
     assert json.loads((tmp_path / "rows.jsonl").read_text().splitlines()[-1])["reason"] == "hurt with no potion"
     ctx2 = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, hp=(1, 20)), make_ledger())
-    monkeypatch.setattr(grind_episode, "party_survives", lambda emu, m: True)
+    monkeypatch.setattr(sustain, "party_survives", lambda emu, m: True)
     monkeypatch.setattr(grind_episode, "LOG", tmp_path / "rows2.jsonl")
     monkeypatch.setattr(grind_episode, "LEDGER", tmp_path / "gp2.json")
     assert grind_episode.update(ctx2) is not None                 # 5% HP but the party survives: it goes on
