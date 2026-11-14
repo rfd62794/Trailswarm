@@ -160,4 +160,5 @@ Diff stat, test tails (including which test skipped for lack of torch), line cou
 - 2026-11-14 12:39 · robert-claude-laptop · none → Queued
 - 2026-11-14 12:39 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 13:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-error-triage-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7DND85KB6KNG05RXMK6TSE5
+- 2026-11-14 13:39 · dispatcher · launched pid=14852; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-error-triage-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 <!-- queue:end -->
