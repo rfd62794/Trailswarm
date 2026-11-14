@@ -150,12 +150,14 @@ Diff stat, test tails (including which test skipped for lack of torch), line cou
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-vision-error-triage-directive |
 | Base branch | - |
+| Base commit | 2175a9a2648ac9d4b13105bce1eff69bcde7af05 |
 
 **Status log**
 - 2026-11-14 12:39 · robert-claude-laptop · none → Queued
 - 2026-11-14 12:39 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 13:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-error-triage-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7DND85KB6KNG05RXMK6TSE5
 <!-- queue:end -->
