@@ -192,4 +192,5 @@ Diff stat, test tails (which tests skipped for lack of torch), line counts of ea
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: movement and location models (directive 3 of 3); needs directive 1 merged
 - 2026-11-14 00:41 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 01:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-movement-and-location-models-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CBM9BRG9GQXDA48J2JMWNF
+- 2026-11-14 01:33 · dispatcher · launched pid=23972; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-movement-and-location-models-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (4 declared need(s), repo-scoped only))
 <!-- queue:end -->
