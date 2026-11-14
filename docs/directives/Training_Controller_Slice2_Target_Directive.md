@@ -214,3 +214,17 @@ Nothing for the build. After merge, Claude runs the seed-12 and seed-13 A/B on t
 - Exec(git grep)
 - Exec(git status)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved all recs 2026-11-14; base includes #245.
+<!-- queue:end -->
