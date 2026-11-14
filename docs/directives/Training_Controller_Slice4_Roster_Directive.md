@@ -198,4 +198,5 @@ Nothing for the build. After merge, Claude runs the seed A/Bs on the laptop.
 - 2026-11-14 03:38 · robert-claude-laptop · none → Queued — Training Controller plan approved; slices 1-3 merged; includes Robert's Weedle-over-Kakuna rule (2026-11-14).
 - 2026-11-14 03:39 · robert-claude-laptop · Queued → Approved — lint override: Any cited training_ctl/roster.py and new test files are created by this directive; behaviours/*.py shorthand refers to existing files under src/pokeagent/explorer/.
 - 2026-11-14 05:18 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice4-roster-42293f; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CS1T64FCQBES437H6GTAYF
+- 2026-11-14 05:30 · dispatcher · launched pid=3920; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice4-roster-42293f; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (5 declared need(s); 1 external))
 <!-- queue:end -->
