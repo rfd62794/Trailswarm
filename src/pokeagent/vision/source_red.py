@@ -1,6 +1,7 @@
 """The Pokemon Red label source: sprite table plus visible background map, read through Emulator."""
 from __future__ import annotations
 
+from pokeagent.ram_symbols import IS_IN_BATTLE
 from pokeagent.vision.bgmap import LCDC_MAP, MAP_LEN, visible_cells
 from pokeagent.vision.labels import FrameLabels, SpriteBox
 
@@ -11,7 +12,6 @@ SLOT_LEN, SLOTS = 16, 16  # slot 0 is the player, 1-15 NPCs
 HIDDEN = 0xFF
 BALL_PIC = 61             # pick-up ball picture id (src/pokeagent/atlas/overlay.py)
 MAP_ID, PLAYER_Y, PLAYER_X = 0xD35E, 0xD361, 0xD362
-IN_BATTLE = 0xD057        # wIsInBattle
 TILESET = 0xD367          # wCurMapTileset
 # hardware registers
 LCDC, SCY, SCX = 0xFF40, 0xFF42, 0xFF43
@@ -41,7 +41,7 @@ class RedSource:
         player = (emu.read(PLAYER_X), emu.read(PLAYER_Y))
         area, bank = f"map-{map_id}", emu.read(TILESET)
         cell = f"{player[0] // 4},{player[1] // 4}"
-        if emu.read(IN_BATTLE):
+        if emu.read(IS_IN_BATTLE):
             return FrameLabels(area, bank, player, cell, skip=True)
         slots = [_slot(emu, i) for i in range(SLOTS)]
         sane = [(i, s) for i, s in enumerate(slots) if s[0] and s[1] != HIDDEN and s[2] >= 0 and s[3] >= 0]
