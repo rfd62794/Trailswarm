@@ -5,6 +5,12 @@ __pycache__/
 .pytest_cache/
 runs/
 !tests/fixtures/review/runs/
+# ROM-derived: vision crops, thumbnails, datasets and trained weights stay local only
+runs/vision/
+runs/vision_models/
+*.pt
+*.pth
+*.npz
 .devin-scratch/
 
 kb/rom_tables.json
