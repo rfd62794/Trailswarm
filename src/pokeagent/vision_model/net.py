@@ -121,3 +121,23 @@ def predict(model, images, batch=512) -> tuple[np.ndarray, np.ndarray]:
             lab[s:s + batch] = logits.argmax(1).numpy()
             co[s:s + batch] = coarse.argmax(1).numpy()
     return lab, co
+
+
+def predict_with_confidence(model, images, batch=512) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(class id, coarse id, confidence) per crop; confidence is the max
+    softmax of the class head."""
+    import torch
+
+    model.eval()
+    lab = np.empty(len(images), np.int64)
+    co = np.empty(len(images), np.int64)
+    conf = np.empty(len(images), np.float32)
+    with torch.no_grad():
+        for s in range(0, len(images), batch):
+            x = (torch.from_numpy(np.ascontiguousarray(images[s:s + batch]))
+                 .float().div_(255.0).permute(0, 3, 1, 2))
+            logits, coarse = model(x)
+            lab[s:s + batch] = logits.argmax(1).numpy()
+            co[s:s + batch] = coarse.argmax(1).numpy()
+            conf[s:s + batch] = torch.softmax(logits, 1).max(1).values.numpy()
+    return lab, co, conf

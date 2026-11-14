@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from pokeagent.vision.dataset import iter_samples, load_image
+from pokeagent.vision_model.semantic import SEMANTIC
 
 COARSE = ("enemy", "npc", "item", "player", "terrain", "other")
 KINDS = ("sprite", "tile")
@@ -27,12 +28,14 @@ class Dataset:
     w: np.ndarray       # (N,) int32 original crop width
     h: np.ndarray       # (N,) int32 original crop height
     ids: np.ndarray     # (N,) str content ids, for the train/test leak check
+    semantic: np.ndarray | None = None  # (N,) int8 index into SEMANTIC, or None
 
     def select(self, idx) -> "Dataset":
         """The subset at integer/bool index ``idx``."""
         return Dataset(self.images[idx], self.label[idx], self.coarse[idx], self.area[idx],
                        self.kind[idx], self.bank[idx], self.weight[idx], self.w[idx],
-                       self.h[idx], self.ids[idx])
+                       self.h[idx], self.ids[idx],
+                       None if self.semantic is None else self.semantic[idx])
 
 
 def _pad16(img: np.ndarray) -> np.ndarray:
@@ -61,7 +64,9 @@ def load_dataset(root, kinds=KINDS) -> Dataset:
         weight=np.minimum(np.array(col("count"), np.float32), MAX_WEIGHT),
         w=np.array(col("w"), np.int32),
         h=np.array(col("h"), np.int32),
-        ids=np.array(col("id")))
+        ids=np.array(col("id")),
+        semantic=(np.array([SEMANTIC.index(r["semantic"]) for r in rows], np.int8)
+                  if all(r.get("semantic") in SEMANTIC for r in rows) else None))
 
 
 def row_key(ds: Dataset, i: int) -> tuple:
