@@ -120,12 +120,14 @@ Diff stat, test tails, and whether the optional step-level test was possible. Th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pp-zero-move-guard-directive |
 | Base branch | - |
+| Base commit | 9303e9dbb35216265a215d503df5156439e43b0d |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-14 14:28 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 15:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pp-zero-move-guard-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DW9CE32R6ZKTBXD6TWTSB9
 <!-- queue:end -->
