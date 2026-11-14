@@ -190,7 +190,7 @@ Nothing for the build. Queue only after #264 (slice 3) has merged.
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | directive/pokeagent-goexplore-slice4-return-and-explo-ee9a20 |
 | Base branch | - |
@@ -202,4 +202,5 @@ Nothing for the build. Queue only after #264 (slice 3) has merged.
 - 2026-11-14 09:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goexplore-slice4-return-and-explo-ee9a20; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7D6K5DS38EYW4TCBBMHMWB8
 - 2026-11-14 09:18 · dispatcher · launched pid=17708; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-goexplore-slice4-return-and-explo-ee9a20; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (11 declared need(s); 7 external))
 - 2026-11-14 11:52 · agentflow-tick · In progress → Blocked — host shutdown/reboot; last activity 2026-11-14T09:24:35, found gone at 2026-11-14T11:43:15 (boot 2026-11-14T11:41:42, trigger lock-takeover); wip commit failed; wip/pokeagent-goexplore-slice4-return-and-explo-ee9a20@9f8df9e pushed
+- 2026-11-14 12:20 · robert-claude-laptop · Blocked → Queued — Run lost to a clean laptop power-off at 09:24 (Event 1074, Start menu); no branch pushed. Requeue unchanged.
 <!-- queue:end -->
