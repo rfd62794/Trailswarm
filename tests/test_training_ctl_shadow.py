@@ -18,8 +18,10 @@ def test_diff_ignores_unknown_gym_hold_and_reports_real_differences():
 
 def _no_boss_data(monkeypatch):
     """Pin the 'no boss data' path: boss_party reads local pokered data, present on a dev laptop and absent in the
-    cloud, so without this the derived train_member is 0 on one machine and None on the other."""
+    cloud, so without this the derived train_member is 0 on one machine and None on the other. floor_for reads the
+    same data. Both are patched at the function (not boss_party) so training's module-level cache cannot leak a value."""
     monkeypatch.setattr(training, "boss_need_for", lambda goals, party: None)
+    monkeypatch.setattr(training, "floor_for", lambda goals, party: None)
 
 
 def test_shadow_equals_old_flags_on_a_quiet_ctx(tmp_path, monkeypatch):
