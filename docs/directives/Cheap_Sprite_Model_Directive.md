@@ -161,11 +161,12 @@ Diff stat, test tails (including which tests skipped for lack of torch), line co
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: cheap sprite classifier (directive 2 of 3); needs directive 1 merged
+- 2026-11-14 00:42 · robert-claude-laptop · Queued → Approved — lint override: vision_model/net.py is a new module this directive creates; its dependency (pokeagent.vision.dataset, directive 1) merged as #251.
 <!-- queue:end -->
