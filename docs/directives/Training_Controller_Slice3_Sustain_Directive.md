@@ -296,7 +296,7 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-training-controller-slice3-sustai-06d7ec |
 | Base branch | directive/pokeagent-training-controller-slice3-sustai-06d7ec |
@@ -315,4 +315,5 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 - 2026-11-14 01:25 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CBQ6MSEFX41SFJDTYDG6NM
 - 2026-11-14 01:29 · dispatcher · launched pid=19340; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (15 declared need(s); 10 external))
 - 2026-11-14 01:41 · devin · In progress → Review — [origin] spent: devin 20 min est. n/a
+- 2026-11-14 03:26 · robert-claude-laptop · Review → Done — note: Merged #259 at 3bbc074. Slice 3 is behaviour-preserving: real-ROM seed 12 and 13 decisions.jsonl byte-identical to main over 12000 steps. sustain.publish is the single writer of train_route_live; grind_heal.py/after_heal.py deleted. Reviews APPROVE; cloud GREEN 2924 passed; laptop with ROM 2974 passed, 0 failed. Follow-up: plan text still says tick is the writer.
 <!-- queue:end -->
