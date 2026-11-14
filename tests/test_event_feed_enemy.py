@@ -17,6 +17,22 @@ def _start(emu):
     return next(e for e in feed.bus.since(0) if e["type"] == "battle_start")
 
 
+def _start_after_send_out(emu, frames=900):
+    """BattleStart waits for a live wBattleMon (4cd38bb gates stale reads), which the game fills only after the
+    "Go! <mon>" text, so advance the intro text with A until the event appears (~280 frames on the baselines)."""
+    from pokeagent.emulator import Button
+    feed = EventFeed()
+    for f in range(frames):
+        feed._battle_events(emu, None)
+        got = next((e for e in feed.bus.since(0) if e["type"] == "battle_start"), None)
+        if got:
+            return got
+        if f % 30 == 0:
+            emu.press(Button.A)
+        emu.tick_rendered(1)
+    raise AssertionError("no battle_start within %d frames" % frames)
+
+
 def test_species_comes_from_enemy_mon_not_move_pp():
     # 0xCFD7 holds a move's max PP (25 here == Gastly's internal id 0x19); 0xCFE5 is the real enemy species.
     emu = FakeEmulator({0xD057: 1, 0xD014: 0xB2, 0xCFD7: 0x19, 0xCFE5: 36, 0xCFF3: 5})
@@ -34,6 +50,6 @@ def test_battle_baselines(name, want):
     emu = PyBoyEmulator(ROM)
     try:
         emu.load_state(BASE / f"battle_matrix_{name}.state")
-        assert _start(emu)["species"] == want
+        assert _start_after_send_out(emu)["species"] == want
     finally:
         emu.close()
