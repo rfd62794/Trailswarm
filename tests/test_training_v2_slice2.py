@@ -118,4 +118,4 @@ def test_unmet_floor_with_a_spent_ceiling_budget_keeps_the_hold(tmp_path, monkey
 
 def test_the_sim_alone_does_not_settle_team_ready_while_the_floor_is_unmet():
     src = open(plan_goal.__file__).read()
-    assert 'elif team.ready and not ctx.__dict__.get("floor_unmet")' in src
+    assert 'elif team.ready and not exit_rule.floor_unmet(ctx)' in src
