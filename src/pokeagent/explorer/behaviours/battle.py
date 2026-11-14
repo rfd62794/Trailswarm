@@ -28,11 +28,13 @@ from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_batt
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.goals import bag_contents, check_goals
 from pokeagent.knowledge import team_plan
-from pokeagent.magikarp import fighter
+from pokeagent.knowledge.kb import table
+from pokeagent.magikarp import fighter, switch_candidate
 from pokeagent.ram_symbols import ENEMY_MON, IS_IN_BATTLE, PARTY_COUNT
-from pokeagent.ramstructs import read_party
+from pokeagent.ramstructs import read_battle_mon, read_party
 
 PENDING_EFFECT_MAX_STEPS = 90  # a landed attack's result text should arrive well within this
 
@@ -122,6 +124,16 @@ def scan_battle_text(ctx: ExplorerContext) -> None:
                 ctx.pending_effect = None  # the real message beat the neutral default
 
 
+def _active_no_damage(ctx: ExplorerContext) -> bool:
+    """True when the mon out in this battle cannot hurt anything: every move it knows has power 0 in the ROM
+    moves table (a Harden-only KAKUNA). A move id not in the table is unknown, not proven harmless: False."""
+    rows = table(None, "moves")
+    if not rows:
+        return False
+    ids = [str(m) for m in read_battle_mon(ctx.emu).moves if m]
+    return bool(ids) and all(i in rows and (rows[i].get("power") or 0) <= 0 for i in ids)
+
+
 class Battle(BehaviourBase):
     name = "battle"
 
@@ -184,6 +196,13 @@ class Battle(BehaviourBase):
             heal = max(ctx.mem.data.get("item_heal", {}).get(str(heal_hp), [heal_hp]) or [heal_hp])
             want_potion = (pick is not None and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
                            and not item_is_blocked(ctx, pick))
+            # A member that cannot hurt the foe is never potioned or fled while a healthy switch-in exists:
+            # SwitchOut is next in line and swaps it this step (2026-11-14: a Harden-only KAKUNA was potioned
+            # turn after turn until it fainted). No candidate: potion/flee exactly as before.
+            sw_out = ((want_potion or kind == 1) and _active_no_damage(ctx)
+                      and switch_candidate(ctx.emu, roster.trainee_slot(ctx)) is not None)
+            if sw_out:
+                want_potion = False
             cur = next((ln for ln in lines_now if ">" in ln), "")
             xdec = None if want_potion else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
             if xdec is not None:
@@ -207,12 +226,12 @@ class Battle(BehaviourBase):
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(ENEMY_MON)))
             skip = stall_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))  # a Harden-only cocoon is a stall, not XP
-            flee = kind == 1 and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
+            flee = kind == 1 and not sw_out and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
             stand = kind == 1 and flee and not skip and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
             if stand:
                 flee = weak = hurry = False
             if kind == 1 and not stand:
-                flee = wild_flee(ctx, flee)  # bandit decision point: fight or flee (the Explorer's own answer when off)
+                flee = wild_flee(ctx, flee) and not sw_out  # bandit decision point (Explorer's answer when off); a swap still wins
             if flee and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""
                 if ">RUN" in run_line:

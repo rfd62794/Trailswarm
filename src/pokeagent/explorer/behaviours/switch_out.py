@@ -59,9 +59,10 @@ def _foe(ctx: ExplorerContext):
 
 
 def matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
-    """(slot, why) of team_plan.switch_choice for this TRAINER battle, or None: the active member is
-    "thin" (the foe's best hit over SWITCH_HP_TURNS turns meets or beats its HP, or its best move does
-    <= WEAK_RATIO of the foe's HP) and a healthy member beats its damage ratio by SWITCH_GAIN.
+    """(slot, why) of team_plan.switch_choice for this battle, or None: the active member is
+    "thin" (the foe's best hit over SWITCH_HP_TURNS turns meets or beats its HP, or - trainer fights
+    only - its best move does <= WEAK_RATIO of the foe's HP; a wild fight also switches a member that
+    cannot hurt the foe at all) and a healthy member beats its damage ratio by SWITCH_GAIN.
     Cached on (step, battle): applies() and _matchup_step ask the same question twice a step and the
     our_party + best_move sims are not free."""
     st = team_plan.of(ctx)
@@ -72,9 +73,11 @@ def matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
 
 
 def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
-    """The uncached pick for this step (see matchup_pick)."""
+    """The uncached pick for this step (see matchup_pick). Wild fights (kind 1) get the thin switch too
+    (2026-11-14: a Harden-only KAKUNA was ground to death pressing HARDEN); anything not a battle: None."""
     bv = ctx.bv
-    if bv is None or getattr(bv, "kind", None) != 2:  # a wild battle (1), or a view stub without a kind
+    kind = getattr(bv, "kind", None)
+    if kind not in (1, 2):
         return None
     bl = ctx.battle_log or {}
     n_sw = bl.get("matchup_switches", 0)
@@ -85,8 +88,9 @@ def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
     hp_now = [m.hp for m in read_party(ctx.emu)]
     if pos < len(hp_now) and hp_now[pos] <= 0:  # the fighter fainted: the forced list is bring_out's, not a matchup choice
         return None
+    trainee = roster.trainee_slot(ctx)
     pick = team_plan.switch_choice(party, pos, foe, None, hp_now=hp_now, switches=n_sw,
-                                   trainee=roster.trainee_slot(ctx))
+                                   trainee=trainee, wild=(kind == 1))
     if pick is None:
         return None
     from pokeagent.knowledge.kb import table
@@ -94,8 +98,14 @@ def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
     moves, active = table(None, "moves"), party[pos]
     cur = hp_now[pos] if pos < len(hp_now) else active.hp
     inc = best_move(foe, active, chart, moves)[0]
-    why = (f"thin: foe hits {inc:.0f}x{team_plan.SWITCH_HP_TURNS} vs {cur} HP" if inc * team_plan.SWITCH_HP_TURNS >= cur
-           else f"weak: best hit <= {team_plan.WEAK_RATIO:.0%} of foe")
+    if inc * team_plan.SWITCH_HP_TURNS >= cur:
+        why = f"thin: foe hits {inc:.0f}x{team_plan.SWITCH_HP_TURNS} vs {cur} HP"
+    elif kind == 1 and best_move(active, foe, chart, moves)[0] <= 0:
+        why = "no damaging move: swapping out before it faints"
+    elif pos == trainee and active.hp and cur / active.hp < team_plan.TRAINEE_SAFE_HP:
+        why = f"trainee at {cur}/{active.hp} HP: out before it faints"
+    else:
+        why = f"weak: best hit <= {team_plan.WEAK_RATIO:.0%} of foe"
     return pick, why
 
 
