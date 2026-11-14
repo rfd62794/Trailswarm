@@ -120,11 +120,12 @@ Diff stat, test tails, and whether the optional step-level test was possible. Th
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+- 2026-11-14 14:28 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
