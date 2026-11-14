@@ -46,11 +46,11 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb |
 | Base branch | repoman/rl-success-and-context |
-| Base commit | 3fc9f4a5341418d40705a4a644dfe5bbf79ebbb0 |
+| Base commit | bd2aef82cbe577640963e719b642052c58630276 |
 
 **Status log**
 - 2026-11-06 21:55 · devin-overseer · Queued → Blocked — hold per robert-claude-laptop lane message: the evaluation gates fold into the behaviour-bandit design first; retire or requeue after that lands (requeue of 21:35 was mine on stale-auth evidence only)
@@ -62,4 +62,5 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 - 2026-11-06 20:26 · devin-overseer (delegated) · Blocked → Queued — requeue: 2026-11-04 spawn death was 'Not logged in' auth, not code - devin.EXE auth status on personal-laptop is healthy now (hub also restored: mailbox+bridge tasks re-enabled); under delegate.requeue
 - 2026-11-13 19:20 · robert-claude-laptop · Blocked → Queued — Requeue (Robert approved all recs 2026-11-13): run died at spawn on 'Not logged in'; `devin auth status` now reports Logged in. pa-captain/pa-curriculum rows are duplicate clones of the same Trailswarm repo; not requeued.
 - 2026-11-13 23:27 · robert-claude-laptop · Queued → Approved — lint override: baselines/battle.state is a gitignored local save state; the directive names it as conditional ("only run ROM probes if both ... already exist in this worktree; otherwise report not run, never search"), so its absence in the worktree is expected, not a typo.
+- 2026-11-13 23:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7C4YFPPA6VCKP6KSRDC4KF8
 <!-- queue:end -->
