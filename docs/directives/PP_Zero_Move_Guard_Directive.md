@@ -120,11 +120,18 @@ Diff stat, test tails, and whether the optional step-level test was possible. Th
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Review |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pp-zero-move-guard-directive |
 | Base branch | - |
+| Base commit | 9303e9dbb35216265a215d503df5156439e43b0d |
+| Head commit | 810e74b465e584378ad34368d929841decb09117 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+- 2026-11-14 14:28 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 15:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pp-zero-move-guard-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DW9CE32R6ZKTBXD6TWTSB9
+- 2026-11-14 15:43 · dispatcher · launched pid=13180; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pp-zero-move-guard-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 15:46 · devin · In progress → Review — Done. battle_pp.py (new, pure): usable_moves masks PP bytes & 0x3F, honours PP Up bits and no_pp, slot beyond len unusable, None read = all usable; cursor_step never returns press_a on an unusable move (nav>5 escape now requires the cursor move be usable). battle_moves.py uses both: empty usable -> B 'pp_out_struggle' on the FIRST step (all_pp_out still counted, >1 delay dropped); pool = usable so the scorer only sees pressable moves; ctx.move_nav=0 when the move menu is not on screen. battle.py: ctx.move_nav=0 added to the battle-end reset line. Refusal handler unchanged; move_scores, catch path, switch_out, party_order, team_plan untouched. Tests: new tests/test_battle_pp_guard.py, 14 passed - `uv run --frozen pytest -q tests/test_battle_pp_guard.py` -> '14 passed'. Regression: `uv run --frozen pytest -q tests/test_battle_mon_gating.py tests/test_battle_types.py tests/test_catch_seam.py tests/test_explorer_behaviours.py` -> '79 passed'. Diff stat vs origin/main -- src/pokeagent: battle.py 2+/-1, battle_moves.py 23 +/-, battle_pp.py +25 (only). Step-level stub was practical (make_ctx/put_box harness): all-zero PP read yields Decision('B','pp_out_struggle') on the first step; stale struct (species 0) does NOT B out; cursor parked on a 0-PP EMBER presses DOWN for 8 straight steps, never A. Committed 810e74b, pushed. [origin] spent: devin 3 min est. n/a
 <!-- queue:end -->
