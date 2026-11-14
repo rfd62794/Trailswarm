@@ -130,4 +130,5 @@ Diff stat, test tails, and whether the optional step-level test was possible. Th
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-14 14:28 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 15:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pp-zero-move-guard-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DW9CE32R6ZKTBXD6TWTSB9
+- 2026-11-14 15:43 · dispatcher · launched pid=13180; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pp-zero-move-guard-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
