@@ -8,10 +8,12 @@ import sys
 from types import SimpleNamespace
 
 from pokeagent.emulator import FakeEmulator
-from pokeagent.explorer import catch_list, grind_episode, trainee_gate
+# behaviours.* first: trainee_gate -> heal_walk -> behaviours/__init__ -> grind_drill -> trainee_gate
+# is a pre-existing cycle on main; it only bites when trainee_gate is imported before behaviours.
 from pokeagent.explorer.behaviours import catch as catch_behav
 from pokeagent.explorer.behaviours import party_order as po
 from pokeagent.explorer.behaviours import switch_out as so_mod
+from pokeagent.explorer import catch_list, grind_episode, trainee_gate
 from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import Combatant
