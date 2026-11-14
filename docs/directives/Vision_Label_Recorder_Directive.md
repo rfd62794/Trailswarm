@@ -201,15 +201,18 @@ Super Mario Land is not part of this directive. Its RAM addresses cannot be vali
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-vision-label-recorder-directive |
 | Base branch | - |
 | Base commit | f1f03a762c370a213ecbc9510a5c9f568c79d316 |
+| Head commit | 37457e26ee7d890dc1f511de78326b71a659320e |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: RAM-labelled vision dataset recorder (directive 1 of 3)
 - 2026-11-13 23:47 · robert-claude-laptop · Queued → Approved — lint override: pyboy/api/sprite.py is cited as PyBoy library background (site-packages), not a repo path; the directive does not ask Devin to read it.
 - 2026-11-13 23:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-label-recorder-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7C64Q56RD7KZ20GAGRE7G3D
 - 2026-11-13 23:51 · dispatcher · launched pid=22236; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-label-recorder-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 00:05 · devin · In progress → Review — [origin] spent: devin 13 min est. n/a
 <!-- queue:end -->
