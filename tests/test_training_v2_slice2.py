@@ -51,14 +51,9 @@ def test_hold_and_grind_latch_walk_marks_training_live(monkeypatch):
     monkeypatch.setattr(plan_goal, "party_survives", lambda emu, m: True)
     monkeypatch.setattr(plan_goal.grind_episode, "start", lambda c, reason="x": False)
     monkeypatch.setattr(plan_goal.train_route, "step", lambda *a, **k: None)
-    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is None and ctx.__dict__.get("grind_walk_step") is None
+    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is None and ctx.train_route_live is False
     monkeypatch.setattr(plan_goal.train_route, "step", lambda *a, **k: ("UP", "goal team_ready: 9 steps to Route 24's grass"))
-    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is not None and ctx.__dict__.get("grind_walk_step") == 10
-    TrainingController().tick(ctx)   # the stamp is a step old at worst: tick turns it into the flag
-    assert ctx.train_route_live is True
-    ctx2 = SimpleNamespace(train_route_live=False, step=11, train_need=0, goals=lambda: {})
-    TrainingController().tick(ctx2)  # no stamp, not team_ready: the flag stays down
-    assert ctx2.train_route_live is False
+    assert PlanGoal._grind_step(ctx, 3, 2, 4, 30, 40) is not None and ctx.train_route_live is True   # published in the same step, as main did
 
 
 def test_a_grind_episode_pace_counts_as_training(tmp_path):

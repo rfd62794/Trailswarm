@@ -27,10 +27,10 @@ def mark_live(ctx, planned):
     """Pass a train_route step through, flagging the run as training. The team_ready stage sets ctx.train_route_live itself,
     but the gym hold and the grind latch (stage beat_misty, floor unmet) walk to the SAME grass through the SAME
     train_route.step (its text still says "goal team_ready") without it: the pacing there was shaken (2026-11-13 A/B: #235's
-    exemption never fired, the two 12,000-step runs were byte-identical). Slice 3: stamp the step, don't write the flag -
-    TrainingController.tick turns the stamp into train_route_live at the top of the next step."""
+    exemption never fired, the two 12,000-step runs were byte-identical). Slice 3: the write goes through training_ctl.sustain.publish (the single writer)."""
     if planned is not None:
-        ctx.__dict__["grind_walk_step"] = ctx.step
+        from pokeagent.explorer.training_ctl import sustain
+        sustain.publish(ctx, True)
     return planned
 
 

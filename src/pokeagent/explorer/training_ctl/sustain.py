@@ -73,9 +73,16 @@ def leaving(planned, m: int) -> bool:
     return m in POKECENTER_MAPS and planned is not None and "leaving the Pokecenter" in planned[1]
 
 
+def publish(ctx, value: bool) -> None:
+    """The ONE place ``ctx.train_route_live`` is assigned (slice 3 single writer). plan_goal publishes the stage verdict
+    right after plan_step and the grind-walk case publishes True, at the exact points main wrote the flag."""
+    ctx.train_route_live = bool(value)
+
+
 def to_grass(ctx, planned, pos, live: bool):
-    """plan_goal's old :131-133 branch: while the trainee stage trains, take the straight walk to the grass when
-    the planner has no step or only its 'leaving the Pokecenter' press. Returns planned unchanged when not live."""
+    """plan_goal's old :131-133 branch: publish the flag, then while the trainee stage trains take the straight walk to
+    the grass when the planner has no step or only its 'leaving the Pokecenter' press. Unchanged when not live."""
+    publish(ctx, live)
     if live and (planned is None or leaving(planned, pos[0])):
         return train_route.step(ctx.mem.data["maps"], pos, ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu),
                                 survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None)) or planned

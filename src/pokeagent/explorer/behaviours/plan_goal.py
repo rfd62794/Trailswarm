@@ -128,7 +128,6 @@ class PlanGoal(BehaviourBase):
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
                              "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {}), "_buy_deferred": magikarp_deferral.deferred(ctx)},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
-        ctx.__dict__["plan_goal_step"] = ctx.step  # main wrote train_route_live here; the flag only moves on steps that reach this line (TrainingController.tick latches)
         planned = sustain.to_grass(ctx, planned, (m, x, y), bool(team_ready_stage and training_live))
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
         gym = (trainers.GYM_BOSSES.get(ctx.stage_goal) or (None, None, None))[2]
