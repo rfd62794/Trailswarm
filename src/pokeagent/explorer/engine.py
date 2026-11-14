@@ -16,6 +16,7 @@ from pokeagent.explorer.progress import PROGRESS_LOG_EVERY, ProgressLog, Progres
 from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
+from pokeagent.explorer.training_ctl.controller import TrainingController
 from pokeagent.novelty.features import Snapshot, read_snapshot
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
@@ -39,6 +40,7 @@ class Engine:
         self._progress = ProgressTracker()  # presses since the last progress (explorer.progress)
         self._prog_snap: Snapshot | None = None  # the game-state snapshot of the previous press
         self._prog_log: ProgressLog | None = None  # progress.jsonl, opened on first write
+        self._training = TrainingController()  # slice 1: shadow owner of the training flags (never writes)
 
     def step(self) -> Decision | None:
         ctx = self.ctx
@@ -46,6 +48,7 @@ class Engine:
             ctx.bandit.begin_step()
         seed_initial_goals(ctx)  # before the first decision, not after the first press
         decision = self.selector.choose(ctx)
+        self._training.observe(ctx)  # shadow check of the training flags plan_goal just set
         party_log.of(ctx).tick(ctx)  # level timeline: out-of-battle level/exp changes, grind/travel step counts
         xp_meter.of(ctx).tick(ctx)  # XP windows: per-member rates, xp_rates.jsonl, spot ledger (measurement only)
         trainer_ledger.tick(ctx)  # trainer ledger: new maps, talk probes, the 50-step flag sync (never raises)
