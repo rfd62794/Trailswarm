@@ -242,4 +242,5 @@ Diff stat, test tails (state which tests skipped for lack of torch), line counts
 - 2026-11-14 12:39 · robert-claude-laptop · none → Queued
 - 2026-11-14 12:40 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 14:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-semantic-labels-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DR5RGS448M4VHCCHK1WWP4
+- 2026-11-14 14:32 · dispatcher · launched pid=20168; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-semantic-labels-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
