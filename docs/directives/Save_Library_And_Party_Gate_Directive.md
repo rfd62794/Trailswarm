@@ -204,7 +204,7 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-save-library-and-party-gate-directive |
 | Base branch | - |
@@ -218,4 +218,5 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 - 2026-11-14 14:30 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DRKR3S0WXHT2C3SNDBSGAM
 - 2026-11-14 14:36 · dispatcher · launched pid=16812; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 - 2026-11-14 14:56 · devin · In progress → Review — [origin] spent: devin 19 min est. n/a
+- 2026-11-14 15:50 · robert-claude-laptop · Review → Blocked — CHANGES-NEEDED (Sonnet review, PR 283 head 694ac23). Continue on the same branch. Fix 1: explorer/press_goals.py imports party_rules and statefp from pokeagent directly, which fails test_explorer_package_layering_and_size; go through an allowed layer, or extend that test's allow-list with a one-line reason. Fix 2: the global statement for _KB in party_rules.py crashes tests/test_layers.py::test_package_never_imports_tools; cache it with a dict or lru_cache instead. Fix 3: states library validate must report every entry that currently violates a rule, and exit 1 when a checkpoint violates; today the restamp, build, validate flow reports 0 even though 12 checkpoints violate. Fix 4: revalidate must pick the nearest clean ancestor from recomputed verdicts in two passes, not from stored stale ones. Legs currently report ancestor none. Full suite must show 0 failed.
 <!-- queue:end -->
