@@ -22,6 +22,12 @@ HM_MOVE = {"cut": "CUT", "flash": "FLASH", "surf": "SURF", "strength": "STRENGTH
 NEVER_CATCH = frozenset({"KAKUNA"})
 
 
+def wild_never_catch(name: str | None, moves) -> bool:
+    """A NEVER_CATCH member that still knows only Harden (a wild catch). A KAKUNA evolved from our own
+    WEEDLE keeps Poison Sting / String Shot, so it is ours to train, not the deposit pick."""
+    return name in NEVER_CATCH and {m for m in moves or () if m} <= {"HARDEN"}
+
+
 _warned = False
 
 

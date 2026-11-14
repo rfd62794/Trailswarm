@@ -169,6 +169,24 @@ def test_a_kakuna_is_never_the_trainee_by_this_rule():
     assert team_plan.trainee_slot(party, named=None) is None
 
 
+def test_our_kakuna_with_poison_sting_stays_the_trainee():
+    ours = Combatant("KAKUNA", 7, ("BUG",), 30, (10,) * 4, ("POISON STING", "STRING SHOT", "HARDEN"), (8,) * 5, (0,) * 5)
+    party = [_com("CHARMELEON", 25), ours, _com("RATTATA", 8)]
+    assert team_plan.trainee_slot(party, named=2) == 1                        # evolved from our Weedle
+    kb = {"name_of_internal": {"113": "KAKUNA"}, "moves": {"40": {"name": "POISON STING"}, "106": {"name": "HARDEN"}}}
+    ram = [SimpleNamespace(species=113, level=7, hp=20, moves=(40, 106, 0, 0)), _com("CHARMELEON", 25)]
+    assert team_plan.trainee_slot(ram, named=None, kb=kb) == 0                # RAM move ids resolve too
+    wild = [SimpleNamespace(species=113, level=7, hp=20, moves=(106, 0, 0, 0)), _com("CHARMELEON", 25)]
+    assert team_plan.trainee_slot(wild, named=None, kb=kb) is None            # Harden only: not ours
+
+
+def test_full_party_keeps_our_evolved_kakuna(monkeypatch):
+    _patch_catch(monkeypatch)
+    party = _full_party()
+    party[5] = _mon("KAKUNA", 9, ("POISON STING", "STRING SHOT", "HARDEN"))
+    assert catch_behav.full_party_slot(_catch_ctx(), party) == 2              # RATTATA L8, the old rule
+
+
 def test_the_rule_matches_a_ram_member_through_name_of_internal():
     kb = {"name_of_internal": {"112": "WEEDLE"}}                              # a PartyMon: species id, no .name
     party = [SimpleNamespace(species=112, level=5, hp=20), _com("CHARMELEON", 25)]
@@ -180,7 +198,7 @@ def test_the_rule_matches_a_ram_member_through_name_of_internal():
 
 def _six_with_kakuna():
     p = _full_party()
-    p[5] = _mon("KAKUNA", 7)
+    p[5] = _mon("KAKUNA", 7, ("HARDEN",))                                     # a wild one: Harden only
     return p
 
 
