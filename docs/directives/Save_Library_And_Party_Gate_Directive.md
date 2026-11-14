@@ -198,3 +198,17 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
