@@ -151,22 +151,6 @@ def ascending_order(levels, fainted) -> list[int]:
     return sorted(range(len(levels)), key=lambda i: (bool(fainted[i]), levels[i]))
 
 
-def can_damage(c, kb=None) -> bool:
-    """True when any move of Combatant ``c`` has power above 0 in the moves table - a Harden-only KAKUNA is
-    False (it can never hurt the foe). A move name missing from the table counts as power 0."""
-    powers = {r.get("name"): (r.get("power") or 0) for r in table(kb, "moves").values()}
-    return any(powers.get(m, 0) > 0 for m in getattr(c, "moves", ()) or ())
-
-
-def lead_order(levels, fainted, can_dmg=None) -> list[int]:
-    """The lead-picking order: like ascending_order, but a member that cannot hurt a foe sits behind every
-    member that can - sort key (fainted, not can_dmg, level), so the weakest DAMAGING member leads and a
-    Harden-only cocoon trails last. ``can_dmg=None`` (no move data) is exactly ascending_order."""
-    if can_dmg is None:
-        return ascending_order(levels, fainted)
-    return sorted(range(len(levels)), key=lambda i: (bool(fainted[i]), not can_dmg[i], levels[i]))
-
-
 def next_swap(levels, fainted, want=None) -> tuple[int, int] | None:
     """(src, want): swap the member at ``src`` into slot ``want`` to move toward ascending_order, or None when
     the party already stands that way. Selection-sort step: the first misplaced slot takes its rightful member.

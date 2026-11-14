@@ -77,6 +77,17 @@ def _key(snap: list[Member]) -> list[tuple]:
     return [(m[0], m[1], m[2]) for m in snap]
 
 
+def build_record(bl: dict, *, step: int, run: str, won: bool, hp_end: list, outcome: str,
+                 battle_map: int, end_map: int, stage: str | None, trainer: dict | None) -> dict:
+    """End-of-battle fields on the record ``bl`` (mutated, returned): every legacy key plus the fidelity keys.
+    ``map`` is the map the fight happened on (``battle_map``; for a blackout ``end_map`` is the respawn town) and
+    ``fled`` means a wild flee - a blackout is ``outcome == "blackout"``, never a flee."""
+    bl.update({"end": step, "won": won, "run": run, "map": battle_map, "presses": step - bl["start"],
+               "hp_end": hp_end, "fled": outcome == "fled", "outcome": outcome,
+               "battle_map": battle_map, "end_map": end_map, "stage": stage, "trainer": trainer})
+    return bl
+
+
 class PartyLog:
     """One per run: remembers the party at battle start, the last party seen, and the run's totals."""
 

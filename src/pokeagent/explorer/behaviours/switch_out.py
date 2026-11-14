@@ -58,25 +58,25 @@ def _foe(ctx: ExplorerContext):
     return replace(foe, hp=max(1, e.hp)) if foe is not None else None
 
 
-def matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
+def matchup_pick(ctx: ExplorerContext, kind: int | None = None) -> tuple[int, str] | None:
     """(slot, why) of team_plan.switch_choice for this battle, or None: the active member is
     "thin" (the foe's best hit over SWITCH_HP_TURNS turns meets or beats its HP, or - trainer fights
     only - its best move does <= WEAK_RATIO of the foe's HP; a wild fight also switches a member that
     cannot hurt the foe at all) and a healthy member beats its damage ratio by SWITCH_GAIN.
-    Cached on (step, battle): applies() and _matchup_step ask the same question twice a step and the
-    our_party + best_move sims are not free."""
+    Cached on (step, battle, kind): applies() and _matchup_step ask the same question twice a step and the
+    our_party + best_move sims are not free. ``kind`` = the caller's fresh IS_IN_BATTLE read when it has
+    one (the battle behaviour asks before ctx.bv is written for the step); ctx.bv's otherwise."""
+    kind = getattr(getattr(ctx, "bv", None), "kind", None) if kind is None else kind
     st = team_plan.of(ctx)
-    key = (getattr(ctx, "step", -1), getattr(ctx, "battles", -1))
+    key = (getattr(ctx, "step", -1), getattr(ctx, "battles", -1), kind)
     if st.get("mu_pick_key") != key:
-        st["mu_pick_key"], st["mu_pick"] = key, _matchup_pick(ctx)
+        st["mu_pick_key"], st["mu_pick"] = key, _matchup_pick(ctx, kind)
     return st["mu_pick"]
 
 
-def _matchup_pick(ctx: ExplorerContext) -> tuple[int, str] | None:
+def _matchup_pick(ctx: ExplorerContext, kind: int | None) -> tuple[int, str] | None:
     """The uncached pick for this step (see matchup_pick). Wild fights (kind 1) get the thin switch too
     (2026-11-14: a Harden-only KAKUNA was ground to death pressing HARDEN); anything not a battle: None."""
-    bv = ctx.bv
-    kind = getattr(bv, "kind", None)
     if kind not in (1, 2):
         return None
     bl = ctx.battle_log or {}

@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from pokeagent.explorer.behaviours import battle_switch as bs
 from pokeagent.explorer.behaviours import switch_out as so_mod
 from pokeagent.explorer.stats import stat_value
 from pokeagent.explorer.training_ctl import roster
-from pokeagent.knowledge import team_plan
+from pokeagent.knowledge import lead, team_plan
 from pokeagent.knowledge.party import Combatant
 
 SYN = {
@@ -53,15 +54,15 @@ def _mon(name, level):
 # --- can_damage / lead_order -------------------------------------------------------------------------
 
 def test_can_damage_false_for_a_harden_only_kakuna():
-    assert team_plan.can_damage(_mon("KAKUNA", 5), SYN) is False   # HARDEN has power 0
-    assert team_plan.can_damage(_mon("WEEDLE", 4), SYN) is True    # POISON STING
-    assert team_plan.can_damage(_mon("RATTATA", 3), SYN) is True   # TACKLE
+    assert lead.can_damage(_mon("KAKUNA", 5), SYN) is False        # HARDEN has power 0
+    assert lead.can_damage(_mon("WEEDLE", 4), SYN) is True         # POISON STING
+    assert lead.can_damage(_mon("RATTATA", 3), SYN) is True        # TACKLE
 
 
 def test_lead_order_puts_the_cocoon_last_and_the_weakest_damaging_member_first():
     levels, fainted = [16, 5, 4], [False] * 3                      # CHARMELEON L16, KAKUNA L5, WEEDLE L4
-    assert team_plan.lead_order(levels, fainted, [True, False, True]) == [2, 0, 1]
-    assert team_plan.lead_order(levels, fainted, None) == team_plan.ascending_order(levels, fainted) == [2, 1, 0]
+    assert lead.lead_order(levels, fainted, [True, False, True]) == [2, 0, 1]
+    assert lead.lead_order(levels, fainted, None) == team_plan.ascending_order(levels, fainted) == [2, 1, 0]
 
 
 # --- switch_choice in a wild fight ----------------------------------------------------------------------
@@ -156,3 +157,104 @@ def test_matchup_pick_wild_does_not_fire_on_the_weak_ratio_alone(monkeypatch):
     ctx = _ctx([_mon("WEEDLE", 8), _mon("CHARMELEON", 16)], kind=1)
     _patch(monkeypatch, ctx, _mon("KAKUNA", 5))
     assert so_mod.matchup_pick(ctx) is None                        # weak but damaging: the wild grind goes on
+
+
+# --- battle_switch.yield_to_switch: the behaviour-layer gate that was missing ----------------------------------
+#
+# CHANGES-NEEDED (PR 281 review): in a real wild Paras L8 fight a non-trainee Rattata went 7 HP -> 2 HP
+# -> fainted with no switch, while switch_choice(wild=True) returned Charmeleon for both HP values.
+# What blocked it: Battle() runs BEFORE SwitchOut() and its potion / RUN Decisions win every step -
+# the old carve-out only yielded for a member with NO damaging move, so a thin member that CAN hurt
+# the foe (TACKLE on the Rattata) was potioned and RUN-attempted to death. The yield now also covers
+# any member a wild matchup pick would save.
+
+
+def _patch_yield(monkeypatch, ctx, foe, move_ids=(4,)):
+    """_patch plus the battle_switch halves the plain _patch leaves real: the moves table the
+    no-damage check reads (SYN) and the battle mon's known move ids (TACKLE by default)."""
+    _patch(monkeypatch, ctx, foe)
+    monkeypatch.setattr(bs, "table", lambda kb, k: SYN.get(k, {}))
+    monkeypatch.setattr(bs, "read_battle_mon", lambda emu: SimpleNamespace(moves=move_ids))
+
+
+def test_wild_thin_member_yields_the_step_to_switchout(monkeypatch):
+    """The Rattata case: it CAN damage (TACKLE), but the foe's hits KO it inside SWITCH_HP_TURNS and a
+    healthy Charmeleon answers - the step belongs to SwitchOut, not to a potion or a RUN."""
+    ctx = _ctx([_mon("RATTATA", 8), _mon("CHARMELEON", 16)], kind=1, active_hp=4)
+    _patch_yield(monkeypatch, ctx, _mon("ODDISH", 21))
+    assert bs.yield_to_switch(ctx, 1, want_potion=True) is True
+    assert bs.yield_to_switch(ctx, 1, want_potion=False) is True    # the RUN attempt yields the same way
+
+
+def test_wild_member_that_cannot_damage_yields_via_the_healthy_candidate_rule(monkeypatch):
+    """The original carve-out still holds: a Harden-only KAKUNA with any healthy member behind it."""
+    ctx = _ctx([_mon("KAKUNA", 5), _mon("CHARMELEON", 16)], kind=1)
+    _patch_yield(monkeypatch, ctx, _mon("RATTATA", 6), move_ids=(5,))
+    monkeypatch.setattr(bs, "switch_candidate", lambda emu, t: 1)
+    assert bs.yield_to_switch(ctx, 1, want_potion=False) is True
+
+
+def test_no_yield_in_a_wild_fight_when_nobody_needs_saving(monkeypatch):
+    ctx = _ctx([_mon("RATTATA", 8), _mon("CHARMELEON", 16)], kind=1)
+    _patch_yield(monkeypatch, ctx, _mon("KAKUNA", 5))               # HARDEN only: nobody is thin
+    assert bs.yield_to_switch(ctx, 1, want_potion=True) is False    # potion/flee rules exactly as before
+
+
+def test_a_trainer_fight_keeps_the_no_damage_only_yield(monkeypatch):
+    """The matchup branch is wild-only: in a trainer fight a damaging member still takes its potion
+    (no fleeing anyway) - only a member with no damaging move yields there."""
+    ctx = _ctx([_mon("RATTATA", 8), _mon("CHARMELEON", 16)], kind=2, active_hp=4)
+    _patch_yield(monkeypatch, ctx, _mon("STARMIE", 21))
+    assert bs.yield_to_switch(ctx, 2, want_potion=True) is False
+
+
+def test_no_yield_once_the_switch_menus_gave_up(monkeypatch):
+    """After a gave_up the normal rules take over again - otherwise the member could neither switch
+    nor be healed/run for the rest of the battle."""
+    ctx = _ctx([_mon("RATTATA", 8), _mon("CHARMELEON", 16)], kind=1, active_hp=4)
+    _patch_yield(monkeypatch, ctx, _mon("ODDISH", 21))
+    ctx.switch_gave_up = ctx.battles
+    assert bs.yield_to_switch(ctx, 1, want_potion=True) is False
+
+
+# --- Battle().step end to end (the FakeEmulator harness from test_train_fight) ---------------------------------
+
+RAT, CHAR, FOE = 0xA5, 0xB0, 0x6D                                  # internal species ids (nonzero; real id is unused)
+
+
+def _wild_ctx(tmp_path, monkeypatch, reserve_hp=40):
+    """A wild fight (kind 1) with a weak RATTATA out (4/23) and a reserve behind it - the same shape as
+    test_train_fight.wild, which ends in a flee_run press when nothing vetoes it."""
+    from test_explorer_behaviours import BATTLE, make_ctx, put_box
+    from test_magikarp import party_mem
+    mem = party_mem([(RAT, 8, 4, 23), (CHAR, 16, reserve_hp, 40)])
+    mem.update({0xD014: RAT, 0xD015: 0, 0xD016: 4, 0xD01C: 4, 0xD022: 8, 0xD023: 0, 0xD024: 23,
+                0xCFE5: FOE, 0xCFF3: 8, 0xCC2F: 0, BATTLE: 1})   # Rattata out at 4/23, wild L8 foe, slot 0 verified
+    ctx = make_ctx(tmp_path, memory=mem)
+    put_box(ctx, menu=True, text_rows=(" RUN",))
+    monkeypatch.setattr(team_plan, "table", lambda kb, k: SYN.get(k, {}))
+    monkeypatch.setattr(so_mod, "_foe", lambda c: _mon("ODDISH", 21))   # KOs the 4 HP lead; Ember answers it 2x
+    monkeypatch.setattr(roster, "trainee_slot", lambda *a, **k: None)
+    monkeypatch.setattr(bs, "table", lambda kb, k: SYN.get(k, {}))
+    ctx.refresh()
+    return ctx
+
+
+def test_battle_step_yields_a_wild_fight_to_switchout(monkeypatch, tmp_path):
+    """Before the fix this exact fixture ended in 'flee_run' - Battle's flee answer won the step and
+    SwitchOut was never asked (the Rattata vs Paras review case)."""
+    from pokeagent.explorer.behaviours import Battle
+    ctx = _wild_ctx(tmp_path, monkeypatch)
+    monkeypatch.setattr(so_mod, "our_party", lambda emu: [_mon("RATTATA", 8), _mon("CHARMELEON", 16)])
+    assert Battle().step(ctx) is None and ctx.bv is not None and ctx.bv.kind == 1
+    pick = so_mod.matchup_pick(ctx)
+    assert pick is not None and pick[0] == 1                       # the healthy Charmeleon SwitchOut sends in
+
+
+def test_battle_step_still_flees_when_no_member_is_a_fit_switch(monkeypatch, tmp_path):
+    """A fit switch-in is the condition for yielding: a lone weak member still gets the flee answer."""
+    from pokeagent.explorer.behaviours import Battle
+    ctx = _wild_ctx(tmp_path, monkeypatch)
+    monkeypatch.setattr(so_mod, "our_party", lambda emu: [_mon("RATTATA", 8)])   # nobody to switch to
+    dec = Battle().step(ctx)
+    assert dec is not None and dec.rule == "flee_run"
