@@ -14,6 +14,7 @@ from pokeagent.explorer.behaviours import party_order as po
 from pokeagent.explorer.behaviours import switch_out as so_mod
 from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
+from pokeagent.knowledge.party import Combatant
 from pokeagent.magikarp import MAGIKARP, trainee_slot_for
 from test_magikarp import party_mem
 
@@ -136,3 +137,37 @@ def test_a_member_fainting_twice_counts_twice():
     ctx.emu = FakeEmulator(party_mem(DOWN))
     ctx.step += 1
     assert roster.note_faints(ctx) == 2                                       # a second faint counts again
+
+
+# --- slice 4b2: prefer evolving a WEEDLE (it keeps Poison Sting through Beedrill) -----------------------------
+
+def _com(name, level):
+    return Combatant(name, level, ("NORMAL",), 30, (10,) * 4, ("TACKLE",), (8,) * 5, (0,) * 5)
+
+
+def test_a_trainable_weedle_wins_over_the_named_member_and_a_breaker():
+    party = [_com("CHARMELEON", 25), _com("WEEDLE", 5), _com("RATTATA", 8)]
+    assert team_plan.trainee_slot(party, named=2) == 1                        # beats the named weak member
+    assert team_plan.trainee_slot(party, named=None, breakers=(2,)) == 1      # ... and a band breaker
+    two = [_com("CHARMELEON", 25), _com("WEEDLE", 6), _com("WEEDLE", 5)]
+    assert team_plan.trainee_slot(two, named=None) == 2                       # the lowest-level one
+
+
+def test_a_weedle_at_beedrill_level_or_the_strongest_is_not_chosen():
+    party = [_com("CHARMELEON", 25), _com("WEEDLE", 10), _com("RATTATA", 8)]
+    assert team_plan.trainee_slot(party, named=2) == 2                        # L10: the old rule answers
+    lead = [_com("WEEDLE", 5), _com("CHARMELEON", 5)]
+    assert team_plan.trainee_slot(lead, named=None) is None                   # never the strongest member
+
+
+def test_a_kakuna_is_never_the_trainee_by_this_rule():
+    party = [_com("CHARMELEON", 25), _com("KAKUNA", 4), _com("RATTATA", 8)]
+    assert team_plan.trainee_slot(party, named=2) == 2                        # falls through to the old logic
+    assert team_plan.trainee_slot(party, named=None) is None
+
+
+def test_the_rule_matches_a_ram_member_through_name_of_internal():
+    kb = {"name_of_internal": {"112": "WEEDLE"}}                              # a PartyMon: species id, no .name
+    party = [SimpleNamespace(species=112, level=5, hp=20), _com("CHARMELEON", 25)]
+    assert team_plan.trainee_slot(party, named=None, kb=kb) == 0
+    assert team_plan.trainee_slot(party, named=None, kb={}) is None           # no table: no match, old logic
