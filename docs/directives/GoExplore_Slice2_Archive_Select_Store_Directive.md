@@ -219,3 +219,17 @@ Nothing for the build. Queue only after slice 1 has merged.
 - Exec(git diff)
 - Exec(git status)
 - Exec(wc -l)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Waits for slice 1 merge before approval/dispatch.
+<!-- queue:end -->
