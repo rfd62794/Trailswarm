@@ -7,7 +7,8 @@ sites run at different points of a step and caching would change decisions).
 """
 from __future__ import annotations
 
-from pokeagent import magikarp
+import pokeagent.magikarp as magikarp
+
 from pokeagent.knowledge import team_plan
 from pokeagent.ramstructs import read_party
 
