@@ -1,6 +1,8 @@
 """Shared synthetic-map helpers for the atlas tests (no ROM)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -48,6 +50,18 @@ def _clear_magikarp_floor():
     budget.set_magikarp_floor(0)
     yield
     budget.set_magikarp_floor(0)
+
+
+def _pin_run_records_at_collection():
+    """Some test modules do ``from pokeagent.grind.atlas import STEPS_PER_MIN`` at import (collection) time, before
+    any fixture runs; conftest imports first, so pin the runs root to an empty dir here too."""
+    import tempfile
+    from pokeagent.grind import atlas, measure
+    measure.RUNS_ROOT = Path(tempfile.mkdtemp(prefix="pa_no_runs_"))
+    atlas.frames_per_step.cache_clear()
+
+
+_pin_run_records_at_collection()
 
 
 @pytest.fixture(autouse=True)
