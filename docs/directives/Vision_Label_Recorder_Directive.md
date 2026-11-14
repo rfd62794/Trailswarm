@@ -201,11 +201,12 @@ Super Mario Land is not part of this directive. Its RAM addresses cannot be vali
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: RAM-labelled vision dataset recorder (directive 1 of 3)
+- 2026-11-13 23:47 · robert-claude-laptop · Queued → Approved — lint override: pyboy/api/sprite.py is cited as PyBoy library background (site-packages), not a repo path; the directive does not ask Devin to read it.
 <!-- queue:end -->
