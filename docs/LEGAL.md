@@ -24,7 +24,8 @@ of association.
 - Links to, or instructions for obtaining, copies of game software
 
 `roms/`, `baselines/` and `runs/` are gitignored, along with the three files generated from a local ROM under `kb/`:
-`rom_tables.json`, `hm_compat.json` and `items.json`.
+`rom_tables.json`, `hm_compat.json` and `items.json`. Crops, thumbnails, datasets and trained model
+weights derived from a game are local only and stay gitignored.
 
 Earlier commits briefly included tables generated from a local ROM: moves, the type chart, species names, items and
 HM compatibility (`kb/rom_tables.json`, `kb/items.json`, `src/pokeagent/data/hm_compat.json`). They hold game facts, numbers

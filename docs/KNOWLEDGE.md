@@ -400,3 +400,15 @@ the legacy owner, so all of today's Red states still load exactly as before.
 - Family memory: `src/pokeagent/family/`. Once a non-Red game folds, `runs/family_provenance.json`, `runs/overlay/<game>/maps.json` and `runs/family_disagreements.jsonl` appear; a Red-only repo never creates them. `kb/overlay/<game>/` holds version-exclusive kb entries.
 - Compat check: `tools/game_compat.py` (map memory + RAM tables, proposed thresholds) and `tools/game_compat_rom.py` (ROM-gated, laptop).
 - Yellow is `playable=False` with its own family `gen1-yellow` and no symbol table; see `docs/plans/Yellow_Prep.md`.
+
+## Vision dataset (2026-11-13)
+
+`tools/vision_record.py` plays a game headless (a state or a seeded random walk) and writes a dataset of
+screen crops labelled for free from RAM: per frame the sprite table gives each NPC/player sprite its
+picture id and position, and the background map gives every visible tile id, so no human labelling is
+needed. Output lives under `runs/vision/<game>/` (`pokemon-red` today): `images/` content-addressed
+PNG crops, `samples.jsonl` one row per unique crop with counts, `thumbs/` frame thumbnails plus
+`thumbs.jsonl`, `positions.jsonl` per-sampled-frame entity positions in map tiles, and `meta.json`.
+Everything under `runs/vision/` is ROM-derived, local only and gitignored; it is the data source for
+the cheap local sprite/movement models and is never committed. Implementation: `src/pokeagent/vision/`
+(label sources per game, the record loop, the deduplicating store) — PyBoy-free so tests run without a ROM.
