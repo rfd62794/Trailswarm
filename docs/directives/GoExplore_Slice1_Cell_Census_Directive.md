@@ -232,3 +232,17 @@ Nothing for the build. After merge, Claude runs the real census on the laptop's 
 - Exec(git diff)
 - Exec(git status)
 - Exec(wc -l)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved Go-Explore doc (#246) and recs 2026-11-14.
+<!-- queue:end -->
