@@ -148,4 +148,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-14 14:26 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 14:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DRF1XPF8WBN8DFSW01QJEY
+- 2026-11-14 14:32 · dispatcher · launched pid=468; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
