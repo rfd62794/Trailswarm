@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pokeagent import checkpoint_goals, statefp
 from pokeagent.goexplore import select
@@ -50,6 +50,9 @@ def load(root: Path) -> Archive:
             raise ValueError("bad shape or version")
         a = Archive(cap=d.get("cap", 1000))
         a.entries = {cid: Entry.from_dict(e) for cid, e in d["entries"].items()}
+        for cid, e in a.entries.items():   # evict() unlinks root/state: a state path must stay inside cells/
+            if PurePosixPath(e.state).parts[:1] != ("cells",) or ".." in PurePosixPath(e.state).parts:
+                raise ValueError(f"cell {cid} state path {e.state!r} is outside cells/")
         return a
     except Exception as exc:
         raise ValueError(f"cannot load archive {path}: {exc}") from exc

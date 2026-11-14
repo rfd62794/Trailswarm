@@ -151,3 +151,12 @@ def test_evict_is_deterministic(tmp_path):
     gone = store.evict(build(r1), r1)
     assert gone == ["1.0.1.0.-.-.-", "1.0.2.0.-.-.-"]
     assert store.evict(build(r2), r2) == gone
+
+
+@pytest.mark.parametrize("bad", ["../escape.state", "cells/../../escape.state", "/abs/x.state", "C:/x.state", "other/x.state"])
+def test_load_rejects_state_paths_outside_cells(tmp_path, bad):
+    a = Archive()
+    a.offer(Entry(cid="x", state=bad, goals=0, steps=1))
+    store.save(a, tmp_path)
+    with pytest.raises(ValueError):
+        store.load(tmp_path)
