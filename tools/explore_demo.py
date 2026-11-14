@@ -101,6 +101,8 @@ def main(argv=None) -> int:
     ap.add_argument("--novelty-delta", default="", help="where this run writes its novelty delta (default <run dir>/novelty_delta.json)")
     legs_attach.add_args(ap)
     ap.add_argument("--cell-dump", default=None, help="harvest cells into this Go-Explore archive dir (slice 3); off = byte-identical run")
+    ap.add_argument("--cell-from", default=None, help="cid of the archived cell this run returned from (slice 4; the harvester parent)")
+    ap.add_argument("--cell-steps", type=int, default=0, help="emulator steps already spent reaching that cell (slice 4; harvester steps_offset)")
     a = ap.parse_args(argv)
     drill_plan = legs_attach.plan(a.drill_leg, a.drill_grind, a.drill_steps, a.leg_states_dir, a.rom,
                                   a.state if a.state != "baselines/bedroom.state" else None, min_hp=a.drill_min_hp)
@@ -189,7 +191,7 @@ def main(argv=None) -> int:
     presser = Presser(ctx)
     engine = Engine(ctx, presser, decision_log=decisions)
     if a.cell_dump:
-        from pokeagent.goexplore.cell_dump import attach; attach(ctx, engine, a.cell_dump)
+        from pokeagent.goexplore.cell_dump import attach; attach(ctx, engine, a.cell_dump, parent=a.cell_from, steps_offset=a.cell_steps)
     frame_pub = None
     if a.frame_share:
         try:
