@@ -48,3 +48,15 @@ def _clear_magikarp_floor():
     budget.set_magikarp_floor(0)
     yield
     budget.set_magikarp_floor(0)
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_run_records(tmp_path_factory, monkeypatch):
+    """grind.atlas.FRAMES_PER_STEP / STEPS_PER_MIN calibrate lazily from the checkout's runs/ (measure.RUNS_ROOT)
+    and cache the answer; a real game run's explore-* dirs must not change what the tests see. Point the root at
+    an empty dir (the no-records default of 16 frames/step) and drop the cache before and after each test."""
+    from pokeagent.grind import atlas, measure
+    monkeypatch.setattr(measure, "RUNS_ROOT", tmp_path_factory.mktemp("no_runs"))
+    atlas.frames_per_step.cache_clear()
+    yield
+    atlas.frames_per_step.cache_clear()
