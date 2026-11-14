@@ -114,3 +114,17 @@ Diff stat, test tails, and whether the optional step-level test was possible. Th
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
