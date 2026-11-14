@@ -182,3 +182,17 @@ Nothing for the build. After merge, Claude runs the seed A/Bs on the laptop.
 - Exec(git diff)
 - Exec(git grep)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 03:38 · robert-claude-laptop · none → Queued — Training Controller plan approved; slices 1-3 merged; includes Robert's Weedle-over-Kakuna rule (2026-11-14).
+<!-- queue:end -->
