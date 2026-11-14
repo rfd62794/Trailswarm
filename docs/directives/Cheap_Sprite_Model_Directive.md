@@ -161,7 +161,7 @@ Diff stat, test tails (including which tests skipped for lack of torch), line co
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-cheap-sprite-model-directive |
 | Base branch | - |
@@ -175,4 +175,5 @@ Diff stat, test tails (including which tests skipped for lack of torch), line co
 - 2026-11-14 01:12 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CAZPZE0KH1HDKWZJ3ZJAZP
 - 2026-11-14 01:23 · dispatcher · launched pid=17064; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 - 2026-11-14 01:33 · devin · In progress → Review — Done. Diff stat vs main: 9 files, +498 — only new files under src/pokeagent/vision_model/ plus the added `vision` group line in pyproject.toml (torch>=2.3; nothing in project deps). Focused suite: `uv run --frozen pytest -q tests/test_vision_model_*.py` = 14 passed, 6 skipped (the torch-gated tests: 5 in test_vision_model_net, 1 in test_vision_model_bench — torch absent in worktree, skip expected). Full suite `uv run --frozen pytest -q` = 2884 passed, 61 skipped, 0 failures. Line counts vs limits: data 88/100, split 49/70, template 63/80, metrics 58/110, net 123/150, bench 64/90, export 51/80, tools/vision_train 109/120. Constants: SIZE=16 pad top-left on median colour, MAX_WEIGHT=20, COARSE 6-way, class key (kind,bank,label), split test_fraction .25 seed 0 min_test_areas 2, train epochs 30 batch 128 lr 2e-3 aug +-1px shift + +-10% brightness (no flip), bench 60 crops/frame 200 batches 10 warmup. gitignore already had runs/vision*, *.pt/pth/npz — unchanged. Claude's lane after verify: `uv lock`, `uv sync --group vision`, rerun net/bench tests without skips, run tools/vision_train.py for pokemon-red and mario-land, eyeball worst confusions, confirm git status clean of weights/reports. [origin] spent: devin 10 min est. n/a
+- 2026-11-14 02:20 · robert-claude-laptop · Review → Done — note: Merged #258 at 5e97693 (Devin c08afe7 + Claude's uv.lock fix). Reviews APPROVE; cloud GREEN 2909 passed, uv lock --check OK; laptop with ROM 2959 passed, 0 failed. Model not yet trained on real data (needs the laptop-recorded dataset).
 <!-- queue:end -->
