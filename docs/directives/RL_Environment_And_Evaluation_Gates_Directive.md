@@ -46,7 +46,7 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | directive/pokeagent-rl-environment-and-evaluation-gat-0d76fb |
 | Base branch | repoman/rl-success-and-context |
@@ -60,4 +60,5 @@ Findings first; then changed files, exact verification output tails, commit SHA,
 - 2026-11-04 23:21 · dispatcher · launched pid=26944; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-rl-environment-and-evaluation-gat-0d76fb; provisioned: uv sync --frozen
 - 2026-11-04 23:21 · dispatcher · In progress → Blocked — dispatch died at spawn: Error: Not logged in. Run `devin.EXE auth login` to authenticate.
 - 2026-11-06 20:26 · devin-overseer (delegated) · Blocked → Queued — requeue: 2026-11-04 spawn death was 'Not logged in' auth, not code - devin.EXE auth status on personal-laptop is healthy now (hub also restored: mailbox+bridge tasks re-enabled); under delegate.requeue
+- 2026-11-13 19:20 · robert-claude-laptop · Blocked → Queued — Requeue (Robert approved all recs 2026-11-13): run died at spawn on 'Not logged in'; `devin auth status` now reports Logged in. pa-captain/pa-curriculum rows are duplicate clones of the same Trailswarm repo; not requeued.
 <!-- queue:end -->
