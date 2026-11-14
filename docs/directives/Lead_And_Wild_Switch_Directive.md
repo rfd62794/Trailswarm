@@ -156,4 +156,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 15:50 · robert-claude-laptop · Blocked → Queued — Requeue for the CHANGES-NEEDED fixes listed in the previous status line; continue on the same branch.
 - 2026-11-14 15:50 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 15:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DX7X2EA7M8XS8JR927Q6X4
+- 2026-11-14 15:58 · dispatcher · launched pid=6740; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; resynced: merged main into directive/pokeagent-lead-and-wild-switch-directive (18 commit(s), clean); provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
