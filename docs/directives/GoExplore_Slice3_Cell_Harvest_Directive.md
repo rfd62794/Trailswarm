@@ -174,3 +174,17 @@ Nothing for the build. Queue only after slices 1 and 2 have merged.
 - Exec(git diff)
 - Exec(git grep)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 03:37 · robert-claude-laptop · none → Queued — Go-Explore design approved by Robert 2026-11-14; slices 1-2 merged (#252, #257).
+<!-- queue:end -->
