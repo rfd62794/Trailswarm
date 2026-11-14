@@ -161,15 +161,18 @@ Diff stat, test tails (including which tests skipped for lack of torch), line co
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-cheap-sprite-model-directive |
 | Base branch | - |
 | Base commit | 15cdb87964ffe90f4e2a5caca7b4ccf66cc9db4c |
+| Head commit | c08afe702c360018df5b3de8bd7bd04a0287a012 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: cheap sprite classifier (directive 2 of 3); needs directive 1 merged
 - 2026-11-14 00:42 · robert-claude-laptop · Queued → Approved — lint override: vision_model/net.py is a new module this directive creates; its dependency (pokeagent.vision.dataset, directive 1) merged as #251.
 - 2026-11-14 01:12 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CAZPZE0KH1HDKWZJ3ZJAZP
 - 2026-11-14 01:23 · dispatcher · launched pid=17064; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 01:33 · devin · In progress → Review — Done. Diff stat vs main: 9 files, +498 — only new files under src/pokeagent/vision_model/ plus the added `vision` group line in pyproject.toml (torch>=2.3; nothing in project deps). Focused suite: `uv run --frozen pytest -q tests/test_vision_model_*.py` = 14 passed, 6 skipped (the torch-gated tests: 5 in test_vision_model_net, 1 in test_vision_model_bench — torch absent in worktree, skip expected). Full suite `uv run --frozen pytest -q` = 2884 passed, 61 skipped, 0 failures. Line counts vs limits: data 88/100, split 49/70, template 63/80, metrics 58/110, net 123/150, bench 64/90, export 51/80, tools/vision_train 109/120. Constants: SIZE=16 pad top-left on median colour, MAX_WEIGHT=20, COARSE 6-way, class key (kind,bank,label), split test_fraction .25 seed 0 min_test_areas 2, train epochs 30 batch 128 lr 2e-3 aug +-1px shift + +-10% brightness (no flip), bench 60 crops/frame 200 batches 10 warmup. gitignore already had runs/vision*, *.pt/pth/npz — unchanged. Claude's lane after verify: `uv lock`, `uv sync --group vision`, rerun net/bench tests without skips, run tools/vision_train.py for pokemon-red and mario-land, eyeball worst confusions, confirm git status clean of weights/reports. [origin] spent: devin 10 min est. n/a
 <!-- queue:end -->
