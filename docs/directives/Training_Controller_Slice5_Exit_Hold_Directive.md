@@ -207,4 +207,5 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 - 2026-11-14 12:20 · robert-claude-laptop · Blocked → Queued — Run lost to a clean laptop power-off at 09:24 (Event 1074, Start menu); no branch pushed. Requeue unchanged.
 - 2026-11-14 12:22 · robert-claude-laptop · Queued → Approved — lint override: Same as the 09:02 override (re-approve after power-off lost the run): paths are src/pokeagent-relative; training_ctl/__init__.py and adapters.py re-verified present at src/pokeagent/explorer/training_ctl/.
 - 2026-11-14 13:26 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DMYR1TMGEYPCH3S7K5EWX0
+- 2026-11-14 13:32 · dispatcher · launched pid=21780; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; not resynced: the reused worktree has uncommitted tracked changes; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (12 declared need(s); 8 external))
 <!-- queue:end -->
