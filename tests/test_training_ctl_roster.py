@@ -8,7 +8,7 @@ import sys
 from types import SimpleNamespace
 
 from pokeagent.emulator import FakeEmulator
-from pokeagent.explorer import grind_episode, trainee_gate
+from pokeagent.explorer import catch_list, grind_episode, trainee_gate
 from pokeagent.explorer.behaviours import catch as catch_behav
 from pokeagent.explorer.behaviours import party_order as po
 from pokeagent.explorer.behaviours import switch_out as so_mod
@@ -17,6 +17,7 @@ from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import Combatant
 from pokeagent.magikarp import MAGIKARP, trainee_slot_for
 from test_magikarp import party_mem
+from test_party_full_policy import _ctx as _catch_ctx, _full_party, _mon
 
 
 def _ctx(emu, train_member=None, step=100):
@@ -171,3 +172,38 @@ def test_the_rule_matches_a_ram_member_through_name_of_internal():
     party = [SimpleNamespace(species=112, level=5, hp=20), _com("CHARMELEON", 25)]
     assert team_plan.trainee_slot(party, named=None, kb=kb) == 0
     assert team_plan.trainee_slot(party, named=None, kb={}) is None           # no table: no match, old logic
+
+
+# --- slice 4b3: a wild KAKUNA in the party is the deposit pick --------------------------------------------------
+
+def _six_with_kakuna():
+    p = _full_party()
+    p[5] = _mon("KAKUNA", 7)
+    return p
+
+
+def _patch_catch(monkeypatch, trainee=None, needs=(), hm=None):
+    monkeypatch.setattr(roster, "trainee_slot", lambda ctx, **kw: trainee)
+    monkeypatch.setattr(catch_list, "upcoming_needs", lambda goals: list(needs))
+    monkeypatch.setattr(catch_list, "hm_table", lambda: hm or {})
+
+
+def test_full_party_marks_the_kakuna_over_a_lower_level_member(monkeypatch):
+    _patch_catch(monkeypatch)
+    party = _six_with_kakuna()                                                # KAKUNA L7, RATTATA L8
+    assert catch_behav.full_party_slot(_catch_ctx(), party) == 5              # the Kakuna, not the lower level
+
+
+def test_full_party_never_marks_the_trainee_even_when_it_is_a_kakuna(monkeypatch):
+    _patch_catch(monkeypatch, trainee=5)
+    assert catch_behav.full_party_slot(_catch_ctx(), _six_with_kakuna()) == 2  # protected: RATTATA L8 marks
+
+
+def test_full_party_without_a_kakuna_keeps_the_lowest_level_choice(monkeypatch):
+    _patch_catch(monkeypatch)
+    assert catch_behav.full_party_slot(_catch_ctx(), _full_party()) == 5      # WEEDLE L7: the old answer
+
+
+def test_full_party_hm_protection_still_wins(monkeypatch):
+    _patch_catch(monkeypatch, needs=["cut"], hm={"cut": {"KAKUNA"}})
+    assert catch_behav.full_party_slot(_catch_ctx(), _six_with_kakuna()) == 2  # the needed learner stays

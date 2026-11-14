@@ -40,14 +40,18 @@ def full_party_slot(ctx: ExplorerContext, party) -> int | None:
     while this battle lasts (``release_pending`` is cleared when the fight ends)."""
     if len(party or ()) < TEAM_SIZE:
         return None
-    from pokeagent.explorer.catch_list import HM_MOVE, hm_table, upcoming_needs
+    from pokeagent.explorer.catch_list import HM_MOVE, NEVER_CATCH, hm_table, upcoming_needs
     needs, hm = upcoming_needs(ctx.goals()), hm_table()
     protected = {i for i, c in enumerate(party)
                  if any(n in HM_MOVE and (c.name in hm.get(n, ()) or HM_MOVE[n] in c.moves) for n in needs)}
     t = roster.trainee_slot(ctx)
     if t is not None:
         protected.add(t)
-    return team_plan.release_candidate(party, protected=protected, values=[c.level for c in party])
+    # A NEVER_CATCH member (a wild KAKUNA knows only Harden; Robert 2026-11-14) scores below every
+    # other member so it is the deposit pick - never past a protected slot, so a Kakuna that is the
+    # current trainee or a needed HM learner is still kept.
+    values = [-1 if getattr(c, "name", None) in NEVER_CATCH else c.level for c in party]
+    return team_plan.release_candidate(party, protected=protected, values=values)
 
 
 def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_max: int,
