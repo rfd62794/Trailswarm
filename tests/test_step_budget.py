@@ -106,7 +106,7 @@ def test_run_rows_tolerate_missing_files_and_torn_lines(tmp_path):
 
 
 def test_slice3_rows_bench_xp_l9_and_walk_to_grass(tmp_path):
-    """bench xp = non-lead per-species exp deltas over run steps; L9 = first step with 2 members >= L9;
+    """bench xp = non-lead per-species exp deltas over run steps; L9 = first step with one more member >= L9 than at the start;
     walk-to-grass lines inside an episode's start -> first-BATTLE window count separately."""
     _jl(tmp_path / "levels.jsonl", [{"step": 1, "party": [[1, 5, 100, 1, 1], [2, 6, 50, 1, 1]]},
                                     {"step": 2, "party": [[2, 6, 60, 1, 1], [1, 5, 140, 1, 1]]},   # reordered: species-keyed
@@ -124,6 +124,15 @@ def test_slice3_rows_bench_xp_l9_and_walk_to_grass(tmp_path):
     r = step_budget.run_rows(tmp_path)
     # species deltas: 1: +40+40+20=100 (lead, excluded), 2: +10*3=30, 3: +10 -> bench 40 over 4 steps
     assert r["bench_xp_total"] == 40 and r["bench_xp_per_1k_run_steps"] == 10000.0
-    assert r["second_member_l9_step"] == 4            # two members at L9 first on the last row
+    assert r["second_member_l9_step"] == 3            # start: 0 at L9; step 3 has one (species 3 at L9)
     assert r["walk_to_grass_lines"] == 61             # every walk line, inside windows or not
     assert r["walk_to_grass_after_episode_start"] == 59 and r["walk_to_grass_per_episode"] == 29.5
+
+
+def test_second_member_l9_is_relative_to_the_start():
+    """heal_cerulean starts with three members at L9+: the row must wait for a fourth, not read 0."""
+    rows = [{"step": 0, "party": [[1, 23, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 8, 0, 1, 1]]},
+            {"step": 50, "party": [[1, 24, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 8, 0, 1, 1]]},
+            {"step": 90, "party": [[1, 24, 0, 1, 1], [2, 9, 0, 1, 1], [3, 9, 0, 1, 1], [4, 9, 0, 1, 1]]}]
+    assert step_budget.second_member_l9_step(rows) == 90
+    assert step_budget.second_member_l9_step(rows[:2]) is None

@@ -133,10 +133,15 @@ def bench_xp(levels: list[dict]) -> int:
 
 
 def second_member_l9_step(levels: list[dict]) -> int | None:
-    """First levels.jsonl step at which at least two party members are L9+: the floor's leading indicator
-    (slot-keyed floor_first_step stays, but reorders make it unreliable - this is membership-keyed)."""
+    """First levels.jsonl step at which one MORE party member is L9+ than at the run's first record: the floor's
+    leading indicator. Relative to the start, so a run that begins with members already at L9 still measures the
+    next one (a fixed ">= 2 at L9" count read 0 on heal_cerulean, which starts with three). None if none grows."""
+    start = None
     for r in levels:
-        if sum(1 for mon in r.get("party") or [] if mon[1] >= 9) >= 2:
+        n = sum(1 for mon in r.get("party") or [] if mon[1] >= 9)
+        if start is None:
+            start = n
+        elif n > start:
             return r["step"]
     return None
 
