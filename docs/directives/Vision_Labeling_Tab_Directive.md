@@ -224,3 +224,17 @@ Diff stat, test tails (and which tests skipped), line counts per new file, and t
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 13:02 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
