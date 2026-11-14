@@ -25,7 +25,7 @@ def make_record(step, behaviour, rule, button, before: tuple, stage, box, battle
 ```
 `before` is `(map_id, x, y)`: the tile the decision was made on. Other rows in the same file carry an `"event"` key (`{"event": "heal_walk_start", ...}`, `{**rec, "event": "item_tossed"}` at `engine.py:100`): **skip every row with an `"event"` key**. The last line may be truncated (buffered writer, `jsonl_buf.py`): skip lines that are not valid JSON objects.
 
-`goal_frames.jsonl` (writer `press_goals.py:67`): one line per goal first reached in that run: `{"goal": "left_house", "step": 41, "frame": 9000}` plus `"skipped": true` for a settled-by-skip goal. `press_stop.py:42` also writes `{"goal": "map:0x42", ...}` (a segment-stop marker, not a ladder goal: ignore any goal not in `GOALS`).
+`goal_frames.jsonl` (writer `press_goals.py:67`): one line per goal first reached in that run: a JSON object with keys goal (e.g. left_house), step (e.g. 41) and frame (e.g. 9000), plus skipped = true for a settled-by-skip goal. `press_stop.py:42` also writes rows whose goal is like map:0x42 (a segment-stop marker, not a ladder goal: ignore any goal not in `GOALS`).
 
 `transitions.jsonl` (`press.py:124`) has `step, from, button, to, moved, textbox, text, facing, source`: positions only, nothing the census needs beyond decisions.jsonl.
 
