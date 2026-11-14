@@ -182,12 +182,14 @@ Diff stat, test tails (which tests skipped for lack of torch), line counts of ea
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-movement-and-location-models-directive |
 | Base branch | - |
+| Base commit | 8436b01f729e79bf14af444f7d6fd38363213713 |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: movement and location models (directive 3 of 3); needs directive 1 merged
 - 2026-11-14 00:41 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 01:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-movement-and-location-models-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CBM9BRG9GQXDA48J2JMWNF
 <!-- queue:end -->
