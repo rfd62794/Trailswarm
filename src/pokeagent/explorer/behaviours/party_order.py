@@ -15,6 +15,8 @@ from pokeagent.explorer.party_menu import MENU_ITEM, menu_open, reorder_press, s
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import team_plan
+from pokeagent.knowledge.kb import table
+from pokeagent.knowledge.party import our_party
 from pokeagent.magikarp import party_species
 from pokeagent.ramstructs import read_party
 
@@ -48,13 +50,20 @@ def _held(ctx: ExplorerContext) -> bool:
 
 def want_home(ctx: ExplorerContext) -> tuple[int, int, str] | None:
     """(src, want, why) for the next reorder, or None when the party order stands. THE one ordering rule
-    (team_plan.ascending_order): lowest level first, fainted members last, ties keep their current order. The
-    weakest member leads (Gen 1 gives XP to every member that took part; the lead always gets a share), and a
-    stronger member is switched in by switch_out / team_plan when the lead is in danger. SWITCH swaps the two slots."""
+    (team_plan.lead_order): lowest level first, fainted members last, ties keep their current order - and
+    when move data is loaded, a member that cannot hurt a foe (a Harden-only KAKUNA) sits behind every
+    member that can, so the weakest DAMAGING member leads (Gen 1 gives XP to every member that took part;
+    the lead always gets a share) and a stronger member is switched in by switch_out / team_plan when the
+    lead is in danger. SWITCH swaps the two slots."""
     party = read_party(ctx.emu)
     if len(party) < 2:
         return None
-    swap = team_plan.next_swap([m.level for m in party], [m.hp <= 0 for m in party])
+    levels, fainted = [m.level for m in party], [m.hp <= 0 for m in party]
+    can_dmg = None
+    if table(None, "moves"):  # move data loaded: a no-damage member sorts behind every damaging one
+        ours = our_party(ctx.emu)
+        can_dmg = [team_plan.can_damage(c) for c in ours] if len(ours) == len(party) else None
+    swap = team_plan.next_swap(levels, fainted, want=team_plan.lead_order(levels, fainted, can_dmg))
     if swap is None or _held(ctx):
         return None
     src, want = swap

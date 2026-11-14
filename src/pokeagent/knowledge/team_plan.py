@@ -27,7 +27,8 @@ SWITCH_HP_TURNS = 2               # "thin": the foe's best expected hit over thi
 WEAK_RATIO = 0.5                  # "thin": our best move does at most this fraction of the foe's HP per turn
 SWITCH_MIN_HP = 0.25              # a switch-in must hold at least this HP fraction (= magikarp.SWITCH_MIN_HP)
 SWITCH_GAIN = 1.5                 # a switch must buy at least this much more damage per turn than staying; untuned
-MAX_SWITCHES_PER_BATTLE = 2       # matchup switches per trainer battle (the count lives in the battle record)
+MAX_SWITCHES_PER_BATTLE = 2       # matchup switches per battle, wild or trainer (the count lives in the battle record)
+TRAINEE_SAFE_HP = 0.35            # a designated trainee below this HP fraction is switched out, thin or not; untuned
 
 # --- grind pressure (the one knob plan_goal reads) ------------------------------------
 GRIND_PRESSURE_START = 0.5        # pressure that latches the grind episode on; untuned
@@ -150,10 +151,27 @@ def ascending_order(levels, fainted) -> list[int]:
     return sorted(range(len(levels)), key=lambda i: (bool(fainted[i]), levels[i]))
 
 
-def next_swap(levels, fainted) -> tuple[int, int] | None:
+def can_damage(c, kb=None) -> bool:
+    """True when any move of Combatant ``c`` has power above 0 in the moves table - a Harden-only KAKUNA is
+    False (it can never hurt the foe). A move name missing from the table counts as power 0."""
+    powers = {r.get("name"): (r.get("power") or 0) for r in table(kb, "moves").values()}
+    return any(powers.get(m, 0) > 0 for m in getattr(c, "moves", ()) or ())
+
+
+def lead_order(levels, fainted, can_dmg=None) -> list[int]:
+    """The lead-picking order: like ascending_order, but a member that cannot hurt a foe sits behind every
+    member that can - sort key (fainted, not can_dmg, level), so the weakest DAMAGING member leads and a
+    Harden-only cocoon trails last. ``can_dmg=None`` (no move data) is exactly ascending_order."""
+    if can_dmg is None:
+        return ascending_order(levels, fainted)
+    return sorted(range(len(levels)), key=lambda i: (bool(fainted[i]), not can_dmg[i], levels[i]))
+
+
+def next_swap(levels, fainted, want=None) -> tuple[int, int] | None:
     """(src, want): swap the member at ``src`` into slot ``want`` to move toward ascending_order, or None when
-    the party already stands that way. Selection-sort step: the first misplaced slot takes its rightful member."""
-    want = ascending_order(levels, fainted)
+    the party already stands that way. Selection-sort step: the first misplaced slot takes its rightful member.
+    ``want`` = the target order when the caller computes one (lead_order with move data); ascending_order else."""
+    want = want if want is not None else ascending_order(levels, fainted)
     for p, src in enumerate(want):
         if src != p:
             return src, p
@@ -217,14 +235,21 @@ def trainee_slot(party, named: int | None = None, breakers=(), wild=None, kb=Non
 
 
 def switch_choice(team, active_slot: int, opponent, kb, *, hp_now=None, switches: int = 0,
-                  trainee: int | None = None) -> int | None:
-    """Party slot to switch to in a TRAINER battle, or None.
+                  trainee: int | None = None, wild: bool = False) -> int | None:
+    """Party slot to switch to, or None.
 
     The active member is "thin" when the foe's best expected hit over SWITCH_HP_TURNS turns meets or
-    beats its CURRENT hp, or its own best move does at most WEAK_RATIO of the foe's HP per turn. A
-    switch then needs another healthy member (current HP >= SWITCH_MIN_HP of its max) whose expected
-    damage per turn beats the active's by SWITCH_GAIN - the best such slot is returned. Never switches
-    the ``trainee`` IN, never past MAX_SWITCHES_PER_BATTLE switches (the caller counts them)."""
+    beats its CURRENT hp, or its own best move does at most WEAK_RATIO of the foe's HP per turn. In a
+    WILD fight (``wild=True``) the weak-ratio test is skipped - a wild grind may fight on purpose -
+    so thin is only "about to faint" or "cannot hurt the foe at all" (``our_dmg == 0``). A designated
+    ``trainee`` is also pulled whenever its current HP fraction is under TRAINEE_SAFE_HP and a candidate
+    exists - thin or not, a trainee never stays in to faint (never the trainee IN, as before).
+
+    A candidate must hold at least SWITCH_MIN_HP of its max AND survive the hit it takes on the switch
+    turn (Gen 1: switching costs a turn, the incoming mon eats the foe's attack); it must also beat the
+    active's damage by SWITCH_GAIN - or, when the active cannot damage the foe at all, simply do more
+    than 0. The best such slot is returned; the trainee-safety pull skips the damage ask. Never past
+    MAX_SWITCHES_PER_BATTLE switches (the caller counts them)."""
     if not team or opponent is None or not (0 <= active_slot < len(team)) or switches >= MAX_SWITCHES_PER_BATTLE:
         return None
     chart, moves = _chart(kb), table(kb, "moves")
@@ -232,18 +257,24 @@ def switch_choice(team, active_slot: int, opponent, kb, *, hp_now=None, switches
     hp = list(hp_now) if hp_now is not None else [c.hp for c in team]
     cur = hp[active_slot] if active_slot < len(hp) else active.hp
     our_dmg = best_move(active, foe, chart, moves)[0]
-    thin = best_move(foe, active, chart, moves)[0] * SWITCH_HP_TURNS >= cur or our_dmg <= WEAK_RATIO * foe.hp
-    if not thin:
+    ko = best_move(foe, active, chart, moves)[0] * SWITCH_HP_TURNS >= cur
+    thin = ko or (our_dmg == 0 if wild else our_dmg <= WEAK_RATIO * foe.hp)
+    unsafe = active_slot == trainee and (cur / active.hp if active.hp else 0.0) < TRAINEE_SAFE_HP
+    if not thin and not unsafe:
         return None
-    pick, best = None, our_dmg * SWITCH_GAIN
+    pick, gain = None, our_dmg * SWITCH_GAIN
     for i, c in enumerate(team):
         if i == active_slot or i == trainee:
             continue
         ci = hp[i] if i < len(hp) else c.hp
         if c.hp <= 0 or ci / c.hp < SWITCH_MIN_HP:
             continue
+        if best_move(foe, c, chart, moves)[0] >= ci:  # the hit on the switch turn KOs it: never sent in
+            continue
         d = best_move(c, foe, chart, moves)[0]
-        if d >= best and (pick is None or d > best_move(team[pick], foe, chart, moves)[0]):
+        if not unsafe and (d < gain if our_dmg > 0 else d <= 0):
+            continue                                # the switch must buy damage - any damage, from a helpless member
+        if pick is None or d > best_move(team[pick], foe, chart, moves)[0]:
             pick = i
     return pick
 
