@@ -138,12 +138,12 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
 | Base commit | 74f62a26b91b5951ead6ea07757b9b07a96d1f82 |
-| Head commit | fdd4ecce73b1ce3448ca4b410fdb4d6a0c83f7c6 |
+| Head commit | ee83856e51cfcbf36cc00401243a0861fc9a083f |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -157,4 +157,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 15:50 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 15:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DX7X2EA7M8XS8JR927Q6X4
 - 2026-11-14 15:58 · dispatcher · launched pid=6740; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; resynced: merged main into directive/pokeagent-lead-and-wild-switch-directive (18 commit(s), clean); provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 16:13 · devin · In progress → Review — CHANGES-NEEDED fixes done. Fix 1 (module sizes): new src/pokeagent/knowledge/lead.py holds can_damage + lead_order (imports ascending_order from team_plan; team_plan.py now 310 lines). New src/pokeagent/explorer/behaviours/battle_switch.py holds active_no_damage + yield_to_switch; battle.py now 295 lines (build_record moved to explorer/party_log.py, the battle-record module, with a compat import so test_battle_log_fidelity passes unedited). Fix 2 (wild Rattata faint): root cause was behaviour order - Battle() runs before SwitchOut() and its potion/flee Decisions win every step, and the old sw_out carve-out only covered a member with NO damaging move, so a thin TACKLE-having member was potioned/RUN-attempted to death while switch_choice(wild=True) named a switch-in. yield_to_switch now also returns True for any member a wild matchup_pick would save (kind==1 only; trainer fights keep the no-damage-only rule; gave_up re-enables potion/flee; no candidate = unchanged). matchup_pick gained an optional kind param so Battle can ask with its fresh IS_IN_BATTLE read before ctx.bv is written; cache key is now (step, battles, kind). Tests: 5 new yield_to_switch unit tests + 2 end-to-end Battle().step tests on the FakeEmulator harness (thin wild lead + healthy reserve -> step yields, bv kind 1, pick slot 1; no fit member -> flee_run unchanged). tails: uv run --frozen pytest -q tests/test_lead_and_wild_switch.py -> 18 passed; tests/test_switch_matchup.py tests/test_party_order_ascending.py tests/test_trainee_gate.py tests/test_training_ctl_roster.py -> 51 passed; FULL SUITE -> 3022 passed, 64 skipped, 0 failed (incl. test_explorer_package_layering_and_size). Diff stat vs origin/main (src/pokeagent): battle.py, party_order.py, switch_out.py, party_log.py, team_plan.py + new battle_switch.py, lead.py. New constants: none this round (TRAINEE_SAFE_HP=0.35 from prior round; all tunables unchanged). ROM check remains Claude's. [origin] spent: devin 23 min est. n/a
 <!-- queue:end -->
