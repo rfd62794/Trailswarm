@@ -192,12 +192,14 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-training-controller-slice5-exit-h-30a7c4 |
 | Base branch | - |
+| Base commit | b46ff8c32ba3585bc5f8bb5561c23a8c07433ba6 |
 
 **Status log**
 - 2026-11-14 09:00 · robert-claude-laptop · none → Queued
 - 2026-11-14 09:02 · robert-claude-laptop · Queued → Approved — lint override: The directive states all paths are under src/pokeagent/; training_ctl/__init__.py and training_ctl/adapters.py exist at src/pokeagent/explorer/training_ctl/. Reviewed by Claude (controller) 2026-11-14.
+- 2026-11-14 09:13 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7D6FSCSY278PQTX81JVY5FT
 <!-- queue:end -->
