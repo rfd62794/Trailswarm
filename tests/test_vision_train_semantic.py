@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from pokeagent.vision.store import Store
+from pokeagent.vision_model import metrics
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -79,6 +80,20 @@ def test_specific_never_calls_as_semantic(tmp_path, monkeypatch):
                         lambda ds: calls.append(ds) or ds)
     mod.main(["--game", "g", "--root", str(root), "--epochs", "1", "--max-seconds", "30"])
     assert calls == []
+
+
+def test_side_by_side_lists_support_classes_and_dashes():
+    t = {"per_class": {"walkable": {"support": 3, "acc": 0.5},
+                       "solid": {"support": 2, "acc": 1.0},
+                       "grass": {"support": 0, "acc": 0.0}}}
+    n = {"per_class": {"walkable": {"support": 3, "acc": 0.25},
+                       "ledge": {"support": 1, "acc": 0.0}}}
+    lines = metrics.side_by_side(t, n)
+    assert lines[0] == "class      support   template  net"
+    assert lines[1] == "walkable   n=3      template=0.500 net=0.250"
+    assert lines[2] == "solid      n=2      template=1.000 net=-"
+    assert lines[3] == "ledge      n=1      template=- net=0.000"
+    assert len(lines) == 4            # zero support in both reports is skipped
 
 
 def test_semantic_net_report(tmp_path, monkeypatch, capsys):
