@@ -238,12 +238,14 @@ Nothing for the build. After merge, Claude runs the real census on the laptop's 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-goexplore-slice1-cell-census-directive |
 | Base branch | - |
+| Base commit | 776ccd7edcf5f35e1379906d2c097aaa268c4ebb |
 
 **Status log**
 - 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved Go-Explore doc (#246) and recs 2026-11-14.
 - 2026-11-13 23:49 · robert-claude-laptop · Queued → Approved — lint override: Every cited goexplore/*, tools/cell_census.py and tests/test_goexplore_* path is a new file this directive creates; `map/x/y` is prose for the three decisions.jsonl fields, not a path.
+- 2026-11-13 23:50 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goexplore-slice1-cell-census-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7C68BFDF2S979P0QZB3BBWJ
 <!-- queue:end -->
