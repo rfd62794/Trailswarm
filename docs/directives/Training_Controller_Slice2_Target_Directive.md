@@ -216,11 +216,12 @@ Nothing for the build. After merge, Claude runs the seed-12 and seed-13 A/B on t
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved all recs 2026-11-14; base includes #245.
+- 2026-11-13 23:45 · robert-claude-laptop · Queued → Approved — lint override: training_ctl/target.py is the new module this directive creates (Step 1), so it is correctly absent from main.
 <!-- queue:end -->
