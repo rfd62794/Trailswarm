@@ -16,7 +16,7 @@ This slice makes `tick` the only writer of `train_route_live`, gives the heal ru
 
 ## 2. Scope (files, in order)
 
-1. NEW `src/pokeagent/explorer/training_ctl/sustain.py` (< 120 lines) + NEW `tests/test_training_ctl_sustain.py`. Absorbs `explorer/grind_heal.py` and `explorer/after_heal.py`, which are then DELETED.
+1. NEW `src/pokeagent/explorer/training_ctl/sustain.py` (< 120 lines) + NEW `tests/test_training_ctl_sustain.py`. Absorbs `explorer/grind_heal.py` and `explorer/after_heal.py`. Do NOT delete them (file deletion is refused in this sandbox and stops the run): leave both files in place, unchanged, with no remaining importer in `src/`; Claude deletes them during review. `sustain.py` is already on this branch (commit 002d4f3): continue from it.
 2. `src/pokeagent/explorer/training_ctl/controller.py`: add `tick`. `src/pokeagent/explorer/training_ctl/adapters.py`: add `team_ready_live`. `src/pokeagent/explorer/engine.py`: call `tick` before `selector.choose`.
 3. `src/pokeagent/explorer/behaviours/grind_loop.py`: `mark_live` stops writing the flag. `src/pokeagent/explorer/behaviours/plan_goal.py`: the removals below (net <= 0).
 4. `src/pokeagent/explorer/behaviours/retreat_heal.py`, `src/pokeagent/explorer/behaviours/frontier.py`: read `heal_now`.
@@ -254,7 +254,7 @@ Expected: only files from section 2 (plus the two deletions).
 ## 7. Completion criteria
 
 - [ ] `TrainingController.tick` is called before `selector.choose` and is the only writer of `ctx.train_route_live` (`mark_live` stamps `ctx.__dict__["grind_walk_step"]`; plan_goal :130 gone). <!-- test: tests/test_training_ctl_sustain.py::test_tick_is_the_sole_writer -->
-- [ ] `training_ctl/sustain.py` exists (< 120 lines) with `heal_now`, `to_grass`, `leaving`, `hurt_no_potion`; `grind_heal.py` and `after_heal.py` are deleted; retreat_heal, frontier and plan_goal read `heal_now`. <!-- test: tests/test_training_ctl_sustain.py -->
+- [ ] `training_ctl/sustain.py` exists (< 120 lines) with `heal_now`, `to_grass`, `leaving`, `hurt_no_potion`; no module under `src/` imports `grind_heal` or `after_heal` (Claude deletes both files in review; a test asserts no importer); retreat_heal, frontier and plan_goal read `heal_now`. <!-- test: tests/test_training_ctl_sustain.py -->
 - [ ] An episode never starts hurt with no potion, pinned by test; `_end_reason` uses `sustain.hurt_no_potion`. <!-- test: tests/test_training_ctl_sustain.py -->
 - [ ] `tools/step_budget.py` reports `bench_xp_per_1k_run_steps`, `second_member_l9_step`, `walk_to_grass_after_episode_start`, `walk_to_grass_per_episode`. <!-- test: tests/test_step_budget.py -->
 - [ ] plan_goal.py <= 300 lines and net <= 0; context.py and memory.py not in the diff; `planner.py`/`planner_east.py` untouched.
@@ -296,7 +296,7 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-training-controller-slice3-sustai-06d7ec |
 | Base branch | - |
@@ -306,4 +306,6 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 - 2026-11-14 00:50 · robert-claude-laptop · none → Queued — Robert approved the Training Controller plan and slices; #255 merged.
 - 2026-11-14 00:50 · robert-claude-laptop · Queued → Approved — lint override: behaviours/plan_goal.py, behaviours/grind_loop.py, behaviours/frontier.py and training_ctl/adapters.py are shorthand for existing files under src/pokeagent/explorer/ (the directive states paths are under that root); training_ctl/sustain.py is the new module this directive creates.
 - 2026-11-14 01:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CAPM3Q69ZVMGK6HW4K8E53
+- 2026-11-14 01:14 · dispatcher · launched pid=23180; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (15 declared need(s); 10 external))
+- 2026-11-14 01:23 · devin · In progress → Blocked — Refused: `git rm src/pokeagent/explorer/grind_heal.py src/pokeagent/explorer/after_heal.py` - directive step 1 requires deleting these two files, but file deletion is refused in every form this sandbox permits (git rm denied by a user deny rule; no del/Remove-Item/git variant is in the allowed command set). sustain.py was written and is committed+pushed on the branch; all other work is unblocked but the deletion gate makes Review impossible as written.
 <!-- queue:end -->
