@@ -424,7 +424,10 @@ numpy piece works without it). `uv run --frozen python tools/vision_train.py --g
 scores both models on held-out areas, times inference and writes `runs/vision_models/<game>/report.json`
 plus `weights.pt`/`classes.json` — all ROM-derived, local and gitignored. A class that appears only on
 held-out areas counts as an error (`unseen_in_train`), and a test crop whose image id also appears in a
-train area is dropped as memorisable (`leak_removed`).
+train area is dropped as memorisable (`leak_removed`). `tools/vision_relabel.py` adds a `semantic` class
+(walkable, solid, grass, counter, ledge, npc, item, player, other) from the ROM collision list, grass/counter
+header bytes and ledge table, and `tools/vision_train.py --labels semantic` trains and scores on it; water,
+doors and signs are not in the vocabulary because the repo reads no tile-level data for them.
 
 ## Movement and location models (2026-11-14)
 
