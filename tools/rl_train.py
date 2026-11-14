@@ -240,9 +240,11 @@ def main() -> int:
 
     def evaluation_env(state):
         evaluation = SegmentEnv(a.rom, state, make_goal(a.segment), goal_name=a.segment,
+                                subgoals=env.subgoals, sub_bonus=env.sub_bonus,
                                 max_steps=a.max_steps, hold=a.hold, settle=a.settle,
                                 obs_extra=EXTRA_OBS.get(a.segment), screen_context=a.screen_context)
         evaluation.actions = list(actions)
+        evaluation.options = env.options  # same obs tail + meta-actions as training, or the mask lies
         evaluation.battle_learning = a.battle_learning
         evaluation.travel_priority = a.travel_priority
         evaluation.combat_context = a.combat_context
@@ -430,8 +432,8 @@ def main() -> int:
                 lid = a.frame_port if a.frame_port is not None else a.seed
                 atomic_json(f'runs/evaluations/{schema}/{lid}_{os.getpid()}_{ep + 1}.json', evaluated)
                 latest_eval = {key: evaluated[key] for key in (
-                    'wins', 'episodes', 'win_rate', 'mean_solved_steps', 'model_digest',
-                    'evaluation_scope', 'training_episode', 'training_steps')}
+                    'version', 'wins', 'episodes', 'win_rate', 'mean_solved_steps', 'epsilon',
+                    'model_digest', 'evaluation_scope', 'training_episode', 'training_steps')}
                 print(f"  EVAL ep {ep + 1}: {evaluated['wins']}/{evaluated['episodes']} wins",
                       flush=True)
             publish_status(ep, eps)
