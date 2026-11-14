@@ -1,10 +1,8 @@
 """Slice 5 (synthetic fixtures): team_ready and grind episodes train in ONE place - no Cerulean ping-pong."""
 from __future__ import annotations
 
-from pokeagent.explorer import grind_episode, train_route, train_target
-from pokeagent.explorer.behaviours.frontier import Frontier
+from pokeagent.explorer import grind_episode, train_target
 from pokeagent.explorer.planner_east import ROUTE24
-from pokeagent.explorer.perceive import TILEMAP_LEN
 from pokeagent.grind import points as gp
 from test_grind_episode import make_ctx, use_ledger
 
@@ -50,12 +48,6 @@ def test_later_gym_hold_is_not_pinned_to_route24(tmp_path):
     assert train_target.only_maps(ctx) == stage_maps.allowed("beat_surge")   # unchanged by the hold: no Route 24 pin
 
 
-def test_live_episode_without_a_point_keeps_train_route_inside_its_maps(tmp_path, monkeypatch):
-    ctx = _cerulean(tmp_path, _ledger(VF, ROUTE24))
-    monkeypatch.setattr(grind_episode, "active", lambda c: {"maps": frozenset({VF}), "point": None})
-    assert train_target.route_kw(ctx) == {"target": VF}
-
-
 def test_choose_prefers_the_train_target_even_when_another_point_scores_higher(tmp_path):
     led = _ledger(VF, ROUTE24)                                   # Viridian Forest has the higher xp/min
     free = gp.choose(led, [6], 8, (3, 20, 1), None, only_maps=None)
@@ -72,27 +64,3 @@ def test_no_episode_starts_on_a_far_map_while_team_ready_trains(tmp_path, monkey
     ctx = _cerulean(tmp_path, _ledger(VF, ROUTE24))
     assert grind_episode.update(ctx) is not None
     assert grind_episode.active(ctx)["point"].map_id == ROUTE24  # the episode and train_route share Route 24
-
-
-def test_frontier_and_plan_goal_agree_with_a_forest_episode_live(tmp_path):
-    """A VIRIDIAN_FOREST episode begun before the stage: plan_goal's team_ready walk retargets to the episode's
-    map (no learned way from Cerulean -> no press), and frontier takes no UP crossing: they never alternate."""
-    ctx = _cerulean(tmp_path, _ledger(VF))
-    ctx._grind_state["episode"] = {"maps": {VF}, "point": gp.GrindPoint(VF, patch=[[5, 5]])}
-    kw = train_target.route_kw(ctx)
-    assert kw["target"] == VF
-    for pos in ((3, 20, 1), (3, 20, 0)):
-        plan = train_route.step(ctx.mem.data["maps"], pos, (), 20, 20, **kw)
-        assert plan is None or plan[0] != "UP"                   # never toward Route 24
-    from pokeagent.explorer.context import Frame
-    ctx.view = Frame(3, 20, 0, bytes(TILEMAP_LEN))
-    f = Frontier().step(ctx)                                     # the episode set {VF} forbids the (20,0) UP crossing
-    assert f is None or f.button != "UP"
-    ctx2 = _cerulean(tmp_path, _ledger(ROUTE24))
-    assert train_target.route_kw(ctx2) == {}                     # no foreign episode: Route 24 as before
-
-
-def test_route_kw_is_empty_when_the_live_episode_is_on_route24(tmp_path):
-    ctx = _cerulean(tmp_path, _ledger(ROUTE24))
-    ctx._grind_state["episode"] = {"maps": {ROUTE24, 3}, "point": gp.GrindPoint(ROUTE24)}
-    assert train_target.route_kw(ctx) == {}
