@@ -171,4 +171,5 @@ Diff stat, test tails (including which tests skipped for lack of torch), line co
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: cheap sprite classifier (directive 2 of 3); needs directive 1 merged
 - 2026-11-14 00:42 · robert-claude-laptop · Queued → Approved — lint override: vision_model/net.py is a new module this directive creates; its dependency (pokeagent.vision.dataset, directive 1) merged as #251.
 - 2026-11-14 01:12 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CAZPZE0KH1HDKWZJ3ZJAZP
+- 2026-11-14 01:23 · dispatcher · launched pid=17064; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-cheap-sprite-model-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 <!-- queue:end -->
