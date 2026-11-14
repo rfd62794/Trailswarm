@@ -190,12 +190,14 @@ Nothing for the build. Queue only after #264 (slice 3) has merged.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-goexplore-slice4-return-and-explo-ee9a20 |
 | Base branch | - |
+| Base commit | b20d4ce093988fd9b7bc31e0e7912df1b1e81a75 |
 
 **Status log**
 - 2026-11-14 09:00 · robert-claude-laptop · none → Queued
 - 2026-11-14 09:01 · robert-claude-laptop · Queued → Approved — lint override: runner.py, go_explore.py and the two test files are NEW files this directive creates; goexplore/runner.py and grind/measure.py are src/pokeagent-relative names (src/pokeagent/grind/measure.py exists); the go_explore.py usage line is documentation of the tool being built, and section 4 forbids running any subprocess, ROM or runs/ access. Reviewed by Claude (controller) 2026-11-14.
+- 2026-11-14 09:15 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-goexplore-slice4-return-and-explo-ee9a20; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7D6K5DS38EYW4TCBBMHMWB8
 <!-- queue:end -->
