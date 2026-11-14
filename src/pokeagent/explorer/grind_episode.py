@@ -26,11 +26,10 @@ from pokeagent.explorer import party_log, story_blockers, train_route
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.explorer.trainer_hooks import run_provenance
-from pokeagent.explorer.training_ctl import sustain, target
+from pokeagent.explorer.training_ctl import roster, sustain, target
 from pokeagent.grind import atlas, measure
 from pokeagent.grind import points as gp
 from pokeagent.grind.drill import log_episode
-from pokeagent.magikarp import trainee_slot_for
 from pokeagent.ramstructs import read_party
 
 log = logging.getLogger(__name__)
@@ -86,7 +85,7 @@ def _levels(ctx) -> list:
 
 def _slot(ctx) -> int | None:
     try:  # the trainee is the named/Magikarp slot's member; the lead stands in when there is none
-        return trainee_slot_for(ctx.emu, getattr(ctx, "train_member", None))
+        return roster.trainee_slot(ctx)
     except Exception as e:  # noqa: BLE001
         _warn_once("slot", "grind episode: trainee slot read failed (%r); falling back to the lead", e)
         return None

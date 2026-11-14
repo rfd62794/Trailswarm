@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from pokeagent.explorer import catch_list
 from pokeagent.explorer.behaviours import catch as catch_behav
 from pokeagent.explorer.dialog import yesno_answer
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge.party import Combatant
 
 
@@ -26,7 +27,7 @@ def _ctx(trainee=None):
 
 
 def test_full_party_slot_marks_the_lowest_value_member(monkeypatch):
-    monkeypatch.setattr(catch_behav, "trainee_slot_for", lambda emu, named: None)
+    monkeypatch.setattr(roster, "trainee_slot", lambda ctx, **kw: None)
     monkeypatch.setattr(catch_list, "upcoming_needs", lambda goals: [])
     monkeypatch.setattr(catch_list, "hm_table", lambda: {})
     slot = catch_behav.full_party_slot(_ctx(), _full_party())
@@ -37,14 +38,14 @@ def test_full_party_slot_never_the_trainee_or_a_needed_learner(monkeypatch):
     party = _full_party()
     # the trainee (slot 5) and the team's only Cut learner (ODDISH slot 1) are protected;
     # the weakest remaining member is RATTATA L8 at slot 2
-    monkeypatch.setattr(catch_behav, "trainee_slot_for", lambda emu, named: 5)
+    monkeypatch.setattr(roster, "trainee_slot", lambda ctx, **kw: 5)
     monkeypatch.setattr(catch_list, "upcoming_needs", lambda goals: ["cut"])
     monkeypatch.setattr(catch_list, "hm_table", lambda: {"cut": {"ODDISH"}})
     assert catch_behav.full_party_slot(_ctx(), party) == 2
 
 
 def test_full_party_slot_none_under_six_or_all_protected(monkeypatch):
-    monkeypatch.setattr(catch_behav, "trainee_slot_for", lambda emu, named: None)
+    monkeypatch.setattr(roster, "trainee_slot", lambda ctx, **kw: None)
     monkeypatch.setattr(catch_list, "upcoming_needs", lambda goals: [])
     monkeypatch.setattr(catch_list, "hm_table", lambda: {})
     assert catch_behav.full_party_slot(_ctx(), _full_party()[:5]) is None  # not full yet

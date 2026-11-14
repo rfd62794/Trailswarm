@@ -18,6 +18,7 @@ from pokeagent.explorer.behaviours.switch_out import MAX_PRESSES, switch_press
 from pokeagent.explorer.catch_list import catch_wanted, dex_owned_count, upcoming_needs
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines
 from pokeagent.explorer.perceive import frame_lines
+from pokeagent.explorer.training_ctl import roster
 from pokeagent.goals import bag_contents
 from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE, status_kind
 from pokeagent.knowledge.catch_plan import TEAM_SIZE
@@ -25,7 +26,6 @@ from pokeagent.knowledge.catch_policy import decide, may_throw_ctx
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import our_party, species_row, trainer_mon
 from pokeagent.knowledge import team_plan
-from pokeagent.magikarp import trainee_slot_for
 from pokeagent.ramstructs import active_slot, read_enemy_mon, read_party
 
 POKE_BALL = 0x04
@@ -44,7 +44,7 @@ def full_party_slot(ctx: ExplorerContext, party) -> int | None:
     needs, hm = upcoming_needs(ctx.goals()), hm_table()
     protected = {i for i, c in enumerate(party)
                  if any(n in HM_MOVE and (c.name in hm.get(n, ()) or HM_MOVE[n] in c.moves) for n in needs)}
-    t = trainee_slot_for(ctx.emu, ctx.train_member)
+    t = roster.trainee_slot(ctx)
     if t is not None:
         protected.add(t)
     return team_plan.release_candidate(party, protected=protected, values=[c.level for c in party])
