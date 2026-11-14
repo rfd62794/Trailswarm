@@ -144,3 +144,17 @@ Diff stat, test tails (including which test skipped for lack of torch), line cou
 ## Required from User
 
 - None. The run needs no dataset and no torch; Claude does the real-data checks afterwards.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 12:39 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
