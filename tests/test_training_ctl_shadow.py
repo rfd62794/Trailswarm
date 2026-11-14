@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 
+from pokeagent.explorer import training
 from pokeagent.explorer.training_ctl import adapters
 from pokeagent.explorer.training_ctl.controller import MAX_MISMATCHES, RATE_STEPS, TrainingController
 from pokeagent.explorer.training_ctl.state import TrainingState
@@ -15,7 +16,14 @@ def test_diff_ignores_unknown_gym_hold_and_reports_real_differences():
     assert TrainingState(train_need=8).diff(TrainingState(train_need=9)) == {"train_need": (8, 9)}
 
 
-def test_shadow_equals_old_flags_on_a_quiet_ctx(tmp_path):
+def _no_boss_data(monkeypatch):
+    """Pin the 'no boss data' path: boss_party reads local pokered data, present on a dev laptop and absent in the
+    cloud, so without this the derived train_member is 0 on one machine and None on the other."""
+    monkeypatch.setattr(training, "boss_need_for", lambda goals, party: None)
+
+
+def test_shadow_equals_old_flags_on_a_quiet_ctx(tmp_path, monkeypatch):
+    _no_boss_data(monkeypatch)
     ctx = make_ctx(tmp_path, m=3, lvl=6, need=8)
     ctl = TrainingController()
     assert ctl.observe(ctx) is not None
@@ -34,7 +42,8 @@ def test_observe_never_writes_the_old_flags(tmp_path):
     assert after == before
 
 
-def test_mismatch_log_is_rate_limited(tmp_path, caplog):
+def test_mismatch_log_is_rate_limited(tmp_path, caplog, monkeypatch):
+    _no_boss_data(monkeypatch)
     ctx = make_ctx(tmp_path, m=3, lvl=6, need=8)
     ctx.train_route_live = True
     ctl = TrainingController()
