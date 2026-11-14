@@ -290,3 +290,17 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 - Exec(git diff)
 - Exec(git grep)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 00:50 · robert-claude-laptop · none → Queued — Robert approved the Training Controller plan and slices; #255 merged.
+<!-- queue:end -->
