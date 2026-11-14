@@ -182,11 +182,12 @@ Diff stat, test tails (which tests skipped for lack of torch), line counts of ea
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-08 13:21 · robert-claude-laptop · none → Queued — Drafted by Claude for Robert: movement and location models (directive 3 of 3); needs directive 1 merged
+- 2026-11-14 00:41 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
