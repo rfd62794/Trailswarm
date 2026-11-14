@@ -76,13 +76,13 @@ class TrainingController:
    `test_grind_episode.py`, `test_train_target.py`, `test_training_v2_slice3.py`.
 3. **Sustain (after Target).** First writer move: `tick` becomes sole writer of `train_route_live`. Removes `after_heal` import (:16, 0 net),
    the :131-132 branch (about -2; :133 is counted in slice 2), the heal inputs in the plan_step dict (`behaviours/plan_goal.py:125`, about -1 to -2), and `grind_heal` calls in `behaviours/retreat_heal.py` and
-   `behaviours/frontier.py:149`; `planner_east.py:114` and the `planner.py` heal branches read `heal_now()`. plan_goal est. -5, context 0. `explorer/context.py:124` stays until grind_loop's writer is gone. Gate: `test_retreat_heal.py`, `test_frontier_patrol.py`, `test_early_training_gate.py`.
+   `behaviours/frontier.py:149`; `planner_east.py:114` and the `planner.py` heal branches read `heal_now()`. plan_goal est. -5, context 0. `explorer/context.py:124` stays until grind_loop's writer is gone. Also in slice 3: the `tools/step_budget.py` bench-xp and 2nd-member-L9 rows (section 5), and the walk-to-grass steps counted separately. Directive: `docs/directives/Training_Controller_Slice3_Sustain_Directive.md` (current line numbers are cited there; those above drifted after slice 2). Gate: `test_retreat_heal.py`, `test_frontier_patrol.py`, `test_early_training_gate.py`.
 4. **Roster.** `team_sig` (species, level, fainted: `party_order.py:31-34`) keeps species and level but replaces the fainted bit with a
    monotonic faint counter (alive->fainted increments, fainted->alive never does). Storage: `team_plan.of(ctx)["faints"]` beside
    `order_hold` (party_order.py:41), updated by Roster from the previous step's per-slot fainted flags (`faints_prev`); team_sig
    becomes (species, level) per member + the counter. Reset: never within a run (blackouts and Pokecenter heals do not reset it;
    a new run starts at 0), so a heal can never undo a faint's reorder trigger. Regression tests: a level-up reorders; a real faint
-   (counter +1) reorders; a heal-revive (fainted->alive) does NOT; no 300-step expiry returns (incident `party_order.py:37-42`: 31 reorders). plan_goal/context est. 0. Gate: `test_party_order_ascending.py`,
+   (counter +1) reorders; a heal-revive (fainted->alive) does NOT; no 300-step expiry returns (incident `party_order.py:37-42`: 31 reorders). plan_goal/context est. 0. Species preference (Robert 2026-11-14, #253: never catch a wild KAKUNA, Harden only): the trainee pick prefers evolving a WEEDLE (it keeps Poison Sting) over keeping a wild Kakuna, so it must value Poison Sting / the Beedrill evolution (`team_value.EVOLUTIONS` already has `WEEDLE -> KAKUNA` at 7 and `KAKUNA -> BEEDRILL` at 10); a wild Kakuna already in the party (seed 12-14 parties held two, internal id 113) is a deposit candidate. Metapod is analogous but NOT decided: do not add it. Gate: `test_party_order_ascending.py`,
    `test_party_log_reorder.py`, `test_trainee_gate.py`, `test_trainer_grind.py`.
 5. **Exit + gym hold.** Fold `_end_reason`, stall hold, GrindBudget; delete `gym_hold_seen` (`behaviours/plan_goal.py:82`, :149) and the gate_lifted block (:139-151, :283, :297-298; est. -20), `floor_unmet` (`training.py:125`), then `explorer/context.py` fields :124, :165, :187 (-3) once their last writer is gone, and dead modules. Gate: `test_grind.py`, `test_area_grind.py`, `test_grind_pressure_plan_goal.py`, `test_plan_goal_gym_road.py`.
 Estimated net removal: plan_goal about -26 total, context -3. Each slice's removals must make plan_goal/context line count net <= 0 (check `wc -l` in review).
@@ -101,12 +101,25 @@ Regression test (added by slice 5, or whichever slice owns Exit): `test_exit_flo
 Runs are deterministic (identical 12000-step runs seen), so one seed-12 A/B per slice is valid; add seed 13 as a sanity check from slice 2.
 Baseline: Route 24 210 xp/1k, SHAKE 7.2%, heal 7.5% + leave-PC 5.4% = 12.9%, 42 reorder sessions, 13 episode starts.
 Slice 1 extends `tools/step_budget.py` with rows: reorder_party (sessions), grind-episode starts by map, blackouts.
-- Route 24 xp/1k >= 210: new `tools/step_budget.py` row reading `xp_rates.jsonl` map_summary (no existing tool reads it). SHAKE <= 7.2%, heal + leave-PC < 12.9%: `tools/step_budget.py`.
+- Training yield (replaces the old "Route 24 xp/1k >= 210" bar, which proved a metric artifact, see "Slice 2 result"): non-lead (bench) xp per 1k RUN steps, from `levels.jsonl` exp deltas, not worse than baseline on each seed; and the step at which the 2nd party slot reaches L9 not later. `tools/step_budget.py` has no bench-xp row today (its `route24_xp_per_1k` reads the `xp_rates.jsonl` map_summary): slice 3 adds the bench-xp row and the 2nd-member-L9 step. SHAKE <= 7.2%, heal + leave-PC < 12.9%: `tools/step_budget.py`.
 - Reorder session = a maximal run of reorder_party decision lines with gaps <= 3 steps; target: 0 inside a Pokecenter, <= 5 total.
 - Episode starts on never-visited maps = 0 (step_budget start-by-map row). Floor progress (2 members reach L19 no later; blackouts not up): a `step_budget.py` row reading `levels.jsonl` (step each member first reaches its level; no reader exists, slice 1 adds it).
 - beat_misty is not reached today in 12000 steps, so "no regression" means floor progress above, not a time.
 - EVERY slice: the full test suite passes with 0 failed (hard rule, no "known failures"), run before merge.
 - Unit tests per sub-system: target, roster, sustain, exit_rule, controller (shadow equals old flags), plus ported tests above.
+
+### Slice 2 result (2026-11-14)
+
+Real-ROM A/B, seeds 12/13/14, 12000 steps from `heal_cerulean`; before = main, after = slice 2 (#250).
+
+| Metric | Before (12/13/14) | After (12/13/14) |
+|---|---|---|
+| Phantom episode starts | 12 / 11 / 11 | 0 / 0 / 0 |
+| Leave-Pokecenter % of steps | 1.9 / 4.5 / 7.0 | 0.9 / 0.7 / 0.9 |
+| SHAKE % | 5.6 / 8.3 / 8.4 | 4.6 / 5.5 / 1.3 |
+| `route24_xp_per_1k` | 199 / 216 / 290 | 180 / 197 / 176 |
+
+The last row looked like a regression and is not: `tools/step_budget.py` (~:112) reads `xp_rates.jsonl` map_summary `xp_per_1k_steps` for map 35, computed in `xp_meter.py` (~:144) over per-party-member window steps, not run steps, so a change in how time is split moves it. The corrected comparison: total xp over all maps -6% / +3% / +13% (flat-to-up); per-battle xp 111 -> 123, 88 -> 88, 106 -> 120; non-lead party levels flat. Hence the new bar in section 5 (bench xp per 1k run steps, 2nd slot to L9). Two cheap wastes found: each episode starts ~56 steps from the grass ("goal team_ready: 56 steps to Route 24's grass"); one seed-13 episode ended "hurt with no potion" for 81 xp in 759 steps. Slice 3 counts the walk-to-grass steps separately in `step_budget`.
 
 ## 6. Risks / what NOT to do
 - No lines added to `explorer/context.py`, `explorer/memory.py`, `explorer/behaviours/plan_goal.py`. Do not move writers in slice 1.
