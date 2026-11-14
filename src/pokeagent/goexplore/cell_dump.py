@@ -32,6 +32,14 @@ class Harvester:
         self.last_check: int | None = None
         self.prev: str | None = None      # last distinct cid this run was checked in
 
+    def _parent_for(self, cid: str) -> str | None:
+        """A NEW cell's parent: the previous cell while it is still archived, else the run's return cell;
+        never the cell itself. A replaced entry keeps its parent, so the chain stays acyclic and evict()
+        (which spares any cell with children) keeps enforcing the cap."""
+        prev = self.prev if self.prev in self.archive.entries else None
+        parent = prev or self.parent
+        return None if parent == cid else parent
+
     def tick(self) -> str | None:
         """The cid saved this call, else None. NEVER raises: an observer must not stop a run."""
         ctx = self.ctx
@@ -49,7 +57,7 @@ class Harvester:
             if old is not None and (goals, -steps) <= (old.goals, -old.steps):
                 self.prev = cid       # state files are ~175 KB: never write one offer() would reject
                 return None
-            parent = old.parent if old is not None and cid == self.prev else (self.prev or self.parent)
+            parent = old.parent if old is not None else self._parent_for(cid)
             self.prev = cid
             rel = store.add_state(ctx.emu, self.root, cid, ctx.run_dir.name,
                                   inherit=ctx.opts.state_path or None)

@@ -164,6 +164,30 @@ def test_parent_chain_links_consecutive_cells(tmp_path):
     assert h.archive.entries[a].parent is None   # the first cell of a run has no previous cell
 
 
+def test_a_better_revisit_keeps_its_parent_so_the_chain_has_no_cycle(tmp_path):
+    ctx = make_ctx(tmp_path)
+    h = cell_dump.Harvester(ctx, tmp_path / "arch")
+    a = h.tick()                                 # A first
+    ctx.step += cell_dump.CHECK_EVERY
+    ctx.emu.set(PX, 20)
+    b = h.tick()                                 # B, parent A
+    ctx.step += cell_dump.CHECK_EVERY
+    ctx.emu.set(PX, 9)
+    h.steps_offset = -10 * cell_dump.CHECK_EVERY  # e.g. a later run that reached A sooner
+    assert h.tick() == a                         # A again from B in fewer steps: replaced
+    assert h.archive.entries[b].parent == a
+    assert h.archive.entries[a].parent is None   # kept, not B: no A<->B cycle
+
+
+def test_a_new_cell_is_never_its_own_parent(tmp_path):
+    ctx = make_ctx(tmp_path)
+    h = cell_dump.Harvester(ctx, tmp_path / "arch", parent=None)
+    h.prev = "gone"                              # the previous cell was evicted: not archived
+    assert h._parent_for("x") is None
+    h.parent = "x"
+    assert h._parent_for("x") is None            # never itself
+
+
 def test_every_written_entry_state_survives_load(tmp_path):
     ctx = make_ctx(tmp_path)
     h = cell_dump.Harvester(ctx, tmp_path / "arch")
