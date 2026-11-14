@@ -216,15 +216,18 @@ Nothing for the build. After merge, Claude runs the seed-12 and seed-13 A/B on t
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-training-controller-slice2-target-e25888 |
 | Base branch | - |
 | Base commit | 5c035e16150cbae4625a7081225c5377b2aa2ea4 |
+| Head commit | 07e9c6b1177a37e06e96dd92539d738de23be8dd |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved all recs 2026-11-14; base includes #245.
 - 2026-11-13 23:45 · robert-claude-laptop · Queued → Approved — lint override: training_ctl/target.py is the new module this directive creates (Step 1), so it is correctly absent from main.
 - 2026-11-13 23:46 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice2-target-e25888; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7C61EME9J437GGPGBQR05PN
 - 2026-11-13 23:51 · dispatcher · launched pid=21960; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice2-target-e25888; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (10 declared need(s); 4 external))
+- 2026-11-13 23:59 · devin · In progress → Review — Slice 2 Target done. New training_ctl/target.py (43 lines): known() rejects points on never-visited maps or with no learned path; choose() scores only known points via gp.choose, never invents; wants_training() = the old grind_drill applies read. grind_episode._try_start now calls target.choose; train_target/route_kw + plan_goal kwarg deleted; grind_drill.applies reads target.wants_training. The :106 lazy import could NOT be deleted: hoisting trainee_check fails with ImportError (trainee_gate -> heal_walk -> behaviours/__init__ -> grind_drill -> 'cannot import name trainee_check from partially initialized module'); lazy import restored. tests/test_train_target.py: 3 route_kw test functions removed (4 call sites); no other changes. wc -l: plan_goal 300 (diff +2/-2 net 0), context 300 unchanged, memory.py untouched, target.py 43. Gate suite 69 passed 0 failed (64 baseline - 3 removed + 8 new). Fresh-process import test passes. Full suite: 2821 passed, 55 skipped, 0 failed. No ROM used; seed-12/13 A/B is Claude's on the laptop. Known delta: no route_kw retarget for an episode begun before the stage. [origin] spent: devin 7 min est. n/a
 <!-- queue:end -->
