@@ -166,7 +166,7 @@ def test_sustain_does_not_import_grind_episode():
 
 
 def test_no_src_module_imports_the_absorbed_modules():
-    """grind_heal.py / after_heal.py stay in the tree until review deletes them; nothing under src/ imports them."""
+    """grind_heal.py / after_heal.py were absorbed into sustain.py and deleted; nothing under src/ may import them again."""
     src = Path(sustain.__file__).resolve().parents[3]     # .../src
     offenders = []
     for f in src.rglob("*.py"):
