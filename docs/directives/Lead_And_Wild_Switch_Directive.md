@@ -138,12 +138,14 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
+| Base commit | 74f62a26b91b5951ead6ea07757b9b07a96d1f82 |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-14 14:26 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 14:27 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DRF1XPF8WBN8DFSW01QJEY
 <!-- queue:end -->
