@@ -311,4 +311,5 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 - 2026-11-14 01:25 · robert-claude-laptop · Blocked → Queued — Directive fixed (#256): Devin no longer deletes files; Claude removes grind_heal.py/after_heal.py in review. Branch has sustain.py (002d4f3) merged with main (64ff940); continue from it.
 - 2026-11-14 01:25 · robert-claude-laptop · Queued → Approved — lint override: behaviours/*.py and training_ctl/adapters.py are shorthand for existing files under src/pokeagent/explorer/; training_ctl/sustain.py already exists on the base branch (002d4f3).
 - 2026-11-14 01:25 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CBQ6MSEFX41SFJDTYDG6NM
+- 2026-11-14 01:29 · dispatcher · launched pid=19340; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (15 declared need(s); 10 external))
 <!-- queue:end -->
