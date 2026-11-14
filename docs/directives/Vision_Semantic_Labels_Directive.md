@@ -237,7 +237,7 @@ Diff stat, test tails (state which tests skipped for lack of torch), line counts
 | Branch | directive/pokeagent-vision-semantic-labels-directive |
 | Base branch | - |
 | Base commit | c0735dedfb4336cb17572a2f7789e1af04d641f8 |
-| Head commit | 14826ef3ee41d01e0d8e11f0e2bb5886401c104b |
+| Head commit | 8c0f5f2ca58fa00469765cdad6a1ccc483fb8c87 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
