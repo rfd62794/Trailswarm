@@ -296,11 +296,12 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-14 00:50 · robert-claude-laptop · none → Queued — Robert approved the Training Controller plan and slices; #255 merged.
+- 2026-11-14 00:50 · robert-claude-laptop · Queued → Approved — lint override: behaviours/plan_goal.py, behaviours/grind_loop.py, behaviours/frontier.py and training_ctl/adapters.py are shorthand for existing files under src/pokeagent/explorer/ (the directive states paths are under that root); training_ctl/sustain.py is the new module this directive creates.
 <!-- queue:end -->
