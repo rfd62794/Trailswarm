@@ -81,10 +81,10 @@ def test_location_cnn_when_torch_present():
     d_tr = location_data.assemble(tr, imgs.get)
     d_te = location_data.assemble(te, imgs.get)
     area_id = {a: i for i, a in enumerate(sorted(set(d_tr["areas"])))}
-    t0 = time.perf_counter()
+    t0 = time.process_time()  # CPU time, not wall: robust under machine load
     net = location_net.train_net(d_tr["images"], [area_id[a] for a in d_tr["areas"]],
                                  d_tr["cells"], n_areas=len(area_id), seed=0, epochs=60)
-    assert time.perf_counter() - t0 < 20
+    assert time.process_time() - t0 < 20
     assert location_net.param_count(net) < 40000
     pred, cells = location_net.predict(net, d_te["images"])
     acc = float((pred == np.array([area_id[a] for a in d_te["areas"]])).mean())
