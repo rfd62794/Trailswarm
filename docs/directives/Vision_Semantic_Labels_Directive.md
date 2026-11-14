@@ -232,15 +232,18 @@ Diff stat, test tails (state which tests skipped for lack of torch), line counts
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-vision-semantic-labels-directive |
 | Base branch | - |
 | Base commit | c0735dedfb4336cb17572a2f7789e1af04d641f8 |
+| Head commit | 14826ef3ee41d01e0d8e11f0e2bb5886401c104b |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-14 12:39 · robert-claude-laptop · none → Queued
 - 2026-11-14 12:40 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 14:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-semantic-labels-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DR5RGS448M4VHCCHK1WWP4
 - 2026-11-14 14:32 · dispatcher · launched pid=20168; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-semantic-labels-directive; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 14:43 · devin · In progress → Review — Done. Diff stat vs origin/main (src/pokeagent): new semantic.py (90L), semantic_rom.py (42L), semantic_view.py (29L); edits data.py (+semantic column, select) and metrics.py (+side_by_side) only. tools: new vision_relabel.py (96L), vision_train.py 124L (+--labels, unchanged specific path). KNOWLEDGE.md +2 sentences. pyproject.toml/uv.lock untouched. Tests: 5 new files 22 passed 1 skipped (test_semantic_net_report skips - torch absent, expected). Baseline suite: 16 passed 6 skipped (unchanged). Full suite: 3025 passed, 65 skipped, 0 failures. Commits 0f51acf, 14826ef pushed. Ambiguity calls: zeroed tileset headers still produce tables (only out-of-bounds headers skip); empty dataset gets vacuous empty semantic array; side_by_side support falls back to net report when class absent from template report. Claude's post-checks per Report section need ROM + torch. [origin] spent: devin 10 min est. n/a
 <!-- queue:end -->
