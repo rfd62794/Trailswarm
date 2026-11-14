@@ -6,11 +6,11 @@ and plan_goal walked back, 7.2% of all steps. The rule, both directions:
 
 * a grind episode may START only on the map train_route trains at while team_ready is training (Route 24);
   no point there -> no episode. The gym hold alone does not narrow episodes;
-* an episode already live (begun before the stage) wins: train_route retargets to the episode's point map.
+* an episode already live (begun before the stage) wins: the retarget now lives with the episode
+  (GrindDrill walks it).
 """
 from __future__ import annotations
 
-from pokeagent.explorer import grind_episode
 from pokeagent.explorer.planner_east import ROUTE24
 from pokeagent.grind import stage_maps
 from pokeagent.knowledge.encounters import TRAIN_MAP
@@ -37,16 +37,3 @@ def only_maps(ctx) -> frozenset | None:
         return allowed
     tgt = stage_target(ctx)
     return frozenset({tgt}) if allowed is None else frozenset(allowed & {tgt}) or frozenset({tgt})
-
-
-def route_kw(ctx) -> dict:
-    """``train_route.step`` kwargs: empty (Route 24) unless a live episode's maps exclude the default
-    target, then the episode point's map and patch - plan_goal must never walk out of the episode set."""
-    ep = grind_episode.active(ctx)
-    pt = ep.get("point") if ep else None
-    if ep is None or ROUTE24 in ep["maps"]:
-        return {}
-    if pt is None:  # a live episode without a point still pins frontier to its maps: never walk train_route out of them
-        maps = sorted(ep["maps"])
-        return {"target": maps[0]} if maps else {}
-    return {"target": pt.map_id, "patch": pt.patch}

@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from pokeagent.explorer import grind_episode, story_blockers, train_route
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
-from pokeagent.explorer.perceive import heal_gate_hp, lead_level
+from pokeagent.explorer.perceive import heal_gate_hp
 from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.trainee_gate import trainee_check
+from pokeagent.explorer.training_ctl import target
 from pokeagent.legs.grass import pace_button, to_grass
 
 
@@ -40,8 +41,7 @@ class GrindDrill(BehaviourBase):
         # Pure read (PR #165 review): the episode's start/finish/save work lives in the engine tick
         # (grind_episode.update), never in applies() - here we only look: an episode is live, or the
         # cheap under-level flag says one could start this step.
-        return (grind_episode.active(ctx) is not None
-                or 0 < (getattr(ctx, "gate_lvl", None) or lead_level(ctx.emu)) < getattr(ctx, "train_need", 0))
+        return target.wants_training(ctx)
 
     def step(self, ctx) -> Decision | None:
         ep = grind_episode.active(ctx)
