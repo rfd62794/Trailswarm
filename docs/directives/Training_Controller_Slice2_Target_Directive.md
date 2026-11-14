@@ -216,12 +216,14 @@ Nothing for the build. After merge, Claude runs the seed-12 and seed-13 A/B on t
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-training-controller-slice2-target-e25888 |
 | Base branch | - |
+| Base commit | 5c035e16150cbae4625a7081225c5377b2aa2ea4 |
 
 **Status log**
 - 2026-11-13 23:43 · robert-claude-laptop · none → Queued — Robert approved all recs 2026-11-14; base includes #245.
 - 2026-11-13 23:45 · robert-claude-laptop · Queued → Approved — lint override: training_ctl/target.py is the new module this directive creates (Step 1), so it is correctly absent from main.
+- 2026-11-13 23:46 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice2-target-e25888; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7C61EME9J437GGPGBQR05PN
 <!-- queue:end -->
