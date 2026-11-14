@@ -153,3 +153,17 @@ Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
