@@ -103,7 +103,7 @@ def wants_training(ctx) -> bool:
 
 **Step 5: grind_drill.py** `applies()`: replace lines 43-44 with `return target.wants_training(ctx)` (import `from pokeagent.explorer.training_ctl import target`); drop `lead_level` from the `perceive` import only if now unused there. `step()` still uses `grind_episode.active` (:47) and keeps its import.
 
-**Step 6: the lazy import in `grind_episode._trainee_ok` (:106)** says `trainee_gate -> behaviours -> grind_drill -> this module`. The plan calls it the half-broken cycle. Try deleting it (hoist `from pokeagent.explorer.trainee_gate import trainee_check` to the top) and run `uv run python -c "import pokeagent.explorer.grind_episode"` and `uv run python -c "import pokeagent.explorer.trainee_gate"` in fresh processes. If both import cleanly, keep it hoisted. If either raises ImportError (grind_drill still imports grind_episode for `step()`), restore the lazy import, and say so in the Report: do not refactor further.
+**Step 6: the lazy import in `grind_episode._trainee_ok` (:106)** says `trainee_gate -> behaviours -> grind_drill -> this module`. The plan calls it the half-broken cycle. Try deleting it (hoist `from pokeagent.explorer.trainee_gate import trainee_check` to the top) and extend `test_fresh_process_imports` (below) with fresh-process imports of `pokeagent.explorer.grind_episode` and of `pokeagent.explorer.trainee_gate` and run it, in fresh processes. If both import cleanly, keep it hoisted. If either raises ImportError (grind_drill still imports grind_episode for `step()`), restore the lazy import, and say so in the Report: do not refactor further.
 
 **Known behaviour delta (state it in the Report, do not "fix" it):** removing `route_kw` means plan_goal's `train_route.step` no longer retargets to a live episode's map when that episode's maps exclude Route 24. Episodes that START while `train_route_live` are already pinned to Route 24 by `only_maps`; the delta only touches an episode begun before the stage. The real-ROM A/B is Claude's.
 
@@ -151,13 +151,10 @@ git diff --stat origin/main -- src/pokeagent/explorer/behaviours/plan_goal.py sr
 ```
 Expected: plan_goal.py <= 300 lines and its diff is net <= 0 (about -1: the kwarg and comment; line 16 changes in place), context.py exactly 300 and not in the diff, memory.py not in the diff, target.py < 120 lines.
 
-```
-uv run python -c "import pokeagent.explorer.grind_episode, pokeagent.explorer.train_target, pokeagent.explorer.training_ctl.target, pokeagent.explorer.behaviours.grind_drill"
-```
-Expected: no output (no ImportError). Then, as a separate fresh process, `uv run python -c "import pokeagent.explorer.train_target"` alone must also succeed, and `git grep -n "route_kw\|train_target" -- src` must show `train_target` imported only by `training_ctl/target.py` (and its own file), `route_kw` nowhere.
+Import-order check, as a test (no `python -c` in this run): add `test_fresh_process_imports` to `tests/test_training_ctl_target.py`. It runs `subprocess.run([sys.executable, "-c", <code>], capture_output=True, text=True)` twice, once with `import pokeagent.explorer.grind_episode, pokeagent.explorer.train_target, pokeagent.explorer.training_ctl.target, pokeagent.explorer.behaviours.grind_drill` and once with `import pokeagent.explorer.train_target` alone, and asserts `returncode == 0` for both (a fresh interpreter catches an import cycle that a warm test process hides). Then `git grep -n "route_kw\|train_target" -- src` must show `train_target` imported only by `training_ctl/target.py` (and its own file), `route_kw` nowhere.
 
 ```
-uv run pytest -n auto -p no:cacheprovider -q
+uv run pytest -p no:cacheprovider -q
 ```
 Expected: 0 failed (the base count plus your new tests; the skip count unchanged from the base). Record the base count first if you have time; run the full suite once, at the end.
 
@@ -209,7 +206,6 @@ Nothing for the build. After merge, Claude runs the seed-12 and seed-13 A/B on t
 - Read(src/pokeagent/explorer/train_target.py)
 - Exec(uv run python --version)
 - Exec(uv run pytest)
-- Exec(uv run python -c)
 - Exec(git diff)
 - Exec(git grep)
 - Exec(git status)
