@@ -186,3 +186,17 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 - Exec(git diff)
 - Exec(git grep)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-14 09:00 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
