@@ -296,12 +296,14 @@ Nothing for the build. After merge, Claude runs the seed A/B on the laptop.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-training-controller-slice3-sustai-06d7ec |
 | Base branch | - |
+| Base commit | a29c18da27f19dcee68b7aa11704de7c1ad96bdc |
 
 **Status log**
 - 2026-11-14 00:50 · robert-claude-laptop · none → Queued — Robert approved the Training Controller plan and slices; #255 merged.
 - 2026-11-14 00:50 · robert-claude-laptop · Queued → Approved — lint override: behaviours/plan_goal.py, behaviours/grind_loop.py, behaviours/frontier.py and training_ctl/adapters.py are shorthand for existing files under src/pokeagent/explorer/ (the directive states paths are under that root); training_ctl/sustain.py is the new module this directive creates.
+- 2026-11-14 01:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice3-sustai-06d7ec; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7CAPM3Q69ZVMGK6HW4K8E53
 <!-- queue:end -->
