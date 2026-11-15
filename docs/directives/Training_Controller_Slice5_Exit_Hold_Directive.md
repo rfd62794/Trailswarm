@@ -192,7 +192,7 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-training-controller-slice5-exit-h-30a7c4 |
 | Base branch | - |
@@ -211,4 +211,5 @@ Nothing for the build. Queue only after #263 (slice 4) has merged.
 - 2026-11-14 13:26 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7DMYR1TMGEYPCH3S7K5EWX0
 - 2026-11-14 13:32 · dispatcher · launched pid=21780; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-training-controller-slice5-exit-h-30a7c4; not resynced: the reused worktree has uncommitted tracked changes; provisioned: uv sync --frozen; permission-mode=smart (`## Sandbox needs` declared (12 declared need(s); 8 external))
 - 2026-11-14 13:38 · devin · In progress → Review — Slice 5a complete on the branch (commits ade8da3 + d84aa46, produced by the run lost to the 09:24 power-off; this run verified and pushed them). Findings: wc -l exit_rule.py=36 (<70), plan_goal.py=298 (net 0), context.py=300 (untouched). Line numbers matched section 3 exactly; no drift after #263. git grep: gym_hold_seen and floor_unmet are assigned only in exit_rule.py; raw reads remain only in adapters.py:18,23 (the shadow) and state.py field/comment; plan_goal.py:87,141 read via exit_rule.floor_unmet. Diff vs merge-base b20d4ce lists only the 8 expected files (the wider stat vs origin/main shows unrelated deletions: main advanced past our base with #272/#273 vision+goexplore merges). Empty-ledger invariant test PASSED on first run - it is a pin, not a fix. Floor-cap gap (report, not changed): stall_hold_holds releases the floor hold after STALL_HOLD_CAP*FLOOR_CAP_MULT (18000) plan steps or FLOOR_BLACKOUTS (10) blackouts while held - weaker than the plan's "never releases the hold"; noted for 5b/design, code untouched. Output tails: gate (12 listed files + test_training_ctl_roster.py + test_training_ctl_exit.py) = 129 passed, 0 failed; tests/test_training_ctl_exit.py alone = 6 passed, none skipped; full suite = 2990 passed, 63 skipped, 0 failed in 195s. Stray: previous run left tests/_sym_tmp.sym staged-but-uncommitted (7-line sym scratch); left untouched, not committed, not pushed. No ROM/emulator used; the byte-identical seed 12/13 decisions.jsonl proof is the controller's on the laptop after review. [origin] spent: devin 158 min est. n/a
+- 2026-11-15 01:50 · robert-claude-laptop · Review → Done
 <!-- queue:end -->
