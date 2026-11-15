@@ -159,7 +159,7 @@ Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-curriculum-build-selection-directive |
 | Base branch | - |
@@ -173,4 +173,5 @@ Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS
 - 2026-11-15 08:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-curriculum-build-selection-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7FPMQJ5DR3H257ZNVEQCFQH
 - 2026-11-15 08:38 · dispatcher · launched pid=22436; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-curriculum-build-selection-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
 - 2026-11-15 08:57 · devin · In progress → Review — Done: build cells, start picker, slow cut; 30+53+115 tests pass; diff stat only Scope files [origin] spent: devin 19 min est. n/a
+- 2026-11-15 18:36 · robert-claude-laptop · Review → Done
 <!-- queue:end -->
