@@ -54,10 +54,10 @@ def test_trains_synthetic_above_09_fast():
     tr = split.area_indices(ds.area, train_areas)
     te = split.area_indices(ds.area, test_areas)
     table = data.class_table(ds.select(tr))
-    t0 = time.perf_counter()
+    t0 = time.process_time()  # CPU time: wall time failed under load (swarm + verifies, 2026-11-14)
     res = net.train(ds, tr, table, epochs=80, batch=16, seed=0, threads=1)
     lab, co = net.predict(res.model, ds.images[te])
-    assert time.perf_counter() - t0 < 10
+    assert time.process_time() - t0 < 10
     assert (lab == data.encode(ds.select(te), table)).mean() > 0.9
     assert (co == ds.coarse[te].astype(np.int64)).mean() > 0.9
 
