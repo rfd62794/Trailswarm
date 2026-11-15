@@ -33,7 +33,7 @@ def _on(m: int):
 TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on(0x44), "to_mt_moon": _on(0x3B), "mt_moon_b1f": _on(0x3C),
            "mt_moon_b2f": _on(0x3D), "through_mt_moon": lambda n: n[0] == ROUTE4 and n[1] >= EXIT_X,
            "to_cerulean": _on(CERULEAN), "heal_cerulean": _on(0x40), "beat_misty": _on(CERULEAN_GYM),
-           "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": None,
+           "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": _on(0x58),
            # S.S. Anne: the rival and the captain's cabin are both at the east end of 2F (ROM warp 0x60 (36,4) -> 0x65); the ROM route
            # there is ship_gate.board_step. The bow target (PR #114) parked every segment attempt on a dead-end map.
            "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN)}

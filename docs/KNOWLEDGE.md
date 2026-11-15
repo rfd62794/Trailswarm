@@ -463,3 +463,8 @@ and `press_goals` writes a violating checkpoint to `<goal>.quarantine.state` rat
 segment, build, verdict and metrics — built by `pokeagent states library build`, listed by `states library list`,
 and re-validated by `states library validate` (RETIRABLE lines name the nearest clean ancestor; report-only).
 Retention keeps the best K legs per (segment, build) and never drops a checkpoint.
+
+## Bill's house / S.S. Ticket (ROM probe, Red, 2026-11-15)
+Map 0x58 (88). Monster-Bill sprite at (6,5): talk from (6,6) facing UP; the text ends in a YES/NO box (cursor starts on YES) and he walks into
+the teleporter (sprite leaves the table). Console: A from (1,5) facing UP ("BCN initiated TELEPORTER Cell Separator!"). Human Bill walks out
+and settles at (4,4): talk from (4,5) facing UP, "received an S.S.TICKET!" = bag item 0x3F. `goal_talk_bill.py` picks the stage from the RAM sprite table.

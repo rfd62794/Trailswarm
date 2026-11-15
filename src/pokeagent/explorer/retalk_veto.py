@@ -6,6 +6,7 @@ needs healing. A hurt party always lets the press through (it may be a healer we
 that vetoed, which goes into the decision log."""
 from __future__ import annotations
 
+from pokeagent.explorer.behaviours import goal_talk_bill as bill
 from pokeagent.explorer.behaviours.goal_talk import GOAL_TALKS
 from pokeagent.explorer.decisions import goal_stage
 from pokeagent.explorer.interaction_policy import Need, decide, needs_heal
@@ -38,7 +39,9 @@ def _at_unmet_goal_stand(ctx) -> bool:
     """True on the stand tile of a GOAL_TALKS goal that is still unmet: the A there is aimed at that person."""
     v = ctx.view
     goals = ctx.goals()
-    return any(not goals.get(g) and (v.m, v.x, v.y) == spec[:3] for g, spec in GOAL_TALKS.items())
+    stands = {g: {spec[:3]} for g, spec in GOAL_TALKS.items()}
+    stands["ss_ticket"] = bill.STAND_TILES  # three stand tiles in Bill's house
+    return any(not goals.get(g) and (v.m, v.x, v.y) in tiles for g, tiles in stands.items())
 
 
 def veto(ctx, decision) -> str | None:
