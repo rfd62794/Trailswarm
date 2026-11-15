@@ -73,6 +73,14 @@ def diff(before: list[Member], after: list[Member]) -> dict[str, Any]:
     return {"exp_gained": exp_gained, "level_ups": level_ups, "evolved": evolved, "moves_learned": moves_learned}
 
 
+def party_exp(emu) -> int | None:
+    """Total party exp now (None when the party cannot be read)."""
+    try:
+        return sum(m[2] for m in snapshot(emu))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _key(snap: list[Member]) -> list[tuple]:
     return [(m[0], m[1], m[2]) for m in snap]
 
@@ -138,6 +146,8 @@ class PartyLog:
             try:
                 d = diff(before, after)
                 self.exp_total += sum(g for g in d["exp_gained"] if g > 0)
+                if getattr(ctx, "bandit", None) is not None:
+                    ctx.bandit.battle_end(sum(g for g in d["exp_gained"] if g > 0))  # closes the wild_battle episode
                 for lu in d["level_ups"]:
                     self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
                 self.prev = after

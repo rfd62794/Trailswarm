@@ -32,6 +32,9 @@ def wild_flee(ctx, rule_flee: bool) -> bool:
             return True  # shield: too hurt to fight; no decision, no episode
         if catch_target(ctx, ctx.emu.read(0xCFE5), bag_contents(ctx.emu).get(0x04, 0)):
             return rule_flee  # the rules would try a catch here: not the bandit's call
+        from pokeagent.explorer.behaviours.battle_train import grinding  # lazy: that module imports this one
+        if not rule_flee and grinding(ctx):
+            return False  # levelling on purpose: XP is the point, the bandit may not turn the Explorer's fight into a flee
         def key() -> str:
             return pt.context_key("wild_battle", goal_stage(ctx.goals()), ctx.view.m, hp, mx, pt.wild_gap(ctx))
         return drv.decide("wild_battle", ctx.battles, key, "flee" if rule_flee else "fight") == "flee"

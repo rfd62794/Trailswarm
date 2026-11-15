@@ -1,6 +1,7 @@
-"""Episode accounting from decision records. An episode runs from a decision to the next goal or MAX_PRESSES.
+"""Episode accounting from decision records. An episode runs from a decision to the next goal or MAX_PRESSES;
+a wild_battle episode also ends with its battle (a ``battle_end`` event) and is paid XP_SCALE per XP the party gained.
 
-Rewards are sparse: -presses/100, +1 goal, -2 stall (once per episode), -3 blackout, -5 item tossed.
+Rewards are sparse: -presses/100, +1 goal, +XP/100 (wild_battle), -2 stall (once per episode), -3 blackout, -5 item tossed.
 Records are the lines of decisions.jsonl: a press line has `outcome`/`rule`; event lines carry `event`.
 """
 from __future__ import annotations
@@ -9,6 +10,7 @@ from dataclasses import dataclass
 
 PRESS, GOAL, STALL, BLACKOUT, TOSS = -0.01, 1.0, -2.0, -3.0, -5.0
 MAX_PRESSES = 300
+XP_SCALE = 0.01  # reward per XP the party gained in a wild battle: ~100 XP is worth one goal
 NOVELTY_SCALE, NOVELTY_CAP = 0.1, 0.5  # explorer role only: novelty bonus x scale, at most CAP per episode (a goal is +1)
 STALL_RULE = "stall_escalate"  # the StallGuard's escalation: the in-process stand-in for the swarm's stall-kill
 
@@ -39,6 +41,10 @@ class Episode:
             self.reward += TOSS
         elif event == "blackout":
             self.reward += BLACKOUT
+        elif event == "battle_end":
+            if self.point == "wild_battle":  # a grind never reaches a goal: the battle is the episode
+                self.reward += XP_SCALE * rec.get("exp", 0)
+                self.done = True
         elif event is None:
             self.presses += 1
             self.reward += PRESS

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pokeagent.bandit.hook import wild_flee
-from pokeagent.explorer.grind import battle_outcome, outcome_of, record_battle_result
+from pokeagent.explorer.grind import battle_outcome, outcome_of, ran_away, record_battle_result
 from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -243,6 +243,8 @@ class Battle(BehaviourBase):
             trainer = bool(ctx.battle_log and ctx.battle_log.get("kind") == 2) or ctx.trainer_npc is not None
             won, moved_away = battle_outcome(trainer=trainer, start=ctx.battle_pos or (-1, -1, -1), end=(m, x, y), party_count=ctx.emu.read(PARTY_COUNT))
             outcome = outcome_of(trainer=trainer, won=won, moved_away=moved_away, party_count=ctx.emu.read(PARTY_COUNT))
+            if ran_away(ctx, trainer=trainer, won=won):
+                won, outcome = False, "fled"  # RUN worked: not a win (battles.jsonl, battles_won, blackout row)
             battle_map = ctx.battle_pos[0] if ctx.battle_pos else m
             npc = ctx.trainer_npc  # the NPC this fight was pinned to; captured before the field is cleared below
             trainer_info = None

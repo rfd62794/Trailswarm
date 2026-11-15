@@ -366,3 +366,37 @@ def test_reflushed_delta_replaces_the_runs_earlier_share(tmp_path):
     other: dict = {}; fill(other, "k", "flee", [0.5])
     write_delta(delta, "run-y", other); merge_delta(shared, delta)
     assert load_cells(shared)["k"]["flee"] == [4, -3.5, 6.25]  # run-x counted once (3 episodes) + run-y
+
+
+# --- wild_battle: the battle is the episode, XP is the reward, a training grind is not flee-able ---------------------
+def test_battle_end_closes_a_wild_episode_paying_xp_and_ignores_other_points():
+    wild = rw.Episode("wild_battle", "k", "flee", "fight")
+    assert wild.add(press()) is False
+    assert wild.add({"event": "battle_end", "exp": 50}) is True
+    assert abs(wild.reward - (rw.PRESS + 50 * rw.XP_SCALE)) < 1e-9
+    heal = rw.Episode("heal", "k", "push_on", "heal_now")
+    assert heal.add({"event": "battle_end", "exp": 50}) is False and heal.reward == 0.0
+
+
+def test_driver_battle_end_records_fight_above_flee(tmp_path, monkeypatch):
+    drv = BanditDriver(tmp_path / "none.json", tmp_path / "d.json", seed=0)
+    for arm, exp in (("fight", 40), ("flee", 0)):
+        monkeypatch.setattr(drv_mod, "choose", lambda *a, arm=arm, **k: arm)
+        drv.decide("wild_battle", 1, lambda: "wild_battle|s|12|3|gt3", "fight")
+        drv.battle_end(exp)
+    cells = drv.delta["wild_battle|s|12|3|gt3"]
+    assert cells["fight"][1] > cells["flee"][1] and drv.open == [] and drv.sticky == {}
+
+
+def test_bandit_cannot_flee_a_training_fight(tmp_path, monkeypatch):
+    from pokeagent.bandit import hook as hk
+    monkeypatch.setattr(hk, "catch_target", lambda *a: False)
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "flee")
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD18C: 6, 0xD16B: 0x99, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 30})
+    ctx.train_need = 12  # lead L6 under the target: training is on
+    attach(ctx, tmp_path / "none.json", seed=0)
+    ctx.refresh()
+    assert hk.wild_flee(ctx, False) is False and ctx.bandit.open == []
+    assert hk.wild_flee(ctx, True) is True  # the Explorer's own flee still stands
+    ctx.train_need = 0  # not training: the bandit decides as before
+    assert hk.wild_flee(ctx, False) is True
