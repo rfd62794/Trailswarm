@@ -157,3 +157,56 @@ def test_a_temp_block_on_the_stand_tile_does_not_shut_the_path():
     c.mem.temp_blocked = {(0x41, 4, 3): 10**9}   # block_sight's sight line covered the tile in front of the leader
     d = GoalTalk().step(c)
     assert d.rule == "goal_talk_walk" and d.button == "UP"
+
+
+# --- stand tile occupied / blocked: alternate tile, then leave and re-enter (2026-11-15 Cerulean Gym, Jr. Trainer parked on (4,3)) ---
+def _alt_ctx(visited, warps=None, step=100, x=5, y=3, facing="LEFT", sprites=()):
+    c = ctx({"beat_misty": False}, m=0x41, x=x, y=y, facing=facing)
+    c.step = step
+    c.mem = SimpleNamespace(data={"maps": {"65": {"visited": {k: 1 for k in visited}, "blocked": [], "warps": warps or {}}}}, temp_blocked=set())
+    c.gym_hold_seen = (step, False)
+    c.emu = SimpleNamespace(read=_ram(sprites))
+    return c
+
+
+def _ram(sprites):
+    mem = {}
+    for i, (pic, sx, sy) in enumerate(sprites, start=1):
+        mem[0xC100 + 16 * i] = pic
+        mem[0xC200 + 16 * i + 5], mem[0xC200 + 16 * i + 4] = sx + 4, sy + 4
+    return lambda a: mem.get(a, 0)
+
+
+def test_occupied_stand_tile_uses_an_alternate_adjacent_tile_and_faces_the_person():
+    # Misty at (4,2); a beaten trainer sprite sits on her stand tile (4,3); (5,2) is known floor
+    c = _alt_ctx(["5,3", "4,3", "5,2", "5,1"], facing="UP", sprites=[(6, 4, 3), (1, 4, 2)])
+    d = GoalTalk().step(c)
+    assert d.button == "UP" and d.rule == "goal_talk_alt"          # (5,3) -> (5,2)
+    c.view.x, c.view.y, c.step = 5, 2, 101
+    d = GoalTalk().step(c)
+    assert d.button == "LEFT" and d.rule == "goal_talk_face"       # Misty is to the left of (5,2)
+    c.facing = "LEFT"
+    d = GoalTalk().step(c)
+    assert d.button == "A" and c.goal_talk_tries["beat_misty"] == 1
+
+
+def test_stand_tile_that_never_lets_us_in_is_marked_blocked_after_three_presses():
+    c = _alt_ctx(["5,3", "4,3", "5,2"])
+    seen = []
+    for i in range(5):
+        c.step = 100 + i
+        seen.append(GoalTalk().step(c).rule)
+    assert seen[:3] == ["goal_talk_walk"] * 3 and seen[3] == "goal_talk_alt"
+
+
+def test_all_adjacent_tiles_blocked_leaves_the_map_once_then_hands_back():
+    warps = {"5,4,DOWN": [0x40, 3, 3]}
+    c = _alt_ctx(["5,3", "5,4"], warps=warps, y=4, x=5, sprites=[(6, 4, 3), (1, 4, 2)])  # stand (4,3) taken; (3,2)/(5,2)/(4,1) unmapped
+    c.step = 100
+    d = GoalTalk().step(c)
+    assert d.rule == "goal_talk_leave" and d.button == "DOWN"
+    c.step = 101
+    assert GoalTalk().step(c).rule == "goal_talk_leave"           # keeps walking out
+    # came back after the reload (gap in steps): one re-entry per goal per run, a second block hands back
+    c.step = 120
+    assert GoalTalk().step(c) is None
