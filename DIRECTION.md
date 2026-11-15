@@ -21,10 +21,17 @@ Measure: `uv run python tools/status.py` (read-only; reports the numbers above).
 Review checkpoint: 2026-11-15 — a checkpoint for Robert to ask whether this still pulls
 him, not a deadline.
 
-Out of scope for the queue: viewer GUI, hybrid mode, Phase 4, anything past Brock,
+Out of scope for the queue: hybrid mode, Phase 4, anything past Brock,
 new MCP tools.
 
 Gate: every directive names the finish-line metric it moves, or it isn't queued.
+
+## Watchability lane (Robert, 2026-11-15)
+
+Viewer work is back in scope for the queue, limited to the Rewinder milestone in `docs/ROADMAP.md`. A directive
+in this lane names the Rewinder done-condition it moves (1 = `pokeagent rewind` prints any step of a finished run;
+2 = Robert scrubs a finished run in the viewer). Target for both: 2026-11-29. Nothing in this lane may state the
+cause of a stall on screen: it shows what happened, Robert works out why.
 
 ## Exploration lane (Robert; weekly-hour cap, no due date)
 
