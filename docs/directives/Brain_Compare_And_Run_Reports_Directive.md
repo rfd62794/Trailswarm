@@ -241,13 +241,15 @@ Nothing before the run. Afterwards Claude runs the three commands on the real fi
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-brain-compare-and-run-reports-directive |
 | Base branch | - |
+| Base commit | 00db88653b6e8f9e01e657914c15490d1dc3f17d |
 
 **Status log**
 - 2026-11-11 07:25 · robert-claude-laptop · none → Draft — queue block added so the directive lints (PR #182 verify failed on lint_scope: no queue block)
 - 2026-11-14 15:17 · robert-claude-laptop · Draft → Queued — Robert 2026-11-14: unblock Pokemon Blue. This is the missing dependency of Game_Compat_Check (blocked 11-11), which gates Family_Shared_Memory (Red+Blue).
 - 2026-11-15 02:04 · robert-claude-laptop · Queued → Approved
+- 2026-11-15 02:18 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-compare-and-run-reports-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7F14AHTE6HW51HQMH00DPF9
 <!-- queue:end -->
