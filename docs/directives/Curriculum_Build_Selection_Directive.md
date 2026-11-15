@@ -159,12 +159,14 @@ Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-curriculum-build-selection-directive |
 | Base branch | - |
+| Base commit | 6727e6f5b70b9cb4cacc1d00196c0faf489edb5c |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
 - 2026-11-15 08:33 · robert-claude-laptop · Queued → Approved
+- 2026-11-15 08:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-curriculum-build-selection-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7FPMQJ5DR3H257ZNVEQCFQH
 <!-- queue:end -->
