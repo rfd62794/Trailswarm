@@ -9,13 +9,16 @@ from pokeagent.explorer.battle import (
 )
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle import _finalize_pending_effect
-from pokeagent.explorer.behaviours.battle_pp import cursor_step, usable_moves
+from pokeagent.explorer.behaviours.battle_pp import cursor_step, off_disabled_step, usable_moves
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.party_view import read_battle_view
 
 
 MENU_CURSORS = ("", "FIGHT", "PKMN", "ITEM", "RUN", "CANCEL")  # a cursor on the battle menu is not a move
+
+
+DISABLED_NAV_CAP = 8  # disabled-screen steps with no progress before backing out with B
 
 
 NON_HIT_NOTES = ("stat-down", "heal", "foe already", "fight ends")
@@ -123,7 +126,7 @@ class BattleMoves(BehaviourBase):
                 ctx.move_reason = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
             ctx.move_tag = move_rule(ctx.emu, target)  # the matchup it is aiming at, even while the cursor walks
             ctx.move_nav = ctx.move_nav + 1
-            action, chosen = cursor_step(cursor_mv, target, usable, ctx.move_nav)
+            action, chosen = cursor_step(cursor_mv, target, usable, ctx.move_nav, moves)
             if action == "press_a":  # A only ever lands on the target or (past 5 presses) a usable move
                 ctx.move_nav = 0
                 tag = move_rule(ctx.emu, chosen)
@@ -137,18 +140,34 @@ class BattleMoves(BehaviourBase):
                 if ctx.move_reason:
                     why += f" ({ctx.move_reason})"
                 return Decision("A", tag, why)
-            return Decision("DOWN", "move_cursor", f"move menu: cursor to {target} (now on {cursor_mv})")
-        ctx.move_nav = 0  # the move menu is not on screen: a stale walk count must not carry into the next one
+            ctx.move_dir = action.upper()  # the disabled screen keeps walking this way instead of undoing the step
+            return Decision(ctx.move_dir, "move_cursor", f"move menu: cursor to {target} (now on {cursor_mv})")
+        disabled_screen = any("DISABLED" in ln.upper() for ln in lines_now)
+        if not disabled_screen:  # the move menu is not on screen: a stale walk count must not carry into the next one
+            ctx.move_nav = 0
+            ctx.move_dir = ""
         if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
             return Decision("UP", "back_to_fight", "battle menu: back up to FIGHT")
         if any("CANCEL" in ln and ">" in ln for ln in lines_now):
             return Decision("A", "close_empty_list", "battle: closing an empty list")
-        if any("DISABLED" in ln.upper() for ln in lines_now):
+        if disabled_screen:
             # "The move is disabled!" leaves the move list on screen WITHOUT its PP line, with the cursor on the refused move:
             # remember it and step the cursor off it (the PP-line branch above never saw this screen; 1,195 presses lost, 2026-11-05)
             stuck = next((ln.replace(">", "").strip() for ln in lines_now
                           if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
             if stuck:
                 ctx.no_pp.add(stuck)
-                return Decision("UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
+            # rows: every line that is not the message, a menu word or blank, in screen order (the move list may sit
+            # above or below the message); on this screen never fall through to A, which could press the disabled move
+            rows = [r for r in (ln.replace(">", "").strip() for ln in lines_now if "DISABLED" not in ln.upper())
+                    if r.upper() not in MENU_CURSORS and r != "-"]
+            if rows:  # a bare message over the battle menu (no move list) falls through to FIGHT
+                ctx.move_nav = ctx.move_nav + 1
+                bm = read_battle_view(ctx.emu).battle_mon
+                free = usable_moves(rows, bm.pp if bm is not None else None, ctx.no_pp)
+                step = "B" if ctx.move_nav > DISABLED_NAV_CAP else off_disabled_step(rows, stuck, free, ctx.move_dir)
+                ctx.move_dir = step if step != "B" else ctx.move_dir
+                if step == "B":
+                    return Decision("B", "disabled_back_out", f"disabled move {stuck}: no usable move to step to, backing out")
+                return Decision(step, "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

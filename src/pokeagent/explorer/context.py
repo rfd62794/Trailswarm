@@ -189,7 +189,7 @@ class ExplorerContext:
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
     mom_talk_hp: int = 0
     mom_talk_step: int | None = None
-    move_nav: int = 0
+    move_nav: int = 0; move_dir: str = ""  # walk count; last walk button (UP/DOWN) the disabled screen keeps
     move_reason: str = ""
     no_pp: set = field(default_factory=set)
     pending_move: dict | None = None
