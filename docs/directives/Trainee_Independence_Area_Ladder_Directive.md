@@ -209,11 +209,12 @@ Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has me
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
+- 2026-11-15 18:55 · robert-claude-laptop · Queued → Approved — lint override: The three cited paths (grind/area_ladder.py, training_ctl/release.py, tests/test_area_ladder.py) are new files this directive creates; absent at main by design.
 <!-- queue:end -->
