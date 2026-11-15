@@ -209,3 +209,17 @@ Diff stat, test tails (including the two dependency test files once merged), the
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:07 · agentflow-tick · none → Queued — suggested by heartbeat: Assign devin; dispatch only after Lead_And_Wild_Switch and PP_Zero_Move_Guard merge to main (can_damage/lead_order/battle_pp.py missing locally)
+<!-- queue:end -->

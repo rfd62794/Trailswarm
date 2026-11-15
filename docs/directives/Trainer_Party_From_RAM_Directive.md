@@ -160,3 +160,17 @@ Diff stat, test tails, whether an unknown top-level maps.json key survives the s
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:09 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified no-ROM build; Devin builds, Claude runs the organic ROM check after verify.
+<!-- queue:end -->

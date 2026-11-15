@@ -189,3 +189,17 @@ Diff stat, test tails, which new files are under their line caps, whether `libra
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:15 · agentflow-tick · none → Queued — suggested by heartbeat: Self-contained synthetic-only build; dependency build_key present on local main; ROM drill steps stay with Claude post-merge
+<!-- queue:end -->

@@ -258,3 +258,17 @@ Diff stat, test tails, the constants and their values (`SYNTHETIC_SHARE_CAP`, sh
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:08 · agentflow-tick · none → Queued — suggested by heartbeat: Self-contained torch-free M build with APIs pasted; Devin builds, Claude runs post-merge ROM proof (4.7).
+<!-- queue:end -->

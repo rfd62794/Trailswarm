@@ -182,3 +182,17 @@ Diff stat, test tails, the new constants and values (`SWITCH_OWN_STAGE`, `SWITCH
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:13 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified synthetic build (FakeEmulator tests, no ROM); ROM check stays with Claude after verify
+<!-- queue:end -->

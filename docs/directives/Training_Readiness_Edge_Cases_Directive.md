@@ -196,3 +196,17 @@ Diff stat (tests and docs only), test tails (including `tests/test_training_ctl_
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:10 · agentflow-tick · none → Queued — suggested by heartbeat: Test-only, fully specified; slice-5 dependency Done and exit_rule.py present; Devin's own ls-files check guards the base
+<!-- queue:end -->

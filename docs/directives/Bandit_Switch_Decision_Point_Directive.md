@@ -169,3 +169,17 @@ Diff stat, test tails, every new constant and value (`STAY_FLOOR` source, `SWITC
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:06 · agentflow-tick · none → Queued — suggested by heartbeat: Self-contained bandit build; dependency symbols present locally; confirm on origin/main before dispatch; organic A/B check is Claude's follow-up
+<!-- queue:end -->
