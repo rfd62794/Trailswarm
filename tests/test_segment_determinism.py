@@ -14,7 +14,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-ROM = Path(os.environ.get("POKEAGENT_ROM") or REPO / "roms" / "Pokemon Red.gb")
+# Resolved against REPO: the demo runs in a tmp cwd, so a relative env path
+# would point nowhere.
+ROM = REPO / Path(os.environ.get("POKEAGENT_ROM") or "roms/Pokemon Red.gb")
 START = REPO / "baselines" / "bedroom.state"
 PORT = 9710   # >= 9700: clear of the swarm's 8800+ agents
 
