@@ -217,8 +217,9 @@ def cmd_library_list(args) -> int:
 
 def cmd_library_validate(args) -> int:
     """``states library validate``: re-run the party rules on every entry's sidecar and print a RETIRABLE line
-    (with the nearest clean ancestor) for each state that turns clean -> violation. Exit 1 when any checkpoint is
-    retirable, or any state under ``--strict``. Report-only: nothing is moved, retired or deleted."""
+    (with the nearest clean ancestor, picked from the recomputed verdicts) for each state that currently
+    violates. Exit 1 when any checkpoint violates, or any state under ``--strict``. Report-only: nothing is
+    moved, retired or deleted."""
     entries = statelib.read(args.lib).get("entries", [])
     root = Path(getattr(args, "root", "."))
     idx = {e["state"]: statefp.read(root / e["state"]) for e in entries}

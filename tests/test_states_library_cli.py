@@ -48,7 +48,8 @@ def test_library_build_list_validate_round_trip(tmp_path, capsys, monkeypatch):
                                                       clean_only=True)) == 0
     assert capsys.readouterr().out.strip() == ""                              # the leg is a violation, not clean
     assert statescmd.cmd_library_validate(SimpleNamespace(lib=lib, strict=False, root=tmp_path)) == 0
-    assert "0 retirable" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "1 retirable" in out and "RETIRABLE 14_5_3" in out          # a stored violation is still reported
 
 
 def test_validate_names_a_newly_violating_checkpoint_and_its_ancestor(tmp_path, capsys, monkeypatch):

@@ -1,8 +1,9 @@
 """Re-validate the library against the party rules: a rule added later still reaches old states.
 
-``revalidate`` re-runs ``party_rules.violations`` on every entry's fingerprint and names, for each entry that
-turns clean -> violation, the NEAREST CLEAN ANCESTOR (the state a regeneration would restart from). Report-only:
-entries are marked in memory; nothing on disk is moved, retired or deleted - that is ``states retire``.
+``revalidate`` re-runs ``party_rules.violations`` on every entry's fingerprint in one pass, then - with every
+entry's verdict recomputed - names, for each entry that currently violates a rule, the NEAREST CLEAN ANCESTOR
+(the state a regeneration would restart from). Report-only: entries are marked in memory; nothing on disk is
+moved, retired or deleted - that is ``states retire``.
 """
 from __future__ import annotations
 
@@ -49,21 +50,27 @@ def _ancestor(e: dict, entries: list) -> dict | None:
 
 
 def revalidate(entries: list, kb: dict | None, directory_index: dict | None) -> Report:
-    """Re-run ``violations`` on every entry's fingerprint (``directory_index`` maps the entry's ``state`` path -
-    or its file name - to the fp read fresh from the sidecar). An entry turning clean -> violation is marked
-    ``retirable: true`` and its RETIRABLE line is added to the report."""
+    """Two passes over ``entries`` (``directory_index`` maps the entry's ``state`` path - or its file name - to
+    the fp read fresh from the sidecar). Pass 1 recomputes every verdict so pass 2 picks ancestors from the
+    RECOMPUTED verdicts, never the stored ones; every entry that currently violates is marked ``retirable``
+    and gets a RETIRABLE line. An entry with no readable sidecar keeps its stored verdict."""
     rep = Report()
     fps = directory_index or {}
     for e in entries:
         fp = fps.get(e.get("state")) or fps.get(Path(e.get("state") or "").name)
         if fp is None:
             continue
-        new_vio = party_rules.violations(fp, kb)
-        if e.get("verdict") != "clean" or not new_vio:
+        e["violations"] = party_rules.violations(fp, kb)
+        e["verdict"] = "violation" if e["violations"] else party_rules.verdict(fp, kb)
+        if e["verdict"] != "violation":
+            e.pop("retirable", None)
+    for e in entries:
+        if e.get("verdict") != "violation":
             continue
-        e["verdict"], e["violations"], e["retirable"] = "violation", new_vio, True
+        e["retirable"] = True
         rep.retirable.append(e)
         anc = _ancestor(e, entries)
         where = f"{anc['name']} ({anc['state']})" if anc else "none"
-        rep.lines.append(f"RETIRABLE {e['name']}: {'; '.join(new_vio)}; nearest clean ancestor: {where}")
+        rep.lines.append(f"RETIRABLE {e['name']}: {'; '.join(e.get('violations') or ['(recorded)'])}; "
+                         f"nearest clean ancestor: {where}")
     return rep

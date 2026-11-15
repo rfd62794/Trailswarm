@@ -4,6 +4,7 @@ trained (Robert, 2026-11-14). A gate stamp records ``fp["rule_violations"]`` so 
 ``verdict`` is ``unknown`` when team or kb tables are missing."""
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -13,18 +14,15 @@ from pokeagent.game.stores import store_path
 from pokeagent.knowledge.kb import table
 
 ROOT = Path(__file__).resolve().parents[2]
-_KB: dict | None | bool = False   # False = not tried yet; None = tried and absent
 
 
+@lru_cache(maxsize=1)   # lru_cache, not a module global: test_layers' AST walk chokes on Global.names
 def rom_kb() -> dict | None:
     """kb/rom_tables.json (the table statescmd._kb_json reads), cached; None when absent or unreadable."""
-    global _KB
-    if _KB is False:
-        try:
-            _KB = json.loads(store_path("kb/rom_tables.json", root=ROOT).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            _KB = None
-    return _KB
+    try:
+        return json.loads(store_path("kb/rom_tables.json", root=ROOT).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 @dataclass(frozen=True)

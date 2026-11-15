@@ -5,7 +5,8 @@ import json
 import os
 from pathlib import Path
 
-from pokeagent import party_rules, statefp
+import pokeagent.party_rules as party_rules
+import pokeagent.statefp as statefp
 from pokeagent.checkpoint_goals import (
     completed_goals,
     read_completed,
