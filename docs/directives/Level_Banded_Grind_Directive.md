@@ -219,15 +219,18 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-level-banded-grind-directive |
 | Base branch | - |
 | Base commit | 465293bb9f5eb23eab9f2906157ed71922a086de |
+| Head commit | a0620e85a5a08b0c6a3fc35d6a0d6b402c9e6b45 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-12 08:23 · robert-claude-laptop · none → Queued — Robert 2026-11-12 (level-banded grind areas); PR #208 merged c88909c. Approve after Party_View_Directive merges (both touch grind_episode.py)
 - 2026-11-15 12:20 · robert-claude-laptop · Queued → Approved — lint override: grind/solo_viable.py, grind/xp_buckets.py, tests/test_xp_buckets.py are files this directive creates; runs/legs/grind_drills.jsonl is read only by Claude's post-merge real-ROM check (Required from User), not by Devin. Approved under Robert's 2026-11-15 'approve all recommendations'.
 - 2026-11-15 14:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-level-banded-grind-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GAFWS9CBCF9SXVEPX3ZM84
 - 2026-11-15 14:33 · dispatcher · launched pid=23940; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-level-banded-grind-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-15 14:58 · devin · In progress → Review — Implemented + pushed (a0620e8). Full suite 3209 passed / 1 skipped (no ROM). Note: directive's section-7 pytest list names tests/test_party_order_matchup.py which does not exist on this branch (renamed to test_party_order_ascending.py); ran all other listed files + neighbours — all pass. Real-ROM checks per directive remain for post-merge review. [origin] spent: devin 25 min est. n/a
 <!-- queue:end -->
