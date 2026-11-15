@@ -159,11 +159,12 @@ Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-14 14:26 · robert-claude-laptop · none → Queued
+- 2026-11-15 08:33 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
