@@ -204,12 +204,12 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-save-library-and-party-gate-directive |
 | Base branch | - |
 | Base commit | bbad351607ccfa3cbb1464ab152efd6e2637d2f3 |
-| Head commit | 694ac23b0baa891b9e954399f0b589fceea44be2 |
+| Head commit | 8168502f4f2746454131d1d3ca8b931e628f4a29 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -222,4 +222,6 @@ Diff stat, test tails, which metrics came out null and why (faints, readiness), 
 - 2026-11-14 15:50 · robert-claude-laptop · Blocked → Queued — Requeue for the CHANGES-NEEDED fixes listed in the previous status line; continue on the same branch.
 - 2026-11-14 15:52 · robert-claude-laptop · Queued → Approved — lint override: Same as the 14:30 override: statelib short names are headings for files marked new on line 25; runs/ paths are runtime outputs. Fix round for PR 283 review findings.
 - 2026-11-14 20:52 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7EEGDDPZKZHTD3FB6Z7MR2V
+- 2026-11-14 21:00 · dispatcher · launched pid=26476; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-save-library-and-party-gate-directive; resynced: merged main into directive/pokeagent-save-library-and-party-gate-directive (20 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True)"; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 21:08 · devin · In progress → Review — CHANGES-NEEDED fix round (head 8168502, pushed). Fix1: press_goals imports via `import pokeagent.party_rules/statefp` + allow-list extended with reason — test_explorer_package_layering_and_size passes. Fix2: rom_kb now lru_cache, no `global` — test_package_never_imports_tools passes. Fix3+4: revalidate is two passes over recomputed verdicts; every currently-violating entry is RETIRABLE with nearest clean ancestor; validate exits 1 on a violating checkpoint. Verification: new-test command 27 passed; existing-ledger command 22 passed; FULL SUITE 3072 passed, 23 skipped, 0 failed (3m44s). diff --stat: only Scope files + tools/seg_store.py. [origin] spent: devin 28 min est. n/a
 <!-- queue:end -->

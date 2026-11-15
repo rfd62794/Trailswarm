@@ -56,3 +56,27 @@ def evaluate(pred_label, true_label, pred_coarse, true_coarse, class_names,
         "coarse_per_class": coarse_per_class,
         "top_confusions": [[cname(t), cname(p), c] for (t, p), c in top],
         "unseen_in_train": unseen}
+
+
+def side_by_side(t_rep: dict, n_rep: dict) -> list[str]:
+    """One line per class with support in either report: template vs net accuracy.
+
+    Support comes from the template report; a class absent from one report's
+    ``per_class`` prints ``-`` for that accuracy. Pure, no printing.
+    """
+    lines = ["class      support   template  net"]
+    seen, names = set(), []
+    for rep in (t_rep, n_rep):
+        for name in rep["per_class"]:
+            if name not in seen:
+                seen.add(name)
+                names.append(name)
+    for name in names:
+        t, n = t_rep["per_class"].get(name), n_rep["per_class"].get(name)
+        sup = t["support"] if t is not None else n["support"]
+        if not (sup or (n is not None and n["support"])):
+            continue
+        t_acc = f"{t['acc']:.3f}" if t is not None else "-"
+        n_acc = f"{n['acc']:.3f}" if n is not None else "-"
+        lines.append(f"{name:<10} n={sup:<6} template={t_acc} net={n_acc}")
+    return lines

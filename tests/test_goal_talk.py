@@ -128,7 +128,7 @@ def test_fainted_trainee_early_return_marks_the_gym_hold_held():
     from pokeagent.explorer.behaviours import plan_goal
     src = inspect.getsource(plan_goal)
     i = src.index("never train a fainted trainee")
-    assert "gym_hold_seen = (ctx.step, True)" in src[i - 300:i + 200]
+    assert "exit_rule.publish_hold(ctx, True)" in src[i - 300:i + 200]
 
 
 def _misty(visited, goals=None, **kw):

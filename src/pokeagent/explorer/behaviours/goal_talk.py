@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.training_ctl import exit_rule
 from pokeagent.explorer.world import WorldGraph
 
 # goal -> (map id, stand x, stand y, facing, who). The captain sits at (4,2) in SS_ANNE_CAPTAINS_ROOM (0x65); his back is rubbed from below.
@@ -57,8 +58,7 @@ def _approach_state(ctx, m: int, at_stand: bool = False) -> dict:
 
 def _hold_clear(ctx: ExplorerContext) -> bool:
     """True only when PlanGoal recently judged the gym hold NOT active (team ready, or its stall hold was released by cap/blackout)."""
-    seen = getattr(ctx, "gym_hold_seen", None)
-    return bool(seen) and seen[1] is False and ctx.step - seen[0] <= HOLD_FRESH
+    return exit_rule.hold_clear(ctx, HOLD_FRESH)
 
 
 class GoalTalk(BehaviourBase):
