@@ -11,6 +11,7 @@ from pokeagent.explorer.world import DUNGEON_MAPS, SHIP_MAPS
 from pokeagent.goals import GOALS
 from pokeagent.knowledge import team_floor, team_plan, trainers
 from pokeagent.knowledge.readiness import MARGIN, Readiness, TeamReadiness, assess, team_readiness
+from pokeagent.explorer.training_ctl import exit_rule
 
 # The lead's level wanted BEFORE the goal on the left is attempted; it applies from the previous entry's goal until this one lands.
 # (Robert, 2026-11-05: two blackouts in Mt Moon at level 8; Misty's Staryu/Starmie are L18/L21.)
@@ -122,7 +123,7 @@ def gate_state(ctx, goals: dict, party: list | None, nv, team) -> tuple[int | No
     """(train_member, gate_ready): the ONE gym verdict plan_goal holds on and trains from. ready = the whole-party sim passes
     AND the checkpoint's team floor is met; the failing floor reason is logged once per change."""
     floor = floor_for(goals, party)
-    ctx.__dict__["floor_unmet"] = floor is not None and not floor.met  # plan_goal's stall escape reads it (floor must hold)
+    exit_rule.publish_floor(ctx, floor is not None and not floor.met)  # plan_goal's stall escape reads it (floor must hold)
     if floor is None or floor.met:
         ctx.floor_note = None  # met again: a later identical failure is logged afresh
     elif floor.text != ctx.floor_note:

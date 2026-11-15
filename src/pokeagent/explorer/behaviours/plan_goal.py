@@ -14,7 +14,7 @@ from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, gate_state, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
 from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route
-from pokeagent.explorer.training_ctl import sustain
+from pokeagent.explorer.training_ctl import exit_rule, sustain
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 from pokeagent.grind import stage_maps
@@ -80,11 +80,11 @@ class PlanGoal(BehaviourBase):
         ctx.train_member, gate_ready = gate_state(ctx, goals_now_all, party_all, nv, team)  # ONE verdict: sim AND team floor
         if not ctx.view.battling and ctx.center_intent is None and (ctx.train_member is not None or MAGIKARP in party_species(ctx.emu)):
             if not trainee_ok(ctx).ok and care_state(ctx).get("walk") is not None:
-                ctx.gym_hold_seen = (ctx.step, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
+                exit_rule.publish_hold(ctx, True); return None  # not judged this step: goal_talk must not walk to the leader meanwhile  # never train a fainted trainee: the heal walk (StatusCare) owns the steps until it lands
         if team_ready_stage:
             if team is None:
                 ctx.team_ready_nodata = True  # no ROM/boss data: never block the route
-            elif team.ready and not ctx.__dict__.get("floor_unmet"):  # the sim alone must not settle the stage while the team floor is unmet
+            elif team.ready and not exit_rule.floor_unmet(ctx):  # the sim alone must not settle the stage while the team floor is unmet
                 ctx.team_ready_ok = ctx.had_team_ready = True  # the sim says the party beats the next boss
             else:
                 ctx.team_ready_ok = False
@@ -138,13 +138,13 @@ class PlanGoal(BehaviourBase):
         st["stall_hold_goal"] = ctx.stage_goal
         lifted = st.get("gate_lifted") is not None
         if hold and not stall_hold_holds(st, ctx.grind.reason(st["gate_lifted"]) if lifted else "without a level gain",
-                                         ctx.step, party_log.of(ctx).blackouts, ctx.__dict__.get("floor_unmet", False)):  # monotonic blackouts
+                                         ctx.step, party_log.of(ctx).blackouts, exit_rule.floor_unmet(ctx)):  # monotonic blackouts
             hold = False  # budget spent (ceiling/blackout), the hold cap, or a blackout while held: never locked out forever
             if st.get("gate_skip_logged") != ctx.stage_goal:
                 st["gate_skip_logged"] = ctx.stage_goal
                 why = ctx.grind.reason(st["gate_lifted"]) if lifted else f"held {STALL_HOLD_CAP} steps or a blackout"
                 ctx.log(f"[team gate: grind budget spent ({why}); gym hold lifted for {ctx.stage_goal}]", "res")
-        ctx.gym_hold_seen = (ctx.step, bool(hold))  # goal_talk reads this: a gym leader is only walked to when no hold is active
+        exit_rule.publish_hold(ctx, hold)  # goal_talk reads this: a gym leader is only walked to when no hold is active
         if hold and st.get("gate_lifted") is not None:
             ctx.train_need = st.get("lifted_need") or ctx.train_need  # the budget stops forcing, not forbids: episodes may start
         if hold:
