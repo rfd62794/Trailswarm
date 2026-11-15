@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from pokeagent import statefp
+from pokeagent import party_rules, statefp
 from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
@@ -162,8 +162,11 @@ class LegStateSaver:
             fresh = not (self.dir / name(*a, self.keep - 1)).exists()
             p = save_entry(ctx.emu, self.dir, *a, keep=self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
-                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)   # lineage carries from the run's start
+                fp = statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                                   inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)   # lineage carries from the run's start
+                # the party gate: a violating leg state is still saved (it is evidence) but the sidecar records
+                # fp["rule_violations"], which makes it unselectable everywhere statelog reads
+                party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001  an unstamped state is still a state
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             self.saved += 1
@@ -192,8 +195,9 @@ class LegStateSaver:
                 return None
             p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
             try:
-                statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
-                              inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)
+                fp = statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
+                                   inherit=getattr(getattr(ctx, "opts", None), "state_path", "") or None)
+                party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
             ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")
