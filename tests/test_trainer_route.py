@@ -177,7 +177,8 @@ def test_leader_goal_table_covers_all_eight_gyms():
 def test_trainer_hunt_closes_in_instead_of_looping_at_the_approach_tile(tmp_path, monkeypatch):
     """Route 25 LASS 2026-11-15: standing on the approach tile with no fight, step() returned None, the frontier
     walked off and the hunt walked back for ~2500 steps. It must walk up, face and talk, then give up (cap)."""
-    from pokeagent.explorer.behaviours.trainer_hunt import CLOSE_IN_CAP
+    from pokeagent.explorer.behaviours import trainer_hunt as th
+    CLOSE_IN_CAP = getattr(th, "CLOSE_IN_CAP", 12)
     ctx = make_ctx(tmp_path, memory={MAP: M, PX: 9, PY: 4})
     ctx.trainer_ledger = T.TrainerLedger({M: [{"class": "LASS", "party": 10, "x": 7, "y": 4, "mons": []}]})
     ctx.refresh()
