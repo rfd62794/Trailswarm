@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pokeagent.statelib import slow_cut
 from seg_store import Segment, WINDOW, accepted, layout, rate, stat, window
 
 MIN_ATTEMPTS = 20
@@ -29,6 +30,7 @@ REJOIN_TOL = 0.10         # probe frames may differ from the pieces' accepted-be
 EVENT_LOOKBACK = 200      # presses before a map entry in which a goal-relevant event supports cutting there (untuned)
 HINT_SLACK = 5            # a cut this many presses around a map entry IS expressible as a map stop (untuned)
 MAX_HINTS = 3             # cut_hints reported per segment (untuned)
+STALL_MIN = 2             # watchdog-stalled attempts in the last WINDOW that count as "stalling" (untuned)
 
 
 def _jl(path: Path) -> list[dict]:
@@ -167,19 +169,34 @@ def should_split_long(st: dict, par: float | None) -> bool:
     return solves[len(solves) // 2] > SPLIT_PAR_MULT * par
 
 
+def _stalls(st: dict) -> bool:
+    """The stall trigger for the slow cut: at least STALL_MIN of the last WINDOW attempts were stopped by
+    the watchdog. The split_retry_at cooldown applies the same way it does to the long-solve trigger."""
+    return (st["n"] >= st.get("split_retry_at", 0)
+            and sum(1 for a in window(st) if a.get("stalled")) >= STALL_MIN)
+
+
 def maybe_split(doc: dict, root=None, par_fn=None) -> list[str]:
     """Split every top-level segment that qualifies; returns the goals split. Unsplittable ones retry after WINDOW more.
-    ``root`` + ``par_fn(seg, st)`` enable the long-solve trigger and the event-ranked cut choice."""
+    ``root`` + ``par_fn(seg, st)`` enable the long-solve trigger and the event-ranked cut choice. The failure-driven cut
+    always runs first; a long-or-stalling segment it cannot cut falls back to the slowest map transition (slow_cut)."""
     done = []
     seen: set[int] = set()   # maps in the attempts of the segments before this one
     for seg in layout(doc):
         st = stat(doc, seg.key)
         if seg.key == seg.goal:
             par = par_fn(seg, st) if par_fn is not None else None
-            if should_split(st) or should_split_long(st, par):
+            long_or_stall = should_split_long(st, par) or _stalls(st)
+            if should_split(st) or long_or_stall:
                 run_dirs = [root / "runs" / a["run"] for a in trusted_failures(window(st))
                             if root is not None and a.get("run")] or None
                 cuts = cut_maps(window(st), seen, run_dirs)
+                if not cuts and long_or_stall and root is not None:
+                    # the slow cut: same run_dirs idea as the failure path but over the whole window -
+                    # a long segment may be SOLVING slowly, so solved attempts carry the evidence too
+                    slow_dirs = [root / "runs" / a["run"] for a in window(st) if a.get("run")]
+                    slow = slow_cut.slowest_transition(slow_dirs, earlier=seen)
+                    cuts = [slow] if slow is not None else []
                 if cuts:
                     doc["splits"][seg.goal] = cuts
                     done.append(seg.goal)

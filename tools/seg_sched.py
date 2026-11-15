@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import random
 import shutil
 import time
 from datetime import datetime
@@ -195,6 +196,26 @@ class Curriculum:
         broken-replay priority, at most once per BROKEN_RECHECK_HOURS."""
         return ssg.pending_repro(self.doc, self._gm, self.root, self.suite, self.clock())
 
+    def _start(self, seg, n: int):
+        """(start Path, Pick|None): a (checkpoint-or-leg, build) cell pick from the states library for
+        ``seg.start``, else (``ss.ckpt`` exactly as today, None). A missing or unreadable library, no clean
+        cells, or a picked file that does not exist all read as no pick - behaviour is then byte-for-byte
+        what it was before the library existed."""
+        try:
+            from pokeagent.statelib import cells, library, start_pick
+            entries = library.read(self.root / library.LIBRARY).get("entries") or []
+            pick = start_pick.pick_start(entries, seg.start, random.Random(self.session + n),
+                                         cells.read_tries(self.root), shares=start_pick.load_shares(self.root))
+            if pick is not None:
+                p = Path(pick.state)
+                if not p.is_absolute():
+                    p = self.root / p
+                if p.is_file():
+                    return p, pick
+        except Exception:  # noqa: BLE001 - a bad library must never block scheduling
+            pass
+        return ss.ckpt(self.root, seg.start), None
+
     def next_job(self, n: int) -> dict | None:
         with self.txn():
             self.refresh()
@@ -207,11 +228,13 @@ class Curriculum:
                 bp = self.pending_broken_replay()        # regression replay, right after a pending confirm
                 if bp:
                     job = self._confirm(*bp)
+            pick_state = None
             if job is None:
                 rp = self.pending_repro()                # organic reproduction of a synthetic-only hypothesis
                 if rp:
                     seg, st = rp
-                    job = self._job(seg, "repro", n, ss.ckpt(self.root, seg.start), st)
+                    start, pick_state = self._start(seg, n)
+                    job = self._job(seg, "repro", n, start, st)
                     st["jobs"] = st.get("jobs", 0) + 1
             if job is None:
                 pick = self.choose(gm=self._gm)   # this call's grades, cached (no second grade_all)
@@ -220,13 +243,18 @@ class Curriculum:
                 kind, seg = pick
                 st = ss.stat(self.doc, seg.key)
                 kind = "rejoin_probe" if kind == "rejoin" else kind   # share group name -> job kind
-                job = self._job(seg, kind, n, ss.ckpt(self.root, seg.start), st)
+                start, pick_state = self._start(seg, n)
+                job = self._job(seg, kind, n, start, st)
                 st["jobs"] = st.get("jobs", 0) + 1
                 if kind in ("unsolved", "frontier") and any(sg.grade_signal(g) for g in self._gm.values()):
                     f = ssg.frontier_seg(self.doc, self.root, self.suite)
                     fh = sg.frontier_health(self._gm.get(f.key) if f else None)
                     job["explore_rate"] = sg.explore_for_health(fh)   # a sick frontier scouts, a healthy one exploits
-        self.log(f"curriculum: {job['kind']} {job['key']} from {Path(job['start']).name}, {job['steps']} steps")
+            if pick_state is not None:
+                job.update(build=pick_state.build, cell=pick_state.cell,
+                           pick_mode=pick_state.mode, why=pick_state.why)
+        extra = f" (build {job['build']}, {job['pick_mode']})" if job.get("pick_mode") else ""
+        self.log(f"curriculum: {job['kind']} {job['key']} from {Path(job['start']).name}{extra}, {job['steps']} steps")
         return job
 
     # --- Supervisor hooks (kept here so swarm_continuous.py stays small) ------------------------------------
@@ -268,7 +296,9 @@ class Curriculum:
         shutil.copy(src, d / src.name)
         cg.copy_sidecar(src, d / src.name)   # the fingerprint travels with the copy (the synthetic gate reads it)
         job["start"] = str(d / src.name)
-        (d / "job.json").write_text(json.dumps({"start_name": src.name, "start_sha": ss.sha256(d / src.name)}), encoding="utf-8")
+        rec = {"start_name": src.name, "start_sha": ss.sha256(d / src.name)}
+        rec.update({k: job[k] for k in ("build", "cell", "pick_mode") if job.get(k) is not None})
+        (d / "job.json").write_text(json.dumps(rec), encoding="utf-8")
 
     def on_finish(self, cfg: dict, rc) -> None:
         job = cfg.get("job")

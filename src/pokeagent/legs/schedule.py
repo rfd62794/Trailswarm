@@ -3,9 +3,11 @@ skipping legs retired for a while after hitting par twice. Pure over legs.json /
 from __future__ import annotations
 
 import json
+import random
 import time
 from pathlib import Path
 
+from pokeagent import party_rules, statefp
 from pokeagent.legs import states as S
 from pokeagent.legs.drill import DRILLS_LOG, budget_steps
 from pokeagent.legs.drill_fold import hit_par, load_drills, matches
@@ -33,6 +35,36 @@ def rank(legs: dict, states: set, drills: list[dict], now: float, min_samples: i
     return sorted(ok, key=lambda r: -waste(r))
 
 
+def _state_for(root: Path, sd: Path, rec: dict, n: int) -> Path | None:
+    """The drill's start state for the chosen leg: a clean build pick from the states library when it covers
+    this leg key (more than one build -> the picker chooses between them), else the newest state file as
+    today. A state whose verdict is ``violation`` is never returned - without a library the sidecar's own
+    ``party_rules.verdict`` decides."""
+    name = S.name(rec["map"], *rec["entry"])[:-len(".state")]   # the leg's key: "<map>_<x>_<y>"
+    try:
+        from pokeagent.statelib import cells, library, start_pick
+        entries = library.read(root / library.LIBRARY).get("entries") or []
+        got = start_pick.pick_start(entries, name, random.Random(f"{name}:{n}"),
+                                    cells.read_tries(root), shares=start_pick.load_shares(root))
+        if got is not None:
+            p = Path(got.state)
+            if not p.is_absolute():
+                p = root / p
+            if p.is_file():
+                return p
+    except Exception:  # noqa: BLE001 - a bad library must never block drills
+        pass
+    newest = S.newest(sd, rec["map"], *rec["entry"])
+    if newest is None:
+        return None
+    try:
+        if party_rules.verdict(statefp.read(newest), party_rules.rom_kb()) == "violation":
+            return None                                     # a gated state is evidence, never a drill start
+    except Exception:  # noqa: BLE001
+        pass
+    return newest
+
+
 def pick(root: str | Path, n: int = 0, now: float | None = None, states_dir: str | Path | None = None) -> dict | None:
     """The n-th worst drillable leg as a launch config {leg, state, steps, key}; None when there is nothing to drill.
     Rotating on n spreads concurrent slots over different legs."""
@@ -46,7 +78,7 @@ def pick(root: str | Path, n: int = 0, now: float | None = None, states_dir: str
     if not ranked:
         return None
     r = ranked[n % min(len(ranked), 5)]
-    state = S.newest(sd, r["map"], *r["entry"])
+    state = _state_for(root, sd, r, n)
     if state is None:
         return None
     from pokeagent.legs.drill import DrillSpec
