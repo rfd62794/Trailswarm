@@ -169,6 +169,7 @@ Expected: 0 failed, none skipped; each new module under 120 lines, `plan_goal.py
 - [ ] `area_ladder.py` and `release.py` exist with the constants and functions in 3.1 and 3.2; missing data is never "released" and never a new map. <!-- test: tests/test_training_ctl_release.py::test_missing_data_is_not_released -->
 - [ ] `stage_target` asks the ladder and falls back to the `TRAIN_MAP` pin; `plan_goal` line 239 uses it, net 0 lines. <!-- test: tests/test_area_ladder.py::test_empty_spots_falls_back_to_pin -->
 - [ ] A released trainee is not switched out above 0.25 HP on the `train_route` path; a revoked or Magikarp trainee behaves as before. <!-- test: tests/test_training_ctl_release.py::test_trainee_out_stays_in_when_released -->
+- [ ] Robert's expectation (2026-11-15): on a pre-Brock route (wild levels 2-5), a full-HP Rattata or Pidgey at level 6 is released to fight alone; at level 5 it may be. A synthetic test pins the level-6 case; if `release.verdict` or `solo_viable` with its constants says no at level 6, do not tune it to pass: report the win rate and HP numbers in the Report. <!-- test: tests/test_training_ctl_release.py::test_level6_trainee_released_on_pre_brock_route -->
 - [ ] The floor and gym-hold test (3.3) passes; no safety constant or file in section 4 changed. <!-- test: tests/test_training_ctl_release.py::test_floor_still_held_with_release_active -->
 - [ ] Section 5 commands: 0 failed, line counts within allowance, diff stat limited to section 2.
 - [ ] Committed on the branch; Status row set to `Review` with the evidence.
@@ -179,7 +180,7 @@ Findings first: how `pick` and `release.verdict` landed (final constants), how o
 
 ## Required from User
 
-Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has merged (and the Party_View directive it waits on). The real-ROM A/B in section 5 is run by Claude before merge.
+Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has merged (Party_View is already merged, #210). The real-ROM A/B in section 5 is run by Claude before merge.
 
 ## Forbidden Actions
 
