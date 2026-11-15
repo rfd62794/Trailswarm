@@ -16,6 +16,7 @@ from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, reco
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle_run import cave_run
+from pokeagent.explorer.behaviours.battle_switch import yield_to_switch
 from pokeagent.explorer.behaviours.battle_train import train_fight
 from pokeagent.explorer.behaviours.low_yield import stall_run
 from pokeagent.explorer.behaviours.bring_out import bring_out_press
@@ -23,6 +24,7 @@ from pokeagent.explorer.behaviours.item_use import (
     HEAL_NAME, close_unwanted_list, item_is_blocked, item_step, new_battle, note_screen)
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer import party_log, trainer_ledger
+from pokeagent.explorer.party_log import build_record
 from pokeagent.explorer.economy import heal_items, ledger as economy_ledger
 from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_battle_step
 from pokeagent.explorer.kb import ROM_KB
@@ -52,17 +54,6 @@ class BattleView:
     want_potion: bool = False
     cur: str = ""
     threat: float = 0.0  # worst ROM-estimated threat this enemy species has shown
-
-
-def build_record(bl: dict, *, step: int, run: str, won: bool, hp_end: list, outcome: str,
-                 battle_map: int, end_map: int, stage: str | None, trainer: dict | None) -> dict:
-    """End-of-battle fields on the record ``bl`` (mutated, returned): every legacy key plus the fidelity keys.
-    ``map`` is the map the fight happened on (``battle_map``; for a blackout ``end_map`` is the respawn town) and
-    ``fled`` means a wild flee - a blackout is ``outcome == "blackout"``, never a flee."""
-    bl.update({"end": step, "won": won, "run": run, "map": battle_map, "presses": step - bl["start"],
-               "hp_end": hp_end, "fled": outcome == "fled", "outcome": outcome,
-               "battle_map": battle_map, "end_map": end_map, "stage": stage, "trainer": trainer})
-    return bl
 
 
 def _record_observed(ctx: ExplorerContext, move: str, observed: str) -> None:
@@ -184,8 +175,13 @@ class Battle(BehaviourBase):
             heal = max(ctx.mem.data.get("item_heal", {}).get(str(heal_hp), [heal_hp]) or [heal_hp])
             want_potion = (pick is not None and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
                            and not item_is_blocked(ctx, pick))
+            # A member that cannot hurt the foe, and a wild-fight member a healthy switch-in would save, are
+            # never potioned or fled: SwitchOut is next in line and swaps it this step. No candidate: unchanged.
+            sw_out = yield_to_switch(ctx, kind, want_potion)
+            if sw_out:
+                want_potion = False
             cur = next((ln for ln in lines_now if ">" in ln), "")
-            xdec = None if want_potion else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
+            xdec = None if want_potion or sw_out else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
             if xdec is not None:
                 return xdec
             if want_potion:
@@ -207,12 +203,12 @@ class Battle(BehaviourBase):
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(ENEMY_MON)))
             skip = stall_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))  # a Harden-only cocoon is a stall, not XP
-            flee = kind == 1 and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
+            flee = kind == 1 and not sw_out and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
             stand = kind == 1 and flee and not skip and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
             if stand:
                 flee = weak = hurry = False
             if kind == 1 and not stand:
-                flee = wild_flee(ctx, flee)  # bandit decision point: fight or flee (the Explorer's own answer when off)
+                flee = wild_flee(ctx, flee) and not sw_out  # bandit decision point (Explorer's answer when off); a swap still wins
             if flee and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""
                 if ">RUN" in run_line:
