@@ -25,7 +25,7 @@ def known(ctx, point) -> bool:
     return gp.travel_steps(maps, here, point.map_id) < gp.FAR_TRAVEL   # no learned path -> reject
 
 
-def choose(ctx, ledger, levels, need, slot=None):
+def choose(ctx, ledger, levels, need, slot=None, rank=None):
     """The ONE training point for a session, or None (empty ledger / nothing known fits): the existing
     scorer ``gp.choose`` over only the points that pass ``known``. Never invents a point."""
     pts = {m: p for m, p in ledger.points.items() if known(ctx, p)}
@@ -33,7 +33,7 @@ def choose(ctx, ledger, levels, need, slot=None):
         return None
     return gp.choose(gp.GrindLedger(pts), levels, need, (ctx.view.m, ctx.view.x, ctx.view.y), ctx.mem,
                      trainee_slot=slot, blocked=story_blockers.blocked_tiles(ctx),
-                     only_maps=train_target.only_maps(ctx))
+                     only_maps=train_target.only_maps(ctx), rank=rank)
 
 
 def wants_training(ctx) -> bool:
