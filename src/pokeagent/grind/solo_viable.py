@@ -24,6 +24,7 @@ from pokeagent.knowledge.party import Combatant, trainer_mon
 SOLO_MIN_WIN = 0.75      # share of encounters the trainee must win alone (was 0.95)
 SOLO_MARGIN = 0.10       # mean HP fraction wanted after the wins (was 0.30)
 SOLO_START_HP = 0.6      # HP fraction a solo trainee must ENTER a battle with: the latch flees under SWITCH_MIN_HP
+MIN_MIX_WEIGHT = 0.99    # the encounter mix must cover this much of the slot table, else no verdict
 MAX_TRAVEL_STEPS = 320   # 10 map crossings at HOP_STEPS, ~an eighth of GRIND_STEPS: no solo preference past it
 MIN_HP_FRACTION = 0.5    # = explorer.train_route.MIN_HP_FRACTION (this module never imports explorer)
 
@@ -43,8 +44,8 @@ def solo_verdict(trainee: Combatant, kb, map_id) -> tuple[float, float] | None:
     share of wins, and the weight-averaged HP fraction left over the wins (0 when it wins none).
     None = missing data - and missing data is never viable."""
     mix, moves = encounter_mix(kb, map_id), table(kb, "moves")
-    if trainee is None or not mix or not moves:
-        return None
+    if trainee is None or not mix or not moves or sum(w for _, _, w in mix) < MIN_MIX_WEIGHT:
+        return None                # a partial slot table hides encounters: never a guess
     chart = {(a, d): e for a, d, e in table(kb, "type_chart")}
     wins, hp = 0.0, 0.0
     for sp, lv, w in mix:
@@ -85,7 +86,7 @@ def nurse_penalty(xp_per_min: float, mean_hp_left: float, steps: float) -> float
 
 def make_rank(viable: dict, nurse: dict, maps: dict, current_map):
     """choose()'s ``rank`` closure: a solo-viable point inside MAX_TRAVEL_STEPS gets
-    (False, -(score - nurse penalty), map_id) and sorts ahead of every other point; anything else
+    (False, -(score - nurse penalty), map_id) and sorts ahead of every other point (only when that net score is > 0); anything else
     returns None - not preference-eligible, so _best orders it by today's score behind them."""
     def rank(p, score):
         v = viable.get(p.map_id)
@@ -93,7 +94,8 @@ def make_rank(viable: dict, nurse: dict, maps: dict, current_map):
             return None
         xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None) \
             else p.xp_per_min_prior
-        return (False, -(score - nurse_penalty(xp, v[1], nurse.get(p.map_id, FAR_TRAVEL))), p.map_id)
+        net = score - nurse_penalty(xp, v[1], nurse.get(p.map_id, FAR_TRAVEL))
+        return (False, -net, p.map_id) if net > 0 else None   # no known nurse / all xp eaten: no preference
     return rank
 
 

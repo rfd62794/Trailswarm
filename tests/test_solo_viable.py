@@ -184,11 +184,12 @@ def test_rank_for_gates_and_builds_a_working_rank():
 
 # --- trainee_out: the one fight-mode hook (4.3) ------------------------------------------------------------
 
-def _trainee_ctx(monkeypatch, solo, frac, trainee=0):
+def _trainee_ctx(monkeypatch, solo, frac, trainee=0, wild=1):
     """A ctx where the trainee is the mon out at ``frac`` of its HP, under an episode flagged ``solo``."""
     ep = {"solo": solo}
     ctx = SimpleNamespace(battles=7, emu=None, _grind_state={"episode": ep})
     monkeypatch.setattr(roster, "trainee_slot", lambda c, **kw: trainee)
+    ctx.emu = SimpleNamespace(read=lambda a: wild)
     monkeypatch.setattr(so_mod, "read_battle_mon",
                         lambda emu: SimpleNamespace(species=10, hp=int(frac * 40), max_hp=40, level=8))
     monkeypatch.setattr(so_mod, "party_species", lambda emu: [10, 11])
@@ -215,3 +216,21 @@ def test_trainee_out_stays_in_when_solo(monkeypatch):
     monkeypatch.setattr(so_mod, "read_battle_mon",
                         lambda emu: SimpleNamespace(species=10, hp=32, max_hp=40, level=8))
     assert so_mod.trainee_out(ctx) == 0
+
+
+def test_trainer_battle_never_keeps_the_trainee_in(monkeypatch):
+    ctx, ep = _trainee_ctx(monkeypatch, True, 0.9, wild=2)      # wIsInBattle 2 = trainer
+    assert so_mod.trainee_out(ctx) == 0 and "solo_battle" not in ep
+
+
+def test_partial_slot_table_is_not_viable():
+    part = {**R1, "wild_by_map": {"12": {"grass": ROUTE1[:7]}}}   # 7 of 10 slots: 0.88 of the weight
+    t = trainer_mon("PIDGEY", 6, part)
+    assert sv.solo_verdict(t, part, 12) is None and sv.is_solo_viable(t, part, 12) is False
+
+
+def test_viable_point_without_a_nurse_gets_no_preference():
+    led = gp.GrindLedger({5: pt(5, prior=100), 6: pt(6, prior=60)})
+    rank = sv.make_rank({6: (1.0, 0.9)}, {6: sv.FAR_TRAVEL}, {}, None)   # no known Pokecenter: penalty = all xp
+    assert rank(led.points[6], 60.0) is None
+    assert gp.choose(led, [10], 20, None, {"maps": {}}, rank=rank).map_id == 5   # today's ordering
