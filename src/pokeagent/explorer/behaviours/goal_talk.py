@@ -8,6 +8,7 @@ that map, it walks the learned graph to the stand tile, faces the person and pre
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours import goal_talk_alt as alt
+from pokeagent.explorer.behaviours import goal_talk_bill as bill
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.training_ctl import exit_rule
@@ -20,12 +21,15 @@ GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain"),
               # Brock stands static at (4,1) in Pewter Gym (0x36; after_victory logs "next BROCK p1 (4,1)"): fought from (4,2) facing up.
               "beat_brock": (0x36, 4, 2, "UP", "Brock"),
               # Misty stands static at (4,2) in Cerulean Gym (0x41; run log "next MISTY p1 (4,2)"): fought from (4,3) facing up.
-              "beat_misty": (0x41, 4, 3, "UP", "Misty")}
+              "beat_misty": (0x41, 4, 3, "UP", "Misty"),
+              # Bill's house (0x58): three stages (monster, console, human), picked live by goal_talk_bill.spec; this row is the first stage.
+              "ss_ticket": bill.STAGES["monster"]}
 APPROACH = ("beat_brock", "beat_misty")  # gym-leader goals: goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
 REQUIRES = {"deliver_parcel": "oaks_parcel"}  # goal -> the goal that must already be met before the talk is wanted
 HOLD_FRESH = 30  # steps a PlanGoal readiness verdict stays good; GoalTalk preempts PlanGoal, so a stale one lets PlanGoal run and refresh it
 BAD_TTL = 50  # steps a no-move direction stays ruled out (an NPC or a dialog tick is not a wall)
 APPROACH_CAP = 60  # approach steps per run before giving up on walking towards an unmapped stand tile
+TALK_CAPS = {"ss_ticket": bill.TALK_CAP}  # per-goal override of MAX_TALKS
 MAX_TALKS = 8  # A presses at the person per run before giving up on the goal (a dialog box in between resets nothing: counted per press)
 
 
@@ -35,7 +39,7 @@ def pending(ctx: ExplorerContext) -> tuple[str, tuple] | None:
         if not goals.get(goal) and ctx.view.m == spec[0] and (goal not in REQUIRES or goals.get(REQUIRES[goal])):
             if goal in APPROACH and not _hold_clear(ctx):
                 continue  # an unready team inside the gym is pulled out by PlanGoal's hold (or the hold is unknown): not the leader's to walk to
-            return goal, spec
+            return goal, (bill.spec(ctx) if goal == "ss_ticket" else spec)
     return None
 
 
@@ -71,7 +75,7 @@ class GoalTalk(BehaviourBase):
         if ctx.view.box or ctx.view.battling or ctx.proc is not None:
             return False
         hit = pending(ctx)
-        return hit is not None and ctx.goal_talk_tries.get(hit[0], 0) < MAX_TALKS
+        return hit is not None and ctx.goal_talk_tries.get(hit[0], 0) < TALK_CAPS.get(hit[0], MAX_TALKS)
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         goal, spec = pending(ctx)
