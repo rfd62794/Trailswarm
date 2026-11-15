@@ -22,6 +22,7 @@ from pathlib import Path
 from functools import lru_cache
 
 from pokeagent import checkpoint_goals as cg
+from pokeagent import fsutil
 from pokeagent import statefp
 from pokeagent import statelog
 from pokeagent.campaign import agent_capabilities, selectable
@@ -64,7 +65,7 @@ def save(root: Path, doc: dict) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(doc, indent=1), encoding="utf-8")
-    os.replace(tmp, p)
+    fsutil.replace_retry(tmp, p)  # Windows: a reader holding segments.json crashed the swarm (2026-11-14)
 
 
 @lru_cache(maxsize=8)
