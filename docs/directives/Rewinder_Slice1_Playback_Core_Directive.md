@@ -167,11 +167,12 @@ Diff stat, the two pytest tails, the `ACTIVITY` table as chosen, and the party f
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-15 12:12 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified pure-code slice (no ROM/window); prerequisites confirmed on disk; check against a real run stays with Claude
+- 2026-11-15 13:05 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
