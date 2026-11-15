@@ -241,11 +241,13 @@ Nothing before the run. Afterwards Claude runs the three commands on the real fi
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-brain-compare-and-run-reports-directive |
 | Base branch | - |
 | Base commit | 00db88653b6e8f9e01e657914c15490d1dc3f17d |
+| Head commit | f2a08e5a6782c1c244d50cd7a07ede0d267634a0 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-11 07:25 · robert-claude-laptop · none → Draft — queue block added so the directive lints (PR #182 verify failed on lint_scope: no queue block)
@@ -253,4 +255,5 @@ Nothing before the run. Afterwards Claude runs the three commands on the real fi
 - 2026-11-15 02:04 · robert-claude-laptop · Queued → Approved
 - 2026-11-15 02:18 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-compare-and-run-reports-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7F14AHTE6HW51HQMH00DPF9
 - 2026-11-15 02:28 · dispatcher · launched pid=17896; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-brain-compare-and-run-reports-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (9 declared need(s); 5 external))
+- 2026-11-15 02:34 · devin · In progress → Review — compare/assists/seed implemented in brain/ + cli_brain_runs.py; 17 new tests pass; golden_red RAN (ROM present in worktree) and passed, hash unchanged [origin] spent: devin 6 min est. n/a
 <!-- queue:end -->
