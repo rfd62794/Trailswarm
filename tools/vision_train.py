@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from pokeagent.vision_model import bench, data, metrics, split, template
+from pokeagent.vision_model import bench, data, metrics, split, template, triage
 
 
 def parse_args(argv=None):
@@ -81,18 +81,21 @@ def main(argv=None) -> int:
     from pokeagent.vision_model import export, net
     res = net.train(ds, train_idx, table, epochs=a.epochs, seed=a.seed,
                     threads=a.threads, max_seconds=a.max_seconds)
-    n_lab, n_co = net.predict(res.model, test_ds.images)
+    n_lab, n_co, n_conf = net.predict_with_confidence(res.model, test_ds.images)
     n_rep = metrics.evaluate(n_lab, y_true, n_co, test_ds.coarse, names,
                              weight=test_ds.weight, coarse_names=data.COARSE,
                              train_classes=set(table.values()))
     _print_report("net", n_rep)
+    tri = triage.triage(y_true, n_lab, test_ds.coarse, n_co, n_conf,
+                        set(table.values()), test_ds.ids, class_names=names)
+    print(triage.format_text(tri))
     out = Path("runs") / "vision_models" / a.game
     export.save(res.model, table, out)
     report = {"game": a.game, "seed": a.seed, "params": net.param_count(res.model),
               "areas": {"train": sorted(train_areas), "test": sorted(test_areas)},
               "rows": {"train": len(train_idx), "test": len(test_idx),
                        "leak_removed": removed},
-              "template": t_rep, "net": n_rep,
+              "template": t_rep, "net": n_rep, "triage": tri,
               "bench": {"net": bench.measure(res.model, threads=a.threads),
                         "template": bench.measure_template(tmpl, threads=a.threads)},
               "train": {"epochs": res.epochs, "seconds": res.seconds,
