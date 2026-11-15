@@ -183,3 +183,17 @@ Diff stat, test tails, line counts of `battle.py` and `battle_moves.py`, whether
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:16 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified synthetic-only chooser fix; anchors present, size caps OK; Claude does the ROM check after Review
+<!-- queue:end -->
