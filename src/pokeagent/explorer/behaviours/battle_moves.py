@@ -9,6 +9,7 @@ from pokeagent.explorer.battle import (
 )
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle import _finalize_pending_effect
+from pokeagent.explorer.behaviours.battle_pp import cursor_step, usable_moves
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.party_view import read_battle_view
@@ -83,18 +84,14 @@ class BattleMoves(BehaviourBase):
                     ctx.no_pp.add(rejected)
                     ctx.log(f"[{rejected} was refused (no PP / disabled) - not reselecting it this battle]", "res")
             # 2) the PP bytes already trusted by move_scores (wBattleMonPP, slots = list order); a stale
-            #    wBattleMon (species 0) reads as the same all-zero PP the fallback below already handles
+            #    wBattleMon (species 0) has no PP data at all, so every unrefused move counts usable
             bm = read_battle_view(ctx.emu).battle_mon
-            pp_of = [p & 0x3F for p in bm.pp] if bm is not None else [0, 0, 0, 0]
-            avail = [mv for i, mv in enumerate(moves)
-                     if (i >= len(pp_of) or pp_of[i] > 0) and mv not in ctx.no_pp]
-            if not avail:  # every move refused or reads 0 PP: B out so the game can fall to STRUGGLE
+            usable = usable_moves(moves, bm.pp if bm is not None else None, ctx.no_pp)
+            if not usable:  # real all-zero read or every move refused: B out -> the game runs STRUGGLE
                 ctx.all_pp_out = ctx.all_pp_out + 1
-                if ctx.all_pp_out > 1:
-                    return Decision("B", "pp_out_struggle", "all moves out of PP: leaving the move list for STRUGGLE")
-            else:
-                ctx.all_pp_out = 0
-            pool = avail or moves  # a stale all-zero PP read must not freeze the chooser: fall back
+                return Decision("B", "pp_out_struggle", "all moves out of PP: leaving the move list for STRUGGLE")
+            ctx.all_pp_out = 0
+            pool = usable  # the scorer only ever sees moves that can be pressed
             enemy_max = enemy_max_hp(ctx.emu)
             defs = enemy_types(ctx.emu)
             def_key = "/".join(defs)
@@ -125,10 +122,9 @@ class BattleMoves(BehaviourBase):
                 target = next((mv for mv in pool if mv not in tried), None) or max(pool, key=lambda mv: score(mv)[1])
                 ctx.move_reason = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
             ctx.move_tag = move_rule(ctx.emu, target)  # the matchup it is aiming at, even while the cursor walks
-            norm = lambda s: "".join(ch for ch in s.upper() if ch.isalnum())
             ctx.move_nav = ctx.move_nav + 1
-            if norm(cursor_mv) == norm(target) or ctx.move_nav > 5:  # never bounce: after 5 moves take what is under the cursor
-                chosen = cursor_mv if ctx.move_nav > 5 else target
+            action, chosen = cursor_step(cursor_mv, target, usable, ctx.move_nav)
+            if action == "press_a":  # A only ever lands on the target or (past 5 presses) a usable move
                 ctx.move_nav = 0
                 tag = move_rule(ctx.emu, chosen)
                 ctx.move_tag = tag
@@ -142,6 +138,7 @@ class BattleMoves(BehaviourBase):
                     why += f" ({ctx.move_reason})"
                 return Decision("A", tag, why)
             return Decision("DOWN", "move_cursor", f"move menu: cursor to {target} (now on {cursor_mv})")
+        ctx.move_nav = 0  # the move menu is not on screen: a stale walk count must not carry into the next one
         if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
             return Decision("UP", "back_to_fight", "battle menu: back up to FIGHT")
         if any("CANCEL" in ln and ">" in ln for ln in lines_now):
