@@ -224,7 +224,7 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 | Branch | directive/pokeagent-level-banded-grind-directive |
 | Base branch | - |
 | Base commit | 465293bb9f5eb23eab9f2906157ed71922a086de |
-| Head commit | a0620e85a5a08b0c6a3fc35d6a0d6b402c9e6b45 |
+| Head commit | bfcf5285f21be220c28fc72c80762c79690a7b3f |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
