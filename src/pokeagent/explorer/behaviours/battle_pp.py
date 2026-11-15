@@ -15,11 +15,22 @@ def usable_moves(moves: list[str], pp_bytes: tuple[int, ...] | None, no_pp: set[
             if i < len(pp_bytes) and (pp_bytes[i] & 0x3F) > 0 and mv not in no_pp]
 
 
-def cursor_step(cursor_mv: str, target: str, usable: list[str], nav: int) -> tuple[str, str | None]:
+def walk_direction(moves: list[str], cursor_mv: str, target: str) -> str:
+    """"up" when the target slot is above the cursor slot, else "down" (also when either is not in the list)."""
+    norm = [_norm(m) for m in moves]
+    try:
+        return "up" if norm.index(_norm(target)) < norm.index(_norm(cursor_mv)) else "down"
+    except ValueError:
+        return "down"
+
+
+def cursor_step(cursor_mv: str, target: str, usable: list[str], nav: int,
+                moves: list[str] | None = None) -> tuple[str, str | None]:
     """("press_a", move) when the move under the cursor is the target, or (nav > 5, the walk has gone on too
-    long) when it is any usable move; otherwise ("down", None). Never ("press_a", m) for an m not in usable."""
+    long) when it is any usable move; otherwise ("up" | "down", None) - the way to the target in the menu's slot
+    order `moves` (plain "down" without it). Never ("press_a", m) for an m not in usable."""
     if _norm(cursor_mv) == _norm(target) and target in usable:
         return "press_a", target
     if nav > 5 and cursor_mv in usable:
         return "press_a", cursor_mv
-    return "down", None
+    return (walk_direction(moves, cursor_mv, target) if moves else "down"), None

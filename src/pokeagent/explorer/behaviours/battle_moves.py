@@ -123,7 +123,7 @@ class BattleMoves(BehaviourBase):
                 ctx.move_reason = "untried" if target not in tried else f"best avg {score(target)[1]:.1f} dmg"
             ctx.move_tag = move_rule(ctx.emu, target)  # the matchup it is aiming at, even while the cursor walks
             ctx.move_nav = ctx.move_nav + 1
-            action, chosen = cursor_step(cursor_mv, target, usable, ctx.move_nav)
+            action, chosen = cursor_step(cursor_mv, target, usable, ctx.move_nav, moves)
             if action == "press_a":  # A only ever lands on the target or (past 5 presses) a usable move
                 ctx.move_nav = 0
                 tag = move_rule(ctx.emu, chosen)
@@ -137,18 +137,25 @@ class BattleMoves(BehaviourBase):
                 if ctx.move_reason:
                     why += f" ({ctx.move_reason})"
                 return Decision("A", tag, why)
-            return Decision("DOWN", "move_cursor", f"move menu: cursor to {target} (now on {cursor_mv})")
-        ctx.move_nav = 0  # the move menu is not on screen: a stale walk count must not carry into the next one
+            ctx.move_dir = action.upper()  # the disabled screen keeps walking this way instead of undoing the step
+            return Decision(ctx.move_dir, "move_cursor", f"move menu: cursor to {target} (now on {cursor_mv})")
+        disabled_screen = any("DISABLED" in ln.upper() for ln in lines_now)
+        if not disabled_screen:  # the move menu is not on screen: a stale walk count must not carry into the next one
+            ctx.move_nav = 0
+            ctx.move_dir = ""
         if ">ITEM" in cur and not want_potion:  # never open ITEM without a reason (a bare CANCEL list stalls)
             return Decision("UP", "back_to_fight", "battle menu: back up to FIGHT")
         if any("CANCEL" in ln and ">" in ln for ln in lines_now):
             return Decision("A", "close_empty_list", "battle: closing an empty list")
-        if any("DISABLED" in ln.upper() for ln in lines_now):
+        if disabled_screen:
             # "The move is disabled!" leaves the move list on screen WITHOUT its PP line, with the cursor on the refused move:
             # remember it and step the cursor off it (the PP-line branch above never saw this screen; 1,195 presses lost, 2026-11-05)
             stuck = next((ln.replace(">", "").strip() for ln in lines_now
                           if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
             if stuck:
                 ctx.no_pp.add(stuck)
-                return Decision("UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
+                # keep going the way the walk was heading (UP when it had not started): undoing it looped forever,
+                # and move_nav must keep counting here so the nav > 5 escape still fires
+                ctx.move_nav = ctx.move_nav + 1
+                return Decision(ctx.move_dir or "UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

@@ -82,7 +82,7 @@ def test_cursor_on_an_empty_move_never_presses_a(tmp_path, monkeypatch):
     ctx = _menu_ctx(tmp_path, {0xD014: 4, 0xD02D: 35, 0xD02E: 40, 0xD02F: 0, 0xD030: 30})
     for _ in range(8):                      # well past the old 5-press take-what-is-under-the-cursor escape
         d = BattleMoves().step(ctx)
-        assert (d.button, d.rule) == ("DOWN", "move_cursor")
+        assert (d.button, d.rule) == ("UP", "move_cursor")  # target SCRATCH is above EMBER: walk up
         assert ctx.last_move_choice != "EMBER"
     assert ctx.move_nav == 8
 
@@ -97,3 +97,57 @@ def test_move_nav_resets_when_the_move_menu_leaves_the_screen(tmp_path):
     gone.refresh()
     d = BattleMoves().step(gone)
     assert d is not None and gone.move_nav == 0
+
+
+# --- directional walk + disabled-screen loop (Route 3 Pidgey stall, 2026-11-15) ---
+PIDGEY = ["GUST", "SAND-ATTACK", "QUICK ATTACK"]
+
+
+def _redraw(ctx, rows):
+    """Replace the box rows wholesale (pad to full width and blank the leftover rows of the previous frame)."""
+    padded = [r.ljust(18) for r in rows] + [" " * 18] * (8 - len(rows))
+    put_box(ctx, padded)
+    ctx.refresh()
+
+
+def test_cursor_step_walks_up_when_the_target_is_above():
+    usable = ["GUST", "SAND-ATTACK"]
+    assert cursor_step("SAND-ATTACK", "GUST", usable, 1, PIDGEY) == ("up", None)
+    assert cursor_step("GUST", "SAND-ATTACK", usable, 1, PIDGEY) == ("down", None)
+
+
+def test_disabled_screen_keeps_the_walk_direction_and_terminates(tmp_path, monkeypatch):
+    monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {"GUST": (10, ""), "SAND-ATTACK": (0, ""), "QUICK ATTACK": (5, "")})
+    # QUICK ATTACK (slot 2) has 0 PP; GUST is the target; the cursor starts on SAND-ATTACK
+    ctx = _menu_ctx(tmp_path, {0xD014: 4, 0xD02D: 35, 0xD02E: 40, 0xD02F: 0})
+    ctx.no_pp.add("QUICK ATTACK")
+    _redraw(ctx, ("FIGHT", "TYPE/", "NORMAL", "29/30", "GUST", ">SAND-ATTACK", "QUICK ATTACK"))
+    d = BattleMoves().step(ctx)
+    assert (d.button, d.rule) == ("UP", "move_cursor")
+
+    # the bad-walk case: DOWN landed on the disabled move -> the disabled screen must keep going DOWN, not undo it
+    ctx.move_dir = "DOWN"
+    _redraw(ctx, ("disabled!", "GUST", "SAND-ATTACK", ">QUICK ATTACK"))
+    nav = ctx.move_nav
+    d = BattleMoves().step(ctx)
+    assert (d.button, d.rule) == ("DOWN", "disabled_move")
+    assert ctx.move_nav == nav + 1  # not reset: the nav > 5 escape can still fire
+
+
+def test_menu_disabled_alternation_ends_in_a_press_on_a_usable_move(tmp_path, monkeypatch):
+    monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {"GUST": (10, ""), "SAND-ATTACK": (0, ""), "QUICK ATTACK": (5, "")})
+    ctx = _menu_ctx(tmp_path, {0xD014: 4, 0xD02D: 35, 0xD02E: 40, 0xD02F: 0})
+    cursor = 1  # SAND-ATTACK
+    pressed = None
+    for _ in range(12):
+        if PIDGEY[cursor] == "QUICK ATTACK":
+            _redraw(ctx, ("disabled!", "GUST", "SAND-ATTACK", ">QUICK ATTACK"))
+        else:
+            rows = [("" if i != cursor else ">") + m for i, m in enumerate(PIDGEY)]
+            _redraw(ctx, ("FIGHT", "TYPE/", "NORMAL", "29/30", *rows))
+        d = BattleMoves().step(ctx)
+        if d.button == "A":
+            pressed = PIDGEY[cursor]
+            break
+        cursor = max(0, min(2, cursor + (1 if d.button == "DOWN" else -1)))
+    assert pressed in ("GUST", "SAND-ATTACK")
