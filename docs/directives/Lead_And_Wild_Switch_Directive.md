@@ -138,12 +138,12 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
 | Base commit | 74f62a26b91b5951ead6ea07757b9b07a96d1f82 |
-| Head commit | ee83856e51cfcbf36cc00401243a0861fc9a083f |
+| Head commit | 33b62c08bbc368156a2432a17f06b7e34bcb7fcf |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -163,4 +163,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 21:40 · robert-claude-laptop · Queued → Approved
 - 2026-11-14 21:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7EHV1CYFKE5C3S4PAMAQ1MW
 - 2026-11-14 21:55 · dispatcher · launched pid=9592; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; resynced: merged main into directive/pokeagent-lead-and-wild-switch-directive (10 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (3 declared need(s), repo-scoped only))
+- 2026-11-14 22:20 · devin · In progress → Review — Round-2 fixes pushed (33b62c0). Root cause: yield_to_switch yielded only on the pick step - while a swap was queued/mid-nav, Battle's potion/RUN/ITEM answers interleaved with the nav presses on the same screens (item_step's party-prompt pick selects the ACTIVE mon on the nav's 'Bring out' list -> 'already out' -> 40-step B-hold cancels the list). That starvation is why the Weedle switch was 'chosen twice' yet never completed, and the gave_up latch it produces is why the Geodude fight had no switch_out decision at all (the chain itself - thin via KO test, Charmeleon survives + damage gain - returns the pick correctly). Fix: yield_to_switch now yields whenever SwitchOut has swap business (in-flight ctx.switch_train / st[matchup], a queued trainee_out swap with a fit candidate, or the wild matchup pick); xdec suppressed on yielded steps; AlreadyOutGuard's hold no longer B's the list a nav owns (the 'already out' message itself still gets B). Tests: +4 in tests/test_lead_and_wild_switch.py incl. the Geodude-shaped resist foe and in-flight/queued-switch cases (22 passed). Full suite: 3089 passed, 1 skipped, 0 failed (uv run --frozen pytest -q). decisions.jsonl for steps 1217-1254 was not available in this worktree - real-ROM recheck remains Claude's. [origin] spent: devin 49 min est. n/a
 <!-- queue:end -->
