@@ -219,12 +219,14 @@ Read/write inside this worktree only; `uv run pytest` with the existing `.venv`.
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-level-banded-grind-directive |
 | Base branch | - |
+| Base commit | 465293bb9f5eb23eab9f2906157ed71922a086de |
 
 **Status log**
 - 2026-11-12 08:23 · robert-claude-laptop · none → Queued — Robert 2026-11-12 (level-banded grind areas); PR #208 merged c88909c. Approve after Party_View_Directive merges (both touch grind_episode.py)
 - 2026-11-15 12:20 · robert-claude-laptop · Queued → Approved — lint override: grind/solo_viable.py, grind/xp_buckets.py, tests/test_xp_buckets.py are files this directive creates; runs/legs/grind_drills.jsonl is read only by Claude's post-merge real-ROM check (Required from User), not by Devin. Approved under Robert's 2026-11-15 'approve all recommendations'.
+- 2026-11-15 14:21 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-level-banded-grind-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GAFWS9CBCF9SXVEPX3ZM84
 <!-- queue:end -->
