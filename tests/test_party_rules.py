@@ -26,7 +26,11 @@ def test_an_evolved_kakuna_with_poison_sting_is_clean():
     assert party_rules.violations(fp, KB) == [] and party_rules.verdict(fp, KB) == "clean"
 
 
-def test_unknown_when_no_team_or_no_kb_tables():
+def test_unknown_when_no_team_or_no_kb_tables(monkeypatch):
+    # kb=None falls back to the on-disk kb/rom_tables.json; hide it so the
+    # "no kb tables" case holds in a checkout that has kb/ (laptop, verify).
+    import pokeagent.knowledge.kb as kbmod
+    monkeypatch.setattr(kbmod, "ROM_KB", None)
     assert party_rules.verdict({"v": 1, "party": [[KAKUNA, 4, 5, 9]]}, KB) == "unknown"
     assert party_rules.verdict({"v": 1, "team": [member(KAKUNA, 4, (HARDEN,))]}, None) == "unknown"
     assert party_rules.verdict({"v": 1, "team": [member(KAKUNA, 4, (HARDEN,))]},
