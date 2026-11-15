@@ -68,10 +68,14 @@ def test_matchup_pick_fires_in_a_trainer_battle(monkeypatch):
     assert "thin" in pick[1] or "weak" in pick[1]
 
 
-def test_matchup_pick_never_in_a_wild_battle(monkeypatch):
+def test_matchup_pick_fires_in_a_wild_battle_too(monkeypatch):
+    """Wild fights get the thin switch since 2026-11-14: a lead losing the fight is swapped for the
+    member that answers the matchup (was: wild battles never switched - a Harden-only KAKUNA was
+    ground to death). The weak-ratio test is still trainer-only (test_lead_and_wild_switch)."""
     ctx = _ctx([_mon("CHARMELEON", 15), _mon("ODDISH", 16)], kind=1)
     _patch(monkeypatch, ctx)
-    assert so_mod.matchup_pick(ctx) is None
+    pick = so_mod.matchup_pick(ctx)
+    assert pick is not None and pick[0] == 1          # Starmie 2-shots the Charmeleon: the Grass answer goes in
 
 
 def test_matchup_pick_respects_the_per_battle_cap(monkeypatch):
