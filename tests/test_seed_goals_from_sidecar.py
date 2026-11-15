@@ -87,3 +87,31 @@ def test_viridian_agent_with_potion_is_never_sent_to_the_bedroom():
     goals = {g: True for g in through("to_viridian")}
     got = plan_step(goals, maps, (1, 21, 35), "UP")
     assert got is None or "0x26" not in got[1] and "0x25" not in got[1]
+
+
+# ---- leg states: no sidecar, no goal name (2026-11-15: a run from 88_2_7.state aimed at Route 1)
+def badge_ctx(tmp_path, badges, extra=None):
+    ctx = ctx_for(tmp_path, "88_2_7", tmp_path / "88_2_7.state")
+    ctx.emu = FakeEmulator({0xD35E: 0x26, 0xD356: badges, **(extra or {})})
+    return ctx
+
+
+def test_leg_state_with_two_badges_assumes_through_beat_misty(tmp_path):
+    ctx = badge_ctx(tmp_path, 0b11)
+    press_goals.seed_initial_goals(ctx)
+    assert through("beat_misty") <= ctx.initial_goals and "to_route1" in ctx.initial_goals
+    assert not {"ss_ticket", "to_route5", "bicycle", "beat_surge"} & ctx.initial_goals
+
+
+def test_no_badges_assumes_nothing_from_badges(tmp_path):
+    ctx = badge_ctx(tmp_path, 0)
+    press_goals.seed_initial_goals(ctx)
+    assert "to_route1" not in ctx.initial_goals
+
+
+def test_out_of_order_bike_shop_does_not_drag(tmp_path):
+    from pokeagent.campaign import badge_anchored
+    ctx = badge_ctx(tmp_path, 0, {0xD35E: 66})   # standing in the bike shop, no badge
+    press_goals.seed_initial_goals(ctx)
+    assert "to_route1" not in ctx.initial_goals and "beat_misty" not in ctx.initial_goals
+    assert badge_anchored(0) == set() and "bike_shop" not in badge_anchored(0b11)

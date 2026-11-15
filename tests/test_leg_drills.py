@@ -450,3 +450,15 @@ def test_drill_does_not_clear_a_slots_segment_failure_streak_on_failure(tmp_path
     slot.streak = 1
     sup._start(slot); t["now"] += 5; sup._finish(slot, 1)
     assert slot.streak == 1
+
+
+def test_saver_writes_goals_sidecar(tmp_path):
+    from pokeagent.checkpoint_goals import read_completed
+    from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+    from pokeagent.explorer.memory import MapMemory
+    emu = FakeEmu()
+    emu.mem[0xD356] = 0b11
+    ctx = ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), run_dir=tmp_path, log=lambda m, t=None: None, opts=ExplorerOptions())
+    p = S.LegStateSaver(tmp_path / "legs").observe(ctx, fr((1, 3, 3), (2, 5, 6)))
+    done = read_completed(p)
+    assert done is not None and {"beat_brock", "beat_misty"} <= done

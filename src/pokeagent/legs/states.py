@@ -137,6 +137,18 @@ def _mtime(f: Path) -> float:
         return 0.0
 
 
+def write_goals_sidecar(ctx, state: Path) -> None:
+    """Record the goals complete NOW beside a leg state (as checkpoints do), so a run started from it seeds its goals correctly
+    (a leg state has no goal name; map-visit goals read false from a fresh emulator). Best effort: never raises."""
+    try:
+        from pokeagent.checkpoint_goals import completed_goals, write_completed
+        from pokeagent.goals import GOALS, check_goals
+        done = completed_goals(check_goals(ctx.emu, ctx), getattr(ctx, "initial_goals", ()) or (), GOALS)
+        write_completed(state, done, ctx.emu.read(0xD719))
+    except Exception as e:  # noqa: BLE001
+        ctx.log(f"[leg state goals sidecar skipped: {e!r}]", "res")
+
+
 class LegStateSaver:
     """Per-press hook: on a map entry that is calm and on the route, save the entry state (once per key per run)."""
 
@@ -169,6 +181,7 @@ class LegStateSaver:
                 party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001  an unstamped state is still a state
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
+            write_goals_sidecar(ctx, p)
             self.saved += 1
             self.count += 1 if fresh else 0
             if self.count > self.max_files:
@@ -200,6 +213,7 @@ class LegStateSaver:
                 party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
+            write_goals_sidecar(ctx, p)
             ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")
             self.trainee_pending = 0
             self.saved += 1

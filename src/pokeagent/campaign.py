@@ -161,6 +161,20 @@ def infer_unverified(g: dict[str, bool]) -> None:
             g[k] = later_true[k] and (pred is None or bool(g.get(pred)))
 
 
+def badge_anchored(badges: int) -> set[str]:
+    """Goals implied done by the badge byte alone (wObtainedBadges, 0xD356): every goal up to and including the HIGHEST earned
+    badge goal on the ladder. Badge bits are the only strictly-ordered, RAM-verified anchors: a gym leader cannot be beaten
+    without crossing everything before it. Item/flag goals (bike voucher, bike shop, ss_ticket...) can be reached out of order,
+    so they are never anchors (the same rule as infer_unverified). A save that starts with no sidecar and no goal name uses this."""
+    specs = load_campaign()
+    last = -1
+    for i, spec in enumerate(specs):
+        det = spec["detector"]
+        if isinstance(det, dict) and "badge" in det and badges >> int(det["badge"]) & 1:
+            last = i
+    return {spec["id"] for spec in specs[:last + 1]}
+
+
 def brief(goals: dict, order: list[str], ahead: int = 6) -> str:
     """Short goal line for logs: 'done/total' then the next few unmet goals (the full ladder is too long to print)."""
     done = sum(1 for k in order if goals.get(k))
