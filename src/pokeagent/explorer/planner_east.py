@@ -36,7 +36,8 @@ TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on
            "nugget_bridge": _on(ROUTE24), "to_bill": _on(0x58), "ss_ticket": _on(0x58),
            # S.S. Anne: the rival and the captain's cabin are both at the east end of 2F (ROM warp 0x60 (36,4) -> 0x65); the ROM route
            # there is ship_gate.board_step. The bow target (PR #114) parked every segment attempt on a dead-end map.
-           "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN)}
+           "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN),
+           "to_route5": _on(0x10)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
 
 
 def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:
@@ -134,6 +135,8 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         return _misty_step(g, goals, pos)
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
         return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
+    if stage == "to_route5":  # after Bill's S.S. Ticket the agent sat in his house: no stage had a target (live marathon, 2026-11-15)
+        return None if pos[0] == CERULEAN else _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5")
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
