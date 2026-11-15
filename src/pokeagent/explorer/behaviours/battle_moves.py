@@ -9,7 +9,7 @@ from pokeagent.explorer.battle import (
 )
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.behaviours.battle import _finalize_pending_effect
-from pokeagent.explorer.behaviours.battle_pp import cursor_step, usable_moves
+from pokeagent.explorer.behaviours.battle_pp import cursor_step, off_disabled_step, usable_moves
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.party_view import read_battle_view
@@ -154,8 +154,12 @@ class BattleMoves(BehaviourBase):
                           if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
             if stuck:
                 ctx.no_pp.add(stuck)
-                # keep going the way the walk was heading (UP when it had not started): undoing it looped forever,
-                # and move_nav must keep counting here so the nav > 5 escape still fires
+                # pick the way from the on-screen rows (never a no-op at a menu edge); move_nav keeps counting
+                dis = next(i for i, ln in enumerate(lines_now) if "DISABLED" in ln.upper())
+                rows = [ln.replace(">", "").strip() for ln in lines_now[dis + 1:] if ln.replace(">", "").strip() not in ("", "-")]
                 ctx.move_nav = ctx.move_nav + 1
-                return Decision(ctx.move_dir or "UP", "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
+                bm = read_battle_view(ctx.emu).battle_mon
+                free = usable_moves(rows, bm.pp if bm is not None else None, ctx.no_pp)
+                ctx.move_dir = off_disabled_step(rows, stuck, free, ctx.move_dir)
+                return Decision(ctx.move_dir, "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

@@ -34,3 +34,22 @@ def cursor_step(cursor_mv: str, target: str, usable: list[str], nav: int,
     if nav > 5 and cursor_mv in usable:
         return "press_a", cursor_mv
     return (walk_direction(moves, cursor_mv, target) if moves else "down"), None
+
+
+def off_disabled_step(rows: list[str], cursor_mv: str, usable: list[str], last_dir: str = "") -> str:
+    """Button that moves the cursor off a disabled move, from the on-screen rows (slot order). Heads for the
+    nearest usable row (ties: the way the walk was going); never a button that cannot move (no wrap):
+    DOWN on the first row, UP on the last. "UP"/"DOWN"."""
+    n = len(rows)
+    idx = next((i for i, r in enumerate(rows) if _norm(r) == _norm(cursor_mv)), None)
+    if idx is None or n < 2:
+        return last_dir or "UP"
+    if idx == 0:
+        return "DOWN"
+    if idx == n - 1:
+        return "UP"
+    free = [i for i, r in enumerate(rows) if i != idx and r in usable]
+    if not free:
+        return last_dir or "UP"
+    best = min(free, key=lambda i: (abs(i - idx), 0 if (i > idx) == (last_dir == "DOWN") else 1))
+    return "DOWN" if best > idx else "UP"

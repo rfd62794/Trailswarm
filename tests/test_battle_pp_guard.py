@@ -130,7 +130,7 @@ def test_disabled_screen_keeps_the_walk_direction_and_terminates(tmp_path, monke
     _redraw(ctx, ("disabled!", "GUST", "SAND-ATTACK", ">QUICK ATTACK"))
     nav = ctx.move_nav
     d = BattleMoves().step(ctx)
-    assert (d.button, d.rule) == ("DOWN", "disabled_move")
+    assert (d.button, d.rule) == ("UP", "disabled_move")  # last slot: DOWN would be a no-op, so back toward GUST
     assert ctx.move_nav == nav + 1  # not reset: the nav > 5 escape can still fire
 
 
@@ -151,3 +151,55 @@ def test_menu_disabled_alternation_ends_in_a_press_on_a_usable_move(tmp_path, mo
             break
         cursor = max(0, min(2, cursor + (1 if d.button == "DOWN" else -1)))
     assert pressed in ("GUST", "SAND-ATTACK")
+
+
+# --- no-wrap cursor model: every menu / disabled-screen alternation must end in A on a usable move ---
+ALL = ["GUST", "SAND-ATTACK", "QUICK ATTACK", "TACKLE"]
+
+
+def _play(tmp_path, monkeypatch, n, disabled, zero, start, target, bound=30):
+    """Menu of n moves; `disabled` moves show the disabled screen while the cursor sits on them (their PP byte
+    stays > 0), `zero` moves have a 0 PP byte. Cursor does not wrap. Returns the move A was pressed on, or None."""
+    names = ALL[:n]
+    monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {m: (10 if i == target else 1, "") for i, m in enumerate(names)})
+    mem = {0xD014: 4}
+    for i in range(n):
+        mem[0xD02D + i] = 0 if i in zero else 20
+    ctx = _menu_ctx(tmp_path, mem)
+    cursor = start
+    for _ in range(bound):
+        if cursor in disabled:
+            _redraw(ctx, ("disabled!", *[("" if i != cursor else ">") + m for i, m in enumerate(names)]))
+        else:
+            _redraw(ctx, ("TYPE/", "29/30", *[("" if i != cursor else ">") + m for i, m in enumerate(names)]))
+        d = BattleMoves().step(ctx)
+        if d.button == "A":
+            return cursor
+        if d.button in ("UP", "DOWN"):
+            cursor = max(0, min(n - 1, cursor + (1 if d.button == "DOWN" else -1)))
+    return None
+
+
+def test_disabled_at_slot_zero_with_the_cursor_on_it_moves_down(tmp_path, monkeypatch):  # (a)
+    # menu [QUICK(disabled), GUST, SAND], cursor remembered on slot 0, disabled screen at once, nothing walked yet
+    at = _play(tmp_path, monkeypatch, 3, disabled={0}, zero=set(), start=0, target=1)
+    assert at in (1, 2)
+
+
+def test_disabled_last_slot_with_pp_left_is_never_pressed_again(tmp_path, monkeypatch):  # (b)
+    # menu [GUST, SAND, QUICK], QUICK disabled but its PP byte > 0, cursor on SAND, target QUICK
+    at = _play(tmp_path, monkeypatch, 3, disabled={2}, zero=set(), start=1, target=2)
+    assert at in (0, 1)
+
+
+def test_menu_disabled_alternation_always_ends_on_a_usable_move(tmp_path, monkeypatch):
+    from itertools import product
+    for n in range(1, 5):
+        for mask in product((0, 1, 2), repeat=n):  # 0 fine, 1 disabled (PP > 0), 2 zero PP
+            disabled = {i for i, m in enumerate(mask) if m == 1}
+            zero = {i for i, m in enumerate(mask) if m == 2}
+            if len(disabled) + len(zero) == n:
+                continue  # at least one usable move
+            for start, target in product(range(n), repeat=2):
+                at = _play(tmp_path, monkeypatch, n, disabled, zero, start, target)
+                assert at is not None and at not in disabled and at not in zero, (n, mask, start, target, at)
