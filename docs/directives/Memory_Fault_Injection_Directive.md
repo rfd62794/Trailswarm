@@ -181,3 +181,17 @@ Diff stat, test tails, the dependency files it read and any place the merged sel
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:17 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified build for Devin; dispatch only after Memory_Self_Grading and Memory_Audit merge (dependency files missing from the checkout)
+<!-- queue:end -->
