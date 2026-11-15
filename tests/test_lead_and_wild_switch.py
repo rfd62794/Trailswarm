@@ -14,6 +14,7 @@ from pokeagent.explorer.behaviours import switch_out as so_mod
 from pokeagent.explorer.stats import stat_value
 from pokeagent.explorer.training_ctl import roster
 from pokeagent.knowledge import lead, team_plan
+from pokeagent.knowledge.catcher import safe_moves
 from pokeagent.knowledge.party import Combatant
 
 SYN = {
@@ -246,16 +247,104 @@ def test_geodude_shaped_resist_foe_switches_the_thin_member_and_keeps_the_menu(m
 
 
 def test_the_queued_trainee_swap_yields_the_step(monkeypatch):
-    """The Weedle case: the trainee is out and a fit member waits, but the matchup model does not ask
-    (the foe cannot KO it) - the swap is still queued, so the step is SwitchOut's, not a potion's or a
-    RUN's. True in a trainer fight too: a queued swap owns the menus wherever it was chosen."""
+    """Round-4 review: ownership needs an ACTUALLY queued swap - ctx.switch_train or a same-battle
+    matchup record. The trainee merely being out with a fit member behind it is a possible swap, not a
+    chosen one: claiming the menu there suppressed ordinary potion/flee answers for no reason."""
     ctx = _ctx([_mon("WEEDLE", 5), _mon("CHARMELEON", 16)], kind=1)
     _patch_yield(monkeypatch, ctx, _mon("KAKUNA", 5))   # HARDEN only: nobody thin, no matchup pick
     monkeypatch.setattr(so_mod, "trainee_out", lambda c: 0)
     monkeypatch.setattr(bs, "switch_candidate", lambda emu, t: 1)
     assert so_mod.matchup_pick(ctx) is None
+    assert bs._swap_owns_menu(ctx, 1) is False                       # possible is not queued
+    assert bs.yield_to_switch(ctx, 1, want_potion=True) is False     # potion/flee behave exactly as before
+    ctx.switch_train = {"rule": "switch_train: x", "presses": 1}     # a nav actually in flight
+    assert bs._swap_owns_menu(ctx, 1) is True
     assert bs.yield_to_switch(ctx, 1, want_potion=True) is True
+    assert bs.yield_to_switch(ctx, 2, want_potion=True) is True      # a queued swap owns the menus wherever chosen
+
+
+def test_a_stale_matchup_entry_cannot_yield_a_trainer_fight(monkeypatch):
+    """Round-4 review: the `want_potion or kind == 1` guard runs before the menu-ownership test, so a
+    matchup entry cannot suppress an ordinary step in a trainer fight (no potion wanted). Where a
+    potion IS at stake the queued swap still owns the menus - the interleave that starved the Weedle
+    nav stays impossible."""
+    ctx = _ctx([_mon("RATTATA", 9), _mon("CHARMELEON", 16)], kind=2)
+    _patch_yield(monkeypatch, ctx, _mon("STARMIE", 21))
+    team_plan.of(ctx)["matchup"] = {"battle": ctx.battles, "target": 1, "presses": 2, "why": "x", "rule": "x"}
+    assert bs.yield_to_switch(ctx, 2, want_potion=False) is False
     assert bs.yield_to_switch(ctx, 2, want_potion=True) is True
+
+
+def test_a_switch_that_loses_the_menu_once_backs_out_and_retries():
+    """The ROM mechanism behind the missed Geodude/Spearow switches: the battle menu renders mid-step,
+    so a stray A lands on FIGHT before the nav ever sees '>FIGHT PKMN' - the next eval faces the move
+    list. switch_press answers B (back to the battle menu) instead of giving the step away, and the
+    ordinary nav sequence resumes."""
+    move_menu = ["TYPE/", "NORMAL", "24/35", ">GUST", "SAND-ATTACK"]
+    assert so_mod.switch_press(move_menu, move_menu, 1, 3) == "B"
+    main_menu = [">FIGHT PKMN", "ITEM RUN"]
+    assert so_mod.switch_press(main_menu, main_menu, 0, 3) == "RIGHT"
+    pkmn = ["FIGHT>PKMN", "ITEM RUN"]
+    assert so_mod.switch_press(pkmn, pkmn, 0, 3) == "A"
+
+
+# --- CHANGES-NEEDED round 3: the catch switch must not send a thin member back in ----------------------
+#
+# Seed-3 rerun (battle ~904): the matchup swap took the thin Weedle out to Charmeleon, then
+# catch_switch sent the SAME Weedle back in as 'the catcher' - twice - until it fainted. The fit mask
+# only tested the HP fraction (24/24 passed), never whether the member survives the foe it faces.
+
+
+def test_the_catch_switch_never_sends_in_a_thin_catcher():
+    """party_hp (10/26) is over CATCHER_MIN_HP (25%) yet the foe's best hit x2 KOs it - unfit only via
+    the thin test. The same member at full HP stays a legal catcher (the old behaviour, kept)."""
+    from pokeagent.knowledge.catch_policy import CATCHER_MIN_HP, decide
+    active, catcher = _mon("CHARMELEON", 16), _mon("ODDISH", 8)
+    wild = _mon("RATTATA", 6)                                     # Charmeleon min-roll KOs: the overpower gate
+    chart = {(a, d): e for a, d, e in SYN["type_chart"]}
+    kw = dict(wild_status=None, catch_rate=255, bag={"POKE": 3}, price={"POKE": 200},
+              chart=chart, moves=SYN["moves"], turn=0, kind=1, lead=0)
+    party = [active, catcher]
+    assert not safe_moves(active, wild, chart, SYN["moves"])       # the overpower gate is what asks for a catcher
+    fit_hp = [(50, 50), (catcher.hp, catcher.hp)]
+    ok = decide(active, party, wild, wild.hp, wild.hp, party_hp=fit_hp, **kw)
+    assert ok.kind == "switch" and ok.slot == 1
+    thin_hp = [(50, 50), (10, catcher.hp)]
+    assert 10 / catcher.hp >= CATCHER_MIN_HP                       # over the old floor: only thinness rejects it
+    no = decide(active, party, wild, wild.hp, wild.hp, party_hp=thin_hp, **kw)
+    assert no.kind != "switch"
+
+
+# --- real kb tables (kb/rom_tables.json): the review asked for the real party + foe, no mocked pick ---
+
+import pytest
+
+from pokeagent.explorer.kb import ROM_KB
+from pokeagent.knowledge.party import trainer_mon
+
+
+@pytest.mark.skipif(not ROM_KB, reason="kb/rom_tables.json not present in this checkout")
+def test_geodude_fight_pick_uses_the_real_kb_tables(monkeypatch):
+    """The seed-3 Geodude fight with the REAL tables and the REAL party order: Rattata L9 leading vs
+    GEODUDE L8 (both our hits x0.5 resisted, its TACKLE the threat), Charmeleon L20 healthy in slot 3.
+    The real chain - our_party/_foe/active_slot feeding team_plan.switch_choice on the real
+    type_chart/moves/species - names Charmeleon through the whole 11 -> 6 -> 1 HP failure window."""
+    team = [trainer_mon(n, lv) for n, lv in
+            (("RATTATA", 9), ("PIDGEY", 9), ("WEEDLE", 5), ("CHARMELEON", 20), ("KAKUNA", 4), ("MAGIKARP", 5))]
+    foe = trainer_mon("GEODUDE", 8)
+    assert all(team) and foe is not None
+    ctx = _ctx(team, kind=1)
+    monkeypatch.setattr(so_mod, "our_party", lambda emu: team)
+    monkeypatch.setattr(so_mod, "_foe", lambda c: foe)
+    monkeypatch.setattr(so_mod, "active_slot", lambda emu: 0)
+    monkeypatch.setattr(roster, "trainee_slot", lambda c, **kw: 5)   # the real trainee: MAGIKARP in slot 5
+    for cur, hp_now in ((11, [11, 14, 0, 53, 17, 18]), (6, [6, 14, 0, 53, 17, 18]),
+                        (1, [1, 14, 0, 53, 17, 18])):
+        ctx.step = cur                                             # a fresh pick each step
+        monkeypatch.setattr(so_mod, "read_party", lambda emu, hp_now=hp_now:
+                            [SimpleNamespace(hp=h) for h in hp_now])
+        pick = so_mod.matchup_pick(ctx)
+        assert pick is not None and pick[0] == 3, (cur, pick)      # CHARMELEON, every hit-point step
 
 
 def test_a_trainee_swap_with_nobody_fit_does_not_yield(monkeypatch):

@@ -123,6 +123,8 @@ def switch_press(frames: list[str], screen: list[str], cur: int, target: int) ->
     if re.search(r"Choose a POK|Bring out", text, re.I):
         return toward(cur, target)
     joined = " ".join(frames)
+    if "TYPE/" in joined:  # the move menu: a stray A picked FIGHT before this nav saw the menu (the
+        return "B"       # menu renders mid-step, between evals): B backs out to FIGHT/PKMN and retries
     if "FIGHT" in joined and "PKMN" in joined:  # the battle menu: FIGHT PKMN / ITEM RUN, cursor somewhere in it
         if re.search(r">\s*PKMN", joined):
             return "A"

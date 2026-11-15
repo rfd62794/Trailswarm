@@ -26,22 +26,21 @@ def active_no_damage(ctx: ExplorerContext) -> bool:
     return bool(ids) and all(i in rows and (rows[i].get("power") or 0) <= 0 for i in ids)
 
 
-def _swap_owns_menu(ctx: ExplorerContext, kind: int, so_mod) -> bool:
+def _swap_owns_menu(ctx: ExplorerContext, kind: int) -> bool:
     """SwitchOut has a swap queued or mid-navigation this step: a chosen switch owns the menus until it
     lands or gives up. Without this Battle's potion / RUN / ITEM answers interleave with the nav's own
     presses on the same screens (the potion's party-prompt pick even selects the ACTIVE mon on the
     nav's 'Bring out which POKeMON?' list, tripping the already-out hold and its B - the reviewed
     Weedle: SWITCH was chosen twice in ~30 steps yet never completed, and the same starvation is what
-    latches switch_gave_up and leaves the next member to grind to death)."""
+    latches switch_gave_up and leaves the next member to grind to death). Ownership needs a swap that
+    is ACTUALLY queued or in nav - the trainee being out with a fit member behind it only means a swap
+    is possible, not chosen (round-4 review: that test suppressed potion/flee in ordinary wild fights)."""
     if kind not in (1, 2):
         return False
     if getattr(ctx, "switch_train", None) is not None:
         return True
     mu = team_plan.of(ctx).get("matchup")
-    if mu is not None and mu.get("battle") == getattr(ctx, "battles", None):
-        return True
-    t = so_mod.trainee_out(ctx)
-    return t is not None and switch_candidate(ctx.emu, t) is not None
+    return mu is not None and mu.get("battle") == getattr(ctx, "battles", None)
 
 
 def yield_to_switch(ctx: ExplorerContext, kind: int, want_potion: bool) -> bool:
@@ -56,11 +55,11 @@ def yield_to_switch(ctx: ExplorerContext, kind: int, want_potion: bool) -> bool:
     again, and with no candidate nothing changes: potion and flee behave exactly as before."""
     if getattr(ctx, "switch_gave_up", None) == getattr(ctx, "battles", -1):
         return False
-    from pokeagent.explorer.behaviours import switch_out as so_mod  # deferred: __init__ imports battle.py first
-    if _swap_owns_menu(ctx, kind, so_mod):
-        return True
-    if not (want_potion or kind == 1):
+    if not (want_potion or kind == 1):  # nothing of Battle's to preempt: a stale nav entry cannot yield a trainer fight
         return False
+    from pokeagent.explorer.behaviours import switch_out as so_mod  # deferred: __init__ imports battle.py first
+    if _swap_owns_menu(ctx, kind):
+        return True
     if active_no_damage(ctx) and switch_candidate(ctx.emu, roster.trainee_slot(ctx)) is not None:
         return True
     return kind == 1 and so_mod.matchup_pick(ctx, kind) is not None

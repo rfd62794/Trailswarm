@@ -20,6 +20,7 @@ from pokeagent.knowledge.catch_math import STATUS_BONUS, best_ball, p_catch
 from pokeagent.knowledge.catcher import catcher_slot, max_damage, move_row, raw_damage, safe_moves
 from pokeagent.knowledge.moves import effect_of
 from pokeagent.knowledge.party import Combatant
+from pokeagent.knowledge.team_plan import SWITCH_HP_TURNS
 
 ACCEPTABLE_P = 0.15            # throw an unweakened target only if one ball has at least this chance; untuned
 STATUS_MIN_GAIN = 0.05         # a status move is worth a turn only if it raises P(catch) by at least this (after its own hit chance); untuned
@@ -80,6 +81,13 @@ def _status_step(active: Combatant, wild_hp: int, wild_hp_max: int, catch_rate: 
                      why=f"status first: {name} takes P(catch) to {p_st:.2f} on a hit")
 
 
+def _foe_hit(wild: Combatant, c: Combatant, chart: dict, moves: dict) -> float:
+    """The wild mon's best expected hit on ``c`` - the "thin" test's incoming figure (switch_choice's
+    best_move(foe, c)). A catcher the foe KOs inside SWITCH_HP_TURNS turns is sent in to faint."""
+    return max((raw_damage(wild, mv, c, chart) for mv in
+                (move_row(n, moves) for n in wild.moves) if mv is not None), default=0.0)
+
+
 def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: int, wild_hp_max: int,
            wild_status: str | None, catch_rate: int, bag: dict[str, int], price: dict[str, int],
            chart: dict, moves: dict, turn: int = 0, *,
@@ -106,7 +114,10 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
         # the overpower gate: every damaging move KOs even at the minimum roll (or none exists)
         if lead is None:
             lead = next((i for i, c in enumerate(party or ()) if c == active), 0)
-        fit = None if party_hp is None else [mx > 0 and hp > 0 and hp / mx >= CATCHER_MIN_HP for hp, mx in party_hp]
+        fit = None if party_hp is None else [
+            i < len(party or ()) and mx > 0 and hp > 0 and hp / mx >= CATCHER_MIN_HP
+            and _foe_hit(wild, party[i], chart, moves) * SWITCH_HP_TURNS < hp
+            for i, (hp, mx) in enumerate(party_hp)]   # a member the foe KOs inside 2 hits is no catcher
         slot = catcher_slot(party or [], [wild], chart, moves, lead=lead, fit=fit)
         if slot is not None:
             return CatchStep("switch", slot=slot, p=p_now,
