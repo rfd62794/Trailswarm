@@ -203,3 +203,17 @@ Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has me
 - Exec(git diff)
 - Exec(git ls-files)
 - Exec(wc)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 18:54 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
