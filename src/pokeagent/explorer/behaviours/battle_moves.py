@@ -18,6 +18,9 @@ from pokeagent.party_view import read_battle_view
 MENU_CURSORS = ("", "FIGHT", "PKMN", "ITEM", "RUN", "CANCEL")  # a cursor on the battle menu is not a move
 
 
+DISABLED_NAV_CAP = 8  # disabled-screen steps with no progress before backing out with B
+
+
 NON_HIT_NOTES = ("stat-down", "heal", "foe already", "fight ends")
 
 
@@ -154,12 +157,17 @@ class BattleMoves(BehaviourBase):
                           if ln.strip().startswith(">") and ln.replace(">", "").strip().upper() not in MENU_CURSORS), None)
             if stuck:
                 ctx.no_pp.add(stuck)
-                # pick the way from the on-screen rows (never a no-op at a menu edge); move_nav keeps counting
-                dis = next(i for i, ln in enumerate(lines_now) if "DISABLED" in ln.upper())
-                rows = [ln.replace(">", "").strip() for ln in lines_now[dis + 1:] if ln.replace(">", "").strip() not in ("", "-")]
+            # rows: every line that is not the message, a menu word or blank, in screen order (the move list may sit
+            # above or below the message); on this screen never fall through to A, which could press the disabled move
+            rows = [r for r in (ln.replace(">", "").strip() for ln in lines_now if "DISABLED" not in ln.upper())
+                    if r.upper() not in MENU_CURSORS and r != "-"]
+            if rows:  # a bare message over the battle menu (no move list) falls through to FIGHT
                 ctx.move_nav = ctx.move_nav + 1
                 bm = read_battle_view(ctx.emu).battle_mon
                 free = usable_moves(rows, bm.pp if bm is not None else None, ctx.no_pp)
-                ctx.move_dir = off_disabled_step(rows, stuck, free, ctx.move_dir)
-                return Decision(ctx.move_dir, "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
+                step = "B" if ctx.move_nav > DISABLED_NAV_CAP else off_disabled_step(rows, stuck, free, ctx.move_dir)
+                ctx.move_dir = step if step != "B" else ctx.move_dir
+                if step == "B":
+                    return Decision("B", "disabled_back_out", f"disabled move {stuck}: no usable move to step to, backing out")
+                return Decision(step, "disabled_move", f"move {stuck} is disabled: moving the cursor off it")
         return Decision("A", "fight", f"BATTLE kind=0x{kind:02X} HP {hp}/{mx}: FIGHT")

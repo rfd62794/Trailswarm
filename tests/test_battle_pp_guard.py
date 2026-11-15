@@ -7,7 +7,7 @@ import pytest
 from pokeagent.explorer.behaviours import battle_moves as bms
 from pokeagent.explorer.behaviours.battle import BattleView
 from pokeagent.explorer.behaviours.battle_moves import BattleMoves
-from pokeagent.explorer.behaviours.battle_pp import cursor_step, usable_moves
+from pokeagent.explorer.behaviours.battle_pp import cursor_step, off_disabled_step, usable_moves
 from test_battle_types import BATTLE, make_ctx, put_box
 
 MOVES = ["SCRATCH", "GROWL", "EMBER", "LEER"]
@@ -116,7 +116,7 @@ def test_cursor_step_walks_up_when_the_target_is_above():
     assert cursor_step("GUST", "SAND-ATTACK", usable, 1, PIDGEY) == ("down", None)
 
 
-def test_disabled_screen_keeps_the_walk_direction_and_terminates(tmp_path, monkeypatch):
+def test_disabled_last_slot_steps_up_and_keeps_counting_nav(tmp_path, monkeypatch):
     monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {"GUST": (10, ""), "SAND-ATTACK": (0, ""), "QUICK ATTACK": (5, "")})
     # QUICK ATTACK (slot 2) has 0 PP; GUST is the target; the cursor starts on SAND-ATTACK
     ctx = _menu_ctx(tmp_path, {0xD014: 4, 0xD02D: 35, 0xD02E: 40, 0xD02F: 0})
@@ -125,7 +125,7 @@ def test_disabled_screen_keeps_the_walk_direction_and_terminates(tmp_path, monke
     d = BattleMoves().step(ctx)
     assert (d.button, d.rule) == ("UP", "move_cursor")
 
-    # the bad-walk case: DOWN landed on the disabled move -> the disabled screen must keep going DOWN, not undo it
+    # DOWN landed on the disabled last slot: DOWN would be a no-op there, so the disabled screen steps back UP
     ctx.move_dir = "DOWN"
     _redraw(ctx, ("disabled!", "GUST", "SAND-ATTACK", ">QUICK ATTACK"))
     nav = ctx.move_nav
@@ -159,7 +159,8 @@ ALL = ["GUST", "SAND-ATTACK", "QUICK ATTACK", "TACKLE"]
 
 def _play(tmp_path, monkeypatch, n, disabled, zero, start, target, bound=30):
     """Menu of n moves; `disabled` moves show the disabled screen while the cursor sits on them (their PP byte
-    stays > 0), `zero` moves have a 0 PP byte. Cursor does not wrap. Returns the move A was pressed on, or None."""
+    stays > 0), `zero` moves have a 0 PP byte. Cursor does not wrap. Plays until A or B is pressed (the target
+    only steers the walk; it need not be reached) and returns ("A", slot), ("B", slot) or (None, slot) at the bound."""
     names = ALL[:n]
     monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {m: (10 if i == target else 1, "") for i, m in enumerate(names)})
     mem = {0xD014: 4}
@@ -173,33 +174,72 @@ def _play(tmp_path, monkeypatch, n, disabled, zero, start, target, bound=30):
         else:
             _redraw(ctx, ("TYPE/", "29/30", *[("" if i != cursor else ">") + m for i, m in enumerate(names)]))
         d = BattleMoves().step(ctx)
-        if d.button == "A":
-            return cursor
+        if d.button in ("A", "B"):
+            return d.button, cursor
         if d.button in ("UP", "DOWN"):
             cursor = max(0, min(n - 1, cursor + (1 if d.button == "DOWN" else -1)))
-    return None
+    return None, cursor
 
 
 def test_disabled_at_slot_zero_with_the_cursor_on_it_moves_down(tmp_path, monkeypatch):  # (a)
     # menu [QUICK(disabled), GUST, SAND], cursor remembered on slot 0, disabled screen at once, nothing walked yet
-    at = _play(tmp_path, monkeypatch, 3, disabled={0}, zero=set(), start=0, target=1)
-    assert at in (1, 2)
+    assert _play(tmp_path, monkeypatch, 3, disabled={0}, zero=set(), start=0, target=1)[1] in (1, 2)
 
 
 def test_disabled_last_slot_with_pp_left_is_never_pressed_again(tmp_path, monkeypatch):  # (b)
     # menu [GUST, SAND, QUICK], QUICK disabled but its PP byte > 0, cursor on SAND, target QUICK
-    at = _play(tmp_path, monkeypatch, 3, disabled={2}, zero=set(), start=1, target=2)
-    assert at in (0, 1)
+    assert _play(tmp_path, monkeypatch, 3, disabled={2}, zero=set(), start=1, target=2)[1] in (0, 1)
 
 
-def test_menu_disabled_alternation_always_ends_on_a_usable_move(tmp_path, monkeypatch):
+def test_menu_disabled_alternation_always_ends_in_a_on_a_usable_move_or_b(tmp_path, monkeypatch):
     from itertools import product
     for n in range(1, 5):
         for mask in product((0, 1, 2), repeat=n):  # 0 fine, 1 disabled (PP > 0), 2 zero PP
             disabled = {i for i, m in enumerate(mask) if m == 1}
             zero = {i for i, m in enumerate(mask) if m == 2}
-            if len(disabled) + len(zero) == n:
-                continue  # at least one usable move
+            any_usable = len(disabled) + len(zero) < n
             for start, target in product(range(n), repeat=2):
-                at = _play(tmp_path, monkeypatch, n, disabled, zero, start, target)
-                assert at is not None and at not in disabled and at not in zero, (n, mask, start, target, at)
+                btn, at = _play(tmp_path, monkeypatch, n, disabled, zero, start, target)
+                ctxt = (n, mask, start, target, btn, at)
+                if btn == "A":
+                    assert at not in disabled and at not in zero, ctxt
+                else:
+                    assert btn == "B" and not any_usable, ctxt  # B only when nothing is usable
+
+
+def test_single_disabled_move_backs_out_with_b(tmp_path, monkeypatch):
+    assert _play(tmp_path, monkeypatch, 1, {0}, set(), 0, 0)[0] == "B"
+
+
+def test_two_disabled_moves_back_out_with_b(tmp_path, monkeypatch):
+    for start in (0, 1):
+        assert _play(tmp_path, monkeypatch, 2, {0, 1}, set(), start, 0)[0] == "B"
+
+
+def _disabled_ctx(tmp_path, monkeypatch, rows):
+    monkeypatch.setattr(bms, "move_scores", lambda emu, catching=False: {})
+    ctx = _menu_ctx(tmp_path, {0xD014: 4, 0xD02D: 20, 0xD02E: 20, 0xD02F: 20})
+    _redraw(ctx, rows)
+    return ctx
+
+
+def test_disabled_screen_without_a_cursor_line_never_presses_a(tmp_path, monkeypatch):
+    ctx = _disabled_ctx(tmp_path, monkeypatch, ("disabled!", "GUST", "SAND-ATTACK", "QUICK ATTACK"))
+    d = BattleMoves().step(ctx)
+    assert d.button in ("UP", "DOWN", "B") and d.rule != "fight"
+    ctx = _disabled_ctx(tmp_path, monkeypatch, ("disabled!", "GUST"))
+    assert BattleMoves().step(ctx).button == "B"
+
+
+def test_disabled_screen_with_the_move_list_above_the_message(tmp_path, monkeypatch):
+    ctx = _disabled_ctx(tmp_path, monkeypatch, ("GUST", "SAND-ATTACK", ">QUICK ATTACK", "disabled!"))
+    d = BattleMoves().step(ctx)
+    assert (d.button, d.rule) == ("UP", "disabled_move") and "QUICK ATTACK" in ctx.no_pp
+
+
+def test_off_disabled_step_tie_break_follows_the_walk_direction():
+    rows = ["A", "B", "C"]
+    assert off_disabled_step(rows, "B", ["A", "C"], "DOWN") == "DOWN"
+    assert off_disabled_step(rows, "B", ["A", "C"], "UP") == "UP"
+    assert off_disabled_step(rows, "B", ["A", "C"], "") == "UP"
+    assert off_disabled_step(rows, "B", [], "UP") == "B"

@@ -36,20 +36,19 @@ def cursor_step(cursor_mv: str, target: str, usable: list[str], nav: int,
     return (walk_direction(moves, cursor_mv, target) if moves else "down"), None
 
 
-def off_disabled_step(rows: list[str], cursor_mv: str, usable: list[str], last_dir: str = "") -> str:
-    """Button that moves the cursor off a disabled move, from the on-screen rows (slot order). Heads for the
-    nearest usable row (ties: the way the walk was going); never a button that cannot move (no wrap):
-    DOWN on the first row, UP on the last. "UP"/"DOWN"."""
-    n = len(rows)
-    idx = next((i for i, r in enumerate(rows) if _norm(r) == _norm(cursor_mv)), None)
-    if idx is None or n < 2:
-        return last_dir or "UP"
+def off_disabled_step(rows: list[str], cursor_mv: str | None, usable: list[str], last_dir: str = "") -> str:
+    """Button for the disabled screen, from the on-screen rows (slot order): "UP"/"DOWN" toward the nearest usable
+    row (ties: the way the walk was going; never a no-op at a menu edge on a no-wrap cursor), or "B" when no
+    other usable row exists (the game then falls back, ending in STRUGGLE when every move is out)."""
+    idx = next((i for i, r in enumerate(rows) if cursor_mv and _norm(r) == _norm(cursor_mv)), None)
+    free = [i for i, r in enumerate(rows) if i != idx and r in usable]
+    if not free or len(rows) < 2:
+        return "B"
+    if idx is None:  # cursor row not readable: keep walking the way we were going
+        return last_dir or "DOWN"
     if idx == 0:
         return "DOWN"
-    if idx == n - 1:
+    if idx == len(rows) - 1:
         return "UP"
-    free = [i for i, r in enumerate(rows) if i != idx and r in usable]
-    if not free:
-        return last_dir or "UP"
     best = min(free, key=lambda i: (abs(i - idx), 0 if (i > idx) == (last_dir == "DOWN") else 1))
     return "DOWN" if best > idx else "UP"
