@@ -167,12 +167,14 @@ Diff stat, the two pytest tails, the `ACTIVITY` table as chosen, and the party f
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-rewinder-slice1-playback-core-directive |
 | Base branch | - |
+| Base commit | 38ec0f56cfa6b68c6881706ec11e0165e2428a43 |
 
 **Status log**
 - 2026-11-15 12:12 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified pure-code slice (no ROM/window); prerequisites confirmed on disk; check against a real run stays with Claude
 - 2026-11-15 13:05 · robert-claude-laptop · Queued → Approved
+- 2026-11-15 13:06 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-rewinder-slice1-playback-core-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7G66SK7YXF87TNFMADCRA5Y
 <!-- queue:end -->
