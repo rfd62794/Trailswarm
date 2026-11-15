@@ -150,7 +150,7 @@ Diff stat, test tails (including which test skipped for lack of torch), line cou
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-vision-error-triage-directive |
 | Base branch | - |
@@ -164,4 +164,5 @@ Diff stat, test tails (including which test skipped for lack of torch), line cou
 - 2026-11-14 13:34 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-error-triage-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7DND85KB6KNG05RXMK6TSE5
 - 2026-11-14 13:39 · dispatcher · launched pid=14852; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-vision-error-triage-directive; provisioned: uv sync --frozen; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-14 13:40 · devin · In progress → Review — Done. New src/pokeagent/vision_model/triage.py (71 lines, no torch) + tests/test_vision_triage.py; net.py gains predict_with_confidence only; vision_train.py gains triage import, one call, report["triage"], one print. Tests: new file 8 passed, 1 skipped (torch absent: test_predict_with_confidence_matches_predict); regression set 14 passed, 6 skipped, 1 warning (matches baseline). Diff stat: triage.py added, net.py +20, vision_train.py +6/-3. Line counts: triage.py 71, net.py 143, vision_train.py 112. [origin] spent: devin 1 min est. n/a
+- 2026-11-15 01:26 · robert-claude-laptop · Review → Done
 <!-- queue:end -->

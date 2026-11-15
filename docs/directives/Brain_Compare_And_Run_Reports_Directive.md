@@ -241,11 +241,12 @@ Nothing before the run. Afterwards Claude runs the three commands on the real fi
 
 | Field | Value |
 |---|---|
-| Status | Draft |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-11 07:25 · robert-claude-laptop · none → Draft — queue block added so the directive lints (PR #182 verify failed on lint_scope: no queue block)
+- 2026-11-14 15:17 · robert-claude-laptop · Draft → Queued — Robert 2026-11-14: unblock Pokemon Blue. This is the missing dependency of Game_Compat_Check (blocked 11-11), which gates Family_Shared_Memory (Red+Blue).
 <!-- queue:end -->
