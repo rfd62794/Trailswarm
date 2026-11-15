@@ -95,6 +95,8 @@ Expected: only `team_plan.py`, `party_order.py`, `switch_out.py`, `battle.py`.
 
 ## Rules for this run
 
+<!-- allow-test-removal --> Robert 2026-11-15: test_matchup_pick_never_in_a_wild_battle asserted the bug this directive fixes (kind==1 -> None); replaced by test_matchup_pick_fires_in_a_wild_battle_too.
+
 - NON-INTERACTIVE: a tool call that needs confirmation ends the run. Never install, download or fetch. Never read outside the working directory. Do not search, glob or hunt: if a file named here is missing, stop and write that in the Status row.
 - Use `uv run --frozen` for every command.
 - Branch only (`directive/pokeagent-lead-and-wild-switch-directive`); commit as you go; never commit to or push main; never merge.

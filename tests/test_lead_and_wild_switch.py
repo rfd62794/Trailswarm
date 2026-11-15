@@ -323,12 +323,12 @@ from pokeagent.explorer.kb import ROM_KB
 from pokeagent.knowledge.party import trainer_mon
 
 
-@pytest.mark.skipif(not ROM_KB, reason="kb/rom_tables.json not present in this checkout")
 def test_geodude_fight_pick_uses_the_real_kb_tables(monkeypatch):
     """The seed-3 Geodude fight with the REAL tables and the REAL party order: Rattata L9 leading vs
     GEODUDE L8 (both our hits x0.5 resisted, its TACKLE the threat), Charmeleon L20 healthy in slot 3.
     The real chain - our_party/_foe/active_slot feeding team_plan.switch_choice on the real
     type_chart/moves/species - names Charmeleon through the whole 11 -> 6 -> 1 HP failure window."""
+    assert ROM_KB, "needs the gitignored kb/rom_tables.json (the laptop verify recipe copies it in)"
     team = [trainer_mon(n, lv) for n, lv in
             (("RATTATA", 9), ("PIDGEY", 9), ("WEEDLE", 5), ("CHARMELEON", 20), ("KAKUNA", 4), ("MAGIKARP", 5))]
     foe = trainer_mon("GEODUDE", 8)
