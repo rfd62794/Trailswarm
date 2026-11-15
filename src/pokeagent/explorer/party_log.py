@@ -127,6 +127,7 @@ class PartyLog:
         party_before comes from the battle-start snapshot, party_after from RAM now: a failed read leaves a
         ``party_error`` (repr of the exception) on the record instead of silently dropping the whole party."""
         out: dict = {}
+        gained = 0  # party exp for the bandit's wild_battle episode (0 when the party could not be diffed)
         before, self.before = self.before, None
         try:
             after = snapshot(ctx.emu)
@@ -146,8 +147,7 @@ class PartyLog:
             try:
                 d = diff(before, after)
                 self.exp_total += sum(g for g in d["exp_gained"] if g > 0)
-                if getattr(ctx, "bandit", None) is not None:
-                    ctx.bandit.battle_end(sum(g for g in d["exp_gained"] if g > 0))  # closes the wild_battle episode
+                gained = sum(g for g in d["exp_gained"] if g > 0)
                 for lu in d["level_ups"]:
                     self.levels_by_slot[lu["slot"]] += lu["to"] - lu["from"]
                 self.prev = after
@@ -164,6 +164,11 @@ class PartyLog:
                 out.setdefault("party_error", repr(exc))
         if not won and not fled:
             self.blackouts += 1
+        try:  # always closes the wild_battle episode (never into the next battle); a bandit fault costs nothing else
+            if getattr(ctx, "bandit", None) is not None:
+                ctx.bandit.battle_end(gained, blackout=not won and not fled)
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger(__name__).warning("bandit.battle_end failed: %r", exc)
         out.update(self._money(ctx, won, fled))
         return out
 

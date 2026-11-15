@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 PRESS, GOAL, STALL, BLACKOUT, TOSS = -0.01, 1.0, -2.0, -3.0, -5.0
 MAX_PRESSES = 300
-XP_SCALE = 0.01  # reward per XP the party gained in a wild battle: ~100 XP is worth one goal
+XP_SCALE = 0.03  # reward per XP the party gained in a wild battle: ~33 XP is worth one goal (a fight is 25+ presses, a flee ~10)
 NOVELTY_SCALE, NOVELTY_CAP = 0.1, 0.5  # explorer role only: novelty bonus x scale, at most CAP per episode (a goal is +1)
 STALL_RULE = "stall_escalate"  # the StallGuard's escalation: the in-process stand-in for the swarm's stall-kill
 
@@ -43,7 +43,7 @@ class Episode:
             self.reward += BLACKOUT
         elif event == "battle_end":
             if self.point == "wild_battle":  # a grind never reaches a goal: the battle is the episode
-                self.reward += XP_SCALE * rec.get("exp", 0)
+                self.reward += XP_SCALE * rec.get("exp", 0) + (BLACKOUT if rec.get("blackout") else 0.0)
                 self.done = True
         elif event is None:
             self.presses += 1

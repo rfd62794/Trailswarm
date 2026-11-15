@@ -291,6 +291,8 @@ class Battle(BehaviourBase):
                 ename = (ROM_KB or {}).get("name_of_internal", {}).get(sp, f"#{sp}")
                 ctx.log(f"[lesson vs {ename}: {ls['wins']}/{ls['fights']} won, fled {ls['fled']}, avg turns {sum(ls['turns']) / len(ls['turns']):.1f}, "
                     f"avg HP lost {sum(ls['hp_lost']) / len(ls['hp_lost']):.1f}, best move {ls.get('best_move', '?')}]", "res")
+            elif ctx.bandit is not None:  # no battle row to write: the wild_battle episode still ends with the battle
+                ctx.bandit.battle_end(0, blackout=not won and outcome != "fled")
         return None
 
     def done(self, ctx: ExplorerContext) -> bool:
