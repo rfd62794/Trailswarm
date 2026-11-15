@@ -18,10 +18,12 @@ from pokeagent.knowledge.encounters import slot_chances
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import Combatant, trainer_mon
 
-SOLO_MIN_WIN = 0.95      # share of encounters the trainee must win alone (over atlas PRIOR_WIN: 1
-                        # loss in 12 already blacks out inside one GRIND_BATTLES session)
-SOLO_MARGIN = 0.30       # mean HP fraction wanted after the wins (= readiness.MARGIN: the boss margin)
-SOLO_START_HP = 0.6      # HP fraction a solo trainee must ENTER a battle with: a fight can cost 1 - SOLO_MARGIN
+# Robert 2026-11-15: 0.95 / 0.30 were "too high of standards, especially when we can detect when to flee
+# and heal, and to swap if necessary" (the trainee_out HP latch flees; the nurse heals). He leans 50/50.
+# Dial plan, one step at a time, ONLY while real-ROM blackouts do not rise: 0.75 -> 0.60 -> 0.50 win share.
+SOLO_MIN_WIN = 0.75      # share of encounters the trainee must win alone (was 0.95)
+SOLO_MARGIN = 0.10       # mean HP fraction wanted after the wins (was 0.30)
+SOLO_START_HP = 0.6      # HP fraction a solo trainee must ENTER a battle with: the latch flees under SWITCH_MIN_HP
 MAX_TRAVEL_STEPS = 320   # 10 map crossings at HOP_STEPS, ~an eighth of GRIND_STEPS: no solo preference past it
 MIN_HP_FRACTION = 0.5    # = explorer.train_route.MIN_HP_FRACTION (this module never imports explorer)
 

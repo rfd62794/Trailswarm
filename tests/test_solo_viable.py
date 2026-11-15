@@ -93,15 +93,34 @@ def test_magikarp_is_never_viable():
 
 
 def test_threshold_boundaries(monkeypatch):
-    monkeypatch.setattr(sv, "solo_verdict", lambda *a: (0.95, 0.30))
+    w, m = sv.SOLO_MIN_WIN, sv.SOLO_MARGIN
+    monkeypatch.setattr(sv, "solo_verdict", lambda *a: (w, m))
     assert sv.is_solo_viable(object(), {}, 1) is True            # exactly at both bars: viable
-    monkeypatch.setattr(sv, "SOLO_MIN_WIN", 0.951)
+    monkeypatch.setattr(sv, "solo_verdict", lambda *a: (w - 0.001, m))
     assert sv.is_solo_viable(object(), {}, 1) is False           # just under the win bar
-    monkeypatch.setattr(sv, "SOLO_MIN_WIN", 0.95)
-    monkeypatch.setattr(sv, "SOLO_MARGIN", 0.31)
+    monkeypatch.setattr(sv, "solo_verdict", lambda *a: (w, m - 0.001))
     assert sv.is_solo_viable(object(), {}, 1) is False           # just under the HP-margin bar
-    monkeypatch.setattr(sv, "solo_verdict", lambda *a: (0.95, 0.31))
-    assert sv.is_solo_viable(object(), {}, 1) is True            # at the raised margin: viable
+
+
+def test_retuned_constants_are_the_robert_2026_11_15_dial_step():
+    assert (sv.SOLO_MIN_WIN, sv.SOLO_MARGIN) == (0.75, 0.10)
+
+
+ROUTE1 = [[3, "PIDGEY"], [3, "RATTATA"], [3, "RATTATA"], [2, "RATTATA"], [2, "PIDGEY"], [3, "PIDGEY"],
+          [3, "PIDGEY"], [4, "RATTATA"], [4, "PIDGEY"], [5, "PIDGEY"]]   # Route 1 (map 0x0C) as in the ROM
+R1 = {**SYN, "species_by_dex": {
+    "16": {"name": "PIDGEY", "type1": "NORMAL", "type2": "FLYING", "hp": 40, "atk": 45, "def": 40,
+           "spd": 56, "spc": 35, "moves1": ["GUST"]},
+    "19": {"name": "RATTATA", "type1": "NORMAL", "type2": "NORMAL", "hp": 30, "atk": 56, "def": 35,
+           "spd": 72, "spc": 25, "moves1": ["TACKLE"]}},
+    "moves": {**SYN["moves"], "16": {"name": "GUST", "type": "NORMAL", "power": 40, "accuracy": 1.0,
+                                     "effect": 0, "pp": 35}},
+    "wild_by_map": {"12": {"grass": ROUTE1}}}
+
+
+@pytest.mark.parametrize("species", ["RATTATA", "PIDGEY"])
+def test_level6_rattata_or_pidgey_fights_route_1_alone(species):
+    assert sv.is_solo_viable(trainer_mon(species, 6, R1), R1, 12) is True
 
 
 def test_choose_prefers_viable_point_over_higher_score():
