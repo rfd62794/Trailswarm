@@ -7,6 +7,7 @@ that map, it walks the learned graph to the stand tile, faces the person and pre
 """
 from __future__ import annotations
 
+from pokeagent.explorer.behaviours import goal_talk_alt as alt
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.training_ctl import exit_rule
@@ -73,8 +74,15 @@ class GoalTalk(BehaviourBase):
         return hit is not None and ctx.goal_talk_tries.get(hit[0], 0) < MAX_TALKS
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
-        goal, (m, sx, sy, facing, who) = pending(ctx)
+        goal, spec = pending(ctx)
+        m, sx, sy, facing, who = spec
         v = ctx.view
+        st = alt.state(ctx, m)
+        alt.observe(ctx, st)
+        occ = alt.occupied(ctx, alt.npc_tile(sx, sy, facing))
+        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked) - {(m, sx, sy)}  # a temp block on our own stand tile must never shut the path
+        if (sx, sy) in st["dead"] or (sx, sy) in occ:
+            return alt.step(ctx, g, st, goal, m, spec, occ)  # the usual stand tile is taken or shut: another side of the person, or out and back in
         if (v.x, v.y) == (sx, sy):
             if goal in APPROACH:
                 _approach_state(ctx, m, at_stand=True)
@@ -82,9 +90,10 @@ class GoalTalk(BehaviourBase):
                 return Decision(facing, "goal_talk_face", f"goal {goal}: facing {who} ({facing})")
             ctx.goal_talk_tries[goal] = ctx.goal_talk_tries.get(goal, 0) + 1
             return Decision("A", "goal_talk", f"goal {goal} is only met by talking to {who}: A (try {ctx.goal_talk_tries[goal]}/{MAX_TALKS})")
-        g = WorldGraph(ctx.mem.data["maps"]); g.blocked_now = frozenset(ctx.mem.temp_blocked) - {(m, sx, sy)}  # a temp block on our own stand tile must never shut the path
         p = g.path((m, v.x, v.y), lambda n: n == (m, sx, sy))
         if p:
+            if len(p) == 1:
+                st["last"] = (getattr(ctx, "step", 0), v.x, v.y, (sx, sy))
             return Decision(p[0], "goal_talk_walk", f"goal {goal}: {len(p)} steps to ({sx},{sy}) to talk to {who}")
         if goal in APPROACH:
             return _approach(ctx, g, goal, m, sx, sy, who)
