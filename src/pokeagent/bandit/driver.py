@@ -69,6 +69,14 @@ class BanditDriver:
                     self._close(ep)
         return [e for e in events if e.get("event") == "blackout"]  # the engine already writes item_tossed itself
 
+    def battle_end(self, exp: int, blackout: bool = False) -> None:
+        """A battle ended with ``exp`` XP gained by the party: close the open wild_battle episode, paying the XP.
+        ``blackout``: the fight was lost and warped us home; the episode is closed before after_press sees the
+        blackout row, so the penalty rides on this event."""
+        for ep in list(self.open):
+            if ep.add({"event": "battle_end", "exp": exp, "blackout": blackout}):
+                self._close(ep)
+
     def add_novelty(self, bonus: float) -> None:
         """Pay an explorer-role novelty bonus into every open episode (capped per episode by reward.NOVELTY_CAP)."""
         for ep in self.open:

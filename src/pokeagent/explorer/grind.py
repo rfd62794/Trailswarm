@@ -79,6 +79,16 @@ def outcome_of(*, trainer: bool, won: bool, moved_away: bool, party_count: int) 
     return "lost" if trainer else "fled"
 
 
+def ran_away(ctx, *, trainer: bool, won: bool) -> bool:
+    """A wild fight that looks won (we stand where it began) but ended after A on RUN with no XP gained: a flee, not a win.
+    (A RUN that failed and a fight that then won gives XP, so it stays a win.)"""
+    if trainer or not won or not (ctx.battle_log or {}).get("ran"):
+        return False
+    from pokeagent.explorer import party_log
+    before, now = party_log.of(ctx).before, party_log.party_exp(ctx.emu)
+    return before is not None and now is not None and now <= sum(m[2] for m in before)
+
+
 def record_battle_result(ctx, *, won: bool, moved_away: bool, trainer: bool = False) -> None:
     """Blackouts in a row: a lost battle that warped us away counts, a win resets, a flee (same spot) changes nothing.
     The same outcome also feeds the stage's blackout tax in the shared learned data when ctx.stage_goal is set:

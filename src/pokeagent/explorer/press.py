@@ -64,6 +64,7 @@ def begin_press(ctx: ExplorerContext, fr: PressFrame) -> None:
         lines_b = frame_lines(tm)
         cursor_b = next((ln.replace(">", "").strip() for ln in lines_b if ">" in ln), "")
         if name == "A" and cursor_b:  # a battle choice: what was chosen and the HP situation at that moment
+            bl["ran"] = bl.get("ran", False) or ">RUN" in next((ln for ln in lines_b if ">" in ln), "")  # A pressed on RUN
             bl["turns"].append({"step": ctx.step, "chose": cursor_b, "menu": [ln for ln in lines_b if ln.isupper() or ">" in ln][:6],
                                 "hp_you": bm.hp if bm is not None else 0, "hp_enemy": u16(0xCFE6)})
         extra["battle_turn"] = len(bl["turns"])

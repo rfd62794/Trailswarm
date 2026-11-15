@@ -366,3 +366,86 @@ def test_reflushed_delta_replaces_the_runs_earlier_share(tmp_path):
     other: dict = {}; fill(other, "k", "flee", [0.5])
     write_delta(delta, "run-y", other); merge_delta(shared, delta)
     assert load_cells(shared)["k"]["flee"] == [4, -3.5, 6.25]  # run-x counted once (3 episodes) + run-y
+
+
+# --- wild_battle: the battle is the episode, XP is the reward, a training grind is not flee-able ---------------------
+def test_battle_end_closes_a_wild_episode_paying_xp_and_ignores_other_points():
+    wild = rw.Episode("wild_battle", "k", "flee", "fight")
+    assert wild.add(press()) is False
+    assert wild.add({"event": "battle_end", "exp": 50}) is True
+    assert abs(wild.reward - (rw.PRESS + 50 * rw.XP_SCALE)) < 1e-9
+    heal = rw.Episode("heal", "k", "push_on", "heal_now")
+    assert heal.add({"event": "battle_end", "exp": 50}) is False and heal.reward == 0.0
+
+
+def test_driver_battle_end_records_fight_above_flee(tmp_path, monkeypatch):
+    drv = BanditDriver(tmp_path / "none.json", tmp_path / "d.json", seed=0)
+    for arm, exp in (("fight", 40), ("flee", 0)):
+        monkeypatch.setattr(drv_mod, "choose", lambda *a, arm=arm, **k: arm)
+        drv.decide("wild_battle", 1, lambda: "wild_battle|s|12|3|gt3", "fight")
+        drv.battle_end(exp)
+    cells = drv.delta["wild_battle|s|12|3|gt3"]
+    assert cells["fight"][1] > cells["flee"][1] and drv.open == [] and drv.sticky == {}
+
+
+def test_bandit_cannot_flee_a_training_fight(tmp_path, monkeypatch):
+    from pokeagent.bandit import hook as hk
+    monkeypatch.setattr(hk, "catch_target", lambda *a: False)
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "flee")
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD18C: 6, 0xD16B: 0x99, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 30})
+    ctx.train_need = 12  # lead L6 under the target: training is on
+    attach(ctx, tmp_path / "none.json", seed=0)
+    ctx.refresh()
+    assert hk.wild_flee(ctx, False) is False and ctx.bandit.open == []
+    assert hk.wild_flee(ctx, True) is True  # the Explorer's own flee still stands
+    ctx.train_need = 0  # not training: the bandit decides as before
+    assert hk.wild_flee(ctx, False) is True
+
+
+# --- review of #297: blackout rides on battle_end; battle_end is unconditional; bench trainee guard ----------------
+def test_battle_end_with_blackout_charges_the_closing_episode():
+    ep = rw.Episode("wild_battle", "k", "fight", "fight")
+    ep.add({"event": "battle_end", "exp": 0, "blackout": True})
+    assert abs(ep.reward - rw.BLACKOUT) < 1e-9 and ep.done
+
+
+def test_wild_fight_ending_in_blackout_scores_minus_3_once(tmp_path, monkeypatch):
+    from pokeagent.explorer import party_log
+    from test_xp_logging import make_ctx as xp_ctx, party
+    ctx = xp_ctx(tmp_path, party((153, 5, 135, 20, 20)))
+    ctx.blackouts = 0
+    ctx.blackouts_row = 0
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "fight")
+    drv = attach(ctx, tmp_path / "none.json", seed=0)
+    drv.decide("wild_battle", 1, lambda: "wild_battle|s|12|3|gt3", "fight")
+    party_log.of(ctx).start_battle(ctx)
+    party_log.of(ctx).end_battle(ctx, won=False, fled=False)  # lost and warped home
+    ctx.blackouts_row = 1
+    drv.after_press(ctx, {"step": 1, "rule": "x", "outcome": "moved", "map": 1}, False)
+    cell = drv.delta["wild_battle|s|12|3|gt3"]["fight"]
+    assert cell[0] == 1 and abs(cell[1] - rw.BLACKOUT) < 1e-9
+
+
+def test_battle_end_still_closes_the_episode_when_the_party_cannot_be_read(tmp_path, monkeypatch):
+    from pokeagent.explorer import party_log
+    from test_xp_logging import make_ctx as xp_ctx, party
+    ctx = xp_ctx(tmp_path, party((153, 5, 135, 20, 20)))
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "flee")
+    drv = attach(ctx, tmp_path / "none.json", seed=0)
+    drv.decide("wild_battle", 1, lambda: "k", "fight")
+    monkeypatch.setattr(party_log, "snapshot", lambda emu: (_ for _ in ()).throw(OSError("ram gone")))
+    party_log.of(ctx).end_battle(ctx, won=True, fled=False)
+    assert drv.open == [] and drv.closed == 1
+
+
+def test_bandit_cannot_flee_while_a_bench_member_trains(tmp_path, monkeypatch):
+    from pokeagent.bandit import hook as hk
+    monkeypatch.setattr(hk, "catch_target", lambda *a: False)
+    monkeypatch.setattr(drv_mod, "choose", lambda *a, **k: "flee")
+    ctx = make_ctx(tmp_path, memory={0xD163: 1, 0xD18C: 30, 0xD16B: 0x99, 0xD16C: 0, 0xD16D: 30, 0xD18D: 0, 0xD18E: 30})
+    ctx.train_need = 12  # strong lead above the target: grinding() is false
+    attach(ctx, tmp_path / "none.json", seed=0)
+    ctx.refresh()
+    assert hk.wild_flee(ctx, False) is True
+    ctx.train_member = 1
+    assert hk.wild_flee(ctx, False) is False

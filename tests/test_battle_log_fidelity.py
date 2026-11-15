@@ -163,3 +163,19 @@ def test_blackout_map_verified_in_both_data_files():
     names = json.loads(resources.files("pokeagent.data").joinpath("ram_names.json").read_text(encoding="utf-8"))
     n = next(x for x in names if x["name"] == "wLastBlackoutMap")
     assert n["verified"] is True and "229 save states" in n["note"]
+
+
+# ---- 4. a successful RUN is a flee, not a win ----
+def test_ran_away_wild_run_with_no_xp_is_a_flee_but_xp_or_trainer_is_not(tmp_path):
+    from pokeagent.explorer.grind import ran_away
+    ctx = xp_ctx(tmp_path, party((153, 5, 135, 20, 20)))
+    party_log.of(ctx).start_battle(ctx)
+    ctx.battle_log = {"ran": True, "turns": []}
+    assert ran_away(ctx, trainer=False, won=True) is True
+    assert ran_away(ctx, trainer=True, won=True) is False and ran_away(ctx, trainer=False, won=False) is False
+    ctx.battle_log = {"ran": False, "turns": []}
+    assert ran_away(ctx, trainer=False, won=True) is False  # never pressed RUN: a plain win
+    ctx.battle_log = {"ran": True, "turns": []}
+    for a, v in party((153, 5, 160, 20, 20)).items():
+        ctx.emu.set(a, v)
+    assert ran_away(ctx, trainer=False, won=True) is False  # RUN failed, the fight was won: XP came in
