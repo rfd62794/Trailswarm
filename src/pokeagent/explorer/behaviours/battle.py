@@ -181,7 +181,7 @@ class Battle(BehaviourBase):
             if sw_out:
                 want_potion = False
             cur = next((ln for ln in lines_now if ">" in ln), "")
-            xdec = None if want_potion else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
+            xdec = None if want_potion or sw_out else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
             if xdec is not None:
                 return xdec
             if want_potion:

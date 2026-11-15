@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.training_ctl import roster
+from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.kb import table
 from pokeagent.magikarp import switch_candidate
 from pokeagent.ramstructs import read_battle_mon
@@ -25,20 +26,41 @@ def active_no_damage(ctx: ExplorerContext) -> bool:
     return bool(ids) and all(i in rows and (rows[i].get("power") or 0) <= 0 for i in ids)
 
 
+def _swap_owns_menu(ctx: ExplorerContext, kind: int, so_mod) -> bool:
+    """SwitchOut has a swap queued or mid-navigation this step: a chosen switch owns the menus until it
+    lands or gives up. Without this Battle's potion / RUN / ITEM answers interleave with the nav's own
+    presses on the same screens (the potion's party-prompt pick even selects the ACTIVE mon on the
+    nav's 'Bring out which POKeMON?' list, tripping the already-out hold and its B - the reviewed
+    Weedle: SWITCH was chosen twice in ~30 steps yet never completed, and the same starvation is what
+    latches switch_gave_up and leaves the next member to grind to death)."""
+    if kind not in (1, 2):
+        return False
+    if getattr(ctx, "switch_train", None) is not None:
+        return True
+    mu = team_plan.of(ctx).get("matchup")
+    if mu is not None and mu.get("battle") == getattr(ctx, "battles", None):
+        return True
+    t = so_mod.trainee_out(ctx)
+    return t is not None and switch_candidate(ctx.emu, t) is not None
+
+
 def yield_to_switch(ctx: ExplorerContext, kind: int, want_potion: bool) -> bool:
     """True when this step belongs to SwitchOut, not to a potion or a RUN.
 
-    Two cases: the member out cannot hurt the foe at all and a healthy switch-in exists (the cocoon
-    rule - in a trainer fight it only vetoes the potion, there is no fleeing anyway), and - wild
-    fights only - a matchup pick names a switch-in for the active member (a thin member that CAN hurt
-    the foe included: a failed RUN attempt costs the same turn the switch-in spends coming in). Once
-    the switch menus gave up this battle the normal rules take over again, and with no candidate
-    nothing changes: potion and flee behave exactly as before."""
-    if not (want_potion or kind == 1) or getattr(ctx, "switch_gave_up", None) == getattr(ctx, "battles", -1):
+    Cases: a swap is mid-navigation or the trainee's swap is queued (its presses must land back to
+    back - the menu state is what it is driving); the member out cannot hurt the foe at all and a
+    healthy switch-in exists (the cocoon rule - in a trainer fight it only vetoes the potion, there is
+    no fleeing anyway); and - wild fights only - a matchup pick names a switch-in for the active
+    member (a thin member that CAN hurt the foe included: a failed RUN attempt costs the same turn the
+    switch-in spends coming in). Once the switch menus gave up this battle the normal rules take over
+    again, and with no candidate nothing changes: potion and flee behave exactly as before."""
+    if getattr(ctx, "switch_gave_up", None) == getattr(ctx, "battles", -1):
+        return False
+    from pokeagent.explorer.behaviours import switch_out as so_mod  # deferred: __init__ imports battle.py first
+    if _swap_owns_menu(ctx, kind, so_mod):
+        return True
+    if not (want_potion or kind == 1):
         return False
     if active_no_damage(ctx) and switch_candidate(ctx.emu, roster.trainee_slot(ctx)) is not None:
         return True
-    if kind != 1:
-        return False
-    from pokeagent.explorer.behaviours import switch_out as so_mod  # deferred: __init__ imports battle.py first
-    return so_mod.matchup_pick(ctx, kind) is not None
+    return kind == 1 and so_mod.matchup_pick(ctx, kind) is not None
