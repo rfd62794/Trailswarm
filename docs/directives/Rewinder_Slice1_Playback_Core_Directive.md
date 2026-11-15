@@ -142,7 +142,7 @@ Expected: the new `src/pokeagent/rewind/` files, the four test files and `src/po
 
 ## Report
 
-Diff stat, the two pytest tails, the `ACTIVITY` table as chosen, and the party field order found in `party_log.py`. Then the check Claude runs afterwards on the laptop (Devin cannot): `pokeagent rewind` against a real 8,000-step run folder: the summary, `--at 500` compared by hand with that run's own rows, and the time `Rewind.from_run` plus 1,000 `frame()` calls take.
+Diff stat, the two pytest tails, the `ACTIVITY` table as chosen, and the party field order found in `party_log.py`. Then the check Claude runs afterwards on the laptop (Devin cannot, so do not run it): the pokeagent rewind command against a real 8,000-step run folder: the summary, `--at 500` compared by hand with that run's own rows, and the time `Rewind.from_run` plus 1,000 `frame()` calls take.
 
 ## Forbidden Actions
 
