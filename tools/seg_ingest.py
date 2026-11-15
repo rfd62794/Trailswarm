@@ -115,8 +115,10 @@ def build_attempt(run: Path, meta: dict, stop: str, milestones: dict | None = No
         if ms:
             gf, est = {"step": ms["step"], "frame": round(ms["step"] * per_step)}, True
     tag = meta.get("tag") or ""
+    job = _job_record(root, tag) if root is not None and tag else {}
     loops = run / "loops.jsonl"
     return {"run": run.name, "solved": gf is not None, "frames": gf["frame"] if gf else 0, "est": est,
+            "build": job.get("build"), "cell": job.get("cell"),
             "steps": gf["step"] if gf else steps, "seed": meta.get("seed"), "starter": meta.get("starter"),
             "explore_rate": meta.get("explore_rate"), "box_pace": meta.get("box_pace"), "budget": meta.get("steps"), "maps": _maps_seen(run),
             "tagged": bool(tag), "outside": sum(1 for r in _jl(run / "transitions.jsonl") if r.get("source", "agent") != "agent"),
@@ -183,11 +185,13 @@ def record_attempt(root: Path, doc: dict, seg, att: dict, run: Path, tag: str | 
 
 
 def _job_record(root: Path, tag: str | None) -> dict:
-    """{start, start_sha} of a normal job: the exact start-state copy and its sha256, written when the job launched."""
+    """{start, start_sha, build, cell} of a normal job: the exact start-state copy and its sha256 plus the
+    build cell the scheduler picked, all written when the job launched (old records read build/cell as None)."""
     try:
         d = job_dir(root, tag)
         rec = json.loads((d / "job.json").read_text(encoding="utf-8"))
-        return {"start": str(d / rec["start_name"]), "start_sha": rec["start_sha"]}
+        return {"start": str(d / rec["start_name"]), "start_sha": rec["start_sha"],
+                "build": rec.get("build"), "cell": rec.get("cell")}
     except (OSError, ValueError, KeyError, TypeError):
         return {}
 
@@ -291,6 +295,12 @@ def ingest(root: Path, doc: dict, finished_tags: set[str] = frozenset(), quiet_s
             record_confirm(root, doc, seg, confirm_of, att)
         else:
             record_attempt(root, doc, seg, att, run, tag)
+            if att.get("cell"):   # one try per ingested attempt, against the cell the start state came from
+                try:
+                    from pokeagent.statelib import cells
+                    cells.record_try(root, att["cell"], att["solved"])
+                except Exception:  # noqa: BLE001 - tries bookkeeping must never break ingest
+                    pass
             n += 1
         release_input(root, doc, tag)
         (run / "end.state").unlink(missing_ok=True)
