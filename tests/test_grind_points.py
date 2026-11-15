@@ -162,3 +162,35 @@ def test_only_maps_falls_back_past_the_level_band_when_nothing_in_band_fits():
     led = ledger_with(route2)
     assert gp.choose(led, [9], 17, 0x02, maps) is None               # unrestricted: band excludes it
     assert gp.choose(led, [9], 17, 0x02, maps, only_maps=stage_maps.allowed("beat_brock")).map_id == 0x0D
+
+
+def test_old_ledger_loads_into_the_default_bucket(tmp_path):
+    """A pre-bucket ledger: 3-element episode values load and save byte-for-byte in that element, and
+    measured_for reads them as the default bucket."""
+    from pokeagent.grind import xp_buckets
+    doc = {"version": 1, "updated": "x", "points": {"35": {"map_id": 35, "name": "R24",
+            "xp_per_min_measured": 67.5, "n_measured": 2, "blackout_rate": 0.5,
+            "episodes": {"r@1": [45.0, 0, "organic"], "r@2": [90.0, 1, "organic"]}}}}
+    f = tmp_path / "gp.json"
+    f.write_text(json.dumps(doc), encoding="utf-8")
+    led = gp.GrindLedger.load(f)
+    out = tmp_path / "out.json"
+    led.save(out)
+    back = json.loads(out.read_text(encoding="utf-8"))
+    assert back["points"]["35"]["episodes"] == {"r@1": [45.0, 0, "organic"], "r@2": [90.0, 1, "organic"]}
+    assert led.points[35].xp_per_min_measured == 67.5                # the old all-episode mean, unchanged
+    assert xp_buckets.measured_for(led.points[35], 10) == (67.5, 2)
+
+
+def test_merge_keeps_the_bucket_and_stays_idempotent():
+    """A 4-element episode value keeps its trainee bucket through the swarm merge; merging twice
+    changes nothing."""
+    a = pt(35)
+    gp.episode_result(a, 10, 50, 0, ep_id="r1@5", trainee_level=12)
+    assert a.episodes["r1@5"] == [45.0, 0, "organic", 10]
+    dst, src = {"maps": {}}, {"maps": {}, "grind_points": {"35": a.to_dict()}}
+    swarm_merge.merge_memory(dst, src)
+    assert dst["grind_points"]["35"]["episodes"]["r1@5"] == [45.0, 0, "organic", 10]
+    once = json.dumps(dst["grind_points"], sort_keys=True)
+    swarm_merge.merge_memory(dst, src)                      # the shared merge is idempotent too
+    assert json.dumps(dst["grind_points"], sort_keys=True) == once

@@ -22,14 +22,16 @@ import logging
 import time
 from pathlib import Path
 
-from pokeagent.explorer import party_log, story_blockers, train_route
+from pokeagent.explorer import party_log, story_blockers, train_route, train_target
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BLACKOUTS, GRIND_STEPS
 from pokeagent.explorer.perceive import lead_level
 from pokeagent.explorer.trainer_hooks import run_provenance
 from pokeagent.explorer.training_ctl import roster, sustain, target
-from pokeagent.grind import atlas, measure
+from pokeagent.explorer.world import POKECENTER_MAPS
+from pokeagent.grind import atlas, measure, solo_viable
 from pokeagent.grind import points as gp
 from pokeagent.grind.drill import log_episode
+from pokeagent.knowledge.party import our_party
 from pokeagent.ramstructs import read_party
 
 log = logging.getLogger(__name__)
@@ -189,20 +191,26 @@ def _try_start(ctx, st: dict) -> tuple[dict | None, str | None]:
         return None, f"trainee level {lvl} not under L{need}"
     pl = party_log.of(ctx)
     ep = {"slot": slot, "need": need, "battles0": ctx.battles, "blackouts0": pl.blackouts,
-          "start_step": ctx.step}
+          "start_step": ctx.step, "lvl0": lvl}
     why = _end_reason(ctx, ep)  # hurt-no-potion / unfit trainee / lifted gate: never start into them
     if why:
         return None, f"would end at once ({why})"
-    pt = target.choose(ctx, _ledger(ctx, st), levels or [lvl], need, slot)
+    rank, viable = solo_viable.rank_for(_ledger(ctx, st).points.values(), our_party(ctx.emu), levels, slot,
+                                        train_target.only_maps(ctx), ctx.mem.data.get("maps", {}),
+                                        (ctx.view.m, ctx.view.x, ctx.view.y), POKECENTER_MAPS, len(read_party(ctx.emu)))
+    pt = target.choose(ctx, _ledger(ctx, st), levels or [lvl], need, slot, rank=rank)
     if pt is None:
         return None, "no grind point fits"
     pt.patch = gp.patch_of(ctx.mem.data.get("maps", {}), pt.map_id) or pt.patch
+    v = viable.get(pt.map_id)
     ep.update(point=pt, start_xp=pl.exp_total,
               maps={pt.map_id, pt.center_map} - {None},
-              id=f"{Path(ctx.run_dir).name}@{ctx.step}", provenance=run_provenance(ctx))
+              id=f"{Path(ctx.run_dir).name}@{ctx.step}", provenance=run_provenance(ctx),
+              solo=solo_viable.passes(v))
     st["episode"] = ep
     ctx.log(f"[grind episode] start on {pt.name or f'0x{pt.map_id:02X}'}: trainee L{lvl} -> L{need} "
-            f"({(pt.xp_per_min_measured or pt.xp_per_min_prior):.0f} xp/min expected)", "res")
+            f"({(pt.xp_per_min_measured or pt.xp_per_min_prior):.0f} xp/min expected"
+            f"{', solo %d%% win %d%% hp' % (v[0] * 100, v[1] * 100) if ep['solo'] and v else ''})", "res")
     return ep, None
 
 
@@ -258,7 +266,8 @@ def _finish(ctx, st: dict, ep: dict, why: str) -> None:
         aborted, why = True, f"{why}; party membership changed mid-episode"
     pt = ep["point"]
     if not aborted:  # a real measurement: fold it into the ledger and the shared swarm table
-        pt = gp.episode_result(pt, xp, max(1, steps), blk, provenance=ep["provenance"], ep_id=ep["id"])
+        pt = gp.episode_result(pt, xp, max(1, steps), blk, provenance=ep["provenance"], ep_id=ep["id"],
+                               trainee_level=ep.get("lvl0"))
         _ledger(ctx, st).upsert(pt)
         try:
             _ledger(ctx, st).save()

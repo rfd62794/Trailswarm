@@ -19,6 +19,7 @@ from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 from pokeagent.explorer.behaviours.party_order import species_names
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.training_ctl import roster
+from pokeagent.grind.solo_viable import SOLO_START_HP
 from pokeagent.ramstructs import active_slot
 from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.party import our_party, trainer_mon
@@ -39,6 +40,14 @@ def trainee_out(ctx: ExplorerContext) -> int | None:
     if t is None:
         return None
     b, sp = read_battle_mon(ctx.emu), party_species(ctx.emu)
+    ep = (ctx.__dict__.get("_grind_state") or {}).get("episode")  # a solo episode: the trainee fights alone
+    if ep and ep.get("solo") and active_pos(ctx) == t:
+        frac = b.hp / b.max_hp if b.max_hp else 0.0
+        sb = ep.get("solo_battle")
+        if not sb or sb[0] != ctx.battles:  # first call of the battle latches the start-HP gate
+            ep["solo_battle"] = (ctx.battles, frac >= SOLO_START_HP)
+        if ep["solo_battle"][1] and frac >= team_plan.SWITCH_MIN_HP:
+            return None
     return t if active_pos(ctx) == t and t < len(sp) and b.species == sp[t] else None
 
 

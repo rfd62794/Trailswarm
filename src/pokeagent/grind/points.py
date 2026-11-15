@@ -18,7 +18,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from pokeagent.grind import atlas
+from pokeagent.grind import atlas, xp_buckets
 from pokeagent.grind.points_io import band_of, patch_of, points_of, species_of
 
 log = logging.getLogger(__name__)
@@ -87,10 +87,12 @@ def _recompute(p: GrindPoint) -> None:
 
 
 def episode_result(p: GrindPoint, xp_gained: float, steps: int, blackouts: int,
-                   provenance: str = "organic", ep_id: str | None = None, now: str | None = None) -> GrindPoint:
+                   provenance: str = "organic", ep_id: str | None = None, now: str | None = None,
+                   trainee_level: int | None = None) -> GrindPoint:
     rate = xp_gained / (steps / atlas.STEPS_PER_MIN) if steps > 0 else 0.0  # fold one episode in by episode id
     prov = provenance if provenance in PROVENANCES else "unknown"
-    p.episodes[ep_id or f"e{len(p.episodes) + 1}"] = [rate, blackouts, prov]
+    p.episodes[ep_id or f"e{len(p.episodes) + 1}"] = \
+        [rate, blackouts, prov] + ([xp_buckets.bucket_of(trainee_level)] if trainee_level is not None else [])
     _recompute(p)
     p.updated = now or time.strftime("%Y-%m-%dT%H:%M:%S")
     return p
@@ -169,7 +171,7 @@ def _reachable(maps, pos, map_id, blocked) -> bool:
     return reachable(maps, pos, map_id, blocked)
 
 
-def _best(ledger, lvl, current_map, maps, blocked, only_maps, use_band):
+def _best(ledger, lvl, current_map, maps, blocked, only_maps, use_band, rank=None):
     best = None
     for p in ledger.points.values():
         lo, hi = p.level_band
@@ -179,16 +181,19 @@ def _best(ledger, lvl, current_map, maps, blocked, only_maps, use_band):
             continue
         if blocked and isinstance(current_map, (tuple, list)) and travel_steps(maps, current_map, p.map_id) < FAR_TRAVEL                 and not _reachable(maps, current_map, p.map_id, blocked):
             continue
-        xp = p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None)             else p.xp_per_min_prior
+        m = xp_buckets.measured_for(p, lvl)              # the trainee's own level bucket when it has the data
+        xp = m[0] if m is not None and m[1] >= MIN_MEASURED else \
+            p.xp_per_min_measured if (p.n_measured >= MIN_MEASURED and p.xp_per_min_measured is not None) \
+            else p.xp_per_min_prior
         score = xp - travel_steps(maps, current_map, p.map_id) / atlas.STEPS_PER_MIN - p.blackout_rate * atlas.BLACKOUT_STEPS
-        key = (-score, p.map_id)
+        key = (rank(p, score) or (True, -score, p.map_id)) if rank else (-score, p.map_id)
         if best is None or key < best[0]:
             best = (key, p)
     return best
 
 
 def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_map, mem=None,
-           trainee_slot: int | None = None, blocked=frozenset(), only_maps=None) -> GrindPoint | None:
+           trainee_slot: int | None = None, blocked=frozenset(), only_maps=None, *, rank=None) -> GrindPoint | None:
     """The best point for the trainee's level (``trainee_slot``, else the lead), or None when there is
     no gap. Deterministic: measured xp/min once MIN_MEASURED episodes exist (else prior) minus travel
     and blackout costs; ties by map id. ``blocked``: (map, x, y) tiles that are walls right now (a story
@@ -201,9 +206,9 @@ def choose(ledger: "GrindLedger", party_levels: list, need_level: int, current_m
     if need_level - lvl <= 0:
         return None
     maps = _maps_of(mem)
-    best = _best(ledger, lvl, current_map, maps, blocked, only_maps, True)
+    best = _best(ledger, lvl, current_map, maps, blocked, only_maps, True, rank)
     if best is None and only_maps is not None:  # a stage list with nothing in band: low XP beats no XP
-        best = _best(ledger, lvl, current_map, maps, blocked, only_maps, False)
+        best = _best(ledger, lvl, current_map, maps, blocked, only_maps, False, rank)
     return best[1] if best else None
 
 

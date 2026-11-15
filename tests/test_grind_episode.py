@@ -77,6 +77,16 @@ def _start(ctx, monkeypatch, tmp_path):
     return grind_episode.active(ctx)
 
 
+def test_episode_start_records_solo_and_level(tmp_path, monkeypatch):
+    """The started episode dict carries the trainee's start level (``lvl0``) and the solo flag; a
+    synthetic party with no ROM rows never latches solo."""
+    led = make_ledger()
+    led.path = tmp_path / "gp.json"
+    ctx = use_ledger(make_ctx(tmp_path, maps=PATCH_MAPS, lvl=10), led)
+    ep = _start(ctx, monkeypatch, tmp_path)
+    assert ep["lvl0"] == 10 and ep["solo"] is False
+
+
 def test_episode_ends_on_need_and_writes_the_drill_row(tmp_path, monkeypatch):
     led = make_ledger()
     led.path = tmp_path / "gp.json"                         # the ledger file lands in the run's own dir
