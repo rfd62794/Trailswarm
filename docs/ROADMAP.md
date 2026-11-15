@@ -73,6 +73,35 @@ region; the same four regions become MCP resources so Claude sees exactly what R
 - **Other games**: Pokemon Blue first (same engine), then Yellow, Crystal, a non-Pokemon GB game - see
   docs/superpowers/specs/2026-11-06-layered-methods-design.md "New game onboarding".
 
+## Milestone: Rewinder (added 2026-11-15, Robert)
+
+Robert, 2026-11-15: what he enjoys is watching a run solve known moments of the game, the small mistakes, and
+working out for himself where and why it got stuck. The Rewinder lets him do that on any finished run: scrub to a
+step and watch the sprite replay on the stitched map we already draw, with what the agent was doing underneath.
+It plays back the logs every run already writes (`transitions.jsonl`, `decisions.jsonl`, `levels.jsonl`); it
+records no video.
+
+Done when (slices 1 and 2, target Sunday 2026-11-29):
+
+1. `pokeagent rewind RUN --at STEP` prints the state of any finished run at any step (slice 1).
+2. In the viewer Robert opens a finished run, drags a scrubber, and the player sprite replays on the Kanto map
+   with an activity timeline, moment marks and party level bars - overworld only (slice 2).
+
+Slices, each one directive, each shippable on its own:
+
+| Slice | Delivers | Needs new logging | Status |
+|---|---|---|---|
+| 1 Playback core | Any step as one frame; activity segments; moments; `pokeagent rewind` (pure, no window, no ROM) | no | `docs/directives/Rewinder_Slice1_Playback_Core_Directive.md` |
+| 2 Viewer mode | Rewind mode in the viewer: scrubber, play/pause/speed, sprite on the map, timeline, moments, party bars | no | written after slice 1 merges (it pastes slice 1's real API) |
+| 3 Battle face | What happened inside a fight at a step: enemy, HP, move chosen | yes: per-turn battle rows | pool |
+| 4 Reasons | The gate verdict, training target and grind episode at each step, logged per step and shown on rewind | yes: a per-step reasons file | pool |
+
+Slice 4's log is the same data the live cards need (the "want / blocked by / doing" view sketched on 2026-11-15);
+that card replan is the sibling milestone and is not drafted yet.
+
+Rule for this milestone: nothing in the viewer may state the cause of a stall. It shows what happened; Robert
+works out why.
+
 ## Open decisions for Robert
 
 - How many Claude consults per run are acceptable in hybrid mode (cost ceiling)?
