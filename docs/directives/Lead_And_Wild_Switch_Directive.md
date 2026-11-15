@@ -138,7 +138,7 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
@@ -167,4 +167,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 22:33 · robert-claude-laptop · Review → Blocked — CHANGES-NEEDED round 3 (Sonnet review + real-ROM recheck of head 33b62c0; 65 targeted tests pass, size cap OK). Continue on the same branch. Your worktree has roms/, kb/, runs/checkpoints - REPRODUCE ON THE ROM before and after fixing: `uv run python tools/explore_demo.py --headless --state runs/checkpoints/buy_magikarp.state --steps 1500 --seed N` for N=3,4,5. Fix A (still fails): seed 3 steps 1217-1296 wild Geodude (169): Rattata L9 16->11->6->1->0, TACKLE/QUICK ATTACK both x0.5, NO switch_out decision anywhere 1219-1273 while Charmeleon healthy; seed 4 fight 750-815 Weedle 20->0 matchup_switches None; seed 5 fight 826-865 Rattata L8 13->0 matchup_switches None. Instrument matchup_pick/switch_choice(wild=True) with the REAL party+foe and find why it returns None (incoming-survives check vs the foe's hit, switch_gave_up latch, SWITCH_HP_TURNS math); add a test that uses the real kb tables (no mocked matchup_pick). Fix B: seed 3 steps 841-884 SwitchOut WEEDLE->CHARMELEON completed, then catch_switch (catch module) switched the Weedle back at 864-870 and it fainted at 884: catch_switch must never send in a member below the faint/thin threshold. Code bugs to fix: (1) _swap_owns_menu's trainee_out+switch_candidate branch is true whenever the trainee is out and any fit member exists, suppressing potion/flee in ordinary wild fights with no swap wanted - only own the menu while a swap is actually queued/in nav; (2) yield_to_switch now evaluates _swap_owns_menu before the `want_potion or kind == 1` guard, so it can yield in trainer fights on a stale matchup entry - restore the guard order. Done = on seeds 3/4/5 no non-trainee faint while a healthy reserve exists (blackouts from all-weak parties are out of scope; list any you see). Report the decisions.jsonl lines for the Geodude fight after the fix. Do not touch bring_out/Kakuna. Full suite 0 failed.
 - 2026-11-14 22:33 · robert-claude-laptop · Blocked → Queued — Requeue for the CHANGES-NEEDED round 3 fixes listed in the previous status line; continue on the same branch.
 - 2026-11-14 22:33 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 22:42 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7EMRJ4WGND0V7NV794G7DRT
 <!-- queue:end -->
