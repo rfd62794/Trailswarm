@@ -163,3 +163,17 @@ Diff stat, test tails, and the constants with their values (`PARA_SKIP`, `CONFUS
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:14 · agentflow-tick · none → Queued — suggested by heartbeat: Assign devin; dispatch only after Battle_Stat_Stage_And_Enemy_Moves merges to main (SideState missing locally)
+<!-- queue:end -->
