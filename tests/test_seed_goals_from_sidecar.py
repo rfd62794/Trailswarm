@@ -115,3 +115,10 @@ def test_out_of_order_bike_shop_does_not_drag(tmp_path):
     press_goals.seed_initial_goals(ctx)
     assert "to_route1" not in ctx.initial_goals and "beat_misty" not in ctx.initial_goals
     assert badge_anchored(0) == set() and "bike_shop" not in badge_anchored(0b11)
+
+
+def test_badge_gap_does_not_assume_skipped_badge():
+    from pokeagent.campaign import badge_anchored
+    got = badge_anchored(0b101)   # Boulder + Thunder, no Cascade
+    assert "beat_brock" in got and "beat_misty" not in got and "beat_surge" not in got
+    assert badge_anchored(0b11) >= got and "beat_misty" in badge_anchored(0b11)

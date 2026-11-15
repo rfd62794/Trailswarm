@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from pokeagent import party_rules, statefp
+from pokeagent import checkpoint_goals, party_rules, statefp
 from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
@@ -84,6 +84,7 @@ def save_entry(emu, d: str | Path, m: int, x: int, y: int, keep: int = KEEP) -> 
             _move_fp(src, d / name(m, x, y, i))
     os.replace(tmp, d / name(m, x, y))
     statefp.sidecar(d / name(m, x, y)).unlink(missing_ok=True)   # a stale stamp must not describe the new state
+    checkpoint_goals.sidecar(d / name(m, x, y)).unlink(missing_ok=True)   # nor a stale goals sidecar
     return d / name(m, x, y)
 
 
@@ -100,14 +101,17 @@ def save_named(emu, d: str | Path, stem: str, keep: int = KEEP) -> Path:
             _move_fp(d / nm(i - 1), d / nm(i))
     os.replace(tmp, d / nm(0))
     statefp.sidecar(d / nm(0)).unlink(missing_ok=True)
+    checkpoint_goals.sidecar(d / nm(0)).unlink(missing_ok=True)
     return d / nm(0)
 
 
 def _move_fp(src: Path, dst: Path) -> None:
-    if statefp.sidecar(src).exists():
-        os.replace(statefp.sidecar(src), statefp.sidecar(dst))
-    else:
-        statefp.sidecar(dst).unlink(missing_ok=True)
+    """Move a state's sidecars (RAM fingerprint and goals) with it; a missing source sidecar clears the destination's."""
+    for side in (statefp.sidecar, checkpoint_goals.sidecar):
+        if side(src).exists():
+            os.replace(side(src), side(dst))
+        else:
+            side(dst).unlink(missing_ok=True)
 
 
 def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
@@ -126,6 +130,7 @@ def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
         for f in groups[k]:
             f.unlink(missing_ok=True)
             statefp.sidecar(f).unlink(missing_ok=True)
+            checkpoint_goals.sidecar(f).unlink(missing_ok=True)
         dropped += len(groups[k])
     return dropped
 

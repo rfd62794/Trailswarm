@@ -462,3 +462,45 @@ def test_saver_writes_goals_sidecar(tmp_path):
     p = S.LegStateSaver(tmp_path / "legs").observe(ctx, fr((1, 3, 3), (2, 5, 6)))
     done = read_completed(p)
     assert done is not None and {"beat_brock", "beat_misty"} <= done
+
+
+def _goals_ctx(tmp_path, emu):
+    from pokeagent.explorer.context import ExplorerContext, ExplorerOptions
+    from pokeagent.explorer.memory import MapMemory
+    return ExplorerContext(emu=emu, mem=MapMemory(tmp_path / "maps.json"), run_dir=tmp_path, log=lambda m, t=None: None, opts=ExplorerOptions())
+
+
+def test_goals_sidecar_follows_its_state_through_rotation(tmp_path):
+    from pokeagent.checkpoint_goals import read_completed
+    d = tmp_path / "legs"
+    sv_dir = d
+    for badges in (0b1, 0b11, 0b111):   # three generations of the same key
+        emu = FakeEmu(); emu.mem[0xD356] = badges
+        S.LegStateSaver(sv_dir).observe(_goals_ctx(tmp_path, emu), fr((1, 0, 0), (2, 5, 6)))
+    new, old1, old2 = (read_completed(d / S.name(2, 5, 6, n)) for n in (0, 1, 2))
+    assert "beat_surge" in new and "beat_surge" not in old1 and "beat_misty" in old1
+    assert "beat_misty" not in old2 and "beat_brock" in old2
+
+
+def test_failed_sidecar_write_leaves_no_stale_sidecar(tmp_path, monkeypatch):
+    from pokeagent import checkpoint_goals as cg
+    d = tmp_path / "legs"
+    S.LegStateSaver(d).observe(_goals_ctx(tmp_path, FakeEmu()), fr((1, 0, 0), (2, 5, 6)))
+    assert cg.sidecar(d / S.name(2, 5, 6)).exists()
+    monkeypatch.setattr(cg, "write_completed", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    S.LegStateSaver(d).observe(_goals_ctx(tmp_path, FakeEmu()), fr((1, 0, 0), (2, 5, 6)))
+    assert not cg.sidecar(d / S.name(2, 5, 6)).exists()           # the new state has none, not the old one's
+    assert cg.sidecar(d / S.name(2, 5, 6, 1)).exists()            # the old one moved with its state
+
+
+def test_evict_removes_goals_sidecars(tmp_path):
+    from pokeagent import checkpoint_goals as cg
+    d = tmp_path / "legs"
+    for i in range(4):
+        S.LegStateSaver(d).observe(_goals_ctx(tmp_path, FakeEmu()), fr((1, 0, 0), (2, i, 0)))
+    S.evict(d, max_files=2)
+    left = {f.name for f in d.iterdir()}
+    for f in left:
+        if f.endswith(".goals.json"):
+            assert f[:-len(".goals.json")] in left      # no orphan sidecar
+    assert len([f for f in left if f.endswith(".state")]) < 4
