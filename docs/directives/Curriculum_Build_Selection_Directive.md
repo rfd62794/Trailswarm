@@ -134,7 +134,7 @@ Expected: the files in Scope only.
 
 ## Report
 
-Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS`, `STALL_MIN`) and where each is overridable. Then the checks Claude runs afterwards with the ROM and the real `runs/` (Devin cannot): with the swarm paused, run `uv run pokeagent states library build`, start `uv run python tools/swarm.py --continuous --plan curriculum --save-leg-states` for a few minutes and read the `curriculum:` log lines to confirm start states vary by build and no violating state is chosen; read `runs/states/build_tries.json` to confirm tries accumulate; confirm one auto-split on a real stalling segment by reading the `splits` key of `runs/segments.json` <!-- new: runs/segments.json -->.
+Diff stat, test tails, the constants (`SHARES`, `PROMISING_MIN_TRIES`, `MIN_RUNS`, `STALL_MIN`) and where each is overridable. Then the checks Claude runs afterwards with the ROM and the real `runs/` (Devin cannot): with the swarm paused, run the states-library build CLI (pokeagent states library build), start the swarm in curriculum mode (tools/swarm.py --continuous --plan curriculum --save-leg-states) for a few minutes and read the `curriculum:` log lines to confirm start states vary by build and no violating state is chosen; read `runs/states/build_tries.json` to confirm tries accumulate; confirm one auto-split on a real stalling segment by reading the `splits` key of `runs/segments.json` <!-- new: runs/segments.json -->.
 
 ## Forbidden Actions
 
