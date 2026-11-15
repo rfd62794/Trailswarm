@@ -52,6 +52,7 @@ def test_engine_notes_the_vetoed_plan_goal_talk(tmp_path):
     from test_loop_veto_engine import Stub, make_ctx
 
     ctx = make_ctx(tmp_path)
+    ctx.initial_goals_ready = True  # bare fake emulator: no start-state goal seeding
     ctx.facing = "UP"
     ctx.mem.m(0x28).setdefault("interactions", {})["5,6,UP"] = {"type": "info", "pages": ["hi"], "count": 8}
     engine = Engine(ctx, selector=Selector([Stub("plan_goal", "A")]))

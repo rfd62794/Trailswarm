@@ -43,6 +43,11 @@ def seed_initial_goals(ctx: ExplorerContext) -> None:
             ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
         elif stem == "team_best":
             ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
+        # No sidecar and no goal name: the ladder is a chain, so everything BEFORE the latest goal the RAM already shows is behind us.
+        # Without this, a mid-game state (Bill's house, 88_2_7) re-planned 'potion' / 'to_route1' from scratch and stalled at the
+        # nearest PC for 2,800 steps after the S.S. Ticket (seen 2026-11-15). The seen-map goals have no RAM detector of their own.
+        last = max((GOALS.index(g) for g in ctx.initial_goals if g in GOALS), default=-1)
+        ctx.initial_goals |= set(GOALS[:last + 1])
     if ctx.initial_goals:
         ctx.log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(ctx.initial_goals)}]", "res")
     try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past

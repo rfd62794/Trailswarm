@@ -26,6 +26,7 @@ def make_ctx(tmp_path, memory=None, **fields) -> ExplorerContext:
     emu = FakeEmulator({MAP: 0x28, PX: 5, PY: 6, **(memory or {})})
     mem = MapMemory(tmp_path / "maps.json")
     ctx = ExplorerContext(emu=emu, mem=mem, opts=ExplorerOptions(), run_dir=tmp_path, stable_frames=10, **fields)
+    ctx.initial_goals_ready = True  # these tests plan from a bare fake emulator: no start-state goal seeding
     return ctx
 
 
