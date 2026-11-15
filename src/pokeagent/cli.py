@@ -287,6 +287,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_world(sub)
     from pokeagent.statescmd import add_parser as _add_states
     _add_states(sub)
+    from pokeagent.rewind.cli import add_parser as _add_rewind
+    _add_rewind(sub)
 
     cli_hex.register(sub)
     cli_brain.register(sub)
