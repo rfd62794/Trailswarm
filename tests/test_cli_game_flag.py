@@ -31,6 +31,8 @@ def test_state_accepts_game(tmp_path, monkeypatch, capsys):
 def test_mcp_accepts_game(monkeypatch):
     import pokeagent.mcp_server as mcp_server
 
+    # The default-ROM assertion must not depend on the caller's environment.
+    monkeypatch.delenv("POKEAGENT_ROM", raising=False)
     seen = {}
     monkeypatch.setattr(
         mcp_server, "serve",
