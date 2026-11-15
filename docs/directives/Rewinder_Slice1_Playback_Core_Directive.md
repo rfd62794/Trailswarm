@@ -161,3 +161,17 @@ Diff stat, the two pytest tails, the `ACTIVITY` table as chosen, and the party f
 - Exec(uv run --frozen pytest)
 - Exec(git diff)
 - Exec(git grep)
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 12:12 · agentflow-tick · none → Queued — suggested by heartbeat: Fully specified pure-code slice (no ROM/window); prerequisites confirmed on disk; check against a real run stays with Claude
+<!-- queue:end -->
