@@ -137,11 +137,8 @@ uv run pytest -q -p no:cacheprovider -rfEs tests/test_frame_slot_layout.py tests
 Expected: `41 passed, 1 warning in ...s` (the only two test files that reference docs/ paths). Run the full suite
 `uv run pytest -q -p no:cacheprovider -rfEs` only if the machine is idle (about 5 minutes); it must stay 0 failed.
 Do NOT use `-p xdist -n 4`: pytest-xdist is not installed here and the command errors.
-```
-uv run pokeagent --help
-uv run pokeagent rewind --help
-```
-Expected: the subcommand list and flags in section 5. Every flag you document must appear in a `--help` you ran.
+Do NOT run `uv run pokeagent ... --help` (not on the dispatch allow list). Every flag you document must appear in the
+help text pasted in section 5; if a flag is not there, leave it out.
 `uv run pokeagent bytecheck scan` needs `runs/bytecheck/index.npz`, which needs the ROM and is absent in a worktree (it exits with
 "no bytecheck index"); it is NOT usable for this run. Run these text checks instead (not run by the author; the first must print
 nothing, the second must print nothing except possibly the existing "bring your own ROM" paragraph):
