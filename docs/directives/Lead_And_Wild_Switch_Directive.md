@@ -138,7 +138,7 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-lead-and-wild-switch-directive |
 | Base branch | - |
@@ -161,4 +161,5 @@ Diff stat, test tails, the new constants and their values. Then the check Claude
 - 2026-11-14 21:40 · robert-claude-laptop · Review → Blocked — CHANGES-NEEDED round 2 (Sonnet code review APPROVE on fixes 1-2; real-ROM proof FAILED, head ee83856). Continue on the same branch. ROM repro: `uv run python tools/explore_demo.py --headless --state runs/checkpoints/buy_magikarp.state --steps 1500 --seed 3` (party Weedle L3, Pidgey L8, Rattata L8, Charmeleon L19, Kakuna L4, Magikarp L5). Wild switches now DO fire (steps 662, 739: WEEDLE -> CHARMELEON thin). Fix A: steps 1217-1254, wild Geodude (species 169, ROCK/GROUND), non-trainee Rattata L9 went 16 -> 11 -> 6 -> 1 -> 0 on TACKLE/QUICK ATTACK with NO switch_out decision at all while Charmeleon sat healthy in slot 3 at 51 HP; find why yield_to_switch / matchup_pick(kind=1) / switch_choice(wild=True) returns None here (check switch_gave_up == battles, the 2-per-battle cap, the incoming-survives check vs Geodude, foe damage calc vs x0.5 resist) and fix it. Fix B: steps 841-884, Weedle L5 at 8 HP fainted after SWITCH was chosen twice (841, 870) yet the fight continued with Weedle; find why the chosen SWITCH did not complete (menu navigation / gave_up) and fix. Add behaviour-level tests reproducing both from synthetic parties (a Geodude-shaped resist foe; a switch that fails once). Do not touch bring_out/Kakuna (follow-up). Full suite 0 failed. Report the decisions.jsonl lines for steps 1217-1254 after the fix if you can run the ROM; otherwise say so - the ROM recheck stays Claude's.
 - 2026-11-14 21:40 · robert-claude-laptop · Blocked → Queued — Requeue for the CHANGES-NEEDED round 2 fixes listed in the previous status line; continue on the same branch.
 - 2026-11-14 21:40 · robert-claude-laptop · Queued → Approved
+- 2026-11-14 21:51 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-lead-and-wild-switch-directive; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7EHV1CYFKE5C3S4PAMAQ1MW
 <!-- queue:end -->
