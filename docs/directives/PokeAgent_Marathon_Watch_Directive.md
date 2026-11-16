@@ -23,10 +23,10 @@ tools/swarm_watch.py (ProgressWatch) catches `hung` (no transition for HUNG_S) a
 Common thread: no new campaign GOAL for thousands of steps while tiles/XP still trickle in.
 
 ## Facts already checked (origin/main), use them, do not re-derive
-- Run dir `runs/explore-<ts>-<pid>/` (gitignored; do not commit anything under runs/). Files: meta.json (has `tag`, `seed`, `start`, `steps`; NO control port today), transitions.jsonl (one line per press, key `to` = [map, x, y], so press count = line count), goal_frames.jsonl (one line per goal: goal, step, frame, optional skipped), levels.jsonl (party per battle end; read with pokeagent.training_progress marks/gained), progress.jsonl (rows: step, reasons, since), loops.jsonl, decisions.jsonl, console.log (ring file; contains lines `thinking: <why>`, `--- step N/M  map=0x.. pos=(..)  ... goals: ...`, and `STALL #N detected here - escalating with X`), claude_hold.json (lease; lease_active skips judging).
+- Run dir `runs/explore-<ts>-<pid>/` (gitignored; do not commit anything under runs/). Files: meta.json (has `tag`, `seed`, `start`, `steps`; NO control port today), transitions.jsonl (one line per press, key `to` = [map, x, y], so press count = line count), goal_frames.jsonl (one line per goal: goal, step, frame, optional skipped), levels.jsonl (party per battle end; read with pokeagent.training_progress marks/gained), progress.jsonl (rows: step, reasons, since), loops.jsonl, decisions.jsonl, console.log (ring file; contains lines `thinking: <why>`, `--- step N/M  map=0x.. pos=(..)  ... goals: ...`, and "STALL #N detected here - escalating with X"), claude_hold.json (lease; lease_active skips judging).
 - `pokeagent.goals.GOALS` is the ordered goal list; pending goals = GOALS minus goals in goal_frames.jsonl (ignore the ones in the run's own start state: the meta `start` goal).
 - control_server.py (POST /command, JSON `{"cmd": ...}`) already has `save_state {name}` (NAME_RE ^[A-Za-z0-9_-]{1,64}$). It has NO stop command.
-- guards.py emits the in-run `STALL #N` escalation (ctx.stalls counter).
+- guards.py emits the in-run "STALL #N" escalation (ctx.stalls counter).
 - find_run_dir in swarm_watch finds by seed; the marathon watcher must find by meta.json `tag` prefix instead.
 
 ## Build
