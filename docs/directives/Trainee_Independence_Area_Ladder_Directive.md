@@ -209,12 +209,14 @@ Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has me
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-trainee-independence-area-ladder--9f407a |
 | Base branch | - |
+| Base commit | 1381767f53b5bdbf6c704e9ed375bef383a29fa2 |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
 - 2026-11-15 18:55 · robert-claude-laptop · Queued → Approved — lint override: The three cited paths (grind/area_ladder.py, training_ctl/release.py, tests/test_area_ladder.py) are new files this directive creates; absent at main by design.
+- 2026-11-15 19:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-trainee-independence-area-ladder--9f407a; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7GVR1KBH7MY4AT7FTH3F8NS
 <!-- queue:end -->
