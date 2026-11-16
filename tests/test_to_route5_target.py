@@ -23,3 +23,24 @@ def test_in_cerulean_exploration_finds_the_south_exit(monkeypatch):
     monkeypatch.setattr(planner_east, "ship_gate_step", lambda *a, **k: None)
     g = SimpleNamespace(path=lambda pos, goal: None, blocked_now=frozenset())
     assert planner_east.east_road_step(g, {}, _goals(), (planner_east.CERULEAN, 5, 5)) is None
+
+
+def _done_through_ticket():
+    return {g: True for g in GOALS[:GOALS.index("to_route5")]}
+
+
+def test_plan_step_dispatches_to_route5_after_the_ticket():
+    """ss_ticket done, to_vermilion not: plan_step returned None (east_road_step was gated on to_vermilion), so to_route5 never ran."""
+    from pokeagent.explorer.planner import plan_step
+    assert _done_through_ticket()["ss_ticket"]
+    maps = {"3": {"visited": {"5,5": 1, "5,6": 1}}, "0": {}}
+    maps["88"] = {"visited": {"2,2": 1}, "warps": {"2,2,DOWN": [3, 5, 5]}}
+    step = plan_step(_done_through_ticket(), maps, (0x58, 2, 2), "UP")
+    assert step and step[0] == "DOWN" and "Cerulean" in step[1]
+
+
+def test_in_cerulean_pushes_to_the_southern_edge():
+    maps = {str(planner_east.CERULEAN): {"visited": {"5,5": 1, "5,6": 1, "6,5": 1}}}
+    g = SimpleNamespace(path=lambda pos, goal: None, blocked_now=frozenset())
+    out = planner_east._edge_frontier(g, maps, (planner_east.CERULEAN, 5, 6), "to_route5", "DOWN")
+    assert out == ("DOWN", "goal to_route5: at the southernmost open tile, pushing DOWN for the map edge")

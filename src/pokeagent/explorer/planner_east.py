@@ -46,13 +46,14 @@ def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str,
     (a person is never learned as a wall), and pushing into him loops forever (Nugget Bridge trainers, 2026-11-06)."""
     d = maps.get(str(pos[0]), {})
     visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
-    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
+    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}[side]
     tiles = [tuple(map(int, k.split(","))) for k in visited]
     tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
              and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})
              and (t[0] + dx, t[1] + dy) not in occupied]
-    order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
-    word = "easternmost" if side == "RIGHT" else "northernmost"
+    order = {"RIGHT": lambda t: (-t[0], abs(t[1] - pos[2])), "UP": lambda t: (t[1], abs(t[0] - pos[1])),
+             "DOWN": lambda t: (-t[1], abs(t[0] - pos[1]))}[side]
+    word = {"RIGHT": "easternmost", "UP": "northernmost", "DOWN": "southernmost"}[side]
     for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
         if (pos[1], pos[2]) == (tx, ty):
             return side, f"goal {stage}: at the {word} open tile, pushing {side} for the map edge"
@@ -136,7 +137,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
         return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
     if stage == "to_route5":  # after Bill's S.S. Ticket the agent sat in his house: no stage had a target (live marathon, 2026-11-15)
-        return None if pos[0] == CERULEAN else _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5")
+        if pos[0] != CERULEAN:
+            return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5")
+        occupied = frozenset((sx, sy) for _pic, sx, sy in goals.get("_sprites", ()))
+        return _edge_frontier(g, maps, pos, stage, "DOWN", occupied)  # Route 5 is the south connection: push to the southern edge
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
