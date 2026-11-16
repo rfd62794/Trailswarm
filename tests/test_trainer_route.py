@@ -172,3 +172,28 @@ def test_unmet_gym_leader_is_never_sight_blocked(tmp_path):
 
 def test_leader_goal_table_covers_all_eight_gyms():
     assert set(R.LEADER_GOALS) == {"BROCK", "MISTY", "LT.SURGE", "ERIKA", "KOGA", "SABRINA", "BLAINE", "GIOVANNI"}
+
+
+def test_trainer_hunt_closes_in_instead_of_looping_at_the_approach_tile(tmp_path, monkeypatch):
+    """Route 25 LASS 2026-11-15: standing on the approach tile with no fight, step() returned None, the frontier
+    walked off and the hunt walked back for ~2500 steps. It must walk up, face and talk, then give up (cap)."""
+    from pokeagent.explorer.behaviours import trainer_hunt as th
+    CLOSE_IN_CAP = getattr(th, "CLOSE_IN_CAP", 12)
+    ctx = make_ctx(tmp_path, memory={MAP: M, PX: 9, PY: 4})
+    ctx.trainer_ledger = T.TrainerLedger({M: [{"class": "LASS", "party": 10, "x": 7, "y": 4, "mons": []}]})
+    ctx.refresh()
+    ent = ctx.trainer_ledger.entries(M)[0]
+    monkeypatch.setattr(R, "options", lambda *a, **k: [R.TrainerOption(ent, 0, 1.0, "engage", "t")])
+    hunt = TrainerHunt()
+    d = hunt.step(ctx)
+    assert d is not None and d.rule == "trainer_hunt_close_in" and d.button == "LEFT"
+    ctx.view.x = 8                                              # adjacent now
+    ctx.facing = "UP"
+    d = hunt.step(ctx)
+    assert d.rule == "trainer_hunt_face" and d.button == "LEFT"
+    ctx.facing = "LEFT"
+    d = hunt.step(ctx)
+    assert d.rule == "trainer_hunt_talk" and d.button == "A"
+    for _ in range(CLOSE_IN_CAP):                               # never talks: bounded, then the trainer is dropped
+        hunt.step(ctx)
+    assert hunt.step(ctx) is None
