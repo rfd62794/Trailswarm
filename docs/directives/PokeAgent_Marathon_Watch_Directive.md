@@ -100,7 +100,7 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -110,4 +110,5 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 - 2026-11-16 00:08 · robert-claude-laptop · Queued → Approved — lint override: Cited paths are the new files this directive creates (tools/marathon_watch.py, src/pokeagent/marathon/*, tests) and gitignored runs/ areas named only as data locations.
 - 2026-11-16 00:08 · dispatcher · Approved → Blocked — preflight: needs: Read(C:/Github/PokeAgent./**)
 - 2026-11-16 01:50 · robert-claude-laptop · Blocked → Queued — Preflight block fixed by PR #319 (absolute repo path removed). Requeue.
+- 2026-11-16 01:51 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
