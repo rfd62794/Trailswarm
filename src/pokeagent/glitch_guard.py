@@ -8,7 +8,7 @@ never raises: an internal error returns True, so a guard bug cannot block a heal
 """
 from __future__ import annotations
 
-from pokeagent.glitch_signals import active_reasons, read_signals
+from pokeagent.glitch_signals import active_reasons, read_signals, shared_streaks
 from pokeagent.statefp import MAP, X, Y
 
 
@@ -19,7 +19,11 @@ def allow_write(emu, what, *, runs_dir="runs", run="", log=None) -> bool:
     ``trainee:<stem>``). On refusal the caller skips the write and keeps the last clean state untouched."""
     try:
         sig = read_signals(emu)
-        reasons = active_reasons(sig)
+        from pokeagent.novelty.discoveries import STUCK_STEPS
+        streaks = shared_streaks(emu)
+        # trainer_flags_stuck / move_override blip during scripted walks: refuse only once the detectors' streak has
+        # held STUCK_STEPS snapshots. script_oor stays instantaneous (the byte persists).
+        reasons = [r for r in active_reasons(sig) if r == "script_oor" or streaks.get(r, 0) >= STUCK_STEPS]
         if not reasons:
             return True
         from pokeagent.novelty.discoveries import DiscoveryLog

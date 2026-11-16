@@ -44,6 +44,42 @@ def test_a_broken_emulator_allows_the_write_instead_of_raising(tmp_path):
     assert glitch_guard.allow_write(Dead(), "x", runs_dir=tmp_path) is True
 
 
+# --- streak: the guard shares the detectors' persistence ------------------------------------------------------
+def _drive(lg, emu, sig_snap, n):
+    """Feed ``n`` consecutive identical snapshots through the discovery detectors (which publish the streaks)."""
+    for step in range(n):
+        lg.check(sig_snap, sig_snap, step, emu, {"counts": {}, "maps_known": True, "stage": {}, "seen_species": set(),
+                                                 "stage_now": None})
+
+
+def test_a_single_snapshot_blip_does_not_refuse(tmp_path):
+    from pokeagent import glitch_signals as gs
+    from pokeagent.novelty.features import Snapshot
+    for byte, fields in ((gs.MOVE_OVERRIDE, {"move_override": 1}), (gs.MISC_FLAGS, {"misc_flags": 1})):
+        emu = FakeEmulator({byte: 1})
+        _drive(dc.DiscoveryLog(tmp_path, "r", "explorer"), emu, Snapshot(sig=gs.Signals(**fields).as_tuple()), 1)
+        assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path, run="r") is True
+        assert not (tmp_path / dc.LOG_NAME).exists()
+
+
+def test_a_held_streak_refuses_and_a_gap_clears_it(tmp_path):
+    from pokeagent import glitch_signals as gs
+    from pokeagent.novelty.features import Snapshot
+    emu = FakeEmulator({gs.MOVE_OVERRIDE: 1})
+    lg = dc.DiscoveryLog(tmp_path, "r", "explorer")
+    blip = Snapshot(sig=gs.Signals(move_override=1).as_tuple())
+    _drive(lg, emu, blip, dc.STUCK_STEPS - 1)
+    assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path, run="r") is True      # 29: still a blip
+    _drive(lg, emu, blip, 1)
+    assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path, run="r") is False     # 30: refused
+    rec = json.loads((tmp_path / dc.LOG_NAME).read_text().splitlines()[-1])
+    assert (rec["kind"], rec["feature"]) == ("checkpoint_refused", "move_override")
+    _drive(lg, FakeEmulator(), Snapshot(sig=gs.Signals().as_tuple()), 1)                    # a clean snapshot resets
+    emu2 = FakeEmulator({gs.MOVE_OVERRIDE: 1})
+    gs.share_streaks(emu2, lg.streaks)
+    assert glitch_guard.allow_write(emu2, "goal:y", runs_dir=tmp_path, run="r") is True
+
+
 # --- call sites ------------------------------------------------------------------------------------------
 class LegEmu:
     """The minimal emu legs.states.calm reads: a healthy one-mon party plus optional glitch bytes."""

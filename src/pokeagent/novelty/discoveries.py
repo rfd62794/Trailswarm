@@ -15,6 +15,7 @@ from pokeagent.glitch_signals import (
     Signals,
     active_reasons,
     instant_text_candidate,
+    share_streaks,
 )
 from pokeagent.novelty.features import Snapshot, flag_bits
 
@@ -208,6 +209,7 @@ class DiscoveryLog:
         self.records: list[dict] = []
 
     def check(self, prev: Snapshot | None, cur: Snapshot, step: int, emu, ctx: dict) -> list[dict]:
+        share_streaks(emu, self.streaks)   # the checkpoint guard reads these same counters
         if cur.in_battle:
             self.last_battle_step = step
         ctx = {**ctx, "step": step, "last_battle_step": self.last_battle_step, "lvl_exp": self.lvl_exp,

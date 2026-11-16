@@ -10,6 +10,7 @@ Constants marked UNVERIFIED feed detectors only; the guard never enforces them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from weakref import WeakKeyDictionary
 
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
@@ -82,3 +83,24 @@ def active_reasons(sig: Signals) -> list[str]:
 def instant_text_candidate(sig: Signals) -> bool:
     """UNVERIFIED instant-text signature (wStatusFlags5 bit 6): logged by a detector only, never an active reason."""
     return bool(sig.status5 & INSTANT_TEXT_CANDIDATE)
+
+
+# Streak counters the discovery detectors keep (name -> consecutive snapshots a stuck-flag rule has held), shared per
+# emulator so the checkpoint guard applies the same persistence instead of refusing on a one-snapshot blip.
+_SHARED_STREAKS: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def share_streaks(emu, streaks: dict) -> None:
+    """Publish ``streaks`` (the live detector dict) for ``emu``; an emulator that cannot be weak-referenced is skipped."""
+    try:
+        _SHARED_STREAKS[emu] = streaks
+    except TypeError:
+        pass
+
+
+def shared_streaks(emu) -> dict:
+    """The detector streak counters published for ``emu`` ({} when no detector has run on it)."""
+    try:
+        return _SHARED_STREAKS.get(emu) or {}
+    except TypeError:
+        return {}
