@@ -6,7 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
-from pokeagent.explorer import cerulean_south
+from pokeagent.explorer import cerulean_south, route5_vermilion
 from pokeagent.explorer.cave_route import ladder_step, rom_route_step
 from pokeagent.explorer.planner_checkpoint import checkpoint_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
@@ -38,7 +38,7 @@ TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on
            # S.S. Anne: the rival and the captain's cabin are both at the east end of 2F (ROM warp 0x60 (36,4) -> 0x65); the ROM route
            # there is ship_gate.board_step. The bow target (PR #114) parked every segment attempt on a dead-end map.
            "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN),
-           "to_route5": _on(0x10)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
+           "to_route5": _on(0x10), "to_route6": _on(0x11), "to_vermilion": _on(0x05)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
 
 
 def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:
@@ -142,6 +142,12 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         if rom or pos[0] == cerulean_south.HOUSE:
             return rom
         return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None
+    if stage in route5_vermilion.STAGES:  # Route 5 -> Underground Path -> Route 6 -> Vermilion: the stages had no target (live marathon, 2026-11-15)
+        rom = route5_vermilion.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))
+        if rom or pos[0] in route5_vermilion.MAPS:
+            return rom
+        rom = cerulean_south.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))  # still on the Cerulean side of the wall
+        return rom or (_back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None)
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
