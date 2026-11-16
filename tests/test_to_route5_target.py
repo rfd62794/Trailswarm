@@ -42,7 +42,7 @@ def test_in_cerulean_the_injected_rom_route_leads_through_the_burgled_house(monk
 def test_route_step_edge_and_back_yard_with_a_fake_planner():
     plan = lambda start, goals, walls=None, blocked=None, hard=None: ["DOWN"] if goals is cerulean_south.BOTTOM else None
     assert "Route 5" in cerulean_south.route_step((cerulean_south.CERULEAN, 27, 8), plan)[1]
-    assert cerulean_south.route_step((cerulean_south.CERULEAN, 20, 35), plan) == ("DOWN", "goal to_route5: on Cerulean's south edge, pushing DOWN onto Route 5")
+    assert cerulean_south.route_step((cerulean_south.CERULEAN, 27, 35), plan) == ("DOWN", "goal to_route5: on Cerulean's south edge, pushing DOWN onto Route 5")
     assert cerulean_south.route_step((0x10, 1, 1), plan) is None
 
 
