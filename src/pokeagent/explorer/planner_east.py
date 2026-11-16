@@ -138,7 +138,7 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
         return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
     if stage == "to_route5":  # after Bill's S.S. Ticket the agent sat in his house: no stage had a target (live marathon, 2026-11-15)
-        rom = cerulean_south.route_step(pos)  # the ROM route round the wall (burgled house hole): exploration never found it
+        rom = cerulean_south.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))  # the ROM route round the wall (burgled house hole): exploration never found it
         if rom or pos[0] == cerulean_south.HOUSE:
             return rom
         return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None
