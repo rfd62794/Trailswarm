@@ -14,6 +14,8 @@ from pathlib import Path
 
 from pokeagent import training_progress as tp
 from pokeagent.goals import GOALS, is_unverified
+
+CHAIN_GAP = 12  # widest legitimate hole between landed ladder goals (unverified goals never land)
 from pokeagent.intervene.lease import lease_active
 
 STEP_RE = re.compile(r"^--- step (\d+)/\d+\s+map=0x([0-9a-fA-F]+)")
@@ -161,9 +163,18 @@ class RunView:
         """Ladder goals still ahead: GOALS minus goal_frames rows minus the goals the run's own
         start state settled (meta initial_goals, taken as listed, else the ``start`` checkpoint's prefix). Unverified
         goals never produce a goal_frames row, so they cannot count as pending."""
-        # No chain rule: initial_goals may hold an out-of-order goal (to_route22 from a to_bill checkpoint), and
-        # the agent's own next-goal pick (campaign.brief) is "first goal in order not met", so the watcher is too.
+        # The agent's next goal (campaign.brief) is "first goal in order not met", and an early landing of a far-ahead
+        # goal (to_route22 from a to_bill checkpoint) must not settle everything before it. So the chain rule (a landed
+        # goal settles those before it) only runs across a contiguous run of landings: a jump of more than CHAIN_GAP
+        # ladder slots is out of order and is counted as itself only.
         done = {g for g, _ in self.goal_steps} | set(self.meta.get("initial_goals") or [])
+        top = None
+        for i in sorted(GOALS.index(g) for g in done if g in GOALS):
+            if top is not None and i - top > CHAIN_GAP:
+                break
+            top = i
+        if top is not None:
+            done |= set(GOALS[: top + 1])
         start = self.meta.get("start")
         if start in GOALS:
             done |= set(GOALS[: GOALS.index(start) + 1])

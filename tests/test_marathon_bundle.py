@@ -107,5 +107,8 @@ def test_pending_goal_ignores_out_of_order_initial_goal(tmp_path):
     meta["initial_goals"] = prefix + ["to_route22"]
     (d / "meta.json").write_text(json.dumps(meta))
     v = RunView(d).refresh()
+    goals(d, *[(g, 100 + i) for i, g in enumerate(GOALS[GOALS.index("to_bill") + 1: GOALS.index("bicycle") + 1])
+               if not is_unverified(g)])
+    v = RunView(d).refresh()
     assert v.current_goal == "vermilion_gym_entry"
     assert "route22_gate" in v.pending_goals and "to_route22" not in v.pending_goals
