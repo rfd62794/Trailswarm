@@ -100,10 +100,11 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-marathon-watch-directive |
 | Base branch | - |
+| Base commit | 5aa43dd9bd1f78b8b31430d738da45f6dfb17de3 |
 
 **Status log**
 - 2026-11-15 21:48 · robert-claude-laptop · none → Queued
@@ -111,4 +112,5 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 - 2026-11-16 00:08 · dispatcher · Approved → Blocked — preflight: needs: Read(C:/Github/PokeAgent./**)
 - 2026-11-16 01:50 · robert-claude-laptop · Blocked → Queued — Preflight block fixed by PR #319 (absolute repo path removed). Requeue.
 - 2026-11-16 01:51 · robert-claude-laptop · Queued → Approved
+- 2026-11-16 01:52 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7HJ157ZN2Z57FKWTQE6PXS6
 <!-- queue:end -->
