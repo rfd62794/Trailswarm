@@ -13,7 +13,8 @@ from pokeagent.explorer import cerulean_south, route5_vermilion as r5v
 
 VERMILION, FAN_CLUB, BIKE_SHOP, CERULEAN = 0x05, 0x5A, 0x42, 0x03
 MAPS = frozenset({VERMILION, FAN_CLUB, BIKE_SHOP})
-PLANNER_MAPS = cerulean_south.MAPS | r5v.MAPS | MAPS  # what ctx.route_plan is built over (the demo and the headless tool both use it)
+YARD_HOUSE = 0xE6  # Cerulean's two-door house (front (9,11), back (9,9)): its back door opens into a walled yard (x 8-18, rows 7-9) that only the house leaves
+PLANNER_MAPS = cerulean_south.MAPS | r5v.MAPS | MAPS | {YARD_HOUSE}  # what ctx.route_plan is built over (the demo and the headless tool both use it)
 FAN_STAGES = ("pokemon_fan_club", "bike_voucher")
 BIKE_STAGES = ("bike_shop", "bicycle")
 GYM_STAGE = "vermilion_gym_entry"  # after the Bicycle: back to Vermilion and its gym door (a Cut tree at (15,18) closes the way in: field_cut uses CUT on it)
@@ -29,6 +30,8 @@ HOUSE_5_EXIT = {(r5v.PATH_5, 3, 7), (r5v.PATH_5, 4, 7)}   # the Route 5 house's 
 # Route 5 row 0 -> Cerulean row 35 (x + 10). Route 5's x 6-13 lead into a walled pocket of Cerulean (x 16-23, rows 34-35: ROM walls at x 15 and 24, row 33) that
 # the south part cannot be left from (live headless run 2026-11-16: 2,000 steps Route 5 <-> that pocket); x 1-4 and 15-18 are the way to the town side.
 ROUTE5_TOP = {(r5v.ROUTE5, x, 0) for x in (1, 2, 3, 4, 15, 16, 17, 18)}
+YARD_DOOR = (CERULEAN, 9, 9)                          # Cerulean's back-yard warp into the two-door house (a ROM-sealed yard: no way out on foot)
+YARD_MATS = {(YARD_HOUSE, 2, 7), (YARD_HOUSE, 3, 7)}   # that house's front-door mat: a press DOWN comes out on Cerulean's town side
 BIKE_EXIT = {(BIKE_SHOP, 2, 7), (BIKE_SHOP, 3, 7)}     # the Bike Shop's door mat
 BIKE_DOOR = (CERULEAN, 13, 25)                        # Cerulean's warp into the Bike Shop
 HOUSE_MATS = {(cerulean_south.HOUSE, 2, 7), (cerulean_south.HOUSE, 3, 7)}  # the burgled house's front-door mat: the way from its hole pocket (Cerulean's south part) up to the town
@@ -66,6 +69,8 @@ def _forward(stage, pos, plan, maps, blocked_now, cut=None):
     """To the Fan Club door in Vermilion; from the Cerulean / Route 5 / Route 6 side, back over route5_vermilion first."""
     if pos in FAN_EXIT or pos in BIKE_EXIT:
         return "DOWN", f"goal {stage}: on a door mat, pressing DOWN to leave"
+    if pos[0] == YARD_HOUSE:
+        return _yard(stage, pos, plan, maps, blocked_now)
     if pos[0] in (FAN_CLUB, BIKE_SHOP):  # the Bike Shop after the Bicycle (the stage walked on to the gym; 2,588 steps patrolled the shop otherwise)
         return _toward(plan, pos, FAN_EXIT if pos[0] == FAN_CLUB else BIKE_EXIT, maps, blocked_now, f"{stage}: out of the building")
     if pos[0] == VERMILION:
@@ -73,7 +78,22 @@ def _forward(stage, pos, plan, maps, blocked_now, cut=None):
         return _toward(plan, pos, {door}, maps, blocked_now, f"{stage}: to {what}", cut)
     if pos[0] in r5v.MAPS:
         return r5v.route_step(pos, plan, maps, blocked_now)
-    return cerulean_south.route_step(pos, plan, maps, blocked_now)
+    return cerulean_south.route_step(pos, plan, maps, blocked_now) or _yard(stage, pos, plan, maps, blocked_now)
+
+
+def _yard(stage, pos, plan, maps, blocked_now):
+    """Out of the two-door house's walled back yard (marathon-2026-11-16b: 17,000 steps patrolling it after the Bicycle): back in by the
+    back door, across the house, out by its front door onto the town side. None when the position is neither the house nor the yard."""
+    why = f"{stage}: out of the walled yard behind Cerulean's two-door house"
+    if pos in YARD_MATS:
+        return "DOWN", f"goal {why}: on the front door mat, pressing DOWN to leave"
+    if pos[0] == YARD_HOUSE:
+        return _toward(plan, pos, YARD_MATS, maps, blocked_now, why)
+    if pos[0] == CERULEAN and pos == YARD_DOOR:
+        return "UP", f"goal {why}: off the back door's tile, to step back onto it"
+    if pos[0] == CERULEAN:
+        return _toward(plan, pos, {YARD_DOOR}, maps, blocked_now, why)
+    return None
 
 
 def _back(stage, pos, plan, maps, blocked_now):
@@ -83,6 +103,8 @@ def _back(stage, pos, plan, maps, blocked_now):
         return "DOWN", f"goal {why}: on a door mat, pressing DOWN to leave"
     if pos in VERMILION_TOP or pos in ROUTE5_TOP:
         return "UP", f"goal {why}: on a map's north edge, pushing UP"
+    if pos[0] == YARD_HOUSE:
+        return _yard(stage, pos, plan, maps, blocked_now)
     if pos[0] == FAN_CLUB:
         goals = FAN_EXIT
     elif pos[0] == VERMILION:
@@ -94,7 +116,7 @@ def _back(stage, pos, plan, maps, blocked_now):
     elif pos[0] == cerulean_south.HOUSE:
         goals = HOUSE_MATS
     elif pos[0] == CERULEAN:  # the town side walks to the shop; the south side (Route 5's end) only reaches the burgled house's hole, so through it
-        return _toward(plan, pos, {BIKE_DOOR}, maps, blocked_now, why) or _toward(plan, pos, {(CERULEAN, 27, 9)}, maps, blocked_now, why)
+        return _toward(plan, pos, {BIKE_DOOR}, maps, blocked_now, why) or _toward(plan, pos, {(CERULEAN, 27, 9)}, maps, blocked_now, why) or _yard(stage, pos, plan, maps, blocked_now)
     else:
         return None
     return _toward(plan, pos, goals, maps, blocked_now, why)

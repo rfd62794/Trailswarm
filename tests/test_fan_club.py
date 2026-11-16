@@ -144,3 +144,48 @@ def test_rom_routes_reach_the_fan_club_and_back_to_the_bike_shop():
     south = (fc.CERULEAN, 20, 33)  # Route 5's end: the shop is not reachable on foot from here, the burgled house's hole is
     assert not plan(south, {fc.BIKE_DOOR}) and plan.follow(south, plan(south, {(fc.CERULEAN, 27, 9)}))[-1] == (cerulean_south.HOUSE, 3, 0)
     assert fc.route_step("bike_shop", south, plan)[0] in ("UP", "DOWN", "LEFT", "RIGHT")
+
+
+def _only(*reachable, answer="DOWN"):
+    """A planner that knows a route only to the given goal sets (everything else is walled off, like the ROM-sealed yard)."""
+    asked = []
+
+    def plan(start, goals, walls=None, blocked=None, hard=None, cut=False):
+        asked.append(set(goals))
+        return [answer] if any(set(goals) == set(r) for r in reachable) else None
+    return plan, asked
+
+
+@pytest.mark.parametrize("stage", ["bike_shop", "bicycle", "vermilion_gym_entry"])
+def test_the_walled_yard_behind_the_two_door_house_is_left_by_the_back_door(stage):
+    """marathon-2026-11-16b: after the Bicycle the agent left the 0xE6 house by its back door into a sealed yard and patrolled it for 17,000 steps (no route from there)."""
+    plan, asked = _only(fc.YARD_MATS, {fc.YARD_DOOR})
+    for pos in ((fc.CERULEAN, 10, 7), (fc.CERULEAN, 17, 8), (fc.CERULEAN, 9, 8)):
+        out = fc.route_step(stage, pos, plan, {}, (), {"can": False})
+        assert out and out[0] == "DOWN" and "yard" in out[1], pos
+        assert {fc.YARD_DOOR} in asked
+    assert fc.route_step(stage, (fc.CERULEAN, 9, 9), plan)[0] == "UP"  # arrived on the door tile: step off it, then back on
+    assert fc.route_step(stage, (fc.YARD_HOUSE, 2, 3), plan)[0] == "DOWN" and fc.YARD_MATS in asked
+    assert fc.route_step(stage, (fc.YARD_HOUSE, 3, 7), plan)[0] == "DOWN"  # the front mat: out onto the town side
+
+
+def test_the_town_side_still_prefers_the_real_route_over_the_yard():
+    plan, asked = _only({fc.BIKE_DOOR})
+    out = fc.route_step("bicycle", (fc.CERULEAN, 20, 20), plan)
+    assert out and "yard" not in out[1] and asked == [{fc.BIKE_DOOR}]
+
+
+def test_the_planner_maps_include_the_two_door_house():
+    assert fc.YARD_HOUSE in fc.PLANNER_MAPS
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="needs the ROM")
+def test_rom_yard_routes_come_out_on_the_town_side():
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
+    yard = (fc.CERULEAN, 10, 7)
+    assert not plan(yard, {fc.BIKE_DOOR}) and not plan(yard, {fc.GYM_DOOR})  # sealed on foot
+    for stage in ("bicycle", "vermilion_gym_entry"):
+        assert fc.route_step(stage, yard, plan)[0] in ("LEFT", "DOWN", "UP", "RIGHT")
+    assert fc.route_step("bicycle", (fc.CERULEAN, 9, 8), plan)[0] == "DOWN"
+    assert fc.route_step("bicycle", (fc.YARD_HOUSE, 2, 1), plan)[0] == "DOWN"
