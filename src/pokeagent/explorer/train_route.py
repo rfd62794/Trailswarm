@@ -11,6 +11,7 @@ from __future__ import annotations
 from pokeagent.explorer import grass_pace
 from pokeagent.explorer.planner_east import ROUTE24
 from pokeagent.explorer.world import WorldGraph
+from pokeagent.knowledge.encounters import map_name
 
 CERULEAN = 0x03       # Route 24's south exit
 MIN_HP_FRACTION = 0.5  # weaker than this the heal behaviours decide where to go
@@ -62,7 +63,7 @@ def step(maps: dict, pos: tuple, blocked, hp: int, mx: int, target: int = ROUTE2
     # GrindPoint.patch arrives from JSON as [[x, y]] lists (unhashable), so key each tile as text first
     src = patch if patch is not None else (maps.get(str(target)) or {}).get("encounters", {})
     grass = {t if isinstance(t, str) else f"{t[0]},{t[1]}" for t in src}
-    what = "Route 24" if target == ROUTE24 else f"map 0x{target:02X}"
+    what = map_name(target)
     if pos[0] == target:
         if not grass:
             return None

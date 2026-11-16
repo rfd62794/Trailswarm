@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pokeagent.bandit.hook import heal_push_on
-from pokeagent.explorer import train_route
+from pokeagent.explorer import train_route, train_target
 from pokeagent.explorer.economy import heal_items
 from pokeagent.explorer.perceive import heal_gate_hp, party_hp, party_needs_heal
 from pokeagent.explorer.retreat_risk import PARTY_FLOOR, party_survives
@@ -85,7 +85,8 @@ def to_grass(ctx, planned, pos, live: bool):
     publish(ctx, live)
     if live and (planned is None or leaving(planned, pos[0])):
         return train_route.step(ctx.mem.data["maps"], pos, ctx.mem.temp_blocked, *heal_gate_hp(ctx.emu),
-                                survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None)) or planned
+                                survives=party_survives(ctx.emu, ctx.view.m), heading=getattr(ctx, "facing", None),
+                                target=train_target.stage_target(ctx)) or planned
     return planned
 
 

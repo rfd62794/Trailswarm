@@ -61,6 +61,7 @@ def test_leaving_and_to_grass(monkeypatch):
     monkeypatch.setattr(sustain, "heal_gate_hp", lambda e: (10, 30))
     monkeypatch.setattr(sustain, "party_survives", lambda e, m: True)
     monkeypatch.setattr(sustain.train_route, "step", lambda *a, **k: ("LEFT", "to the grass"))
+    monkeypatch.setattr(sustain.train_target, "stage_target", lambda c: 0x23)   # the stub has no pos()/stage; its own tests cover the pick
     assert sustain.to_grass(ctx, ("UP", "keep"), (0x40, 4, 5), False) == ("UP", "keep")      # not live: untouched
     assert sustain.to_grass(ctx, None, (0x40, 4, 5), True) == ("LEFT", "to the grass")       # live, no plan: the walk
     assert sustain.to_grass(ctx, ("DOWN", "x: leaving the Pokecenter"), (0x40, 4, 5), True) == ("LEFT", "to the grass")
