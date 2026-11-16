@@ -100,11 +100,12 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-15 21:48 · robert-claude-laptop · none → Queued
+- 2026-11-16 00:08 · robert-claude-laptop · Queued → Approved — lint override: Cited paths are the new files this directive creates (tools/marathon_watch.py, src/pokeagent/marathon/*, tests) and gitignored runs/ areas named only as data locations.
 <!-- queue:end -->
