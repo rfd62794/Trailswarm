@@ -94,3 +94,17 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 - Add `control_port` to explore_demo's meta.json; `--port` stays the fallback.
 - `--stop`: add a small `stop` command to the explore_demo control server if it stays within ~15 lines; otherwise ship report-only and say so in the Report.
 - GRIND_GOALS: derive from the repo's own training/hold stages (team_ready, the gym holds that enforce a team floor, grind episodes) rather than a hand list; list what you derived in the Report.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 21:48 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
