@@ -198,7 +198,7 @@ later (this slice skips it and does not retry).
 | Branch | directive/pokeagent-pokeagent-glitch-detectors-directive |
 | Base branch | - |
 | Base commit | 5de14e470d162df583f3986c20465ccc98ef90c2 |
-| Head commit | 66d29f9a6b37c50752f108ad9a6e35f08d3b9c53 |
+| Head commit | 4cd32750dd2aa203ef8cc2de0703ed9d36d6dd3a |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
