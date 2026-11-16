@@ -173,12 +173,14 @@ List every claim you could not verify and therefore omitted. State no conclusion
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-docs-refresh-directive |
 | Base branch | - |
+| Base commit | 4cd68d73cd6f58e3cbc557fa5dec119fab20e6b0 |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
 - 2026-11-15 20:09 · robert-claude-laptop · Queued → Approved — lint override: Remaining hits are gitignored runs/ paths the directive only names, and docs/CLI.md, docs/TRAINING.md, docs/OPERATING.md which the directive creates.
+- 2026-11-15 20:10 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-docs-refresh-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GYEVBH1YMJG3S9D89D8SHE
 <!-- queue:end -->
