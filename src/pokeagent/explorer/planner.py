@@ -6,7 +6,8 @@ first battle (FIGHT), then the road to Pewter.
 from __future__ import annotations
 
 from pokeagent.explorer.planner_east import east_road_step
-from pokeagent.explorer.world import POKECENTER_MAPS, STARTERS, WorldGraph, interaction_spots, parcel_spots
+from pokeagent.explorer.ship_gate import leave_ship_step
+from pokeagent.explorer.world import POKECENTER_MAPS, SHIP_MAPS, STARTERS, WorldGraph, interaction_spots, parcel_spots
 
 # No-grind list for everything east of Pewter (Route 3/4, Mt Moon 1F/B1F/B2F, Cerulean + Pokecenter + Gym, Routes 24/25, Bill's house):
 # never turn back to Route 1 to train from here.
@@ -246,5 +247,9 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
     if goals.get("beat_brock") and not goals.get("ss_ticket"):
         return east_road_step(g, maps, goals, pos, facing)
     if goals.get("ss_ticket") and not goals.get("ss_anne_captain"):  # to_route5 on (it was gated on to_vermilion: dead code, 2026-11-15); Vermilion checkpoint, then aboard: the ROM route to the captain's door on 2F
+        return east_road_step(g, maps, goals, pos, facing)
+    if goals.get("ss_anne_captain") and pos[0] in SHIP_MAPS:  # Cut is in hand: no later goal has a ship target, so walk off the ship (2026-11-15: 1,100 steps on its decks)
+        return leave_ship_step(goals, pos, maps)
+    if goals.get("ss_anne_captain") and not goals.get("vermilion_gym_entry"):  # Vermilion after Cut: Fan Club -> Bike Voucher -> Cerulean Bike Shop -> Bicycle -> the gym door (marathon 2026-11-16a: no planner step from here, 1,500 steps in Vermilion)
         return east_road_step(g, maps, goals, pos, facing)
     return None

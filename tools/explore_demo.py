@@ -54,6 +54,16 @@ from explore_plan import ControlServer, png_bytes  # noqa: E402
 __all__ = ["DIRS", "box_open", "box_text", "frame_lines", "is_menu", "main"]  # probe_pc.py's imports
 
 
+def _meta_dict(a) -> dict:
+    """The run's meta.json: identity plus enough to find it again (control_port is additive)."""
+    return {"start": state_goal(Path(a.state).stem) if a.state else "baseline",
+            "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag,
+            "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace,
+            "starter": a.starter, "seed": a.seed, "frame_share": a.frame_share,
+            "train_level": a.train_level, "window": not a.headless,
+            "control_port": a.control_port, "git_sha": _git_sha() or ""}
+
+
 KEYS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT", "a": "A", "s": "B",
         "Return": "START", "Shift_L": "SELECT", "Shift_R": "SELECT"}
 
@@ -120,10 +130,7 @@ def main(argv=None) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     buf = JsonlBuffer()  # one cadence (every 50 steps + close) for the run's per-step jsonl appends
     trans = buf.open(run_dir / "transitions.jsonl")
-    (run_dir / "meta.json").write_text(json.dumps({"start": state_goal(Path(a.state).stem) if a.state else "baseline",
-                                                    "stop_at_goal": a.stop_at_goal, "stop_at_map": a.stop_at_map, "tag": a.tag, "steps": a.steps, "explore_rate": a.explore_rate, "box_pace": a.box_pace, "starter": a.starter, "seed": a.seed,
-                                                    "frame_share": a.frame_share, "train_level": a.train_level,
-                                                    "window": not a.headless, "git_sha": _git_sha() or ""}))
+    (run_dir / "meta.json").write_text(json.dumps(_meta_dict(a)))
     mem = MapMemory(Path(a.maps), record_paths=False)  # the demo's maps.json gains no 'paths' key
     emu = PyBoyEmulator(Path(a.rom), headless=True)
     emu.tick(60); emu.load_state(Path(a.state)); emu.tick(30)
@@ -183,9 +190,7 @@ def main(argv=None) -> int:
     from pokeagent.atlas.walkgrid import rom_cave_planner
     ctx.cave_plan = rom_cave_planner(a.rom)
     from pokeagent.explorer.world import SHIP_MAPS
-    from pokeagent.explorer.cerulean_south import MAPS as CERULEAN_MAPS
-    from pokeagent.explorer.route5_vermilion import MAPS as ROUTE5_MAPS
-    ROUTE_MAPS = CERULEAN_MAPS | ROUTE5_MAPS
+    from pokeagent.explorer.fan_club import PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
     ctx.route_plan = rom_cave_planner(a.rom, maps=ROUTE_MAPS)
     ctx.ship_plan = rom_cave_planner(a.rom, maps=SHIP_MAPS)
     from pokeagent.atlas.collision import rom_walkable_ids

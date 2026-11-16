@@ -30,6 +30,7 @@ ACTIVITY: dict[str, str] = {
     "advance_dialog": "text",    # keep text boxes moving
     # menus and menu-driven sequences
     "menu": "menu",              # YES/NO answers, move-forgetting, goal menu choices
+    "field_cut": "menu",         # START -> POKeMON -> member -> CUT on a tree in the route
     "party_order": "menu",       # START -> POKeMON -> SWITCH reorder walk
     "procedures": "menu",        # named menu-task sequences (check health, open bag, save, TOWN MAP)
     "procedure_runner": "menu",  # a loaded goal procedure's bounded steps

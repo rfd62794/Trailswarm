@@ -11,6 +11,7 @@ ROUTE5, PATH_5, PATH_NS, PATH_6, ROUTE6, VERMILION = 0x10, 0x47, 0x77, 0x4A, 0x1
 MAPS = frozenset({ROUTE5, PATH_5, PATH_NS, PATH_6, ROUTE6})
 STAGES = ("to_route6", "to_vermilion")
 EXIT = {(PATH_6, 3, 7), (PATH_6, 4, 7)}              # the Route 6 house's door mat: a bottom-edge warp, fired by a press DOWN
+SEALED_TOP = {(ROUTE5, x, 0) for x in range(6, 14)}  # Route 5's middle (x 6-13) is a set of closed rooms joined only to Cerulean's row 35 x 16-23: the way out is back UP
 BOTTOM_ROW = 35
 BOTTOM = {(ROUTE6, x, BOTTOM_ROW) for x in (8, 9, *range(11, 20))}  # Route 6's walkable cells on the connection to Vermilion
 
@@ -29,6 +30,12 @@ def route_step(pos: tuple, plan, maps: dict | None = None, blocked_now=()) -> tu
         blocks.setdefault(m, set()).add((x, y))
     goals = BOTTOM if pos[0] == ROUTE6 else EXIT  # Route 5 and the path chain to the house door in one plan (warps are planned through)
     path = plan(pos, goals, walls, blocks)
+    if not path and pos[0] == ROUTE5:  # no way on from here: inside the sealed middle, back up to Cerulean's south part
+        if pos in SEALED_TOP:
+            return "UP", "goal route5-vermilion: sealed part of Route 5, back UP to Cerulean"
+        path = plan(pos, SEALED_TOP, walls, blocks)
+        if path:
+            return path[0], f"goal route5-vermilion: {len(path)} steps back up out of Route 5's sealed middle"
     if not path:
         return None
     where = "Vermilion over Route 6" if goals is BOTTOM else "Route 6 through the Underground Path (the gate houses are shut)"

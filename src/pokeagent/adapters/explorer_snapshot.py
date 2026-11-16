@@ -182,6 +182,12 @@ class ExplorerAgentView:
             self.recent.append(Event(step=ctx.step, driver="human", text=f"load {name}"))
             return {}
 
+        def stop(**_) -> dict:
+            from pokeagent.explorer.demos import shutdown
+            ctx.done = True; shutdown(ctx)  # the step cap's own ending (headless then exits)
+            ctx.log(f"done: stopped by remote command at step {ctx.step}", "hdr")
+            return {}
+
         raw = {
             "pause": lambda **_: _ret(setattr(ctx, "paused", True)),
             "resume": lambda **_: _ret(setattr(ctx, "paused", False)),
@@ -191,6 +197,7 @@ class ExplorerAgentView:
             "hand_to": lambda driver, **_: _ret(hold.touch() if driver == "human" else hold.release()),
             "save_state": save_state,
             "load_state": load_state,
+            "stop": stop,
         }
         extra = intervene_handlers(self)
         raw.update(extra)
