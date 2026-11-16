@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from pokeagent import checkpoint_goals, party_rules, statefp
+from pokeagent import checkpoint_goals, glitch_guard, party_rules, statefp
 from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
@@ -173,6 +173,11 @@ class LegStateSaver:
                 return None
             if not calm(ctx.emu, bool(fr.box_after)):
                 return None
+            if not glitch_guard.allow_write(ctx.emu, f"leg:{a[0]}_{a[1]}_{a[2]}",
+                                            runs_dir=Path(getattr(ctx, "run_dir", ".")).parent,
+                                            run=Path(getattr(ctx, "run_dir", ".")).name,
+                                            log=lambda t: ctx.log(t, "res")):
+                return None  # not marked done: a later calm press retries once the signature clears
             self.done.add(tuple(a))
             if self.count is None:
                 self.count = len(list(self.dir.glob("*.state"))) if self.dir.is_dir() else 0
@@ -211,6 +216,11 @@ class LegStateSaver:
                 self.trainee_level = self.trainee_pending = level
             if not self.trainee_pending or not calm(ctx.emu, bool(fr.box_after)):
                 return None
+            if not glitch_guard.allow_write(ctx.emu, f"trainee:gyarados@L{self.trainee_pending}",
+                                            runs_dir=Path(getattr(ctx, "run_dir", ".")).parent,
+                                            run=Path(getattr(ctx, "run_dir", ".")).name,
+                                            log=lambda t: ctx.log(t, "res")):
+                return None  # trainee_pending stays set: the next calm press retries
             p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
             try:
                 fp = statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
