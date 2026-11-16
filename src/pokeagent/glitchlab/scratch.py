@@ -1,7 +1,7 @@
 """Scratch copies and report paths for the glitch lab.
 
 The input state is evidence: never opened for writing, never written beside. Copies land under
-the caller's scratch root and reports under ``<runs_dir>/discoveries/`` - the directory every
+the caller's scratch root and reports under ``<runs_dir>/<DIR_NAME>/`` - the directory every
 checkpoint/curriculum reader already ignores (``is_discovery_state`` is the guard they ask).
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ def scratch_copy(state, scratch_root) -> Path:
 
 
 def report_path(runs_dir, name) -> Path:
-    """``<runs_dir>/discoveries/glitchlab-<name>.jsonl`` - inside the discoveries directory so the
+    """``<runs_dir>/<DIR_NAME>/glitchlab-<name>.jsonl`` - inside the discoveries directory so the
     report can never be mistaken for a checkpoint or a curriculum state file."""
     p = Path(runs_dir) / DIR_NAME / f"glitchlab-{name}.jsonl"
     assert is_discovery_state(p) or (p.suffix == ".jsonl" and p.parent.name == DIR_NAME)

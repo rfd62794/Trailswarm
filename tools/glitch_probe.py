@@ -4,7 +4,7 @@
     uv run python tools/glitch_probe.py survey --state S --map ID [--name N]
 
 The input state is copied to scratch first (never opened for writing); the JSONL report and any
-kept save state land under <runs-dir>/discoveries/. Prints one JSON summary line (the verdict or
+kept save state land under the runs dir's discoveries directory. Prints one JSON summary line (the verdict or
 the survey summary) plus the report path. Exit 0 clean, 2 on usage error (missing state, bad
 script, placeholder steps), 1 on an aborted run. Importing this module never starts an emulator.
 """
@@ -101,7 +101,7 @@ def main(argv=None, *, emu_factory=None) -> int:
     for p in (r, s):
         p.add_argument("--rom", default=os.environ.get("POKEAGENT_ROM", "roms/Pokemon Red.gb"))
         p.add_argument("--runs-dir", default="runs")
-        p.add_argument("--name", default=None, help="report name under <runs-dir>/discoveries/")
+        p.add_argument("--name", default=None, help="report name inside the discoveries dir")
     a = ap.parse_args(argv)
     make_emu = emu_factory or pyboy_factory(a.rom)
     if a.cmd == "repro":

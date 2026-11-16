@@ -4,7 +4,7 @@ distance, one tile per step, with START pressed on the last (adjacent) tile's st
 The kb rows carry no facing and no sight range (trainer_route.SIGHT_GUESS is an UNVERIFIED
 guess), so this MEASURES: per tile, whether the engaged-trainer byte went nonzero and whether
 the Start menu still opened. Every (trainer, distance, tile) is one JSONL row under
-``<out_dir>/discoveries/``; each run starts from a fresh scratch copy of the state. Buttons
+``<out_dir>/<DIR_NAME>/``; each run starts from a fresh scratch copy of the state. Buttons
 and reads only.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ def survey_map(emu_factory, state, map_id, kb, *, distances=(2, 3, 4, 5, 6),
     out_dir = Path(out_dir)
     report = report_path(out_dir, name or f"survey-{map_id}")
     report.parent.mkdir(parents=True, exist_ok=True)
-    scratch_root = out_dir / DIR_NAME  # scratch copies sit beside the report, inside discoveries/
+    scratch_root = out_dir / DIR_NAME  # scratch copies sit beside the report, inside the discoveries dir
     menu_probe = menu_probe or default_menu_probe
 
     def probe(emu) -> dict:
