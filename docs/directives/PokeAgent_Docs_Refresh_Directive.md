@@ -173,11 +173,11 @@ List every claim you could not verify and therefore omitted. State no conclusion
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-docs-refresh-directive |
 | Base branch | - |
-| Base commit | 4cd68d73cd6f58e3cbc557fa5dec119fab20e6b0 |
+| Base commit | 8d9e0e2e6a8da2a220c6f8fd046426456349b405 |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
@@ -186,4 +186,5 @@ List every claim you could not verify and therefore omitted. State no conclusion
 - 2026-11-15 20:16 · dispatcher · In progress → Blocked — launch failed: [WinError 267] The directory name is invalid
 - 2026-11-15 20:17 · robert-claude-laptop · Blocked → Queued — Launch failed (WinError 267, directory name invalid): the controller's disk cleanup removed the freshly provisioned dispatch worktree (clean, 0 ahead of main) mid-launch. Requeue.
 - 2026-11-15 20:17 · robert-claude-laptop · Queued → Approved — lint override: Remaining hits are gitignored runs/ paths the directive only names, and docs/CLI.md, docs/TRAINING.md, docs/OPERATING.md which the directive creates.
+- 2026-11-15 20:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-docs-refresh-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GYXBM8PHEQ3M6VMX6CC3NH
 <!-- queue:end -->
