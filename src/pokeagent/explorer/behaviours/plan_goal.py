@@ -13,7 +13,7 @@ from pokeagent.explorer.retreat_risk import party_survives
 from pokeagent.explorer.planner import plan_step
 from pokeagent.explorer.grind import GRIND_BATTLES, GRIND_BATTLES_GYARADOS, GrindBudget, best_level, grinding_now, stall_hold_holds, STALL_HOLD_CAP
 from pokeagent.explorer.training import boss_need_for, gate_for, gate_state, readiness_for, required_level, set_blackout_tax, stage_goal, team_for, under_level_note
-from pokeagent.explorer import party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route, train_target
+from pokeagent.explorer import field_cut, party_log, area_grind, grind_episode, magikarp_deferral, par_follow, retalk_memory, train_route, train_target
 from pokeagent.explorer.training_ctl import exit_rule, sustain
 from pokeagent.explorer.world import POKECENTER_MAPS, WorldGraph
 from pokeagent.goals import GOALS
@@ -125,7 +125,7 @@ class PlanGoal(BehaviourBase):
         planned = plan_step({**goals_now_all, "_starter": ctx.opts.starter, "_blocked_now": frozenset(ctx.mem.temp_blocked), "_talk_vetoed": retalk_memory.active(ctx), "_declined": set(ctx.declined_balls), "_hp": heal_gate_hp(ctx.emu), **sustain.heal_now(ctx, goals_now_all).goal_keys(), "_parcel_spot": parcel,
                              "_level": lead, "_train_level": need, "_heal_trips": ctx.heal_trips,
                              "_center_intent": ctx.center_intent, "_ladders": ctx.ladders, "_cave_plan": ctx.cave_plan, "_rom_route": ctx.rom_route, "_sprites": [(pic, sx - 4, sy - 4) for pic, sy, sx in sprite_snapshot(ctx.emu)], "_mom_failed": ctx.mom_failed_until > ctx.step,
-                             "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_route_plan": ctx.route_plan, "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {}), "_buy_deferred": magikarp_deferral.deferred(ctx)},
+                             "_respawn": ctx.emu.read(0xD719), "_need": need_raw, "_ship": ctx.__dict__.setdefault("ship_state", {}), "_ship_plan": ctx.ship_plan, "_route_plan": ctx.route_plan, "_field_cut": field_cut.offer(ctx), "_ckpt_steps": ctx.__dict__.setdefault("ckpt_steps", {}), "_buy_deferred": magikarp_deferral.deferred(ctx)},
                             ctx.mem.data["maps"], (m, x, y), ctx.facing)
         planned = sustain.to_grass(ctx, planned, (m, x, y), bool(team_ready_stage and training_live))
         # the team gate holds at the gym door: while not ready the planner's stage push must not enter
