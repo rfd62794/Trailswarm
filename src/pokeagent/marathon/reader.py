@@ -159,12 +159,11 @@ class RunView:
     @property
     def pending_goals(self) -> list[str]:
         """Ladder goals still ahead: GOALS minus goal_frames rows minus the goals the run's own
-        start state settled (meta initial_goals, else the ``start`` checkpoint's prefix). Unverified
+        start state settled (meta initial_goals, taken as listed, else the ``start`` checkpoint's prefix). Unverified
         goals never produce a goal_frames row, so they cannot count as pending."""
+        # No chain rule: initial_goals may hold an out-of-order goal (to_route22 from a to_bill checkpoint), and
+        # the agent's own next-goal pick (campaign.brief) is "first goal in order not met", so the watcher is too.
         done = {g for g, _ in self.goal_steps} | set(self.meta.get("initial_goals") or [])
-        landed = [GOALS.index(g) for g in done if g in GOALS]
-        if landed:  # the ladder is a chain: a landed goal settles every goal before it
-            done |= set(GOALS[: max(landed) + 1])
         start = self.meta.get("start")
         if start in GOALS:
             done |= set(GOALS[: GOALS.index(start) + 1])

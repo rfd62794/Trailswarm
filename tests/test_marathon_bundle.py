@@ -96,3 +96,16 @@ def test_bundle_pending_goal_skips_unverified(tmp_path):
     assert v.current_goal == "ss_anne_captain" and "rival_ss_anne" not in v.pending_goals
     out = bundle.build(v, "guard_stall", ["guard_stall"])
     assert out["current_goal"] == "ss_anne_captain" and "ss_anne_captain" not in out["next_goals"]
+
+
+def test_pending_goal_ignores_out_of_order_initial_goal(tmp_path):
+    """A to_bill checkpoint run lists to_route22 (an early Route 22 visit) in initial_goals; it must not settle the
+    ladder up to index 116 - the agent's next goal is still vermilion_gym_entry."""
+    d = make_run(tmp_path)
+    prefix = list(GOALS[: GOALS.index("to_bill") + 1])
+    meta = json.loads((d / "meta.json").read_text())
+    meta["initial_goals"] = prefix + ["to_route22"]
+    (d / "meta.json").write_text(json.dumps(meta))
+    v = RunView(d).refresh()
+    assert v.current_goal == "vermilion_gym_entry"
+    assert "route22_gate" in v.pending_goals and "to_route22" not in v.pending_goals
