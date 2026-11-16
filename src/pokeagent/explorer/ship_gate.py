@@ -13,11 +13,12 @@ State lives in goals["_ship"] (a ctx-owned dict): {"off": 0 untouched | 1 walkin
 """
 from __future__ import annotations
 
-from pokeagent.explorer.world import SHIP_MAPS, WorldGraph
+from pokeagent.explorer.world import POKECENTER_MAPS, SHIP_MAPS, WorldGraph
 from pokeagent.goals import GOALS
 
 VERMILION, ROUTE6, DOCK = 0x05, 0x11, 0x5E
 DOCK_EXIT_PRESS = "UP"  # the dock's exit warp (14,0) is on its top edge
+DOCK_DOORS = ((18, 31), (19, 31))
 OUTSIDE = 255  # a ROM warp destination "the map you came from": the dock's exit to Vermilion
 SHIP_STAGES = ("to_ss_anne", "rival_ss_anne", "ss_anne_captain")
 # Cerulean -> Route 5 -> Route 5 gate (0x47) -> Underground Path (0x77) -> Route 6 gate (0x4A) -> Route 6 -> Vermilion
@@ -33,6 +34,8 @@ def _on(m: int):
 
 def under_level(goals: dict) -> bool:
     """The lead is below the stage's training level. ``_need`` is the level before the per-map gate (the ship's gate is 0)."""
+    if goals.get("rival_ss_anne"):
+        return False  # the rival is beaten: ss_anne_captain is a walk, and the next boss's level (Lt. Surge's, L29) is not the ship's gate (2026-11-15: a fit L19 lead left the ship for 3,000 steps in Diglett's Cave)
     level, need = goals.get("_level", 0), goals.get("_need", goals.get("_train_level", 0))
     return 0 < level < need
 
@@ -72,12 +75,20 @@ def walk_off_step(goals: dict, pos: tuple, maps: dict | None = None) -> tuple[st
     if st["steps"] > WALK_OFF_CAP:
         st["off"] = 2
         return None
+    step = _dock_exit(goals, pos, maps, f"goal walk-off: {'weak' if weak(goals) else 'under-level'} (L{goals.get('_level')}, need L{goals.get('_need')}, HP {goals.get('_hp')})")
+    if step is None:
+        st["off"] = 2  # no route (unreadable ROM): stay aboard rather than loop
+    return step
+
+
+def _dock_exit(goals: dict, pos: tuple, maps: dict | None, why: str) -> tuple[str, str] | None:
+    """The ROM route from anywhere aboard to the dock's exit warp (Vermilion); presses the edge warp when standing on it."""
+    plan = goals["_ship_plan"]
     exits = plan.warp_tiles(DOCK, OUTSIDE)
     if pos in exits:  # standing ON the edge warp: the plan from here is empty, the exit fires on one more press toward the edge
-        return DOCK_EXIT_PRESS, "goal walk-off: pressing out through the dock's exit to Vermilion"
+        return DOCK_EXIT_PRESS, f"{why}: pressing out through the dock's exit to Vermilion"
     buttons = plan(pos, exits)
     if not buttons:
-        st["off"] = 2  # no route (unreadable ROM): stay aboard rather than loop
         return None
     # An edge warp (the bow's two tiles) only fires on a press toward the edge, so the ROM hop onto its tile lands us ON it and the
     # next plan oscillates (DOWN/UP forever): when we stand on a LEARNED warp tile whose map lies on the route, press its direction.
@@ -85,8 +96,16 @@ def walk_off_step(goals: dict, pos: tuple, maps: dict | None = None) -> tuple[st
     for key, dest in (maps or {}).get(str(pos[0]), {}).get("warps", {}).items():
         x, y, d = key.split(",")
         if (int(x), int(y)) == pos[1:] and dest[0] in on_route and dest[0] != pos[0]:
-            return d, f"goal walk-off: taking the learned warp {key} to map 0x{dest[0]:02X}"
-    return buttons[0], f"goal walk-off: {'weak' if weak(goals) else 'under-level'} (L{goals.get('_level')}, need L{goals.get('_need')}, HP {goals.get('_hp')}), {len(buttons)} steps off the ship to Vermilion"
+            return d, f"{why}: taking the learned warp {key} to map 0x{dest[0]:02X}"
+    return buttons[0], f"{why}, {len(buttons)} steps off the ship to Vermilion"
+
+
+def leave_ship_step(goals: dict, pos: tuple, maps: dict | None = None) -> tuple[str, str] | None:
+    """The captain has given Cut (ss_anne_captain done) and the next goal is ashore: leave the ship by the ROM route instead of
+    exploring its decks (2026-11-15: 1,100 steps on the bow after HM01, no later goal has a ship target)."""
+    if not goals.get("ss_anne_captain") or pos[0] not in SHIP_MAPS or goals.get("_ship_plan") is None:
+        return None
+    return _dock_exit(goals, pos, maps, "goal leave the ship (captain done)")
 
 
 def ready_gate(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
@@ -123,6 +142,15 @@ def route_back_step(g: WorldGraph, goals: dict, pos: tuple, grid_get=None) -> tu
     return None
 
 
+def return_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None:
+    """A ship stage pending, nothing under-level to grind for, and the agent on a map off the ship's road (Route 11, a gate, Diglett's
+    Cave: exploration wandered there): walk the learned world back to Vermilion instead of exploring new discoveries forever."""
+    if pos[0] in SHIP_MAPS or pos[0] in BACK_MAPS or pos[0] == VERMILION or pos[0] in POKECENTER_MAPS or pos[0] == 0x5B or under_level(goals):
+        return None
+    p = g.path(pos, _on(VERMILION))
+    return (p[0], f"goal back to the ship: {len(p)} steps back to Vermilion (a ship stage is pending)") if p else None
+
+
 def _rom_step(pos: tuple, tile: tuple, grid_get=None) -> str | None:
     """First button of the ROM-grid par route to ``tile`` on this map (None without a ROM grid or a route)."""
     from pokeagent.legs import grid as G
@@ -153,7 +181,13 @@ def board_step(g: WorldGraph, goals: dict, pos: tuple) -> tuple[str, str] | None
         return None
     if pos[0] == VERMILION:
         p = g.path(pos, _on(DOCK))
-        return (p[0], f"goal boarding: {len(p)} steps to the S.S. Anne dock") if p else None
+        if p:
+            return p[0], f"goal boarding: {len(p)} steps to the S.S. Anne dock"
+        if pos[1:] in DOCK_DOORS:  # ROM: Vermilion's dock warps are the south edge tiles (18,31) and (19,31)
+            return "DOWN", "goal boarding: pressing down through the dock warp"
+        # the walk-off only LEARNED the dock's way out, not the way in: 1,400 steps of exploring Vermilion (2026-11-15). ROM grid route to the door.
+        step = _rom_step(pos, (VERMILION, *DOCK_DOORS[0]), goals.get("_grid_get"))
+        return (step, "goal boarding: ROM route to the S.S. Anne dock warp, way in not learned yet") if step else None
     if pos[0] not in SHIP_MAPS or pos[0] == CAPTAIN:
         return None
     plan = goals.get("_ship_plan")
@@ -165,4 +199,4 @@ def ship_gate_step(g: WorldGraph, goals: dict, stage: str | None, pos: tuple, gr
     if stage not in SHIP_STAGES:
         return None
     left_ship(goals, pos)
-    return walk_off_step(goals, pos, g.maps) or route_back_step(g, goals, pos, grid_get) or ready_gate(g, goals, pos) or board_step(g, goals, pos)
+    return walk_off_step(goals, pos, g.maps) or route_back_step(g, goals, pos, grid_get) or return_step(g, goals, pos) or ready_gate(g, goals, pos) or board_step(g, goals, pos)
