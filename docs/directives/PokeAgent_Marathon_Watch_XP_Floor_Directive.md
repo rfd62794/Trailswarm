@@ -73,3 +73,17 @@ None expected.
 
 ## Report
 Findings first: the floor source used per goal, how Magikarp was handled, which goals had no floor and fell back to the old behaviour. Then evidence: the tails of both pytest runs. Then files changed and any rule or case you could not implement and why.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-16 07:24 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
