@@ -1,6 +1,6 @@
 # Marathon Watch: stall detector for single long runs
 
-Repo: C:\Github\PokeAgent. Branch: directive/pokeagent-marathon-watch (never commit to main, never push, never merge).
+Repo: PokeAgent (this worktree). Branch: directive/pokeagent-marathon-watch (never commit to main, never push, never merge).
 Base: origin/main. Build it in your worktree only.
 
 ## Rules for this run
