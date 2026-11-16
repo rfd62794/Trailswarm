@@ -151,12 +151,14 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
+| Base commit | d60b76a694a293bc0f3d15ee940847515d7237a4 |
 
 **Status log**
 - 2026-11-16 08:17 · robert-claude-laptop · none → Queued
 - 2026-11-16 08:17 · robert-claude-laptop · Queued → Approved
+- 2026-11-16 08:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J83N4GSPH942S2D7H82K78
 <!-- queue:end -->
