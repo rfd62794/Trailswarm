@@ -14,7 +14,7 @@ many variants of the same segment are tried and graded without replaying the who
 | S3 | Pallet Town to the starter | left_house checkpoint | party count > 0 | 74 | Oak's speech (one-time), ball offer, nickname NO | trigger at the north gap (11,1); balls (6,3)/(7,3)/(8,3) faced from y=4 |
 | S4 | Rival battle in the lab | first_pokemon checkpoint | battle ended on the same tile | 89 | rival challenge text; FIGHT -> move 1 x ~7 | walk toward the lab door to trigger it; 14 turns; HP 10/16 -> 4/8 typical |
 | S5 | Lab to Route 1 | won_battle checkpoint | map 0x0C seen | 92 (one run) | rival leaves text | north gap again; first wild battles; flee below 40% HP |
-| S6 | Route 1 to Viridian City | to_route1 checkpoint | map 0x01 seen | - | - | not yet reached by any agent |
+| S6 | Route 1 to Viridian City | to_route1 checkpoint | map 0x01 seen | - | - | reached; the swarm went well past it (see the live table) |
 | S7 | Viridian Mart: Oak's Parcel | to_viridian checkpoint | bag has 0x46 | - | - | goals.json goal 6 |
 | S8 | Back to Oak: Pokedex | oaks_parcel checkpoint | START menu shows POKeDEX | - | - | goals.json goal 7 |
 | S9 | Pewter to Route 3 | beat_brock checkpoint | map 0x0E seen | - | - | push east out of Pewter (connection E) |
@@ -29,6 +29,12 @@ many variants of the same segment are tried and graded without replaying the who
 | S18 | Route 24 (Nugget Bridge) | beat_misty checkpoint | map 0x23 seen | - | - | Cerulean's north connection; bridge trainers |
 | S19 | Route 25 to Bill's house | nugget_bridge checkpoint | map 0x58 seen | - | - | push east from Route 24 into Route 25 (0x24); the house is the warp at (45,3) |
 | S20 | Bill: S.S. TICKET | to_bill checkpoint | bag has item 0x3F | - | - | talk to Bill through the transformation sequence |
+
+The named table stops at S20 because the segments past it are tracked in `runs/segments.json`, not by hand: the
+goal chain continues to `beat_champion` (see docs/campaign_goals.md), and each new segment gets its own checkpoints,
+attempts and splits the same way. For the live list of segments with their real try counts, rates and bests run
+`uv run python tools/segments.py` (or `uv run pokeagent review segments`) rather than reading records here - the
+numbers below are only as fresh as the last hand edit.
 
 Grading a segment variant: fewer presses wins when the end condition is met; a variant that loses HP it did
 not need to lose, or that triggered a stall, ranks below one that did not (review_runs.py reports waste per
@@ -59,3 +65,14 @@ attempts. Each job starts from the PREVIOUS segment's best checkpoint (`runs/che
   (at least 600 frames); polish goes to the segment with the most to win (expected minus best). A janitor deletes kept job
   dirs and candidate states older than 24 h that no best points at, and `end.state` is deleted from every run folder after
   ingest (only candidates keep a copy). `swarm.py --port-base N` picks the first control port (use >= 9700 for checks).
+
+### Build selection (which checkpoint starts a job)
+
+A segment can start from more than one saved state: the save library (`runs/states/library.json`, built by
+`pokeagent states library build`) indexes every checkpoint and leg state by its team build, so `statelib/start_pick.py`
+picks WHICH build a job starts from, once the curriculum has picked the segment. Three modes, drawn per job
+(deterministic from the job's seed): `exploit` 60% (the best build at that start by recorded readiness, then fewest
+steps and faints), `alternative` 25% (a rarity-weighted draw over the non-exploit cells, so rarely-tried builds get
+tried), `promising` 15% (the under-tried build - fewer than 3 tries - with the best readiness). The shares are untuned
+first values and can be overridden in `runs/curriculum_builds.json`. When no clean library cell matches the segment's
+start the picker returns nothing and the job falls back to the plain checkpoint path above.
