@@ -214,3 +214,29 @@ def test_a_tree_cut_failed_three_times_is_no_longer_routed_through(tmp_path):
     offer = fcut.offer(ctx)
     assert tree in offer["blocked"]
     assert fc.route_step(fc.GYM_STAGE, pos, _Plan(), cut=offer) is None and st["want"] is None
+
+
+# --- marathon-2026-11-16c: the Vermilion tree was never cut ---------------------------------------------------------------------------
+
+def test_field_cut_menu_presses_are_never_loop_vetoed():
+    """Live run: the party-list cursor moves do not change the screen text, so the loop ledger vetoed DOWN/A after 3 and swapped in B: CUT never ran."""
+    from pokeagent.explorer.loop_memory import NEVER_VETO
+    assert "field_cut" in NEVER_VETO
+
+
+def test_a_cooling_down_try_holds_at_the_tree_instead_of_giving_the_stage_to_exploration():
+    """After a failed try (400-step cooldown) the planner returned None and exploration walked off through Route 11 and Diglett's Cave."""
+    plan, pos = _Plan(), (fc.VERMILION, 14, 18)
+    assert fc.route_step(fc.GYM_STAGE, pos, plan, cut={"can": False, "hold": False}) is None  # no cutter / badge: not held
+    st = {"can": False, "hold": True}
+    out = fc.route_step(fc.GYM_STAGE, pos, plan, cut=st)
+    assert out and out[0] == "RIGHT" and "cooling down" in out[1] and not st.get("want")
+
+
+def test_offer_marks_hold_only_during_the_cooldown(tmp_path):
+    ctx = _ctx(tmp_path)
+    st = fcut.state(ctx)
+    st["cooldown_until"] = ctx.step + 50
+    assert fcut.offer(ctx)["hold"] and not fcut.offer(ctx)["can"]
+    ctx.step += 51
+    assert not fcut.offer(ctx)["hold"] and fcut.offer(ctx)["can"]
