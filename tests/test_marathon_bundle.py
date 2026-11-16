@@ -13,7 +13,7 @@ from pokeagent.marathon.reader import RunView  # noqa: E402
 def make_run(tmp_path, name="explore-1-1", tag="marathon-x"):
     d = tmp_path / "runs" / name
     d.mkdir(parents=True)
-    (d / "meta.json").write_text(json.dumps({"tag": tag, "seed": 7, "start": "bedroom", "steps": 99999}))
+    (d / "meta.json").write_text(json.dumps({"tag": tag, "seed": 7, "start": "to_bill", "steps": 99999}))
     return d
 
 
@@ -112,3 +112,14 @@ def test_pending_goal_ignores_out_of_order_initial_goal(tmp_path):
     v = RunView(d).refresh()
     assert v.current_goal == "vermilion_gym_entry"
     assert "route22_gate" in v.pending_goals and "to_route22" not in v.pending_goals
+
+
+def test_later_landing_does_not_settle_an_unreached_verified_goal(tmp_path):
+    """No prefix chain: a landed ss_ticket leaves the verified goals before it (here potion) pending."""
+    d = make_run(tmp_path)
+    meta = json.loads((d / "meta.json").read_text())
+    meta["start"] = "bedroom"
+    (d / "meta.json").write_text(json.dumps(meta))
+    goals(d, ("ss_ticket", 100))
+    v = RunView(d).refresh()
+    assert v.current_goal == "potion" and "ss_ticket" not in v.pending_goals
