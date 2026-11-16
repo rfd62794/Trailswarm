@@ -6,6 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
+from pokeagent.explorer import cerulean_south
 from pokeagent.explorer.cave_route import ladder_step, rom_route_step
 from pokeagent.explorer.planner_checkpoint import checkpoint_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
@@ -137,10 +138,10 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
         return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
     if stage == "to_route5":  # after Bill's S.S. Ticket the agent sat in his house: no stage had a target (live marathon, 2026-11-15)
-        if pos[0] != CERULEAN:
-            return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5")
-        occupied = frozenset((sx, sy) for _pic, sx, sy in goals.get("_sprites", ()))
-        return _edge_frontier(g, maps, pos, stage, "DOWN", occupied)  # Route 5 is the south connection: push to the southern edge
+        rom = cerulean_south.route_step(pos)  # the ROM route round the wall (burgled house hole): exploration never found it
+        if rom or pos[0] == cerulean_south.HOUSE:
+            return rom
+        return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)

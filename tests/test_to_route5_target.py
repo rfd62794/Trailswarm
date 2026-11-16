@@ -18,11 +18,20 @@ def test_from_bills_house_the_planner_walks_back_toward_cerulean(monkeypatch):
     assert out and out[0] == "DOWN" and "Cerulean" in out[1]
 
 
-def test_in_cerulean_exploration_finds_the_south_exit(monkeypatch):
+def test_in_cerulean_the_rom_route_leads_through_the_burgled_house(monkeypatch):
     monkeypatch.setattr(planner_east, "checkpoint_step", lambda *a, **k: None)
     monkeypatch.setattr(planner_east, "ship_gate_step", lambda *a, **k: None)
     g = SimpleNamespace(path=lambda pos, goal: None, blocked_now=frozenset())
-    assert planner_east.east_road_step(g, {}, _goals(), (planner_east.CERULEAN, 5, 5)) is None
+    out = planner_east.east_road_step(g, {}, _goals(), (planner_east.CERULEAN, 27, 13))
+    assert out and out[0] in ("UP", "LEFT", "RIGHT") and "hole" in out[1]  # the wall at row 28 has no Cut-free gap: round by the house
+
+
+def test_rom_route_in_the_house_and_back_yard():
+    from pokeagent.explorer import cerulean_south as cs
+    assert cs.route_step((cs.HOUSE, 2, 7))[0] == "UP"                  # inside, heading for the hole at (3, 0)
+    assert "Route 5" in cs.route_step((cs.CERULEAN, 27, 8))[1]          # behind the house: the south region is open
+    assert cs.route_step((cs.CERULEAN, 20, 35)) == ("DOWN", "goal to_route5: on Cerulean's south edge, pushing DOWN onto Route 5")
+    assert cs.route_step((0x10, 1, 1)) is None
 
 
 def _done_through_ticket():
