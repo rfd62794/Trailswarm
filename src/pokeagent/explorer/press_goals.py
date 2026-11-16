@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 
+import pokeagent.campaign as campaign
 import pokeagent.party_rules as party_rules
 import pokeagent.statefp as statefp
 from pokeagent.checkpoint_goals import (
@@ -43,6 +44,8 @@ def seed_initial_goals(ctx: ExplorerContext) -> None:
             ctx.initial_goals |= set(GOALS[:GOALS.index(stem) + 1])
         elif stem == "team_best":
             ctx.initial_goals |= set(GOALS[:GOALS.index("to_route1") + 1])
+        else:  # a leg state / odd state: no sidecar, not a goal name. Badge bits (strictly ordered, RAM-verified) imply earlier goals.
+            ctx.initial_goals |= campaign.badge_anchored(ctx.emu.read(campaign.BADGES))
     if ctx.initial_goals:
         ctx.log(f"[starting from {stem or 'the baseline'}: goals assumed done: {sorted(ctx.initial_goals)}]", "res")
     try:  # the swarm orchestrator scores 'attempts' from this: a run cannot attempt a goal it already started past
