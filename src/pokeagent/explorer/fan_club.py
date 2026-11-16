@@ -12,7 +12,7 @@ from __future__ import annotations
 from pokeagent.explorer import cerulean_south, route5_vermilion as r5v
 
 VERMILION, FAN_CLUB, BIKE_SHOP, CERULEAN = 0x05, 0x5A, 0x42, 0x03
-MAPS = frozenset({VERMILION, FAN_CLUB})
+MAPS = frozenset({VERMILION, FAN_CLUB, BIKE_SHOP})
 PLANNER_MAPS = cerulean_south.MAPS | r5v.MAPS | MAPS  # what ctx.route_plan is built over (the demo and the headless tool both use it)
 FAN_STAGES = ("pokemon_fan_club", "bike_voucher")
 BIKE_STAGES = ("bike_shop", "bicycle")
@@ -29,7 +29,8 @@ HOUSE_5_EXIT = {(r5v.PATH_5, 3, 7), (r5v.PATH_5, 4, 7)}   # the Route 5 house's 
 # Route 5 row 0 -> Cerulean row 35 (x + 10). Route 5's x 6-13 lead into a walled pocket of Cerulean (x 16-23, rows 34-35: ROM walls at x 15 and 24, row 33) that
 # the south part cannot be left from (live headless run 2026-11-16: 2,000 steps Route 5 <-> that pocket); x 1-4 and 15-18 are the way to the town side.
 ROUTE5_TOP = {(r5v.ROUTE5, x, 0) for x in (1, 2, 3, 4, 15, 16, 17, 18)}
-BIKE_DOOR = (CERULEAN, 13, 25)                         # Cerulean's warp into the Bike Shop
+BIKE_EXIT = {(BIKE_SHOP, 2, 7), (BIKE_SHOP, 3, 7)}     # the Bike Shop's door mat
+BIKE_DOOR = (CERULEAN, 13, 25)                        # Cerulean's warp into the Bike Shop
 HOUSE_MATS = {(cerulean_south.HOUSE, 2, 7), (cerulean_south.HOUSE, 3, 7)}  # the burgled house's front-door mat: the way from its hole pocket (Cerulean's south part) up to the town
 
 
@@ -48,10 +49,10 @@ def _toward(plan, pos, goals, maps, blocked_now, why) -> tuple[str, str] | None:
 
 def _forward(stage, pos, plan, maps, blocked_now):
     """To the Fan Club door in Vermilion; from the Cerulean / Route 5 / Route 6 side, back over route5_vermilion first."""
-    if pos in FAN_EXIT:
-        return "DOWN", f"goal {stage}: on the Fan Club's door mat, pressing DOWN to leave"
-    if pos[0] == FAN_CLUB:
-        return _toward(plan, pos, FAN_EXIT, maps, blocked_now, f"{stage}: out of the Fan Club")
+    if pos in FAN_EXIT or pos in BIKE_EXIT:
+        return "DOWN", f"goal {stage}: on a door mat, pressing DOWN to leave"
+    if pos[0] in (FAN_CLUB, BIKE_SHOP):  # the Bike Shop after the Bicycle (the stage walked on to the gym; 2,588 steps patrolled the shop otherwise)
+        return _toward(plan, pos, FAN_EXIT if pos[0] == FAN_CLUB else BIKE_EXIT, maps, blocked_now, f"{stage}: out of the building")
     if pos[0] == VERMILION:
         door, what = (GYM_DOOR, "the gym door (12,19)") if stage == GYM_STAGE else (FAN_DOOR, "the Fan Club door (9,13)")
         return _toward(plan, pos, {door}, maps, blocked_now, f"{stage}: to {what}")

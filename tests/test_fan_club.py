@@ -57,6 +57,15 @@ def test_plan_step_reaches_the_east_road_after_the_captain_until_the_bicycle():
     assert plan_step({**_goals("beat_surge"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP") is None
 
 
+def test_after_the_bicycle_the_bike_shop_is_left_for_the_gym():
+    """Live headless run: the Bicycle landed at step 424 and the agent then patrolled the shop for 2,588 steps (no target for vermilion_gym_entry)."""
+    plan, asked = _asking(("DOWN",))
+    goals = {**_goals("vermilion_gym_entry"), "_route_plan": plan}
+    assert planner_east.east_road_step(G, {}, goals, (fc.BIKE_SHOP, 3, 7))[0] == "DOWN" and not asked
+    assert planner_east.east_road_step(G, {}, goals, (fc.BIKE_SHOP, 4, 4))[0] == "DOWN" and asked == [fc.BIKE_EXIT]
+    assert planner_east.TARGETS["vermilion_gym_entry"]((0x5C, 1, 1))
+
+
 def test_inside_the_fan_club_the_voucher_stage_is_a_talk_not_a_route():
     plan, asked = _asking()
     assert planner_east.east_road_step(G, {}, {**_goals("bike_voucher"), "_route_plan": plan}, (fc.FAN_CLUB, 3, 6)) is None and not asked
@@ -125,10 +134,11 @@ def test_rom_routes_reach_the_fan_club_and_back_to_the_bike_shop():
     plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
     assert plan.warp_tiles(fc.VERMILION, fc.FAN_CLUB) == {fc.FAN_DOOR} and plan.warp_tiles(fc.CERULEAN, fc.BIKE_SHOP) == {fc.BIKE_DOOR}
     assert plan((fc.VERMILION, 18, 25), {fc.FAN_DOOR})
-    for start, goals in (((fc.FAN_CLUB, 3, 6), fc.FAN_EXIT), ((fc.VERMILION, 9, 14), fc.VERMILION_TOP), ((rv.ROUTE6, 8, 35), fc.HOUSE_5_EXIT),
+    for start, goals in (((fc.FAN_CLUB, 3, 6), fc.FAN_EXIT), ((fc.BIKE_SHOP, 4, 2), fc.BIKE_EXIT), ((fc.VERMILION, 9, 14), fc.VERMILION_TOP), ((rv.ROUTE6, 8, 35), fc.HOUSE_5_EXIT),
                          ((rv.ROUTE5, 16, 28), fc.ROUTE5_TOP), ((fc.CERULEAN, 27, 11), {fc.BIKE_DOOR}), ((cerulean_south.HOUSE, 3, 0), fc.HOUSE_MATS)):
         path = plan(start, goals)
-        assert path and plan.follow(start, path)[-1] in goals, start
+        end = plan.follow(start, path)[-1] if path else None
+        assert end in goals or (goals == {fc.BIKE_DOOR} and end == (fc.BIKE_SHOP, 2, 7)), start  # a goal warp is followed into the shop
     for _m, x, _y in fc.ROUTE5_TOP:  # every Route 5 exit cell lands on a Cerulean cell joined to the burgled house's hole (none in the walled pocket)
         assert plan((fc.CERULEAN, x + 10, 35), {(fc.CERULEAN, 27, 9)}), x
     south = (fc.CERULEAN, 20, 33)  # Route 5's end: the shop is not reachable on foot from here, the burgled house's hole is
