@@ -16,7 +16,7 @@ MAPS = frozenset({VERMILION, FAN_CLUB, BIKE_SHOP})
 PLANNER_MAPS = cerulean_south.MAPS | r5v.MAPS | MAPS  # what ctx.route_plan is built over (the demo and the headless tool both use it)
 FAN_STAGES = ("pokemon_fan_club", "bike_voucher")
 BIKE_STAGES = ("bike_shop", "bicycle")
-GYM_STAGE = "vermilion_gym_entry"  # after the Bicycle: back to Vermilion and its gym door (a Cut tree stands in front: no Cut-use behaviour yet)
+GYM_STAGE = "vermilion_gym_entry"  # after the Bicycle: back to Vermilion and its gym door (a Cut tree at (15,18) closes the way in: field_cut uses CUT on it)
 STAGES = FAN_STAGES + BIKE_STAGES + (GYM_STAGE,)
 GYM = 0x5C
 GYM_DOOR = (VERMILION, 12, 19)                         # Vermilion's warp into the gym
@@ -34,20 +34,32 @@ BIKE_DOOR = (CERULEAN, 13, 25)                        # Cerulean's warp into the
 HOUSE_MATS = {(cerulean_south.HOUSE, 2, 7), (cerulean_south.HOUSE, 3, 7)}  # the burgled house's front-door mat: the way from its hole pocket (Cerulean's south part) up to the town
 
 
-def _ask(plan, pos, goals, maps, blocked_now):
+def _ask(plan, pos, goals, maps, blocked_now, cut=False):
     walls = {m: set((maps or {}).get(str(m), {}).get("blocked", ())) for m in PLANNER_MAPS}
     blocks: dict = {}
     for m, x, y in blocked_now:
         blocks.setdefault(m, set()).add((x, y))
-    return plan(pos, goals, walls, blocks)
+    return plan(pos, goals, walls, blocks, cut=True) if cut else plan(pos, goals, walls, blocks)
 
 
-def _toward(plan, pos, goals, maps, blocked_now, why) -> tuple[str, str] | None:
+def _toward(plan, pos, goals, maps, blocked_now, why, cut=None) -> tuple[str, str] | None:
+    """The first press of the route; ``cut`` (field_cut's state dict, with ``can``) lets a route that has no Cut-free way go through a tree."""
     path = _ask(plan, pos, goals, maps, blocked_now)
-    return (path[0], f"goal {why}: {len(path)} steps") if path else None
+    if path:
+        return path[0], f"goal {why}: {len(path)} steps"
+    if not (cut and cut.get("can") and hasattr(plan, "trees")):
+        return None
+    path = _ask(plan, pos, goals, maps, blocked_now, cut=True)
+    if not path:
+        return None
+    ahead = plan.follow(pos, path[:1])[-1]
+    if ahead[1:] in plan.trees(pos[0]) and ahead[0] == pos[0]:  # the first step enters a cuttable tree: field_cut uses CUT on it
+        cut["want"] = {"pos": tuple(pos), "dir": path[0], "tree": tuple(ahead)}
+        return path[0], f"goal {why}: {len(path)} steps through the Cut tree at {ahead[1:]}"
+    return path[0], f"goal {why}: {len(path)} steps (the route needs Cut at a tree)"
 
 
-def _forward(stage, pos, plan, maps, blocked_now):
+def _forward(stage, pos, plan, maps, blocked_now, cut=None):
     """To the Fan Club door in Vermilion; from the Cerulean / Route 5 / Route 6 side, back over route5_vermilion first."""
     if pos in FAN_EXIT or pos in BIKE_EXIT:
         return "DOWN", f"goal {stage}: on a door mat, pressing DOWN to leave"
@@ -55,7 +67,7 @@ def _forward(stage, pos, plan, maps, blocked_now):
         return _toward(plan, pos, FAN_EXIT if pos[0] == FAN_CLUB else BIKE_EXIT, maps, blocked_now, f"{stage}: out of the building")
     if pos[0] == VERMILION:
         door, what = (GYM_DOOR, "the gym door (12,19)") if stage == GYM_STAGE else (FAN_DOOR, "the Fan Club door (9,13)")
-        return _toward(plan, pos, {door}, maps, blocked_now, f"{stage}: to {what}")
+        return _toward(plan, pos, {door}, maps, blocked_now, f"{stage}: to {what}", cut)
     if pos[0] in r5v.MAPS:
         return r5v.route_step(pos, plan, maps, blocked_now)
     return cerulean_south.route_step(pos, plan, maps, blocked_now)
@@ -85,7 +97,7 @@ def _back(stage, pos, plan, maps, blocked_now):
     return _toward(plan, pos, goals, maps, blocked_now, why)
 
 
-def route_step(stage: str, pos: tuple, plan, maps: dict | None = None, blocked_now=()) -> tuple[str, str] | None:
+def route_step(stage: str, pos: tuple, plan, maps: dict | None = None, blocked_now=(), cut=None) -> tuple[str, str] | None:
     """(button, why) toward the Fan Club (FAN_STAGES) or the Bike Shop (BIKE_STAGES) from a (map, x, y), else None.
     Inside the target map the stage is a talk (GoalTalk), not a route."""
     if plan is None or stage not in STAGES:
@@ -93,5 +105,5 @@ def route_step(stage: str, pos: tuple, plan, maps: dict | None = None, blocked_n
     if stage in FAN_STAGES:
         return None if pos[0] == FAN_CLUB else _forward(stage, pos, plan, maps, blocked_now)
     if stage == GYM_STAGE:
-        return None if pos[0] == GYM else _forward(stage, pos, plan, maps, blocked_now)  # the Bike Shop is left by patrol_exit (its learned door)
+        return None if pos[0] == GYM else _forward(stage, pos, plan, maps, blocked_now, cut)  # the Bike Shop is left by patrol_exit (its learned door)
     return None if pos[0] == BIKE_SHOP else _back(stage, pos, plan, maps, blocked_now)

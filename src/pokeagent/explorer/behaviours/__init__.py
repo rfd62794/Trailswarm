@@ -14,6 +14,7 @@ from pokeagent.explorer.behaviours.box_settle import BoxSettle, PostTalkSettle
 from pokeagent.explorer.behaviours.catch import Catch
 from pokeagent.explorer.behaviours.cave_escape import CaveEscape
 from pokeagent.explorer.behaviours.cave_topup import CaveTopUp
+from pokeagent.explorer.behaviours.field_cut import FieldCut
 from pokeagent.explorer.behaviours.frontier import ExploreBurst, Frontier
 from pokeagent.explorer.behaviours.goal_talk import GoalTalk
 from pokeagent.explorer.behaviours.goto import Goto
@@ -39,7 +40,7 @@ from pokeagent.explorer.behaviours.use_items import UseItems
 
 __all__ = [
     "AdvanceDialog", "AfterVictory", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BattleYesNo", "AlreadyOutGuard", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
-    "ExploreBurst", "Frontier", "GoalTalk", "Goto", "GrindDrill", "Heal", "LearnerHunt", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
+    "ExploreBurst", "FieldCut", "Frontier", "GoalTalk", "Goto", "GrindDrill", "Heal", "LearnerHunt", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "ProcedureRunner", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "Restock", "RetreatHeal", "SettleWait", "StallGuard", "StatusCare", "SwitchOut",
     "TeamHunt", "TrainerHunt",
     "UseItems", "default_behaviours", "no_press",
@@ -55,7 +56,7 @@ def default_behaviours() -> list[Behaviour]:
     and finally plain exploration.
     """
     return [
-        SettleWait(), LoopGuard(), PartyOrder(), PostTalkSettle(), Readiness(), AnomalyWait(), ReplayInterrupt(),
+        SettleWait(), LoopGuard(), PartyOrder(), PostTalkSettle(), Readiness(), AnomalyWait(), ReplayInterrupt(), FieldCut(),
         AlreadyOutGuard(), BattleYesNo(), BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), AfterVictory(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
         NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), RetreatHeal(), StatusCare(), UseItems(), GoalTalk(), GrindDrill(),

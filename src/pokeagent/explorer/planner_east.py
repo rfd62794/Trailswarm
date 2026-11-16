@@ -151,7 +151,7 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
         rom = cerulean_south.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))  # still on the Cerulean side of the wall
         return rom or (_back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None)
     if stage in fan_club.STAGES:  # ROM route to the Fan Club door / back to the Bike Shop door; inside either map the stage is a GoalTalk
-        return fan_club.route_step(stage, pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))
+        return fan_club.route_step(stage, pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()), goals.get("_field_cut"))
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)
