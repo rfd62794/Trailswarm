@@ -17,7 +17,7 @@ from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
 from pokeagent.explorer.training_ctl.controller import TrainingController
-from pokeagent import glitch_guard
+import pokeagent.glitch_guard as glitch_guard
 from pokeagent.novelty.features import Snapshot, read_snapshot
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
