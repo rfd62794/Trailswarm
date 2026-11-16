@@ -245,3 +245,17 @@ address table with any change you were forced to make; (4) full-suite summary li
 <!-- new: tests/test_glitchlab_trainer_escape.py -->
 <!-- new: tests/test_glitchlab_survey.py -->
 <!-- new: tests/test_glitch_probe_tool.py -->
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-15 21:00 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
