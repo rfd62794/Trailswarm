@@ -79,12 +79,14 @@ Findings first: the floor source used per goal, how Magikarp was handled, which 
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-marathon-watch-xp-floor-cb13a3 |
 | Base branch | - |
+| Base commit | 5c1a6f7b6693172955e2a8dde976b550616e8d06 |
 
 **Status log**
 - 2026-11-16 07:24 · robert-claude-laptop · none → Queued
 - 2026-11-16 07:24 · robert-claude-laptop · Queued → Approved
+- 2026-11-16 07:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-xp-floor-cb13a3; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J52M3P9HPWD9ZZPFYMYB2D
 <!-- queue:end -->
