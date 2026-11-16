@@ -81,3 +81,18 @@ def test_observe_failure_log_is_rate_limited(caplog):
             ctx.step = step
             assert ctl.observe(ctx) is None
     assert len([r for r in caplog.records if "observe failed" in r.message]) == 2
+
+
+def test_battling_party_read_is_the_likely_mismatch_source(tmp_path, monkeypatch):
+    """2026-11-15 marathon err: 70 shadow mismatches, every one old True/0 vs shadow False/None.
+    While ctx.view.battling the derived party read is [] (adapters.derived), so floor_for and
+    train_member_for answer None - a stale live flag reads as a mismatch. A measurement
+    artifact, not a controller verdict."""
+    _no_boss_data(monkeypatch)
+    ctx = make_ctx(tmp_path, m=3, lvl=6, need=8)
+    ctx.view.battling = True
+    ctx.__dict__["floor_unmet"], ctx.train_member = True, 1      # the stale live flags
+    old = adapters.old_flags(ctx)
+    assert old.floor_unmet is True and old.train_member == 1
+    der = adapters.derived(ctx)
+    assert der.floor_unmet is False and der.train_member is None

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pokeagent.magikarp as magikarp
 
+from pokeagent.explorer.training_ctl import release
 from pokeagent.knowledge import team_plan
 from pokeagent.ramstructs import read_party
 
@@ -17,6 +18,12 @@ def trainee_slot(ctx, *, breakers: bool = False) -> int | None:
     """THE one entry for "which party slot is the switch-trainee"."""
     return magikarp.trainee_slot_for(ctx.emu, getattr(ctx, "train_member", None),
                                      (team_plan.of(ctx).get("breakers") or ()) if breakers else ())
+
+
+def released(ctx, slot) -> bool:
+    """True while the slot's trainee may stand alone on the map we're on (``release.verdict`` on
+    ctx.view.m): the switch trick is skipped - it leads and fights for the full XP share."""
+    return release.released(ctx, slot)
 
 
 def note_faints(ctx) -> int:

@@ -5,8 +5,7 @@ this one hands them a BattleView (``ctx.bv``) of what it just read.
 """
 from __future__ import annotations
 
-import json
-import re
+import json, re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +29,7 @@ from pokeagent.explorer.item_policies.xitems_battle import battle_step as x_batt
 from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.perceive import party_hp
 from pokeagent.explorer.stat_records import record_catch
+from pokeagent.explorer.training_ctl import release
 from pokeagent.goals import bag_contents, check_goals
 from pokeagent.knowledge import team_plan
 from pokeagent.magikarp import fighter
@@ -263,6 +263,7 @@ class Battle(BehaviourBase):
                 ctx.__dict__["trainer_win_step"] = ctx.step  # burst_gate: a gain right after this is the fight's aftermath
                 proc_state(ctx)["twins"] += 1  # AfterVictory decides once per TRAINER win, never on a wild one
             record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
+            release.note_wild(ctx, battle_map, won=won, outcome=outcome, trainer=trainer)
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy

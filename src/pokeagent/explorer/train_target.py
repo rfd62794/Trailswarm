@@ -12,14 +12,29 @@ and plan_goal walked back, 7.2% of all steps. The rule, both directions:
 from __future__ import annotations
 
 from pokeagent.explorer.planner_east import ROUTE24
-from pokeagent.grind import stage_maps
-from pokeagent.knowledge.encounters import TRAIN_MAP
+from pokeagent.explorer.training_ctl import release
+from pokeagent.grind import area_ladder, stage_maps
+from pokeagent.grind.points import travel_steps
+from pokeagent.knowledge.encounters import TRAIN_MAP, map_name
 
 
 def stage_target(ctx) -> int:
-    """The map train_route walks to for the current stage: the pre-Brock stage map, else Route 24."""
+    """The map train_route walks to for the current stage: the ladder's rung when it answers, else the pin."""
     stage = getattr(ctx, "stage_goal", None)
-    return TRAIN_MAP[stage] if stage_maps.allowed(stage) and stage in TRAIN_MAP else ROUTE24
+    pin = TRAIN_MAP[stage] if stage_maps.allowed(stage) and stage in TRAIN_MAP else ROUTE24
+    maps, here = ctx.mem.data.get("maps", {}), ctx.pos()
+    try:
+        spots, slot = release.ladder_spots(ctx, stage, maps, here)
+        out, old = area_ladder.decide(ctx.__dict__.setdefault("ladder", {}), spots,
+                                      lambda m: release.verdict(ctx, slot, m),
+                                      lambda m: travel_steps(maps, here, m), ctx.step)
+        if out is not None and out != old and (old is not None or out != pin):
+            xp = {s.map_id: s.xp_per_step for s in spots}
+            ctx.log(f"[ladder] {map_name(old or pin)} -> {map_name(out)} (xp/step {xp.get(old, 0.0):.1f} -> {xp.get(out, 0.0):.1f})", "res")
+        return out if out is not None else pin
+    except Exception as e:  # noqa: BLE001
+        release.warn_ladder(e)
+        return pin
 
 
 def stage_training(ctx) -> bool:

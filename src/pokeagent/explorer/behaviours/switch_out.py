@@ -54,6 +54,9 @@ def trainee_out(ctx: ExplorerContext) -> int | None:
             ep["solo_battle"] = (ctx.battles, frac >= SOLO_START_HP)
         if ep["solo_battle"][1] and frac >= team_plan.SWITCH_MIN_HP:
             return None
+    if active_pos(ctx) == t and roster.released(ctx, t) and _wild(ctx) \
+            and b.hp / (b.max_hp or 1) >= team_plan.SWITCH_MIN_HP:
+        return None                                   # released (any training, not just an episode): it stands alone
     return t if active_pos(ctx) == t and t < len(sp) and b.species == sp[t] else None
 
 
