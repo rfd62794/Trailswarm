@@ -250,4 +250,6 @@ def plan_step(goals: dict, maps: dict, pos: tuple, facing: str) -> tuple[str, st
         return east_road_step(g, maps, goals, pos, facing)
     if goals.get("ss_anne_captain") and pos[0] in SHIP_MAPS:  # Cut is in hand: no later goal has a ship target, so walk off the ship (2026-11-15: 1,100 steps on its decks)
         return leave_ship_step(goals, pos, maps)
+    if goals.get("ss_anne_captain") and not goals.get("bicycle"):  # Vermilion after Cut: Fan Club -> Bike Voucher -> Cerulean Bike Shop -> Bicycle (marathon 2026-11-16a: no planner step from here, 1,500 steps in Vermilion)
+        return east_road_step(g, maps, goals, pos, facing)
     return None

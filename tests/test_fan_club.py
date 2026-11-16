@@ -43,6 +43,17 @@ def test_vermilion_walks_to_the_fan_club_door():
     assert out and out[0] == "LEFT" and "Fan Club door" in out[1] and asked == [{fc.FAN_DOOR}]
 
 
+def test_plan_step_reaches_the_east_road_after_the_captain_until_the_bicycle():
+    """The gate was `ss_ticket and not ss_anne_captain`: once Cut was taught plan_step returned None for good and exploration patrolled."""
+    from pokeagent.explorer.planner import plan_step
+    plan, asked = _asking(("LEFT",))
+    base = {**_goals("pokemon_fan_club"), "_route_plan": plan}
+    assert plan_step(base, {}, (fc.VERMILION, 20, 10), "UP")[0] == "LEFT" and asked == [{fc.FAN_DOOR}]
+    asked.clear()
+    assert plan_step({**_goals("bicycle"), "_route_plan": plan}, {}, (fc.CERULEAN, 20, 33), "UP")[0] == "LEFT" and asked == [{fc.BIKE_DOOR}]
+    assert plan_step({**_goals("vermilion_gym_entry"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP") is None
+
+
 def test_inside_the_fan_club_the_voucher_stage_is_a_talk_not_a_route():
     plan, asked = _asking()
     assert planner_east.east_road_step(G, {}, {**_goals("bike_voucher"), "_route_plan": plan}, (fc.FAN_CLUB, 3, 6)) is None and not asked
@@ -115,6 +126,8 @@ def test_rom_routes_reach_the_fan_club_and_back_to_the_bike_shop():
                          ((rv.ROUTE5, 16, 28), fc.ROUTE5_TOP), ((fc.CERULEAN, 27, 11), {fc.BIKE_DOOR}), ((cerulean_south.HOUSE, 3, 0), fc.HOUSE_MATS)):
         path = plan(start, goals)
         assert path and plan.follow(start, path)[-1] in goals, start
+    for _m, x, _y in fc.ROUTE5_TOP:  # every Route 5 exit cell lands on a Cerulean cell joined to the burgled house's hole (none in the walled pocket)
+        assert plan((fc.CERULEAN, x + 10, 35), {(fc.CERULEAN, 27, 9)}), x
     south = (fc.CERULEAN, 20, 33)  # Route 5's end: the shop is not reachable on foot from here, the burgled house's hole is
     assert not plan(south, {fc.BIKE_DOOR}) and plan.follow(south, plan(south, {(fc.CERULEAN, 27, 9)}))[-1] == (cerulean_south.HOUSE, 3, 0)
     assert fc.route_step("bike_shop", south, plan)[0] in ("UP", "DOWN", "LEFT", "RIGHT")

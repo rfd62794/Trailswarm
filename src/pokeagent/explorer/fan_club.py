@@ -23,7 +23,9 @@ FAN_EXIT = {(FAN_CLUB, 2, 7), (FAN_CLUB, 3, 7)}        # the Fan Club's door mat
 # row 35 x 11-19 is a pocket the house cannot be reached from, so only x 8-9 = Vermilion 18-19 are the way north)
 VERMILION_TOP = {(VERMILION, x, 0) for x in (18, 19)}
 HOUSE_5_EXIT = {(r5v.PATH_5, 3, 7), (r5v.PATH_5, 4, 7)}   # the Route 5 house's door mat (press DOWN out onto Route 5)
-ROUTE5_TOP = {(r5v.ROUTE5, x, 0) for x in (1, 2, 3, 4, *range(6, 14), *range(15, 19))}  # Route 5 row 0 -> Cerulean row 35 (x + 10)
+# Route 5 row 0 -> Cerulean row 35 (x + 10). Route 5's x 6-13 lead into a walled pocket of Cerulean (x 16-23, rows 34-35: ROM walls at x 15 and 24, row 33) that
+# the south part cannot be left from (live headless run 2026-11-16: 2,000 steps Route 5 <-> that pocket); x 1-4 and 15-18 are the way to the town side.
+ROUTE5_TOP = {(r5v.ROUTE5, x, 0) for x in (1, 2, 3, 4, 15, 16, 17, 18)}
 BIKE_DOOR = (CERULEAN, 13, 25)                         # Cerulean's warp into the Bike Shop
 HOUSE_MATS = {(cerulean_south.HOUSE, 2, 7), (cerulean_south.HOUSE, 3, 7)}  # the burgled house's front-door mat: the way from its hole pocket (Cerulean's south part) up to the town
 
