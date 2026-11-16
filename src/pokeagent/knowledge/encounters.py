@@ -4,7 +4,8 @@ from __future__ import annotations
 from pokeagent.knowledge.kb import table
 
 # Map names for the maps the campaign visits (ids verified in docs/KNOWLEDGE.md); others print as 0xNN.
-MAP_NAMES = {0x0C: "Route 1", 0x0D: "Route 2", 0x0E: "Route 3", 0x0F: "Route 4", 0x21: "Route 22", 0x23: "Route 24", 0x24: "Route 25",
+MAP_NAMES = {0x0C: "Route 1", 0x0D: "Route 2", 0x0E: "Route 3", 0x0F: "Route 4", 0x10: "Route 5", 0x11: "Route 6", 0x12: "Route 7", 0x13: "Route 8", 0x14: "Route 9",
+             0x15: "Route 10", 0x16: "Route 11", 0x21: "Route 22", 0x23: "Route 24", 0x24: "Route 25",
              0x33: "Viridian Forest", 0x3B: "Mt Moon 1F", 0x3C: "Mt Moon B1F", 0x3D: "Mt Moon B2F"}
 
 

@@ -12,39 +12,103 @@ and plan_goal walked back, 7.2% of all steps. The rule, both directions:
 from __future__ import annotations
 
 from pokeagent.explorer.planner_east import ROUTE24
+from pokeagent.explorer.world import WorldGraph
 from pokeagent.grind import stage_maps
 from pokeagent.grind.points import FAR_TRAVEL, travel_steps
-from pokeagent.knowledge.encounters import TRAIN_MAP
+from pokeagent.knowledge.encounters import TRAIN_MAP, map_name, species_on
 
 ROUTE_MAPS = range(0x0C, 0x25)  # overworld route ids (Route 1 .. Route 25): caves and towns are never the fallback
 MIN_GRASS_TILES = 8             # encounter-proven tiles a map needs to be a patch worth walking to
+TRAINEE_REACH = 12              # untuned: a map whose weakest wild level is more than this above the trainee is too hard
+REVALIDATE_STEPS = 50           # the sticky pick is re-checked for a route this often
+NO_BATTLE_WINDOW = 600          # steps with no new battle before the pick is dropped (and not repicked this stage)
+
+
+def suits(trainee_level: int | None, map_id: int) -> bool:
+    """The map's wild table (encounters.species_on) fits the trainee: its top level is not below the trainee (no XP)
+    and its weakest is within TRAINEE_REACH above it. No level or no table = not suitable (never a guess)."""
+    lv = list(species_on(map_id).values())
+    if not trainee_level or not lv:
+        return False
+    return max(hi for _, hi, _ in lv) >= trainee_level and min(lo for lo, _, _ in lv) <= trainee_level + TRAINEE_REACH
+
+
+def _trainee_level(ctx) -> int | None:
+    from pokeagent.explorer import grind_episode  # deferred: grind_episode imports this module
+    try:
+        lvl = grind_episode._lvl_of(ctx, grind_episode._levels(ctx), grind_episode._slot(ctx))
+    except Exception:  # noqa: BLE001
+        return None
+    return lvl or None
+
+
+def _reachable(ctx, mid: int) -> bool:
+    g = WorldGraph(ctx.mem.data.get("maps", {}))
+    g.blocked_now = frozenset(ctx.mem.temp_blocked)
+    return g.path(ctx.pos(), lambda n: n[0] == mid) is not None or ctx.pos()[0] == mid
+
+
+def _kept(ctx, cache: dict, stage) -> int | None:
+    """The cached pick when it is still good, else None (cache cleared). Dropped when the stage changed, the route is
+    cut off (re-checked every REVALIDATE_STEPS), or NO_BATTLE_WINDOW steps passed with no new battle (it is then barred
+    for this stage so the next pick differs)."""
+    if cache.get("stage") != stage or cache.get("map") is None:
+        return None
+    step, battles = getattr(ctx, "step", 0), getattr(ctx, "battles", 0)
+    if battles != cache.get("battles"):
+        cache["battles"], cache["since"] = battles, step
+    if step - cache.get("since", step) >= NO_BATTLE_WINDOW:
+        cache.setdefault("barred", set()).add(cache["map"])
+        ctx.log(f"[train target: no battle on {map_name(cache['map'])} for {NO_BATTLE_WINDOW} steps - picking again]", "res")
+        cache["map"] = None
+        return None
+    if step - cache.get("checked", step) >= REVALIDATE_STEPS:
+        cache["checked"] = step
+        if not _reachable(ctx, cache["map"]):
+            cache["map"] = None
+            return None
+    return cache["map"]
 
 
 def nearest_grass(ctx) -> int | None:
-    """The learned route map with proven grass that is nearest by walking steps, or None. Sticky per stage: the
-    first answer holds until the stage changes, so the walk cannot flip between two near-equal patches."""
+    """The nearest learned route map with proven grass that SUITS the trainee (see ``suits``), or None. The pick is
+    sticky per stage but re-validated (``_kept``). None when nothing suitable is known: the caller falls back."""
     stage = getattr(ctx, "stage_goal", None)
     cache = ctx.__dict__.setdefault("near_grass", {})
-    if cache.get("stage") == stage and cache.get("map") is not None:
-        return cache["map"]
-    maps, here = ctx.mem.data.get("maps", {}), ctx.pos()
-    best = None
+    kept = _kept(ctx, cache, stage)
+    if kept is not None:
+        return kept
+    if cache.get("stage") != stage:
+        cache.clear()
+    maps, here, lvl = ctx.mem.data.get("maps", {}), ctx.pos(), _trainee_level(ctx)
+    barred = cache.get("barred", set())
+    best, unsuited = None, 0
     for mid in ROUTE_MAPS:
         d = maps.get(str(mid)) or {}
-        if not d.get("visited") or len(d.get("encounters") or {}) < MIN_GRASS_TILES:
+        if mid in barred or not d.get("visited") or len(d.get("encounters") or {}) < MIN_GRASS_TILES:
             continue
         steps = travel_steps(maps, here, mid)
-        if steps < FAR_TRAVEL and (best is None or (steps, mid) < best):
+        if steps >= FAR_TRAVEL:
+            continue
+        if not suits(lvl, mid):
+            unsuited += 1
+            continue
+        if best is None or (steps, mid) < best:
             best = (steps, mid)
-    if best is not None:
-        cache["stage"], cache["map"] = stage, best[1]
-    return best[1] if best else None
+    if best is None:
+        if unsuited and cache.get("why") != (stage, lvl):
+            cache["why"] = (stage, lvl)
+            ctx.log(f"[train target: {unsuited} known grass map(s) do not suit a L{lvl} trainee - falling back to Route 24]", "res")
+        return None
+    step = getattr(ctx, "step", 0)
+    cache.update(stage=stage, map=best[1], since=step, checked=step, battles=getattr(ctx, "battles", 0))
+    return best[1]
 
 
 def stage_target(ctx) -> int:
-    """The map train_route walks to for the current stage: the pre-Brock stage map; a stage with no pin in
-    TRAIN_MAP (everything after Misty) trains at the NEAREST proven grass, not back at Route 24 (2026-11-15
-    marathon: Vermilion -> Route 24, 200+ tiles north); a pinned stage keeps its Route 24 default."""
+    """The map train_route walks to for the current stage. Order: the pre-Brock stage map; a stage pinned in TRAIN_MAP
+    keeps its Route 24 default; any other stage (everything after Misty) trains at the nearest SUITABLE proven grass,
+    else Route 24. A ladder rung (area_ladder) belongs between the pin tests and ``nearest_grass``."""
     stage = getattr(ctx, "stage_goal", None)
     if stage_maps.allowed(stage) and stage in TRAIN_MAP:
         return TRAIN_MAP[stage]
