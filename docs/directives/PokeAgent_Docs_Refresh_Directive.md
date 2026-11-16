@@ -173,11 +173,12 @@ List every claim you could not verify and therefore omitted. State no conclusion
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
+- 2026-11-15 20:09 · robert-claude-laptop · Queued → Approved — lint override: Remaining hits are gitignored runs/ paths the directive only names, and docs/CLI.md, docs/TRAINING.md, docs/OPERATING.md which the directive creates.
 <!-- queue:end -->
