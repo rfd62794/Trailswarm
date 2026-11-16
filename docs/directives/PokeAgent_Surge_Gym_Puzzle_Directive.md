@@ -145,3 +145,17 @@ UNVERIFIED assumption you coded against so the controller can confirm each one.
 
 Findings first (what you built, which design choices, every UNVERIFIED assumption), then evidence (the real test output tails for both
 commands), then a recommended next action (the real-ROM checks above). Keep it short and list the head sha of the pushed branch.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-16 08:17 · robert-claude-laptop · none → Queued
+<!-- queue:end -->
