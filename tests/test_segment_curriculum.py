@@ -1,4 +1,5 @@
 """Segment curriculum: store stats, scheduler shares, daisy-chain starts, confirm gate, auto-split, budgets."""
+import pytest
 import json
 import sys
 from pathlib import Path
@@ -424,6 +425,17 @@ def test_remove_tree_refuses_paths_outside_runs_segments(tmp_path):
 
 
 # --- campaign gating ------------------------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _hermetic_capabilities(tmp_path, monkeypatch):
+    """campaign.agent_capabilities() with no root falls back to the repo's REAL runs/checkpoints (cut_taught.state there
+    adds the 'cut' capability), so a live marathon changed which goals were gated. Default the root to an empty tmp dir."""
+    from pokeagent import campaign
+    real = campaign.agent_capabilities
+    hermetic = lambda emu=None, root=None: real(emu, tmp_path / "no-repo-root" if root is None else root)  # noqa: E731
+    monkeypatch.setattr(campaign, "agent_capabilities", hermetic)
+    monkeypatch.setattr(ss, "agent_capabilities", hermetic)       # seg_store bound the name at import (store.py:29, :80)
+
+
 def _ladder():
     from pokeagent import campaign
     ids = campaign.goal_ids()
