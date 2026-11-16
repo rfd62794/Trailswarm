@@ -45,20 +45,52 @@ def test_a_broken_emulator_allows_the_write_instead_of_raising(tmp_path):
 
 
 # --- the guard reads the bytes alone: no detector or --novelty run needs to have fed it (review, spec 4.C) ------------
-def test_stuck_trainer_flags_and_move_override_refuse_on_the_first_read(tmp_path):
+def test_a_single_blip_of_a_persistent_reason_does_not_refuse(tmp_path):
     from pokeagent import glitch_signals as gs
     for byte in (gs.MISC_FLAGS, gs.STATUS_FLAGS5, gs.MOVE_OVERRIDE):
+        emu = FakeEmulator({byte: 1})
+        assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path / hex(byte), run="r") is True
+        emu.set(byte, 0)
+        assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path / hex(byte), run="r") is True
+
+
+def test_persistent_reasons_refuse_after_stuck_steps_consecutive_observations_novelty_off(tmp_path):
+    from pokeagent import glitch_signals as gs
+    for byte in (gs.MISC_FLAGS, gs.STATUS_FLAGS5, gs.MOVE_OVERRIDE):
+        emu = FakeEmulator({byte: 1})
+        for _ in range(dc.STUCK_STEPS - 1):
+            glitch_guard.observe(emu)                      # the engine's per-press hook; no DiscoveryLog.check anywhere
         logs = []
-        assert glitch_guard.allow_write(FakeEmulator({byte: 1}), "goal:x",
-                                        runs_dir=tmp_path / hex(byte), run="r", log=logs.append) is False
+        assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path / hex(byte), run="r") is True
+        glitch_guard.observe(emu)
+        assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path / hex(byte), run="r", log=logs.append) is False
         assert "checkpoint refused" in logs[0]
+
+
+def test_a_gap_resets_the_streak_and_allow_write_alone_can_build_one(tmp_path):
+    from pokeagent import glitch_signals as gs
+    emu = FakeEmulator({gs.MOVE_OVERRIDE: 1})
+    for _ in range(dc.STUCK_STEPS - 1):
+        glitch_guard.observe(emu)
+    emu.set(gs.MOVE_OVERRIDE, 0)
+    glitch_guard.observe(emu)
+    emu.set(gs.MOVE_OVERRIDE, 1)
+    glitch_guard.observe(emu)
+    assert glitch_guard.allow_write(emu, "x", runs_dir=tmp_path, run="r") is True
+    bare = FakeEmulator({gs.MOVE_OVERRIDE: 1})            # never hooked: allow_write feeds the counter itself
+    res = [glitch_guard.allow_write(bare, "x", runs_dir=tmp_path, run="b") for _ in range(dc.STUCK_STEPS)]
+    assert res[:-1] == [True] * (dc.STUCK_STEPS - 1) and res[-1] is False
+
+
+def test_script_oor_refuses_instantly(tmp_path):
+    assert glitch_guard.allow_write(FakeEmulator({VFS: 3}), "x", runs_dir=tmp_path, run="r") is False
 
 
 def test_the_write_is_allowed_again_once_the_byte_clears(tmp_path):
     from pokeagent import glitch_signals as gs
-    emu = FakeEmulator({gs.MOVE_OVERRIDE: 1})
+    emu = FakeEmulator({gs.MOVE_OVERRIDE: 1, VFS: 6})
     assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path, run="r") is False
-    emu.set(gs.MOVE_OVERRIDE, 0)
+    emu.set(VFS, 0)
     assert glitch_guard.allow_write(emu, "goal:x", runs_dir=tmp_path, run="r") is True
 
 
@@ -69,6 +101,8 @@ def test_refusals_share_one_log_so_dedupe_and_the_state_names_apply_across_calls
         assert glitch_guard.allow_write(emu, what, runs_dir=tmp_path, run="r") is False
     assert len((tmp_path / dc.LOG_NAME).read_text().splitlines()) == 1
     emu.set(gs.MOVE_OVERRIDE, 1)                                            # a different reason set is a new record
+    for _ in range(dc.STUCK_STEPS):
+        glitch_guard.observe(emu)
     assert glitch_guard.allow_write(emu, "goal:b", runs_dir=tmp_path, run="r") is False
     assert len((tmp_path / dc.LOG_NAME).read_text().splitlines()) == 2
     assert len(list((tmp_path / dc.DIR_NAME).glob(f"*{dc.STATE_SUFFIX}"))) == 2   # the state files do not overwrite

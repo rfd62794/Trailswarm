@@ -9,6 +9,7 @@ never raises: an internal error returns True, so a guard bug cannot block a heal
 from __future__ import annotations
 
 from pathlib import Path
+from weakref import WeakKeyDictionary
 
 from pokeagent.glitch_signals import active_reasons, read_signals
 from pokeagent.statefp import MAP, X, Y
@@ -23,6 +24,44 @@ def _log_for(runs_dir, run):
     return _LOGS.setdefault((str(Path(runs_dir)), run), DiscoveryLog(runs_dir, run, "guard"))
 
 
+# Per-emulator persistence counters, independent of --novelty: the engine feeds them every press via ``observe``
+# (allow_write feeds them itself only on an emulator no hook has ever fed, e.g. a bare script or test).
+_STREAKS: WeakKeyDictionary = WeakKeyDictionary()
+_PERSISTENT = ("trainer_flags_stuck", "move_override")   # scripted walks blip these; script_oor stays instant
+
+
+class _Streak:
+    def __init__(self):
+        self.counts = {r: 0 for r in _PERSISTENT}
+        self.hooked = False
+
+
+def _state(emu):
+    try:
+        st = _STREAKS.get(emu)
+        if st is None:
+            st = _STREAKS[emu] = _Streak()
+        return st
+    except TypeError:   # not weak-referenceable: no streak can build, so the persistent reasons never refuse
+        return _Streak()
+
+
+def _count(emu, reasons) -> dict:
+    st = _state(emu)
+    for r in _PERSISTENT:
+        st.counts[r] = st.counts[r] + 1 if r in reasons else 0
+    return st.counts
+
+
+def observe(emu) -> None:
+    """Per-press hook: feed the streak counters from one RAM read. Never raises."""
+    try:
+        _state(emu).hooked = True
+        _count(emu, active_reasons(read_signals(emu)))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def allow_write(emu, what, *, runs_dir="runs", run="", log=None) -> bool:
     """True when RAM shows no active glitch signature; False while one is, logging the refused write.
 
@@ -30,7 +69,12 @@ def allow_write(emu, what, *, runs_dir="runs", run="", log=None) -> bool:
     ``trainee:<stem>``). On refusal the caller skips the write and keeps the last clean state untouched."""
     try:
         sig = read_signals(emu)
-        reasons = active_reasons(sig)  # anything verifiably wrong right now refuses the write (spec 4.C)
+        from pokeagent.novelty.discoveries import STUCK_STEPS
+        active = active_reasons(sig)
+        counts = _state(emu).counts if _state(emu).hooked else _count(emu, active)
+        # trainer_flags_stuck / move_override blip during scripted walks: refuse only after STUCK_STEPS consecutive
+        # observations. script_oor stays instantaneous (the byte persists).
+        reasons = [r for r in active if r not in _PERSISTENT or counts[r] >= STUCK_STEPS]
         if not reasons:
             return True
         from pokeagent.novelty.features import Snapshot

@@ -17,6 +17,7 @@ from pokeagent.explorer.retalk_veto import veto
 from pokeagent.explorer.selector import Selector
 from pokeagent.explorer.toss_guard import toss_veto
 from pokeagent.explorer.training_ctl.controller import TrainingController
+from pokeagent import glitch_guard
 from pokeagent.novelty.features import Snapshot, read_snapshot
 
 MAX_PENDING = 2000  # cap on un-flushed decision records
@@ -102,6 +103,7 @@ class Engine:
         if self.decision_log is not None and _tossed(ctx) > tossed_before:  # an item was thrown away: the bandit reward counts this line
             self.decision_log.write({**rec, "event": "item_tossed", "outcome": "item_tossed"})
         self._note_novelty()
+        glitch_guard.observe(ctx.emu)  # feeds the guard's own persistence streaks every press, novelty on or off
         reasons = self._note_progress(goals_reached, after)
         loop_veto.record(ctx, decision, reasons)
         self._pending_outcomes.append(rec)
