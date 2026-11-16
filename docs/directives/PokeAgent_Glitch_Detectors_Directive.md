@@ -193,11 +193,12 @@ later (this slice skips it and does not retry).
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-15 20:11 · robert-claude-laptop · none → Queued
+- 2026-11-15 20:54 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
