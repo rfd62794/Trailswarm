@@ -183,9 +183,7 @@ def main(argv=None) -> int:
     from pokeagent.atlas.walkgrid import rom_cave_planner
     ctx.cave_plan = rom_cave_planner(a.rom)
     from pokeagent.explorer.world import SHIP_MAPS
-    from pokeagent.explorer.cerulean_south import MAPS as CERULEAN_MAPS
-    from pokeagent.explorer.route5_vermilion import MAPS as ROUTE5_MAPS
-    ROUTE_MAPS = CERULEAN_MAPS | ROUTE5_MAPS
+    from pokeagent.explorer.fan_club import PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
     ctx.route_plan = rom_cave_planner(a.rom, maps=ROUTE_MAPS)
     ctx.ship_plan = rom_cave_planner(a.rom, maps=SHIP_MAPS)
     from pokeagent.atlas.collision import rom_walkable_ids

@@ -65,9 +65,7 @@ def run(args) -> dict:
     from pokeagent.explorer.world import SHIP_MAPS
     legs_attach.attach(ctx, drill_plan, args.save_leg_states, args.leg_states_dir, args.state, drills_log=args.drills_log or work / "drills.jsonl",
                        grind_log=args.grind_drills_log or work / "grind_drills.jsonl", goto=args.drill_goto)  # a check never writes the shared logs
-    from pokeagent.explorer.cerulean_south import MAPS as CERULEAN_MAPS
-    from pokeagent.explorer.route5_vermilion import MAPS as ROUTE5_MAPS
-    ROUTE_MAPS = CERULEAN_MAPS | ROUTE5_MAPS
+    from pokeagent.explorer.fan_club import PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
     ctx.route_plan = rom_cave_planner(args.rom, maps=ROUTE_MAPS)  # cerulean_south: the Cut-free way to Route 5
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
