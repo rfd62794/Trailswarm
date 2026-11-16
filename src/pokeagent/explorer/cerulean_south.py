@@ -10,8 +10,10 @@ from __future__ import annotations
 CERULEAN, HOUSE = 0x03, 0x3E
 MAPS = frozenset({CERULEAN, HOUSE})
 HOLE = (HOUSE, 3, 0)               # the hole's warp tile in the house's top wall
-BOTTOM_ROW = 35                    # Cerulean's last cell row; Route 5's connection spans x 10..29
-BOTTOM = {(CERULEAN, x, BOTTOM_ROW) for x in range(10, 30)}
+BOTTOM_ROW = 35                    # Cerulean's last cell row; Route 5's connection spans x 10..29 (the good part: BOTTOM)
+# Only x 11-14 and 25-28 lead onto Route 5's open corridors (its x 1-4 / 15-18). Cerulean x 16-23 (joined to the south part) opens onto Route 5's sealed middle (x 6-13,
+# ROM: closed rooms whose only way out is back up): pressing DOWN there trapped the explorer (fresh-memory headless run 2026-11-16, 2,000 steps).
+BOTTOM = {(CERULEAN, x, BOTTOM_ROW) for x in (*range(11, 15), *range(25, 29))}
 
 
 def route_step(pos: tuple, plan, maps: dict | None = None, blocked_now=()) -> tuple[str, str] | None:

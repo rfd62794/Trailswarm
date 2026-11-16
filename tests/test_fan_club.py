@@ -189,3 +189,34 @@ def test_rom_yard_routes_come_out_on_the_town_side():
         assert fc.route_step(stage, yard, plan)[0] in ("LEFT", "DOWN", "UP", "RIGHT")
     assert fc.route_step("bicycle", (fc.CERULEAN, 9, 8), plan)[0] == "DOWN"
     assert fc.route_step("bicycle", (fc.YARD_HOUSE, 2, 1), plan)[0] == "DOWN"
+
+
+def test_cerulean_pocket_cells_are_not_the_way_down_to_route_5():
+    """Fresh-memory headless run 2026-11-16: DOWN on Cerulean's row 35 at x 16-23 enters Route 5's sealed middle (x 6-13), where 2,000 steps were lost."""
+    plan, asked = _only({fc.BIKE_DOOR}, cerulean_south.BOTTOM)
+    for x in (16, 19, 23):
+        out = cerulean_south.route_step((fc.CERULEAN, x, 35), plan)
+        assert out is None or out[1].find("pushing DOWN") < 0, x
+    assert cerulean_south.route_step((fc.CERULEAN, 12, 35), plan)[0] == "DOWN" and cerulean_south.route_step((fc.CERULEAN, 27, 35), plan)[0] == "DOWN"
+    assert not {(fc.CERULEAN, x, 35) for x in range(16, 24)} & cerulean_south.BOTTOM
+
+
+def test_the_sealed_middle_of_route_5_is_left_back_up():
+    plan, _ = _only()  # no route from inside the sealed rooms
+    assert rv.route_step((rv.ROUTE5, 13, 0), plan)[0] == "UP"
+    plan2, asked = _only(rv.SEALED_TOP, answer="LEFT")
+    out = rv.route_step((rv.ROUTE5, 9, 5), plan2)
+    assert out and out[0] == "LEFT" and rv.SEALED_TOP in asked
+    assert fc.route_step("vermilion_gym_entry", (rv.ROUTE5, 13, 0), plan)[0] == "UP"
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="needs the ROM")
+def test_rom_pocket_and_sealed_route_5_lead_out():
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
+    assert cerulean_south.route_step((fc.CERULEAN, 19, 33), plan)[0] in ("UP", "DOWN", "LEFT", "RIGHT")
+    for x in range(6, 14):
+        assert plan((rv.ROUTE5, x, 1), rv.BOTTOM) is None  # sealed: no route on
+        assert rv.route_step((rv.ROUTE5, x, 1), plan)[0] in ("UP", "LEFT", "RIGHT", "DOWN")
+    for x in (1, 2, 3, 4, 15, 16, 17, 18):
+        assert rv.route_step((rv.ROUTE5, x, 0), plan)[1].find("sealed") < 0
