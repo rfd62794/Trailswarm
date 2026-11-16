@@ -251,12 +251,14 @@ address table with any change you were forced to make; (4) full-suite summary li
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-glitch-trainer-escape-d-3f90ad |
 | Base branch | - |
+| Base commit | 855f59b66716f415236a29474e3543fc98516ca9 |
 
 **Status log**
 - 2026-11-15 21:00 · robert-claude-laptop · none → Queued
 - 2026-11-16 07:22 · robert-claude-laptop · Queued → Approved
+- 2026-11-16 07:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-glitch-trainer-escape-d-3f90ad; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J4YWCSMSVFZN5MA0385ZJN
 <!-- queue:end -->
