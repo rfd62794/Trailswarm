@@ -16,7 +16,10 @@ MAPS = frozenset({VERMILION, FAN_CLUB})
 PLANNER_MAPS = cerulean_south.MAPS | r5v.MAPS | MAPS  # what ctx.route_plan is built over (the demo and the headless tool both use it)
 FAN_STAGES = ("pokemon_fan_club", "bike_voucher")
 BIKE_STAGES = ("bike_shop", "bicycle")
-STAGES = FAN_STAGES + BIKE_STAGES
+GYM_STAGE = "vermilion_gym_entry"  # after the Bicycle: back to Vermilion and its gym door (a Cut tree stands in front: no Cut-use behaviour yet)
+STAGES = FAN_STAGES + BIKE_STAGES + (GYM_STAGE,)
+GYM = 0x5C
+GYM_DOOR = (VERMILION, 12, 19)                         # Vermilion's warp into the gym
 FAN_DOOR = (VERMILION, 9, 13)                          # Vermilion's warp into the Fan Club
 FAN_EXIT = {(FAN_CLUB, 2, 7), (FAN_CLUB, 3, 7)}        # the Fan Club's door mat: a bottom-edge warp, fired by a press DOWN
 # Vermilion row 0 -> Route 6 row 35 (x - 10): the cells walkable on both sides AND joined to the rest of Route 6 (ROM grids: Route 6's
@@ -45,8 +48,13 @@ def _toward(plan, pos, goals, maps, blocked_now, why) -> tuple[str, str] | None:
 
 def _forward(stage, pos, plan, maps, blocked_now):
     """To the Fan Club door in Vermilion; from the Cerulean / Route 5 / Route 6 side, back over route5_vermilion first."""
+    if pos in FAN_EXIT:
+        return "DOWN", f"goal {stage}: on the Fan Club's door mat, pressing DOWN to leave"
+    if pos[0] == FAN_CLUB:
+        return _toward(plan, pos, FAN_EXIT, maps, blocked_now, f"{stage}: out of the Fan Club")
     if pos[0] == VERMILION:
-        return _toward(plan, pos, {FAN_DOOR}, maps, blocked_now, f"{stage}: to the Fan Club door (9,13)")
+        door, what = (GYM_DOOR, "the gym door (12,19)") if stage == GYM_STAGE else (FAN_DOOR, "the Fan Club door (9,13)")
+        return _toward(plan, pos, {door}, maps, blocked_now, f"{stage}: to {what}")
     if pos[0] in r5v.MAPS:
         return r5v.route_step(pos, plan, maps, blocked_now)
     return cerulean_south.route_step(pos, plan, maps, blocked_now)
@@ -83,4 +91,6 @@ def route_step(stage: str, pos: tuple, plan, maps: dict | None = None, blocked_n
         return None
     if stage in FAN_STAGES:
         return None if pos[0] == FAN_CLUB else _forward(stage, pos, plan, maps, blocked_now)
+    if stage == GYM_STAGE:
+        return None if pos[0] == GYM else _forward(stage, pos, plan, maps, blocked_now)  # the Bike Shop is left by patrol_exit (its learned door)
     return None if pos[0] == BIKE_SHOP else _back(stage, pos, plan, maps, blocked_now)

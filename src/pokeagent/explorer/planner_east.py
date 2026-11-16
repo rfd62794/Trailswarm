@@ -40,7 +40,7 @@ TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on
            "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN),
            "to_route5": _on(0x10), "to_route6": _on(0x11), "to_vermilion": _on(0x05),
            # Vermilion after Cut: the Fan Club chairman gives the Bike Voucher, the Cerulean Bike Shop clerk swaps it (marathon 2026-11-16a patrolled the Old Rod house 8,000 steps: no target)
-           "pokemon_fan_club": _on(fan_club.FAN_CLUB), "bike_voucher": _on(fan_club.FAN_CLUB), "bike_shop": _on(fan_club.BIKE_SHOP), "bicycle": _on(fan_club.BIKE_SHOP)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
+           "pokemon_fan_club": _on(fan_club.FAN_CLUB), "bike_voucher": _on(fan_club.FAN_CLUB), "bike_shop": _on(fan_club.BIKE_SHOP), "bicycle": _on(fan_club.BIKE_SHOP), fan_club.GYM_STAGE: _on(fan_club.GYM)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
 
 
 def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:

@@ -51,7 +51,10 @@ def test_plan_step_reaches_the_east_road_after_the_captain_until_the_bicycle():
     assert plan_step(base, {}, (fc.VERMILION, 20, 10), "UP")[0] == "LEFT" and asked == [{fc.FAN_DOOR}]
     asked.clear()
     assert plan_step({**_goals("bicycle"), "_route_plan": plan}, {}, (fc.CERULEAN, 20, 33), "UP")[0] == "LEFT" and asked == [{fc.BIKE_DOOR}]
-    assert plan_step({**_goals("vermilion_gym_entry"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP") is None
+    asked.clear()
+    out = plan_step({**_goals("vermilion_gym_entry"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP")
+    assert out[0] == "LEFT" and asked == [{fc.GYM_DOOR}]
+    assert plan_step({**_goals("beat_surge"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP") is None
 
 
 def test_inside_the_fan_club_the_voucher_stage_is_a_talk_not_a_route():
