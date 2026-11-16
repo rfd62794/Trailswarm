@@ -203,3 +203,14 @@ def test_nothing_to_cut_text_ends_the_try(tmp_path):
     _draw(ctx.emu, ["There isn't", "anything to CUT!"], framed=True)
     d = _go(ctx)
     assert d.rule == "field_cut_failed" and st["seq"] is None and st["tries"]
+
+
+def test_a_tree_cut_failed_three_times_is_no_longer_routed_through(tmp_path):
+    ctx = _ctx(tmp_path)
+    st, tree, pos = fcut.state(ctx), (fc.VERMILION, 15, 18), (fc.VERMILION, 14, 18)
+    assert fc.route_step(fc.GYM_STAGE, pos, _Plan(), cut=fcut.offer(ctx))[0] == "RIGHT"
+    st["tries"][tree] = fcut.MAX_TRIES
+    st["want"] = {"pos": pos, "dir": "RIGHT", "tree": tree}
+    offer = fcut.offer(ctx)
+    assert tree in offer["blocked"]
+    assert fc.route_step(fc.GYM_STAGE, pos, _Plan(), cut=offer) is None and st["want"] is None

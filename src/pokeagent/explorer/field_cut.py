@@ -46,6 +46,7 @@ def offer(ctx: ExplorerContext) -> dict:
     """The planner's view: ``can`` = a route may go through a tree now (a cutter, the badge, no cooldown)."""
     st = state(ctx)
     st["can"] = ctx.step >= st["cooldown_until"] and can_cut(ctx.emu)
+    st["blocked"] = {t for t, n in st["tries"].items() if n >= MAX_TRIES}  # trees given up on: the planner must not route into them
     return st
 
 
