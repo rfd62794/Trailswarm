@@ -151,11 +151,12 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
 
 **Status log**
 - 2026-11-16 08:17 · robert-claude-laptop · none → Queued
+- 2026-11-16 08:17 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
