@@ -50,7 +50,7 @@ def _toward(plan, pos, goals, maps, blocked_now, why, cut=None) -> tuple[str, st
     path = _ask(plan, pos, goals, maps, blocked_now)
     if path:
         return path[0], f"goal {why}: {len(path)} steps"
-    if not (cut and cut.get("can") and hasattr(plan, "trees")):
+    if not (cut and (cut.get("can") or cut.get("hold")) and hasattr(plan, "trees")):
         return None
     path = _ask(plan, pos, goals, maps, blocked_now, cut=True)
     if not path:
@@ -59,6 +59,8 @@ def _toward(plan, pos, goals, maps, blocked_now, why, cut=None) -> tuple[str, st
     if tuple(ahead) in cut.get("blocked", ()):  # CUT failed on this tree MAX_TRIES times: no route through it, nothing to keep bumping
         cut["want"] = None
         return None
+    if not cut.get("can"):  # cooling down after a failed try (marathon-2026-11-16c: no route for 400 steps and exploration left through Diglett's Cave): keep walking to / bumping the tree
+        return path[0], f"goal {why}: {len(path)} steps (Cut cooling down, holding at the tree)"
     if ahead[1:] in plan.trees(pos[0]) and ahead[0] == pos[0]:  # the first step enters a cuttable tree: field_cut uses CUT on it
         cut["want"] = {"pos": tuple(pos), "dir": path[0], "tree": tuple(ahead)}
         return path[0], f"goal {why}: {len(path)} steps through the Cut tree at {ahead[1:]}"
