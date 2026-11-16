@@ -13,6 +13,7 @@ from collections import Counter, deque
 from pathlib import Path
 
 from pokeagent import training_progress as tp
+from pokeagent.campaign import infer_unverified
 from pokeagent.goals import GOALS, is_unverified
 from pokeagent.intervene.lease import lease_active
 
@@ -159,14 +160,16 @@ class RunView:
     @property
     def pending_goals(self) -> list[str]:
         """Ladder goals still ahead: GOALS minus goal_frames rows minus the goals the run's own
-        start state settled (meta initial_goals, else the ``start`` checkpoint's prefix). Unverified
+        start state settled (meta initial_goals, taken as an exact set, else the ``start`` checkpoint's prefix). Unverified
         goals never produce a goal_frames row, so they cannot count as pending."""
-        done = {g for g, _ in self.goal_steps} | set(self.meta.get("initial_goals") or [])
-        landed = [GOALS.index(g) for g in done if g in GOALS]
-        if landed:  # the ladder is a chain: a landed goal settles every goal before it
-            done |= set(GOALS[: max(landed) + 1])
+        # initial_goals is the exact set done at start and goal_frames the landings since: neither chains (an early
+        # to_route22 must not settle the ladder before it). Only unverified goals are inferred, by the agent's own rule.
+        reached = {g: True for g, _ in self.goal_steps}
+        reached.update({g: True for g in self.meta.get("initial_goals") or []})
+        infer_unverified(reached)
+        done = {g for g, v in reached.items() if v}
         start = self.meta.get("start")
-        if start in GOALS:
+        if start in GOALS and not self.meta.get("initial_goals"):
             done |= set(GOALS[: GOALS.index(start) + 1])
         return [g for g in GOALS if g not in done and not is_unverified(g)]
 

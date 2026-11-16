@@ -81,7 +81,7 @@ def view(d):
 
 def test_bills_house_patrol_flags_map_dwell(tmp_path):
     """1: ss_ticket landed, then 4000 patrol presses on Bill's map 0x58, to_route5 pending."""
-    d = make_run(tmp_path)
+    d = make_run(tmp_path, start="to_bill")
     goals(d, ("ss_ticket", 100))
     presses(d, [(0x58, 4000)])
     thinking(d, ["no frontier: patrolling"] * 3)
@@ -94,7 +94,7 @@ def test_bills_house_patrol_flags_map_dwell(tmp_path):
 
 def test_bike_shop_drift_flags_goal_budget(tmp_path):
     """2: 1250 patrolling presses across maps is fine; past the budget it flags, never map_dwell."""
-    d = make_run(tmp_path)
+    d = make_run(tmp_path, start="to_bill")
     goals(d, ("ss_ticket", 100))
     presses(d, [(0x42, 300), (0x03, 300), (0x42, 300), (0x03, 300), (0x42, 150)])
     r = rules.evaluate(view(d))

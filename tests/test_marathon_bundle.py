@@ -13,7 +13,7 @@ from pokeagent.marathon.reader import RunView  # noqa: E402
 def make_run(tmp_path, name="explore-1-1", tag="marathon-x"):
     d = tmp_path / "runs" / name
     d.mkdir(parents=True)
-    (d / "meta.json").write_text(json.dumps({"tag": tag, "seed": 7, "start": "bedroom", "steps": 99999}))
+    (d / "meta.json").write_text(json.dumps({"tag": tag, "seed": 7, "start": "to_bill", "steps": 99999}))
     return d
 
 
@@ -96,3 +96,30 @@ def test_bundle_pending_goal_skips_unverified(tmp_path):
     assert v.current_goal == "ss_anne_captain" and "rival_ss_anne" not in v.pending_goals
     out = bundle.build(v, "guard_stall", ["guard_stall"])
     assert out["current_goal"] == "ss_anne_captain" and "ss_anne_captain" not in out["next_goals"]
+
+
+def test_pending_goal_ignores_out_of_order_initial_goal(tmp_path):
+    """A to_bill checkpoint run lists to_route22 (an early Route 22 visit) in initial_goals; it must not settle the
+    ladder up to index 116 - the agent's next goal is still vermilion_gym_entry."""
+    d = make_run(tmp_path)
+    prefix = list(GOALS[: GOALS.index("to_bill") + 1])
+    meta = json.loads((d / "meta.json").read_text())
+    meta["initial_goals"] = prefix + ["to_route22"]
+    (d / "meta.json").write_text(json.dumps(meta))
+    v = RunView(d).refresh()
+    goals(d, *[(g, 100 + i) for i, g in enumerate(GOALS[GOALS.index("to_bill") + 1: GOALS.index("bicycle") + 1])
+               if not is_unverified(g)])
+    v = RunView(d).refresh()
+    assert v.current_goal == "vermilion_gym_entry"
+    assert "route22_gate" in v.pending_goals and "to_route22" not in v.pending_goals
+
+
+def test_later_landing_does_not_settle_an_unreached_verified_goal(tmp_path):
+    """No prefix chain: a landed ss_ticket leaves the verified goals before it (here potion) pending."""
+    d = make_run(tmp_path)
+    meta = json.loads((d / "meta.json").read_text())
+    meta["start"] = "bedroom"
+    (d / "meta.json").write_text(json.dumps(meta))
+    goals(d, ("ss_ticket", 100))
+    v = RunView(d).refresh()
+    assert v.current_goal == "potion" and "ss_ticket" not in v.pending_goals
