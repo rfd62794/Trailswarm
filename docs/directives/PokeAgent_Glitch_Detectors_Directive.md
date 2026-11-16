@@ -193,12 +193,14 @@ later (this slice skips it and does not retry).
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-glitch-detectors-directive |
 | Base branch | - |
+| Base commit | 5de14e470d162df583f3986c20465ccc98ef90c2 |
 
 **Status log**
 - 2026-11-15 20:11 · robert-claude-laptop · none → Queued
 - 2026-11-15 20:54 · robert-claude-laptop · Queued → Approved
+- 2026-11-15 21:04 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-glitch-detectors-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7H1J37APG621WA02598SCAJ
 <!-- queue:end -->
