@@ -4,7 +4,7 @@ This is the old ``agent_step()`` closure's job, minus the window and the HTTP AP
 """
 from __future__ import annotations
 
-from pokeagent.explorer import grind_episode, loop_veto, party_log, retalk_memory, trainer_ledger, xp_meter
+from pokeagent.explorer import grind_episode, ledge_trap, loop_veto, party_log, retalk_memory, trainer_ledger, xp_meter
 from pokeagent.explorer.behaviours import default_behaviours
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
@@ -67,6 +67,9 @@ class Engine:
         why_toss = toss_veto(ctx.view.lines, decision)
         if why_toss:  # a toss screen is up: nothing may advance it, whichever behaviour pressed (B backs out, NO then A declines)
             decision = Decision("B", "toss_veto", why_toss, behaviour=decision.behaviour)
+        why_ledge = ledge_trap.veto(ctx, decision)
+        if why_ledge:  # a one-way ledge into a sealed pocket: B instead, and the tile is a wall from now on
+            decision = Decision("B", "ledge_trap", why_ledge, behaviour=decision.behaviour)
         view = ctx.view
         before, box, battle = (view.m, view.x, view.y), view.box, view.battling
         stage, goals_reached = goal_stage(ctx.goals()), len(ctx.goal_steps)
