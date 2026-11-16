@@ -10,7 +10,8 @@ from pokeagent.explorer.field_cut import (AFTER_CUT_STEPS, CALM_FRAMES, COOLDOWN
 from pokeagent.explorer.party_menu import MENU_ITEM, is_start_menu, screen_lines, start_menu_target, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
 
-_SUBMENU = re.compile(r"^>?\s*(CUT|FLY|SURF|STRENGTH|FLASH|DIG|TELEPORT|SOFTBOILED|STATS|SWITCH|CANCEL)$")
+# the member menu is a frame over the party list: its rows can be fused with party text on the left ("Choose a P SWITCH"), so match the row END
+_SUBMENU = re.compile(r"(?:^|\s)>?\s*(CUT|FLY|SURF|STRENGTH|FLASH|DIG|TELEPORT|SOFTBOILED|STATS|SWITCH|CANCEL)$")
 
 
 class FieldCut(BehaviourBase):
@@ -77,9 +78,8 @@ class FieldCut(BehaviourBase):
     @staticmethod
     def _press(ctx: ExplorerContext, seq: dict, lines: list[str], framed: list[str], text: str) -> tuple[str, str]:
         cur = ctx.emu.read(MENU_ITEM)
-        rows = [ln.strip() for ln in lines if _SUBMENU.match(ln.strip())]
-        if "STATS" in text and "SWITCH" in text and rows:  # the member's own menu: CUT sits first, above STATS
-            names = [r.lstrip(">").strip() for r in rows]
+        names = [m.group(1) for m in (_SUBMENU.search(ln.strip()) for ln in framed) if m]
+        if "STATS" in text and "SWITCH" in text and names:  # the member's own menu: CUT sits first, above STATS
             if "CUT" not in names:
                 return "B", "the member menu has no CUT row: backing out"
             btn = toward(cur, names.index("CUT"))

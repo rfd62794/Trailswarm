@@ -166,7 +166,7 @@ def test_start_menu_party_list_member_menu_then_cut(tmp_path):
     assert _go(ctx).button == "DOWN"                                     # slot 1 knows CUT
     ctx.emu.set(MENU_ITEM, 1)
     assert _go(ctx).button == "A"
-    _draw(ctx.emu, ["Choose a POKeMON.", "BULBA", "BULBA", ">CUT", "STATS", "SWITCH", "CANCEL"])
+    _draw(ctx.emu, [">CUT", "STATS", "Choose a P SWITCH", "CANCEL"], framed=True)  # the party text fuses with the box row on the left
     ctx.emu.set(MENU_ITEM, 1)                                            # on STATS: CUT is row 0
     assert _go(ctx).button == "UP"
     ctx.emu.set(MENU_ITEM, 0)
