@@ -10,12 +10,10 @@ Constants marked UNVERIFIED feed detectors only; the guard never enforces them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from weakref import WeakKeyDictionary
 
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
 VIRIDIAN_FOREST_SCRIPT = 0xD618   # wViridianForestCurScript (ram_map.json)
-VIRIDIAN_FOREST_MAP = 51          # VIRIDIAN_FOREST (atlas/map_names.json key "51")
 MISC_FLAGS = 0xCD60               # wMiscFlags (ram_map.json); bit 0 stuck = trainer bookkeeping (research row 2)
 STATUS_FLAGS5 = 0xD730            # wStatusFlags5 (ram_map.json: "bit 7 = no joypad input / scripted walk"); bit 0 per research row 2
 ENGAGED_TRAINER_CLASS = 0xCD2D    # wEngagedTrainerClass (ram_map.json)
@@ -83,24 +81,3 @@ def active_reasons(sig: Signals) -> list[str]:
 def instant_text_candidate(sig: Signals) -> bool:
     """UNVERIFIED instant-text signature (wStatusFlags5 bit 6): logged by a detector only, never an active reason."""
     return bool(sig.status5 & INSTANT_TEXT_CANDIDATE)
-
-
-# Streak counters the discovery detectors keep (name -> consecutive snapshots a stuck-flag rule has held), shared per
-# emulator so the checkpoint guard applies the same persistence instead of refusing on a one-snapshot blip.
-_SHARED_STREAKS: WeakKeyDictionary = WeakKeyDictionary()
-
-
-def share_streaks(emu, streaks: dict) -> None:
-    """Publish ``streaks`` (the live detector dict) for ``emu``; an emulator that cannot be weak-referenced is skipped."""
-    try:
-        _SHARED_STREAKS[emu] = streaks
-    except TypeError:
-        pass
-
-
-def shared_streaks(emu) -> dict:
-    """The detector streak counters published for ``emu`` ({} when no detector has run on it)."""
-    try:
-        return _SHARED_STREAKS.get(emu) or {}
-    except TypeError:
-        return {}

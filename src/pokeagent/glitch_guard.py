@@ -8,8 +8,19 @@ never raises: an internal error returns True, so a guard bug cannot block a heal
 """
 from __future__ import annotations
 
-from pokeagent.glitch_signals import active_reasons, read_signals, shared_streaks
+from pathlib import Path
+
+from pokeagent.glitch_signals import active_reasons, read_signals
 from pokeagent.statefp import MAP, X, Y
+
+# One DiscoveryLog per (runs_dir, run): its done-set dedupes identical refusals and MAX_PER_RUN caps a run's
+# records across every call site, not just inside a single allow_write call.
+_LOGS: dict = {}
+
+
+def _log_for(runs_dir, run):
+    from pokeagent.novelty.discoveries import DiscoveryLog
+    return _LOGS.setdefault((str(Path(runs_dir)), run), DiscoveryLog(runs_dir, run, "guard"))
 
 
 def allow_write(emu, what, *, runs_dir="runs", run="", log=None) -> bool:
@@ -19,21 +30,18 @@ def allow_write(emu, what, *, runs_dir="runs", run="", log=None) -> bool:
     ``trainee:<stem>``). On refusal the caller skips the write and keeps the last clean state untouched."""
     try:
         sig = read_signals(emu)
-        from pokeagent.novelty.discoveries import STUCK_STEPS
-        streaks = shared_streaks(emu)
-        # trainer_flags_stuck / move_override blip during scripted walks: refuse only once the detectors' streak has
-        # held STUCK_STEPS snapshots. script_oor stays instantaneous (the byte persists).
-        reasons = [r for r in active_reasons(sig) if r == "script_oor" or streaks.get(r, 0) >= STUCK_STEPS]
+        reasons = active_reasons(sig)  # anything verifiably wrong right now refuses the write (spec 4.C)
         if not reasons:
             return True
-        from pokeagent.novelty.discoveries import DiscoveryLog
         from pokeagent.novelty.features import Snapshot
         raw = {"forest_script": sig.forest_script, "misc_flags": sig.misc_flags, "status5": sig.status5,
                "engaged_class": sig.engaged_class, "engaged_set": sig.engaged_set,
                "move_override": sig.move_override, "in_battle": sig.in_battle, "text_d358": sig.text_d358}
-        DiscoveryLog(runs_dir, run, "guard").record("checkpoint_refused", "+".join(reasons), None,
-                                                  {"what": what, **raw}, 0, emu,
-                                                  Snapshot(map=emu.read(MAP), x=emu.read(X), y=emu.read(Y)))
+        dlog = _log_for(runs_dir, run)
+        # len(records) stands in for the step: it keeps each refusal's .discovery.state filename distinct
+        # (a fixed step would write every kind to <run>-<step>-checkpoint_refused.discovery.state).
+        dlog.record("checkpoint_refused", "+".join(reasons), None, {"what": what, **raw},
+                    len(dlog.records), emu, Snapshot(map=emu.read(MAP), x=emu.read(X), y=emu.read(Y)))
         if log is not None:
             log(f"[checkpoint refused: {what}: {'+'.join(reasons)}]")
         return False
