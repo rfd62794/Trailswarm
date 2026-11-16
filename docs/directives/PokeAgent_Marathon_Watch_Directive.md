@@ -100,7 +100,7 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-marathon-watch-directive |
 | Base branch | - |
@@ -114,4 +114,5 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 - 2026-11-16 01:51 · robert-claude-laptop · Queued → Approved
 - 2026-11-16 01:52 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7HJ157ZN2Z57FKWTQE6PXS6
 - 2026-11-16 02:00 · dispatcher · launched pid=22420; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-16 02:17 · devin · In progress → Blocked — Refused command: `uv run python tools/marathon_watch.py --help` (uv run python <script> not in run permissions). Implementation complete in worktree, uncommitted: tools/marathon_watch.py + pokeagent/marathon package + explore_demo control_port + control-server stop + 24 synthetic tests all passing; full suite/commit/--help not run.
 <!-- queue:end -->
