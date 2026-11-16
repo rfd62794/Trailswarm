@@ -100,7 +100,7 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-marathon-watch-directive |
 | Base branch | - |
@@ -118,4 +118,5 @@ Controller (not Devin) runs this after merge, against real marathons: `uv run py
 - 2026-11-16 02:00 · dispatcher · launched pid=22420; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-16 02:17 · devin · In progress → Blocked — Refused command: `uv run python tools/marathon_watch.py --help` (uv run python <script> not in run permissions). Implementation complete in worktree, uncommitted: tools/marathon_watch.py + pokeagent/marathon package + explore_demo control_port + control-server stop + 24 synthetic tests all passing; full suite/commit/--help not run.
 - 2026-11-16 02:19 · robert-claude-laptop · Blocked → Review — Devin finished the work (24/24 new tests) but stopped at a refused `marathon_watch.py --help` check; controller committed + pushed 56a9a800. Needs gate verify (full suite) + review. [origin] spent: devin 17 min est. n/a
+- 2026-11-16 02:57 · robert-claude-laptop · Review → Done
 <!-- queue:end -->
