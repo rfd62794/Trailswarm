@@ -44,6 +44,15 @@ def fingerprint(emu, source_run: str | None = None) -> dict:
         fp["bag_slots"] = len(bag)
     except Exception:  # noqa: BLE001
         pass
+    try:  # glitch signatures (glitch_signals): raw bytes so runs with a different dialog-timing state stay comparable
+        from pokeagent.glitch_signals import VIRIDIAN_FOREST_SCRIPT, active_reasons, read_signals
+        sig = read_signals(emu)
+        fp["text_flags"] = [sig.status5, sig.text_d358]
+        fp["script_bytes"] = {f"0x{VIRIDIAN_FOREST_SCRIPT:04X}": sig.forest_script}
+        if active_reasons(sig):
+            fp["glitch_active"] = active_reasons(sig)
+    except Exception:  # noqa: BLE001
+        pass
     if isinstance(getattr(emu, "frames", None), int):
         fp["frames"] = emu.frames
     if source_run:

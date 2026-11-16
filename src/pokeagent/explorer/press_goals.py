@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import pokeagent.campaign as campaign
+import pokeagent.glitch_guard as glitch_guard
 import pokeagent.party_rules as party_rules
 import pokeagent.statefp as statefp
 from pokeagent.checkpoint_goals import (
@@ -73,22 +74,24 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame, **({"skipped": True} if skipped else {})}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
-                tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp)
-                dest = cp / f"{g}.state"
-                try:  # the party gate: a violating checkpoint never overwrites a clean one (quarantine name)
-                    dest = party_rules.quarantine_dest(statefp.fingerprint(ctx.emu, ctx.run_dir.name), dest,
-                                                       party_rules.rom_kb())
-                except Exception:  # noqa: BLE001  the gate never decides the run's fate
-                    pass
-                replace_retry(tmp, dest)
-                write_completed(dest, completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
-                try:
-                    stamp_fingerprint(ctx.emu, dest, ctx.run_dir.name,
-                                      inherit=getattr(ctx.opts, "state_path", "") or None)  # a synthetic/promoted start's lineage carries into the checkpoint
-                    party_rules.gate_stamp(statefp.read(dest) or {}, dest, party_rules.rom_kb(),
-                                           log=lambda t: ctx.log(t, "res"))
-                except Exception:  # noqa: BLE001  (a stamp failure must never lose the checkpoint)
-                    pass
+                if glitch_guard.allow_write(ctx.emu, f"goal:{g}", runs_dir=Path(ctx.run_dir).parent,
+                                            run=Path(ctx.run_dir).name, log=lambda t: ctx.log(t, "res")):
+                    tmp = cp / f"{g}.{os.getpid()}.tmp"; ctx.emu.save_state(tmp)
+                    dest = cp / f"{g}.state"
+                    try:  # the party gate: a violating checkpoint never overwrites a clean one (quarantine name)
+                        dest = party_rules.quarantine_dest(statefp.fingerprint(ctx.emu, ctx.run_dir.name), dest,
+                                                           party_rules.rom_kb())
+                    except Exception:  # noqa: BLE001  the gate never decides the run's fate
+                        pass
+                    replace_retry(tmp, dest)
+                    write_completed(dest, completed_goals(goals, ctx.initial_goals, GOALS), ctx.emu.read(0xD719))  # curriculum order check + respawn point
+                    try:
+                        stamp_fingerprint(ctx.emu, dest, ctx.run_dir.name,
+                                          inherit=getattr(ctx.opts, "state_path", "") or None)  # a synthetic/promoted start's lineage carries into the checkpoint
+                        party_rules.gate_stamp(statefp.read(dest) or {}, dest, party_rules.rom_kb(),
+                                               log=lambda t: ctx.log(t, "res"))
+                    except Exception:  # noqa: BLE001  (a stamp failure must never lose the checkpoint)
+                        pass
             except Exception as e:
                 ctx.log(f"[checkpoint save failed: {e!r}]", "res")
             gp = Path("runs/milestones.json")
