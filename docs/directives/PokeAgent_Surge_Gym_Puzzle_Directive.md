@@ -151,7 +151,7 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
@@ -178,4 +178,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 21:46 · robert-claude-laptop · Review → Blocked — Round-2 real-ROM check (head 68adc6bc, vermilion_gym_entry.state, seed 1, 8000 steps, fast and slow text): ORACLE PASSES - both locks, beat_surge settled at step 637 (Raichu L24 beaten), identical with/without --fast-text. SEARCH opens both locks at step 1713 (17 tries, 3 resets, 2 hits, text verdicts correct) but never reaches Surge: beat_surge routes to 'nearest known tile to Lt. Surge' (5,5) and oscillates (5,5)<->(5,6)/(4,5) to step 8000 because UP from (5,5) is a wall LEARNED while the barrier was closed. One fix: on 'opened' (and on any reset), forget learned walls/blocked edges on the barrier cells x4-5,y4-5 and their entry edges, and let beat_surge re-plan via the ROM route plan (GYM is in ROUTE_MAPS now). Add a synthetic test: walls learned on barrier cells are cleared by the opened event and the goal path then passes the barrier. Gate: controller re-runs search on the real ROM; it must settle beat_surge.
 - 2026-11-17 21:46 · robert-claude-laptop · Blocked → Queued — Requeue round 3: forget barrier walls on opened/reset so search reaches Surge (see previous note). Same branch.
 - 2026-11-17 21:46 · robert-claude-laptop · Queued → Approved
+- 2026-11-17 21:47 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7P8STW2C79JTVG1VM15CA3N
 <!-- queue:end -->
