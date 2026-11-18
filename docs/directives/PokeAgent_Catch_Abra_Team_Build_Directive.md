@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Queued |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
@@ -179,4 +179,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 03:48 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py exists on this directive's branch.
 - 2026-11-18 03:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PXFS8YQBN5NSJCYF996F3D
 - 2026-11-18 07:23 · agentflow-tick · In progress → Blocked — Run finished and reports pushing d416e83d with tests green, but its set-to-Review never reached the queue; verify the remote head, then move to Review
+- 2026-11-18 18:35 · robert-claude-laptop · Blocked → Queued — Controller real-ROM check 2026-11-18 at d416e83 (nugget_bridge.state, --build abra, 8000 steps, seeds 1+2, kb present): FAIL both seeds. Abra met 5x per seed on Route 24/25 but 'no ball: let go'; restock logged '[restock: no route to a Mart]' 3x per seed, so 0 balls all run; catch_abra_gave_up=true. Fix on the same branch: (1) restock must route to Cerulean Mart from Route 24/25 with 0 balls; (2) when ROM_KB is None, catch_abra_settled() returns True silently - under --build abra fail loudly/log instead. Re-check is controller's real-ROM run.
 <!-- queue:end -->
