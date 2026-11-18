@@ -126,7 +126,6 @@ touching main, editing live config, changing repo visibility, publishing anythin
 - Exec(git status)
 - Exec(git add)
 - Exec(git commit)
-- Exec(git push)
 
 ## Required from User
 
