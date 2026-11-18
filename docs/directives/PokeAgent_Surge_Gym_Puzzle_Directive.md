@@ -151,7 +151,7 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
@@ -163,4 +163,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-16 08:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J83N4GSPH942S2D7H82K78
 - 2026-11-17 19:58 · dispatcher · In progress → Approved — dispatch rolled back: stale dispatch marker (stage provision)
 - 2026-11-17 20:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7P33MS1M9FZM82QH19WNS93
+- 2026-11-17 20:22 · dispatcher · In progress → Approved — dispatch rolled back: stale dispatch marker (stage provision)
 <!-- queue:end -->
