@@ -151,12 +151,12 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
 | Base commit | d60b76a694a293bc0f3d15ee940847515d7237a4 |
-| Head commit | 4ef866819535f97acb349ac7496047a7ae3e6bf9 |
+| Head commit | 399048a0d41af5fc11028bf51b06758440cf2efc |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -186,4 +186,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 22:22 · robert-claude-laptop · Queued → Approved
 - 2026-11-17 22:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7PATF6M27WEXS9226R8FTXA
 - 2026-11-17 22:30 · dispatcher · launched pid=25464; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; resynced: merged main into directive/pokeagent-pokeagent-surge-gym-puzzle-directive (5 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-17 22:40 · devin · In progress → Review — Round 4 done, head 399048a0. (1) Caps: MAX_TOTAL 60->250, MAX_ATTEMPTS removed - passes are bounded only by the run cap; new 'skipped' set (behaviour-dead cans) keeps an unreachable puzzle terminating in 'gave up'. (2) Wrong-neighbour memory is now per first-lock cell (wrong2: {first -> its answered neighbours}); cleared on every reset since the locks re-randomize. (3) 'nothing'-since-last-reset cans are never re-pressed (tried, cleared only by a reset or a pass restart after ALL cans answered nothing - the missed-verdict escape hatch). Probe (100 seeds, FakeGame): text verdicts 100/100 solved (max 85 presses, avg 21.8); blind referee-only 100/100 (max 111). New test_search_solves_random_lock_games_inside_the_run_cap asserts <=1/100 unsolved. Tests: focused 118 passed; full serial '3451 passed, 1 skipped, 2 warnings in 321.16s' (0 failed; skip = no-ROM gate). gym_puzzle.py now 299 lines (<=300 layering cap). .devin-scratch/ left on disk (gitignored; no delete command in the allowed set). UNVERIFIED carried over: lock text strings, referee model, D744=0 blind spot, reset semantics. Gate: controller real-ROM search on seeds 1,2,3 must all settle beat_surge. [origin] spent: devin 68 min est. n/a
 <!-- queue:end -->
