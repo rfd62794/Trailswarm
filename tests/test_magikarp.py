@@ -60,7 +60,8 @@ def draw_framed(emu: FakeEmulator, rows: list[str]) -> None:
 def test_buy_magikarp_sits_before_mt_moon_and_team_ready_is_a_ladder_goal():
     assert GOALS.index("to_route4") < GOALS.index("buy_magikarp") < GOALS.index("to_mt_moon")
     assert GOALS.index("team_ready") == GOALS.index("nugget_bridge") + 1
-    assert GOALS.index("to_bill") == GOALS.index("team_ready") + 1
+    assert GOALS.index("catch_abra") == GOALS.index("team_ready") + 1
+    assert GOALS.index("to_bill") == GOALS.index("catch_abra") + 1
     assert "gyarados" not in GOALS
     assert SIDE_GOALS == []
 

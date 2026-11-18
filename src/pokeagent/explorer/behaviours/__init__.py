@@ -1,6 +1,7 @@
 """The explorer's behaviours, in the demo's priority order (the old ``agent_step`` top to bottom)."""
 from __future__ import annotations
 
+from pokeagent.explorer.behaviours.abra_hunt import AbraHunt
 from pokeagent.explorer.behaviours.after_victory import AfterVictory
 from pokeagent.explorer.behaviours.anomaly_wait import AnomalyWait
 from pokeagent.explorer.behaviours.advance_dialog import AdvanceDialog, NamingKeyboard
@@ -40,7 +41,7 @@ from pokeagent.explorer.behaviours.trainer_hunt import TrainerHunt
 from pokeagent.explorer.behaviours.use_items import UseItems
 
 __all__ = [
-    "AdvanceDialog", "AfterVictory", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BattleYesNo", "AlreadyOutGuard", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
+    "AbraHunt", "AdvanceDialog", "AfterVictory", "AnomalyWait", "Battle", "BattleTextWait", "BoxSettle", "PostTalkSettle", "BattleMoves", "BattleYesNo", "AlreadyOutGuard", "BeatStart", "Behaviour", "BehaviourBase", "Catch", "CaveEscape", "CaveTopUp", "Decision",
     "ExploreBurst", "FieldCut", "Frontier", "GoalTalk", "Goto", "GrindDrill", "GymPuzzle", "Heal", "LearnerHunt", "LoopGuard", "Menu", "NamingKeyboard", "Pickup", "PlanGoal",
     "PartyOrder", "ProcedureRunner", "Procedures", "Readiness", "ReplayBeat", "ReplayInterrupt", "Restock", "RetreatHeal", "SettleWait", "StallGuard", "StatusCare", "SwitchOut",
     "TeamHunt", "TrainerHunt",
@@ -61,5 +62,5 @@ def default_behaviours() -> list[Behaviour]:
         AlreadyOutGuard(), BattleYesNo(), BattleTextWait(), Battle(), SwitchOut(), Catch(), BattleMoves(), AfterVictory(), CaveEscape(), CaveTopUp(), UseItems(active_only=True),
         NamingKeyboard(), BeatStart(), BoxSettle(), AdvanceDialog(), Menu(),
         Procedures(), Goto(), ReplayBeat(), StallGuard(), Heal(), Restock(), RetreatHeal(), StatusCare(), UseItems(), GymPuzzle(), GoalTalk(), GrindDrill(),
-        ExploreBurst(), Pickup(), PlanGoal(), LearnerHunt(), TeamHunt(), TrainerHunt(), ProcedureRunner(), Frontier(),
+        ExploreBurst(), Pickup(), PlanGoal(), LearnerHunt(), AbraHunt(), TeamHunt(), TrainerHunt(), ProcedureRunner(), Frontier(),
     ]

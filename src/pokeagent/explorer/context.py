@@ -43,7 +43,7 @@ class ExplorerOptions:
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
     drill_grind: int | None = None  # grind drill: the map id whose grass the GrindDrill behaviour paces (pokeagent.grind.drill)
-    par_follow: bool = False; gym_puzzle_mode: str = "search"  # par path walk; Lt. Surge's locks: "search" tries cans / "oracle" reads the lock indices
+    par_follow: bool = False; gym_puzzle_mode: str = "search"; build: str = ""  # par path walk; Lt. Surge's locks: "search" tries cans / "oracle" reads the lock indices; team-build variant ("": default; "abra": catch + keep an Abra-line member for catch_abra)
 
 
 @dataclass
@@ -179,11 +179,11 @@ class ExplorerContext:
     team_ready_idle: int = 0  # consecutive plan steps at the team_ready stage with the training gate closed or lifted
     team_ready_skipped: bool = False  # GYARADOS_STEP_CAP spent: the team_ready goal is settled for this run
     team_ready_ok: bool = False  # plan_goal's last team verdict at the team_ready stage (team_for().ready)
-    had_team_ready: bool = False  # team_ready_ok latched: once the sim says ready the goal stays settled
-    team_ready_nodata: bool = False  # no ROM/boss data to judge the team_ready stage: settled, never blocks
+    had_team_ready: bool = False; team_ready_nodata: bool = False  # team_ready_ok latched: once the sim says ready the goal stays settled; no ROM/boss data to judge the team_ready stage: settled, never blocks
+    abra_steps: int = 0; abra_skipped: bool = False; abra_encounters: int = 0  # steps with catch_abra open under --build abra (plan_goal; ABRA_STEP_CAP settles); the stage ran out of steps: settled for this run; wanted flee-species encounters seen this run (catch.py logs one line each)
+    abra_pending: dict | None = None; had_abra: bool = False  # the last Abra encounter awaiting its caught/fled result (abra_hunt); an Abra-line member was in the party this run: catch_abra stays settled
     team_plan: list = field(default_factory=list)  # the ranked CatchAction list team_hunt last built
-    team_wants: dict = field(default_factory=dict)  # species -> catch reason for catch_list.catch_wanted(wants=)
-    team_hunt_steps: int = 0  # steps team_hunt has spent hunting this run (TEAM_HUNT_STEP_CAP)
+    team_wants: dict = field(default_factory=dict); team_hunt_steps: int = 0  # species -> catch reason for catch_list.catch_wanted(wants=); steps team_hunt has spent hunting this run (TEAM_HUNT_STEP_CAP)
     train_member: int | None = None  # party slot team_readiness names as the shortfall (None when the team is ready)
     team_note: str = ""  # last team-readiness verdict logged (plan_goal)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set

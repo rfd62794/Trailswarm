@@ -23,6 +23,7 @@ from pokeagent.goals import bag_contents
 from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE, status_kind
 from pokeagent.knowledge.catch_plan import TEAM_SIZE
 from pokeagent.knowledge.catch_policy import decide, may_throw_ctx
+from pokeagent.knowledge.flee_catch import ABRA_LINE, FLEE_SPECIES
 from pokeagent.knowledge.kb import table
 from pokeagent.knowledge.party import our_party, species_row, trainer_mon
 from pokeagent.knowledge import team_plan
@@ -47,6 +48,8 @@ def full_party_slot(ctx: ExplorerContext, party) -> int | None:
     t = roster.trainee_slot(ctx)
     if t is not None:
         protected.add(t)
+    if getattr(getattr(ctx, "opts", None), "build", "") == "abra":
+        protected |= {i for i, c in enumerate(party) if c.name in ABRA_LINE}  # the build's mon is never the deposit pick
     # A wild NEVER_CATCH member (a wild KAKUNA knows only Harden; Robert 2026-11-14) scores below every
     # other member so it is the deposit pick - never past a protected slot, so a Kakuna that is the
     # current trainee or a needed HM learner is still kept. A Kakuna evolved from our own Weedle knows
@@ -128,10 +131,18 @@ class Catch(BehaviourBase):
             key = (ctx.battles, species)
             if ctx.catch_want[0] != key:  # decided once per fight: the party read is not free
                 why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()),
-                                   owned=owned, wants=ctx.team_wants)
+                                   owned=owned, wants=ctx.team_wants,
+                                   build=getattr(getattr(ctx, "opts", None), "build", ""))
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
+        if kind == 1 and not balls and dex_no and e_max:
+            # A flee species met with an empty ball bag: nothing to throw, and it leaves on its own turn.
+            nb_name = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), str(species))
+            nb_key = (ctx.battles, species)
+            if nb_name in FLEE_SPECIES and ctx.catch_skip_logged != nb_key:
+                ctx.catch_skip_logged = nb_key
+                ctx.log(f"[catch: no ball: Abra encounter let go ({nb_name} L{e_lvl})]", "res")
         # Party full: throw only when the plan marks a member for deposit (a live release_pending
         # makes the deposit prompt answer YES); otherwise the catch is skipped with "party full".
         release_slot = None
@@ -153,7 +164,7 @@ class Catch(BehaviourBase):
             ctx.log(f"[catch: party full - slot {release_slot + 1} marked for deposit for {sp_name}]", "res")
         gave_up = ctx.catch_switch[0] == ctx.catch_want[0] and ctx.catch_switch[1] > MAX_PRESSES
         if gave_up or not (want and balls and dex_no and e_max and may_throw_ctx(ctx)
-                           and (not owned or want.startswith(("can learn", "planned")))):
+                           and (not owned or want.startswith(("can learn", "planned", "catch_abra")))):
             ctx.catch_mode = False
             ctx.catch_hint = None
             return None
@@ -170,6 +181,13 @@ class Catch(BehaviourBase):
         ctx.catch_turns = (key, sig, turn)
         hint = _policy_hint(ctx, sp_name, e_lvl, e_hp, e_max, bag, turn)
         ctx.catch_hint = hint
+        if sp_name in FLEE_SPECIES and (ctx.abra_pending or {}).get("battle") != ctx.battles:
+            # One line per Abra encounter (level, turn, action, ball); abra_hunt resolves caught/fled.
+            ctx.abra_pending = {"battle": ctx.battles, "species": sp_name, "level": e_lvl}
+            ctx.abra_encounters += 1
+            action = hint.kind if hint is not None else "throw"
+            what = (hint.ball or hint.move) if hint is not None else ""
+            ctx.log(f"[abra: {sp_name} L{e_lvl} turn {turn} {action}{' ' + what if what else ''}]", "res")
         ctx.catch_mode = hint is None or hint.kind != "skip"  # a skip means fight it out normally
         if hint is not None and hint.kind == "skip" and ctx.catch_skip_logged != key:
             ctx.catch_skip_logged = key

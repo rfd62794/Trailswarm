@@ -18,7 +18,7 @@ PREFIX = ["potion", "left_house", "first_pokemon", "won_battle",
           "to_route1", "to_viridian", "oaks_parcel", "deliver_parcel",
           "to_route2", "to_pewter", "to_gym", "beat_brock",
           "to_route3", "to_route4", "buy_magikarp", "to_mt_moon", "mt_moon_b1f", "mt_moon_b2f", "through_mt_moon", "to_cerulean",
-          "heal_cerulean", "beat_misty", "nugget_bridge", "team_ready", "to_bill", "ss_ticket"]
+          "heal_cerulean", "beat_misty", "nugget_bridge", "team_ready", "catch_abra", "to_bill", "ss_ticket"]
 SPECS = list(campaign.load_campaign())
 
 
@@ -29,11 +29,11 @@ def _ids(det):
     return inner.get("map", [])
 
 
-def test_ladder_is_long_and_starts_with_todays_26():
+def test_ladder_is_long_and_starts_with_todays_27():
     assert len(SPECS) >= 100
-    assert goals.GOALS[:26] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
+    assert goals.GOALS[:27] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
     assert len(set(goals.GOALS)) == len(goals.GOALS)
-    assert all(g.get("special") for g in SPECS[:26]) and [g["id"] for g in SPECS if g.get("special")] == [*PREFIX, "cut_learner"]
+    assert all(g.get("special") for g in SPECS[:27]) and [g["id"] for g in SPECS if g.get("special")] == [*PREFIX, "cut_learner"]
 
 
 def test_order_is_a_chain():

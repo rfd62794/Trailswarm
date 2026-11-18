@@ -106,6 +106,9 @@ def main(argv=None) -> int:
     ap.add_argument("--gym-puzzle-mode", default=None, choices=("search", "oracle"),
                     help="Lt. Surge's trash-can locks: search tries cans (default), oracle reads the lock indices "
                          "(env POKEAGENT_GYM_PUZZLE_MODE; the flag wins)")
+    ap.add_argument("--build", default=None, choices=("", "abra"),
+                    help="team build variant: 'abra' catches + keeps an Abra-line member (catch_abra goal; "
+                         "env POKEAGENT_BUILD; the flag wins)")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--bandit-delta", default="", help="where this run writes its bandit delta (default <run dir>/bandit_delta.json)")
     ap.add_argument("--role", default="", help="swarm role (explorer/exploiter/...); with --novelty only explorer is steered and paid by novelty")
@@ -118,8 +121,10 @@ def main(argv=None) -> int:
     ap.add_argument("--cell-steps", type=int, default=0, help="emulator steps already spent reaching that cell (slice 4; harvester steps_offset)")
     a = ap.parse_args(argv)
     from pokeagent.explorer import gym_puzzle
+    from pokeagent import abra_goal
     try:
         a.gym_puzzle_mode = gym_puzzle.resolve_mode(a.gym_puzzle_mode, os.environ.get(gym_puzzle.ENV_MODE))
+        a.build = abra_goal.resolve_build(a.build, os.environ.get(abra_goal.ENV_BUILD))
     except ValueError as e:
         ap.error(str(e))
     drill_plan = legs_attach.plan(a.drill_leg, a.drill_grind, a.drill_steps, a.leg_states_dir, a.rom,
@@ -181,7 +186,8 @@ def main(argv=None) -> int:
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
                              bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
                              gym_puzzle_mode=a.gym_puzzle_mode or "search",
-                             role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
+                             role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta,
+                             build=a.build))
     ctx.jsonl_buf = buf  # the shared cadence: per-step jsonl appends flush every 50 steps and on exit
     legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log, goto=a.drill_goto)
     if a.bandit:

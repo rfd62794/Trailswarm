@@ -12,6 +12,7 @@ import logging
 from pokeagent.campaign import load_campaign
 from pokeagent.knowledge import hm_compat
 from pokeagent.knowledge.cut_learner import LearnerTarget, pick_target
+from pokeagent.knowledge.flee_catch import ABRA_LINE
 
 log = logging.getLogger(__name__)
 
@@ -67,15 +68,18 @@ def _party_covers(hm: str, party) -> bool:
 
 
 def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned: bool = False,
-                 wants: dict[str, str] | None = None) -> str | None:
+                 wants: dict[str, str] | None = None, build: str = "") -> str | None:
     """Why a ball should go on ``species`` (a reason string), or None. ``owned``: the species is already in the dex.
     ``wants``: the catch plan's species -> reason map (knowledge.catch_plan via ctx.team_wants); a planned species
-    reports its plan reason after the HM check and before the dex check. A NEVER_CATCH species is never wanted."""
+    reports its plan reason after the HM check and before the dex check. A NEVER_CATCH species is never wanted.
+    ``build`` = the ExplorerOptions team build: "abra" makes any Abra-line member wanted for its goal."""
     if species in NEVER_CATCH:
         return None
     for hm in HM_MOVE:
         if hm in upcoming and species in hm_table().get(hm, ()) and not _party_covers(hm, party):
             return f"can learn {hm.upper()} (needed ahead, nobody in the party can)"
+    if build == "abra" and species in ABRA_LINE:
+        return "catch_abra goal (build abra)"
     if wants and species in wants:
         return wants[species]
     if not owned and dex_owned < DEX_TARGET and "dex10" in upcoming:

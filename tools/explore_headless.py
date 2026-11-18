@@ -62,7 +62,7 @@ def run(args) -> dict:
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
                                                                    bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow,
                                                                    gym_puzzle_mode=args.gym_puzzle_mode or "search",
-                                                                   role=args.role, novelty=args.novelty, novelty_path=args.novelty_path))
+                                                                   role=args.role, novelty=args.novelty, novelty_path=args.novelty_path, build=args.build))
     from pokeagent.atlas.walkgrid import rom_cave_planner
     from pokeagent.explorer.world import SHIP_MAPS
     legs_attach.attach(ctx, drill_plan, args.save_leg_states, args.leg_states_dir, args.state, drills_log=args.drills_log or work / "drills.jsonl",
@@ -160,6 +160,9 @@ def main(argv=None) -> int:
     ap.add_argument("--gym-puzzle-mode", default=None, choices=("search", "oracle"),
                     help="Lt. Surge's trash-can locks: search tries cans (default), oracle reads the lock indices "
                          "(env POKEAGENT_GYM_PUZZLE_MODE; the flag wins)")
+    ap.add_argument("--build", default=None, choices=("", "abra"),
+                    help="team build variant: 'abra' catches + keeps an Abra-line member (catch_abra goal; "
+                         "env POKEAGENT_BUILD; the flag wins)")
     ap.add_argument("--role", default="", help="swarm role; with --novelty only explorer is steered and paid by novelty")
     ap.add_argument("--novelty", action="store_true", help="novelty tracking on (reads --novelty-path; delta and discoveries stay in the work dir)")
     ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start (read-only here)")
@@ -167,8 +170,10 @@ def main(argv=None) -> int:
     legs_attach.add_args(ap)
     a = ap.parse_args(argv)
     from pokeagent.explorer import gym_puzzle
+    from pokeagent import abra_goal
     try:
         a.gym_puzzle_mode = gym_puzzle.resolve_mode(a.gym_puzzle_mode, os.environ.get(gym_puzzle.ENV_MODE))
+        a.build = abra_goal.resolve_build(a.build, os.environ.get(abra_goal.ENV_BUILD))
     except ValueError as e:
         ap.error(str(e))
     print(json.dumps(run(a), indent=1))
