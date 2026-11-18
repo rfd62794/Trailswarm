@@ -152,7 +152,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | - |
 | Base branch | - |
@@ -160,4 +160,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 **Status log**
 - 2026-11-17 21:21 · robert-claude-laptop · none → Queued — Robert 2026-11-17: Abra team build as a goal. Merged as docs PR #328 (5021e481). Approve after the Surge fix round returns (one heavy local job at a time).
 - 2026-11-18 00:45 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree (copytree kb); knowledge/flee_catch.py is a NEW file this directive creates (src/pokeagent/knowledge/); Exec(git push) is redundant with the default push path every PokeAgent run already uses (Surge rounds 1-5 pushed without a grant) and the deny rule still governs.
+- 2026-11-18 01:21 · agentflow-tick · Approved → Blocked — dispatch refused (deterministic, no retry): sandbox needs refused: Exec(git push) matches deny rule Exec(git push --)
 <!-- queue:end -->
