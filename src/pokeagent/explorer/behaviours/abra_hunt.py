@@ -4,14 +4,20 @@ Sibling of learner_hunt.py (same applies/step shape over the learned world graph
 nearest grass map whose table holds ABRA - Route 24 (0x23, 15.2%/encounter) over Route 25 (0x24) at
 equal distance. On the target map it arms ``ctx.hunt_grass`` so frontier seeks grass; the Catch
 behaviour throws on turn 1 (knowledge.flee_catch) and catch_wanted's build want keeps the target
-wanted. It also publishes the resolved result of the last Abra encounter (caught / fled) that
-catch.py recorded. The goal never blocks: the ABRA_STEP_CAP bookkeeping lives in plan_goal.
+wanted. Fewer than BALLS_MIN balls in the bag sends it shopping first: it arms a restock trip
+(want=Balls) and yields - the Restock behaviour does the Mart walk, the purchase (shopping's
+ball_need sees the open goal), and the leave. It also publishes the resolved result of the last
+Abra encounter (caught / fled) that catch.py recorded at the battle's start. The goal never
+blocks: the ABRA_STEP_CAP bookkeeping lives in plan_goal.
 """
 from __future__ import annotations
 
+from pokeagent.abra_goal import BALLS_MIN, ball_count, can_afford_ball
 from pokeagent.explorer import grind_episode
+from pokeagent.explorer import restock as rs
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
+from pokeagent.explorer.kb import ROM_KB
 from pokeagent.explorer.world import WorldGraph
 from pokeagent.knowledge.cut_learner import LearnerTarget
 from pokeagent.knowledge.encounters import map_name, slot_chances
@@ -82,7 +88,25 @@ class AbraHunt(BehaviourBase):
         ctx.log(f"[catch_abra: {t.species} on {t.name} (0x{t.map:02X}), L{t.levels[0]}-{t.levels[1]}, "
                 f"{t.chance * 100:.0f}%/encounter]", "res")
 
+    def _ball_errand(self, ctx: ExplorerContext) -> bool:
+        """Fewer than BALLS_MIN balls: the hunt needs throws in the bag - arm a restock trip and
+        yield while Restock runs it (its own Mart walk, purchase, and leave; ``want`` picks a Mart
+        that sells Balls). "0 balls AND no money for one" is the only settle the goal knows - short
+        of balls with money in the purse never gives up, it shops first."""
+        st = ctx.restock
+        if st.get("intent") or st.get("leave"):
+            return True  # a trip is armed or underway: Restock owns these steps
+        if (ball_count(ctx.emu) >= BALLS_MIN or not can_afford_ball(ctx.emu, ROM_KB)
+                or st.get("tries", 0) >= rs.MAX_TRIES):
+            return False
+        st.update(intent=True, want=(rs.BALL_ID,), steps=0)
+        ctx.shop_intent = ("mart", None)
+        ctx.log(f"[catch_abra: {ball_count(ctx.emu)} balls under {BALLS_MIN} - buying Poke Balls at a Mart first]", "res")
+        return True
+
     def step(self, ctx: ExplorerContext) -> Decision | None:
+        if self._ball_errand(ctx):
+            return None  # a Mart errand is armed: Restock's walk wins the next steps
         t = self._target
         if t is None:
             t = self._target = self._pick(ctx)

@@ -126,8 +126,13 @@ class Catch(BehaviourBase):
         owned = bool(dex_no) and bool(ctx.emu.read(0xD2F7 + (dex_no - 1) // 8) >> ((dex_no - 1) % 8) & 1)
         e_hp, e_max = ((ctx.emu.read(0xCFE6) << 8) | ctx.emu.read(0xCFE7)), ((ctx.emu.read(0xCFF4) << 8) | ctx.emu.read(0xCFF5))
         want = sp_name = None
-        if kind == 1 and balls and dex_no and e_max and cave_catch_allowed(ctx, species):
+        if kind == 1 and e_max:
             sp_name = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), str(species))
+            if sp_name in ABRA_LINE and (ctx.abra_pending or {}).get("battle") != ctx.battles:
+                # The Abra encounter counts from the battle's first step - with balls or without, caught or fled.
+                ctx.abra_pending = {"battle": ctx.battles, "species": sp_name, "level": e_lvl}
+                ctx.abra_encounters += 1
+        if kind == 1 and balls and dex_no and e_max and cave_catch_allowed(ctx, species):
             key = (ctx.battles, species)
             if ctx.catch_want[0] != key:  # decided once per fight: the party read is not free
                 why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()),
@@ -138,11 +143,10 @@ class Catch(BehaviourBase):
             want = ctx.catch_want[1]
         if kind == 1 and not balls and dex_no and e_max:
             # A flee species met with an empty ball bag: nothing to throw, and it leaves on its own turn.
-            nb_name = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), str(species))
             nb_key = (ctx.battles, species)
-            if nb_name in FLEE_SPECIES and ctx.catch_skip_logged != nb_key:
+            if sp_name in FLEE_SPECIES and ctx.catch_skip_logged != nb_key:
                 ctx.catch_skip_logged = nb_key
-                ctx.log(f"[catch: no ball: Abra encounter let go ({nb_name} L{e_lvl})]", "res")
+                ctx.log(f"[catch: no ball: Abra encounter let go ({sp_name} L{e_lvl})]", "res")
         # Party full: throw only when the plan marks a member for deposit (a live release_pending
         # makes the deposit prompt answer YES); otherwise the catch is skipped with "party full".
         release_slot = None
@@ -181,10 +185,10 @@ class Catch(BehaviourBase):
         ctx.catch_turns = (key, sig, turn)
         hint = _policy_hint(ctx, sp_name, e_lvl, e_hp, e_max, bag, turn)
         ctx.catch_hint = hint
-        if sp_name in FLEE_SPECIES and (ctx.abra_pending or {}).get("battle") != ctx.battles:
-            # One line per Abra encounter (level, turn, action, ball); abra_hunt resolves caught/fled.
-            ctx.abra_pending = {"battle": ctx.battles, "species": sp_name, "level": e_lvl}
-            ctx.abra_encounters += 1
+        pend = ctx.abra_pending
+        if sp_name in FLEE_SPECIES and pend is not None and not pend.get("acted"):
+            # One action line per Abra encounter (level, turn, action, ball); abra_hunt resolves caught/fled.
+            pend["acted"] = True
             action = hint.kind if hint is not None else "throw"
             what = (hint.ball or hint.move) if hint is not None else ""
             ctx.log(f"[abra: {sp_name} L{e_lvl} turn {turn} {action}{' ' + what if what else ''}]", "res")

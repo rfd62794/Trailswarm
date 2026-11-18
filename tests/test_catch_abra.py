@@ -4,22 +4,34 @@ fakes for RAM), no ROM.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 from dataclasses import replace
 from types import SimpleNamespace
 
 from pokeagent import team_fp
-from pokeagent.abra_goal import ABRA_STEP_CAP, BALLS_MIN, catch_abra_settled, resolve_build
+from pokeagent.abra_goal import ABRA_STEP_CAP, BALLS_MIN, abra_stage, catch_abra_settled, resolve_build
+from pokeagent.campaign import goal_ids
 from pokeagent.emulator import FakeEmulator
+from pokeagent.explorer import press_goals
+from pokeagent.explorer.behaviours import Catch, Restock
+from pokeagent.explorer.behaviours import catch as catch_mod
+from pokeagent.explorer.behaviours.abra_hunt import AbraHunt
+from pokeagent.explorer.behaviours.battle import BattleView
 from pokeagent.explorer.behaviours.catch import full_party_slot
 from pokeagent.explorer.catch_list import catch_wanted
+from pokeagent.explorer.economy.shopping import ball_need
 from pokeagent.knowledge import team_floor
+from pokeagent.knowledge.catch_policy import CatchStep
 from pokeagent.knowledge.flee_catch import flee_on_turn
 from pokeagent.knowledge.party import Combatant
 from pokeagent.goals import GOALS, check_goals
 from test_catch_policy import ALL_BALLS, _decide, _mon
+from test_catch_seam import _ctx
 from test_magikarp import bcd, party_mem
 from test_team_floor import BOSS
+from test_team_inventory import make_ctx
 from test_team_plan import SYN, _mon as _tp_mon
 
 ABRA_ID, KADABRA_ID, ALAKAZAM_ID = 148, 38, 149   # name_of_internal ids in the NAMES fake below
@@ -109,16 +121,22 @@ def test_kadabra_and_alakazam_count_too():
         assert catch_abra_settled(emu, _st("abra"), set(), {"name_of_internal": NAMES})
 
 
-def test_goal_settles_on_the_step_cap_and_when_no_balls_no_money():
+def test_goal_settles_on_the_step_cap_and_only_when_no_balls_no_money():
+    """"0 balls AND no money for one" is the ONLY out-of-resources settle: short of BALLS_MIN but
+    able to buy, or broke with balls still in the bag, the goal stays open - it shops or hunts on."""
     emu = _emu(money=3000)
     st = _st("abra", abra_skipped=True)
     assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})       # ABRA_STEP_CAP spent
-    broke = _emu(money=0, balls={4: BALLS_MIN - 1})
-    assert catch_abra_settled(broke, _st("abra"), set(), {"name_of_internal": NAMES})  # no balls, no money
-    restockable = _emu(money=3000, balls={4: BALLS_MIN - 1})
-    assert not catch_abra_settled(restockable, _st("abra"), set(), {"name_of_internal": NAMES})  # money buys a ball
-    stocked = _emu(money=0, balls={4: BALLS_MIN})
-    assert not catch_abra_settled(stocked, _st("abra"), set(), {"name_of_internal": NAMES})
+    assert catch_abra_settled(_emu(money=0), _st("abra"), set(), {"name_of_internal": NAMES})      # no ball, no money
+    assert catch_abra_settled(_emu(money=100), _st("abra"), set(), {"name_of_internal": NAMES})    # under a ball's price
+    st2 = _st("abra")
+    assert not catch_abra_settled(_emu(money=3000), st2, set(), {"name_of_internal": NAMES})       # 0 balls but a buy is affordable
+    assert not catch_abra_settled(_emu(money=0, balls={4: 3}), _st("abra"), set(),
+                                {"name_of_internal": NAMES})                                     # broke but 3 throws left: hunt on
+    assert not catch_abra_settled(_emu(money=3000, balls={4: BALLS_MIN - 1}), _st("abra"), set(),
+                                {"name_of_internal": NAMES})                                     # short of the stock: restock first
+    assert not catch_abra_settled(_emu(money=0, balls={4: BALLS_MIN}), _st("abra"), set(),
+                                {"name_of_internal": NAMES})
 
 
 def test_check_goals_wires_catch_abra_between_team_ready_and_to_bill():
@@ -201,3 +219,158 @@ def test_build_key_names_the_abra_build():
     band = team_fp.build_key({"team": [{"species": ABRA_ID, "level": 12}]}, kb)
     assert band == team_fp.build_key({"team": [{"species": ABRA_ID, "level": 10}]}, kb)  # same 5-level band
     assert team_fp.build_key({"team": [{"species": ABRA_ID, "level": 10}]}, kb) == "ABRA:L10"
+
+
+# --- the Mart errand (round 2: buy balls before hunting) ------------------------------------------------------------
+
+def test_the_shopping_list_wants_balls_while_catch_abra_is_open():
+    met = {g: True for g in goal_ids()}
+    assert not ball_need(met)                              # nothing upcoming: no ball need
+    assert ball_need({**met, "catch_abra": False})         # the open abra goal wants balls
+    assert not ball_need({**met, "catch_abra": True})      # settled: back to the campaign's own needs
+
+
+def test_ball_errand_arms_a_restock_trip_the_existing_machinery_walks(tmp_path):
+    ctx = make_ctx(tmp_path, balls=0, money=4000)          # Cerulean, Mart learned, purse covers it
+    assert AbraHunt()._ball_errand(ctx)
+    assert ctx.restock["intent"] and ctx.restock["want"] == (0x04,) and ctx.shop_intent == ("mart", None)
+    d = Restock().step(ctx)
+    assert d is not None and d.rule == "restock_walk"      # the armed trip is walked by Restock itself
+
+
+def test_ball_errand_stays_quiet_when_stocked_broke_or_spent(tmp_path):
+    assert not AbraHunt()._ball_errand(make_ctx(tmp_path, balls=BALLS_MIN, money=4000))   # enough throws already
+    assert not AbraHunt()._ball_errand(make_ctx(tmp_path, balls=0, money=0))              # the settle rule owns this
+    ctx = make_ctx(tmp_path, balls=0, money=4000)
+    ctx.restock["tries"] = 3
+    assert not AbraHunt()._ball_errand(ctx)               # the per-run Mart budget is spent
+    ctx = make_ctx(tmp_path, balls=0, money=4000)
+    ctx.restock["intent"] = True
+    assert AbraHunt()._ball_errand(ctx)                   # a trip is underway: keep yielding to Restock
+
+
+# --- encounter counting (round 2: a wild Abra counts at battle start, balls or not) ---------------------------------
+
+ABRA_KB = {"dex_of_internal": {"148": 63}, "name_of_internal": {"148": "ABRA"}, "items": {}}
+
+
+def _abra_battle_ctx(tmp_path, monkeypatch):
+    monkeypatch.setattr(catch_mod, "ROM_KB", ABRA_KB)
+    ctx = _ctx(tmp_path)
+    ctx.bv = BattleView(kind=1, hp=20, mx=20, run_line="RUN", species=ABRA_ID, e_lvl=10)
+    logs = []
+    ctx.log = lambda t, tag=None: logs.append(t)
+    return ctx, logs
+
+
+def test_abra_encounter_counts_at_battle_start_even_with_no_balls(tmp_path, monkeypatch):
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)    # the fake bag is empty: nothing to throw
+    assert Catch().step(ctx) is None
+    assert ctx.abra_encounters == 1 and ctx.abra_pending["battle"] == ctx.battles
+    assert any("no ball" in t and "ABRA" in t for t in logs)   # let go - but the encounter counted
+    Catch().step(ctx)
+    assert ctx.abra_encounters == 1                        # once per battle, not once per step
+    ctx.battles += 1
+    Catch().step(ctx)
+    assert ctx.abra_encounters == 2                        # the next encounter counts too
+
+
+def test_abra_encounter_counts_with_balls_and_logs_one_action_line(tmp_path, monkeypatch):
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    monkeypatch.setattr(catch_mod, "bag_contents", lambda emu: {0x04: 5})
+    monkeypatch.setattr(catch_mod, "catch_wanted", lambda *a, **k: "catch_abra goal (build abra)")
+    monkeypatch.setattr(catch_mod, "cave_catch_allowed", lambda ctx, sp: True)
+    monkeypatch.setattr(catch_mod, "our_party", lambda emu: [])
+    monkeypatch.setattr(catch_mod, "dex_owned_count", lambda emu: 0)
+    monkeypatch.setattr(catch_mod, "upcoming_needs", lambda goals: [])
+    monkeypatch.setattr(catch_mod, "_policy_hint", lambda *a, **k: CatchStep("throw", ball="POKE"))
+    Catch().step(ctx)
+    assert ctx.abra_encounters == 1
+    assert sum("abra:" in t for t in logs) == 1 and any("throw" in t and "ABRA" in t for t in logs)
+    Catch().step(ctx)
+    assert ctx.abra_encounters == 1 and sum("abra:" in t for t in logs) == 1   # one line per encounter
+
+
+# --- the give-up (round 2: a settle without an Abra is never a success) ----------------------------------------------
+
+def _stage_ctx(**kw):
+    logs = []
+    base = dict(abra_steps=0, abra_skipped=False, abra_encounters=2, had_abra=False,
+                abra_gave_up=False, abra_settle="", opts=SimpleNamespace(build="abra"),
+                log=lambda t, tag=None: logs.append(t), goals=lambda: {"catch_abra": True})
+    return SimpleNamespace(**(base | kw)), logs
+
+
+def test_abra_stage_marks_the_cap_settle_a_give_up_never_a_success():
+    state = {"catch_abra": False}
+    ctx, logs = _stage_ctx(abra_steps=ABRA_STEP_CAP, goals=lambda: dict(state))
+    abra_stage(ctx, dict(state))                           # the open step that crosses the cap
+    assert ctx.abra_skipped and any("gave up" in t for t in logs)
+    state["catch_abra"] = True                             # the next goals() reports the skip settled
+    abra_stage(ctx, dict(state))
+    assert ctx.abra_gave_up and any("settled - gave up" in t for t in logs)
+    assert not any("caught" in t for t in logs)
+
+
+def test_abra_stage_reports_a_caught_abra_not_a_give_up():
+    state = {"catch_abra": False}
+    ctx, logs = _stage_ctx(goals=lambda: dict(state))
+    abra_stage(ctx, dict(state))                           # an open step first: the latch arms
+    ctx.had_abra = True
+    state["catch_abra"] = True                             # the catch landed between calls
+    abra_stage(ctx, dict(state))
+    assert not ctx.abra_gave_up and any("settled - caught" in t for t in logs)
+
+
+class _FakeEmu:
+    def save_state(self, path):
+        open(path, "wb").write(b"s")
+
+    def read(self, addr):
+        return 0
+
+
+def _record_ctx(run, logs, **kw):
+    return SimpleNamespace(emu=_FakeEmu(), run_dir=run, step=7, frame=70, goal_steps={},
+                           initial_goals=set(), initial_goals_ready=True, goal_left_house=False,
+                           log=lambda m, t=None: logs.append(m),
+                           opts=SimpleNamespace(state_stem="", stop_at_goal=None, stop_at_map=None,
+                                                headless=False, starter="x"), **kw)
+
+
+def test_record_goals_marks_a_catch_abra_settle_without_an_abra_a_give_up(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    state = {g: False for g in GOALS}
+    state["catch_abra"] = True
+    monkeypatch.setattr(press_goals, "check_goals", lambda emu, ctx: dict(state))
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "meta.json").write_text("{}")
+    logs = []
+    ctx = _record_ctx(run, logs, had_abra=False, abra_gave_up=False)
+    press_goals.record_goals(ctx, SimpleNamespace(goals=None))
+    assert ctx.goal_steps["catch_abra"] == 7 and ctx.goal_steps["catch_abra_gave_up"] == 7
+    assert ctx.abra_gave_up
+    row = json.loads((run / "goal_frames.jsonl").read_text().splitlines()[0])
+    assert row["goal"] == "catch_abra" and row["gave_up"] is True
+    hist = json.loads((tmp_path / "runs/milestones.json").read_text())
+    assert hist["catch_abra"][-1]["gave_up"] is True
+    assert any("gave up" in m for m in logs) and not any("GOAL REACHED" in m for m in logs)
+
+
+def test_record_goals_reports_a_caught_abra_as_an_ordinary_goal(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    state = {g: False for g in GOALS}
+    state["catch_abra"] = True
+    monkeypatch.setattr(press_goals, "check_goals", lambda emu, ctx: dict(state))
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "meta.json").write_text("{}")
+    logs = []
+    ctx = _record_ctx(run, logs, had_abra=True, abra_gave_up=False)
+    press_goals.record_goals(ctx, SimpleNamespace(goals=None))
+    assert ctx.goal_steps["catch_abra"] == 7 and "catch_abra_gave_up" not in ctx.goal_steps
+    assert not ctx.abra_gave_up
+    row = json.loads((run / "goal_frames.jsonl").read_text().splitlines()[0])
+    assert row["goal"] == "catch_abra" and "gave_up" not in row
+    assert any("GOAL REACHED: catch_abra" in m for m in logs)

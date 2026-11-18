@@ -137,6 +137,7 @@ def run(args) -> dict:
            "frames_per_page": round(m["box_frames"] / max(1, m["pages"]), 1),
            "option_byte": emu.read(0xD355), "hp_end": [emu.read(0xD16D), emu.read(0xD18E)], "map_end": emu.read(0xD35E), "text_speed": mem.data.get("text_speed"), "types": types,
            "retalked_info_or_sign": retalk, "stats": stats, "goals": [g for g, v in check_goals(emu, ctx).items() if v], "goal_steps": dict(ctx.goal_steps), "starter_species": emu.read(0xD16B),
+           "catch_abra_gave_up": bool(getattr(ctx, "abra_gave_up", False)),  # settled without an Abra: a give-up, not a catch
            "pace": mem.data.get("text_pace"), "drill_result": getattr(ctx.drill, "result", None), "leg_states_saved": getattr(ctx.leg_saver, "saved", 0), "work": str(work)}
     emu.close()
     return out

@@ -67,11 +67,17 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
             continue  # inferred from later goals (no detector of its own): never a goal_frames line, checkpoint or milestone
         if goals[g] and g not in ctx.goal_steps and g not in ctx.initial_goals:
             skipped = g == "buy_magikarp" and not ctx.get("had_magikarp")  # settled by skip (cannot buy / cave entered), not a purchase
+            gave_up = g == "catch_abra" and not getattr(ctx, "had_abra", False)  # settled without an Abra: a give-up, never a GOAL REACHED
             ctx.goal_steps[g] = ctx.step
+            if gave_up:
+                ctx.goal_steps["catch_abra_gave_up"] = ctx.step
+                ctx.abra_gave_up = True
             ctx.log(f"[goal] buy_magikarp skipped: no Magikarp bought, goal settled at step {ctx.step}" if skipped
+                    else f"[goal] catch_abra gave up: settled at step {ctx.step} (no Abra caught)" if gave_up
                     else f"*** GOAL REACHED: {g} at step {ctx.step} frame {ctx.frame} ***", "res")
             with (ctx.run_dir / "goal_frames.jsonl").open("a", encoding="utf-8") as fh:  # frames are what pacing changes
-                fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame, **({"skipped": True} if skipped else {})}) + chr(10))
+                fh.write(json.dumps({"goal": g, "step": ctx.step, "frame": ctx.frame,
+                                     **({"skipped": True} if skipped else {}), **({"gave_up": True} if gave_up else {})}) + chr(10))
             try:  # checkpoint: the swarm re-runs the NEXT segment from here (tools/swarm.py --segment)
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 if glitch_guard.allow_write(ctx.emu, f"goal:{g}", runs_dir=Path(ctx.run_dir).parent,
@@ -99,7 +105,8 @@ def record_goals(ctx: ExplorerContext, fr: PressFrame) -> bool:
                 hist = json.loads(gp.read_text()) if gp.exists() else {}
             except json.JSONDecodeError:
                 hist = {}
-            rec = {"run": ctx.run_dir.name, "step": ctx.step, **({"skipped": True} if skipped else {})}
+            rec = {"run": ctx.run_dir.name, "step": ctx.step, **({"skipped": True} if skipped else {}),
+                   **({"gave_up": True} if gave_up else {})}
             if g == "first_pokemon":
                 rec["species_byte"] = ctx.emu.read(0xD164)  # wPartySpecies[0] (unverified): 0xB0 Charmander? we learn it
                 rec["wanted"] = ctx.opts.starter
