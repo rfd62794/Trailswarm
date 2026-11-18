@@ -154,9 +154,9 @@ def test_search_finds_both_locks_within_the_caps_for_many_seeds():
         assert s.score()["tried"] <= gp.MAX_TOTAL    # the run cap is always respected
         if not s.done:
             unsolved.append((seed, s.score()))
-    # a reset re-randomizes both locks, so a run can only afford ~6 armed guesses inside MAX_TOTAL:
-    # most seeds solve; the rest end in the honest "gave up" (never a hang, never over-cap)
-    assert len(unsolved) <= 20, f"too many gave up: {unsolved}"
+    # a reset re-randomizes both locks; inside MAX_TOTAL=250 a run affords ~27 armed guesses, so
+    # near-every seed solves and the rare rest end in the honest "gave up" (never a hang, over-cap)
+    assert len(unsolved) <= 2, f"too many gave up: {unsolved}"
     assert all(score["tried"] == gp.MAX_TOTAL for _seed, score in unsolved), unsolved  # give-ups land on the run cap
 
 
@@ -168,7 +168,7 @@ def test_reset_clears_the_tried_sets_and_counts():
     assert s.first == (1, 7) and s.hits == 1
     assert s.next_can() == (1, 9)          # untried neighbours of the first lock only
     s.record(game.answer((1, 9)))          # a wrong neighbour: the locks reset
-    assert s.resets == 1 and s.first is None and not s.tried and not s.tried2 and not s.done
+    assert s.resets == 1 and s.first is None and not s.tried and not s.wrong2 and not s.done
 
 
 def test_oracle_goes_straight_to_each_lock_as_the_game_arms_it():
@@ -258,6 +258,19 @@ def test_referee_values_never_change_search_choices():
     assert seqs[0] == seqs[1] == seqs[2]
 
 
+def test_search_solves_random_lock_games_inside_the_run_cap():
+    """The round-4 gate (the controller, 2026-11-17): a simulated game with random locks per seed
+    must solve within MAX_TOTAL in >= 99% - the round-3 live run died on MAX_TOTAL=60 with every
+    verdict correct, so the caps must make success near-certain, not lucky."""
+    unsolved = []
+    for seed in range(100):
+        game, s = FakeGame(random.Random(seed)), gp.Search(gp.can_cells(FakePlan()))
+        solve(s, game)
+        if not s.done:
+            unsolved.append((seed, s.score()))
+    assert len(unsolved) <= 1, f"too many gave up: {unsolved}"
+
+
 def test_search_caps_end_the_puzzle():
     s = gp.Search(gp.can_cells(FakePlan()))
     game = FakeGame(random.Random(0), first=(9, 11))
@@ -268,8 +281,9 @@ def test_search_caps_end_the_puzzle():
     s2.total = gp.MAX_TOTAL                          # the run cap
     assert s2.next_can() is None and s2.gave_up
     s3 = gp.Search(gp.can_cells(FakePlan()))
-    s3.attempts = gp.MAX_ATTEMPTS + 1                # the pass cap
-    assert s3.next_can() is None and s3.gave_up
+    for can in s3.cans:                              # every can unreachable: nothing left to press
+        s3.skip(can)
+    assert s3.next_can() is None and s3.gave_up      # ... so passes alone cannot loop forever
     assert "gym_puzzle" in NEVER_VETO                # self-capped: the loop ledger must not veto its presses
 
 

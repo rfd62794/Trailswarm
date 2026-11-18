@@ -35,8 +35,7 @@ ENV_MODE = "POKEAGENT_GYM_PUZZLE_MODE"
 LOCK_ADDRS = (0xD743, 0xD744)   # wFirstLockTrashCanIndex, wSecondLockTrashCanIndex (ram_map.json, unverified)
 GYM_CAN_ADDR = 0xCD5B           # wGymTrashCanIndex
 MAX_PER_ATTEMPT = 15            # cans in one pass over the can order (there are only 15)
-MAX_ATTEMPTS = 4                # passes over the can order before "gave up" (a missed answer must not end the run)
-MAX_TOTAL = 60                  # can presses per run -> give up
+MAX_TOTAL = 250                 # can presses per run -> give up (round 4: near-certain, not lucky)
 
 
 def resolve_mode(cli_mode: str | None, env_mode: str | None) -> str:
@@ -165,20 +164,24 @@ def watch_barrier(st: dict, tm: bytes, px: int, py: int) -> str | None:
 
 
 class Search:
-    """The try-order state machine. No first lock yet: cans in a fixed order (can id, skipping tried
-    ones). After a first-lock hit: only that can's UNTRIED orthogonal neighbours (``tried2``: a can
+    """The try-order state machine (the controller's 2026-11-17 round-4 rules). No first lock yet:
+    cans in a fixed order (can id), skipping ones that answered "nothing" since the last reset
+    (``tried`` - never re-pressed). After a first-lock hit: only that can's orthogonal neighbours,
+    in a fixed order, skipping the ones already answered FOR THAT first-lock cell (``wrong2``: a can
     that answered "nothing" before the lock armed can still be the second). A "reset" clears both
-    tried-sets (the game re-randomizes) and counts. A pass that runs out of candidates is NOT the end:
-    a flashed box can hide a hit, so the next pass starts over (``attempts``, capped by MAX_ATTEMPTS
-    and MAX_TOTAL - the controller's 2026-11-17 fix: a capped loop, not a one-pass "gave up").
-    ``record`` gets only the result word - never the referee RAM values (those go to log lines, the
-    score, and the after-the-fact referee_result of the press just made)."""
+    answer-maps (the locks re-randomized: old answers no longer hold). A pass that runs out of
+    candidates starts the next one (``attempts``) - a flashed box can hide a hit; the only bound is
+    MAX_TOTAL presses. ``skipped`` holds cans the behaviour could never press at all, so an
+    unreachable puzzle still ends in "gave up". ``record`` gets only the result word - never the
+    referee RAM values (those go to log lines, the score, and the after-the-fact referee_result of
+    the press just made)."""
 
     def __init__(self, cans: list[tuple[int, int]]) -> None:
         self.cans = list(cans)
         self.can_set = frozenset(cans)
-        self.tried: set = set()           # first-lock hunt: cans pressed this pass
-        self.tried2: set = set()          # second-lock hunt: the first lock's neighbours already pressed
+        self.tried: set = set()           # first-lock hunt: "nothing" answers since the last reset
+        self.wrong2: dict = {}            # armed hunt: first-lock cell -> its neighbours already answered
+        self.skipped: set = set()         # cans the behaviour could never press: out for the run
         self.first: tuple | None = None   # the can that opened the first lock this pass
         self.pending: tuple | None = None # the can ``next_can`` last returned, awaiting record()
         self.total = 0                    # can presses this run
@@ -191,30 +194,28 @@ class Search:
     def next_can(self) -> tuple[int, int] | None:
         if self.done or self.gave_up:
             return None
-        if self.total >= MAX_TOTAL or self.attempts > MAX_ATTEMPTS:
+        if self.total >= MAX_TOTAL:
             self.gave_up = True
             return None
         can = self._pick()
         if can is None:                     # this pass ran out of candidates: start the next one
             self.attempts += 1
-            if self.attempts > MAX_ATTEMPTS:
+            self.tried.clear()              # the locks re-randomize anyway; a lost answer is retried
+            self.wrong2.clear()
+            self.first = None
+            can = self._pick()
+            if can is None:                 # every can is out of candidacy: nothing left to press
                 self.gave_up = True
-            else:
-                self.tried.clear()          # the locks re-randomize anyway; a lost answer is retried
-                self.tried2.clear()
-                self.first = None
-                can = self._pick()
-                if can is None:
-                    self.gave_up = True
         self.pending = can
         return can
 
     def _pick(self) -> tuple[int, int] | None:
         if self.first is not None:
-            cand = [c for c in neighbours(self.can_set, self.first) if c not in self.tried2]
+            cand = [c for c in neighbours(self.can_set, self.first)
+                    if c not in self.wrong2.get(self.first, ()) and c not in self.skipped]
             if cand:
                 return cand[0]
-        return next((c for c in self.cans if c not in self.tried), None)
+        return next((c for c in self.cans if c not in self.tried and c not in self.skipped), None)
 
     def record(self, result: str) -> None:
         """Fold one can's result into the state machine ("first" / "second" / "reset" / "nothing")."""
@@ -229,17 +230,17 @@ class Search:
             self.done, self.hits = True, self.hits + 1
         elif result == "reset":
             self.resets, self.first = self.resets + 1, None
-            self.tried.clear()            # both tried-sets: the locks re-randomized, start over
-            self.tried2.clear()
+            self.tried.clear()            # both answer-maps: the locks re-randomized, start over
+            self.wrong2.clear()
         elif self.first is not None:      # "nothing" while armed: not the second lock (a missed text)
-            self.tried2.add(can)
+            self.wrong2.setdefault(self.first, set()).add(can)
         else:                             # "nothing": this can answered no first lock
             self.tried.add(can)
 
     def skip(self, can: tuple[int, int]) -> None:
-        """A can we could not reach or press: out of this attempt's candidates without a result."""
+        """A can we could not reach or press: out of this run's candidacy entirely."""
+        self.skipped.add(can)
         self.tried.add(can)
-        self.tried2.add(can)
         if self.pending == can:
             self.pending = None
 
@@ -271,8 +272,8 @@ class Oracle(Search):
 
     def _pick(self) -> tuple[int, int] | None:
         target = self._lock_target()
-        seen = self.tried2 if self.first is not None else self.tried
-        if target is not None and target not in seen:
+        seen = self.wrong2.get(self.first, ()) if self.first is not None else self.tried
+        if target is not None and target not in seen and target not in self.skipped:
             return target
         return super()._pick()
 

@@ -8,9 +8,9 @@ indices read around the press - a D743/D744 move counts the hit the text never s
 pair only ever scores a made press, never picks the next one; in ORACLE it steers the walk directly.
 
 Caps modelled on field_cut: PRESS_CAP steps spent on one can, MAX_TRIES failed tries per can,
-COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_ATTEMPTS /
-MAX_TOTAL). The readiness hold (_hold_clear) is NOT consulted: the puzzle may run only while the
-agent is already in the gym.
+COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_TOTAL - the
+round-4 caps: attempts are bounded only by the run cap). The readiness hold (_hold_clear) is NOT
+consulted: the puzzle may run only while the agent is already in the gym.
 
 Any lock verdict (first / reset / second) also forgets learned walls touching the barrier cells:
 a bump recorded while the gate was closed is stale the moment a lock moves (the controller's
