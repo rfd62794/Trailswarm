@@ -151,12 +151,12 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
-| Head commit | ac7d2221ba977a82a96a1decc5a5b10b33a59a4d |
+| Head commit | d416e83d2c5a63028a0268fe6216921a0f81d5d7 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -173,4 +173,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 02:42 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py is created by this directive (now on the branch).
 - 2026-11-18 02:42 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PSQ7MD3JZR2PWS4T6GVBFP
 - 2026-11-18 02:49 · dispatcher · launched pid=23612; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; resynced: merged main into directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 (5 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
+- 2026-11-18 03:12 · devin · In progress → Review — Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head d416e83d2c5a63028a0268fe6216921a0f81d5d7); synthetic tests only; real-ROM check from nugget_bridge.state is the controller's. Round 2: ball buying via the existing restock machinery (ball_need sees the open catch_abra; abra_hunt arms the trip), encounters counted at battle start, catch_abra_gave_up flag in goal_steps/goal_frames/milestones/headless summary. [origin] spent: devin 58 min est. n/a
 <!-- queue:end -->
