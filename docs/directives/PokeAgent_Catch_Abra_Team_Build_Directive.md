@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
@@ -168,4 +168,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 01:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PNZC89NWA0JCRSY541G3E0
 - 2026-11-18 01:45 · dispatcher · launched pid=13464; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
 - 2026-11-18 02:21 · devin · In progress → Review — [origin] spent: devin 35 min est. n/a
+- 2026-11-18 02:41 · robert-claude-laptop · Review → Blocked — Real-ROM check (head ac7d2221, nugget_bridge.state, --build abra, seeds 1-2, 8000 steps): NO ABRA CAUGHT. Navigation works (Route 24 grass found, 5 wild Abra met on seed 1 at L8-10). Every one logged '[catch: no ball: Abra encounter let go (ABRA L10)]' and the Abra teleported (lesson vs ABRA: 0/5, fled 5): the nugget_bridge save has NO Poke Balls in the bag. Then catch_abra 'settled - step cap after 3001 steps, 0 Abra encounters' (counter wrong: 5 met) and the goal counted as done, a false success. Fix round 2: (1) with build abra and fewer than BALLS_MIN balls, buy Poke Balls first at the nearest reachable Mart (Cerulean, map 0x03 area; reuse the existing mart/purchase machinery - the same path potion/heal trips use; do not write a new shop flow) when money allows, then hunt; only 'no balls AND cannot afford' settles. (2) Count Abra encounters from the battle start (species ABRA/KADABRA wild), not from catches. (3) Step-cap settle must log 'gave up' and must not be reported as success by the headless summary (keep the goal settled for ladder progress, but add a distinct 'catch_abra_gave_up' flag in goal_steps/summary). Synthetic tests for each. Gate: controller real-ROM seeds 1 and 2 must end with an ABRA in the party.
 <!-- queue:end -->
