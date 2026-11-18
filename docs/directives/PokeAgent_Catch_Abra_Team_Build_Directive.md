@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
@@ -170,4 +170,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 02:21 · devin · In progress → Review — [origin] spent: devin 35 min est. n/a
 - 2026-11-18 02:41 · robert-claude-laptop · Review → Blocked — Real-ROM check (head ac7d2221, nugget_bridge.state, --build abra, seeds 1-2, 8000 steps): NO ABRA CAUGHT. Navigation works (Route 24 grass found, 5 wild Abra met on seed 1 at L8-10). Every one logged '[catch: no ball: Abra encounter let go (ABRA L10)]' and the Abra teleported (lesson vs ABRA: 0/5, fled 5): the nugget_bridge save has NO Poke Balls in the bag. Then catch_abra 'settled - step cap after 3001 steps, 0 Abra encounters' (counter wrong: 5 met) and the goal counted as done, a false success. Fix round 2: (1) with build abra and fewer than BALLS_MIN balls, buy Poke Balls first at the nearest reachable Mart (Cerulean, map 0x03 area; reuse the existing mart/purchase machinery - the same path potion/heal trips use; do not write a new shop flow) when money allows, then hunt; only 'no balls AND cannot afford' settles. (2) Count Abra encounters from the battle start (species ABRA/KADABRA wild), not from catches. (3) Step-cap settle must log 'gave up' and must not be reported as success by the headless summary (keep the goal settled for ladder progress, but add a distinct 'catch_abra_gave_up' flag in goal_steps/summary). Synthetic tests for each. Gate: controller real-ROM seeds 1 and 2 must end with an ABRA in the party.
 - 2026-11-18 02:41 · robert-claude-laptop · Blocked → Queued — Requeue round 2: buy balls first, count encounters, no false success on cap (see previous note). Same branch.
+- 2026-11-18 02:42 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py is created by this directive (now on the branch).
 <!-- queue:end -->
