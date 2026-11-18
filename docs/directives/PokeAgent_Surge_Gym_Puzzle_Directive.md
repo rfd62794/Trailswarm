@@ -151,11 +151,13 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
 | Base commit | d60b76a694a293bc0f3d15ee940847515d7237a4 |
+| Head commit | eae401e87d2f087a3fb89c4525bd157e3e014052 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-16 08:17 · robert-claude-laptop · none → Queued
@@ -166,4 +168,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 20:22 · dispatcher · In progress → Approved — dispatch rolled back: stale dispatch marker (stage provision)
 - 2026-11-17 20:22 · dispatcher · launched pid=7444; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; resynced: merged main into directive/pokeagent-pokeagent-surge-gym-puzzle-directive (1 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-17 20:53 · devin · Approved → Blocked — Work COMPLETE and pushed (branch head eae401e; full serial suite 3436 passed/1 skipped). Only the status flip failed: queue still says Approved (dispatch was never recorded as In progress) and refuses Approved->Review and Approved->In progress for actor devin.
+- 2026-11-17 20:57 · robert-claude-laptop · Blocked → Review — Devin finished: head eae401e8, full serial suite 3436 passed/1 skipped, 107 focused. Blocked only because the status flip was refused (row never recorded In progress). Needs review + verify + real-ROM gym check (search and oracle modes) before merge. [origin] spent: devin 31 min est. n/a
 <!-- queue:end -->
