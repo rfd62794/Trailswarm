@@ -151,10 +151,11 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
+| Base commit | efc28246939f05164af6a22d589627bd75f36297 |
 
 **Status log**
 - 2026-11-17 21:21 · robert-claude-laptop · none → Queued — Robert 2026-11-17: Abra team build as a goal. Merged as docs PR #328 (5021e481). Approve after the Surge fix round returns (one heavy local job at a time).
@@ -162,4 +163,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 01:21 · agentflow-tick · Approved → Blocked — dispatch refused (deterministic, no retry): sandbox needs refused: Exec(git push) matches deny rule Exec(git push --)
 - 2026-11-18 01:23 · robert-claude-laptop · Blocked → Queued — Sandbox needs fixed on main by PR #330 (Exec(git push) removed; verified 3455/0/0). Requeue.
 - 2026-11-18 01:37 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py is a NEW file this directive creates.
+- 2026-11-18 01:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PNZC89NWA0JCRSY541G3E0
 <!-- queue:end -->
