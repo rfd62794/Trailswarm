@@ -307,7 +307,7 @@ def test_search_caps_end_the_puzzle():
     assert s2.next_can() is None and s2.gave_up
     s3 = gp.Search(gp.can_cells(FakePlan()))
     for can in s3.cans:                              # every can unreachable: nothing left to press
-        s3.skip(can)
+        s3.pass_over(can)
     assert s3.next_can() is None and s3.gave_up      # ... so passes alone cannot loop forever
     assert "gym_puzzle" in NEVER_VETO                # self-capped: the loop ledger must not veto its presses
 

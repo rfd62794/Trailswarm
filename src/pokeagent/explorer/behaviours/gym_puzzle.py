@@ -194,7 +194,7 @@ class GymPuzzle(BehaviourBase):
         if tries[can] >= MAX_TRIES:
             st["can"] = None
             if solver is not None:
-                solver.skip(can)
+                solver.pass_over(can)
         st["cooldown_until"] = ctx.step + COOLDOWN
         self._log_press(ctx, can, f"miss ({why}; try {tries[can]}/{MAX_TRIES})")
         return no_press("gym_puzzle_fail", f"gym puzzle: can {gp.can_id(can)}: {why}")

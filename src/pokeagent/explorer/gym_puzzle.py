@@ -235,7 +235,7 @@ class Search:
             self.tried.add(can)             # "nothing" in pokered - a lost verdict just spends the guess
             self.spent.add(can)
 
-    def skip(self, can: tuple[int, int]) -> None:
+    def pass_over(self, can: tuple[int, int]) -> None:
         """A can we could not reach or press: out of this run's candidacy entirely."""
         self.skipped.add(can)
         self.tried.add(can)
