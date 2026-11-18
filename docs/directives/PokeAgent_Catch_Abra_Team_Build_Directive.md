@@ -151,11 +151,13 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
+| Head commit | ac7d2221ba977a82a96a1decc5a5b10b33a59a4d |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-17 21:21 · robert-claude-laptop · none → Queued — Robert 2026-11-17: Abra team build as a goal. Merged as docs PR #328 (5021e481). Approve after the Surge fix round returns (one heavy local job at a time).
@@ -165,4 +167,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 01:37 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py is a NEW file this directive creates.
 - 2026-11-18 01:37 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PNZC89NWA0JCRSY541G3E0
 - 2026-11-18 01:45 · dispatcher · launched pid=13464; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
+- 2026-11-18 02:21 · devin · In progress → Review — [origin] spent: devin 35 min est. n/a
 <!-- queue:end -->
