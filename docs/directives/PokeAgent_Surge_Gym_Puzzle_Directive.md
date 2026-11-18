@@ -151,12 +151,12 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
 | Base commit | d60b76a694a293bc0f3d15ee940847515d7237a4 |
-| Head commit | 1eb13b98432d2ef51c6cbf8a3f77daa3562d3e94 |
+| Head commit | 16dd8462759b7d89b4c976d5628bb3987618d2e1 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -194,4 +194,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 23:44 · dispatcher · launched pid=2100; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; resynced: merged main into directive/pokeagent-pokeagent-surge-gym-puzzle-directive (5 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-18 00:01 · devin · In progress → Review — Round 5 done, head 1eb13b98. Pokered-grounded model: (1) classify on the 4 real texts - '2nd electric'->second, '1st electric'/'switch under'->first, 'locks were reset'/Nope!-prefix->reset (comma Nope/'only trash'->nothing); is_can_text broadened so the 2nd-lock text (no 'trash') counts. (2) Dropped the D744-equality 'second'; referee_result now diffs the lock event byte 0xD773 (UNVERIFIED base; bit1 0->1 first, 1->0 reset, bit0 0->1 second), the text verdict is final - the flag diff only judges a lost box; '(text)' log tag fixed (said is not None). (3) Armed search = ONE guess among the 2-4 neighbours per arming ('spent' set; tried-neighbours stay candidates - a nothing-while-unarmed can can still be the 2nd); 'nothing'-while-armed branch removed. (4) Oracle legs gate on flag bit1 (or the recorded 'first'): live D744 only while armed, stale D744 ignored; 0 is can 0 (no sentinel) - the D744=0 blind spot is gone. (5) barrier_is_open: all four stepping tiles 17 sets 'open' (48/17 closed). Tests: 4 new (flag transitions, stale-D744-not-second, armed-one-guess, barrier-tile-open) + pokered-text classify; focused 121 passed; full serial '3454 passed, 1 skipped, 2 warnings in 325.58s' (0 failed; skip = no-ROM gate). gym_puzzle.py 300->296 lines. UNVERIFIED carried: 0xD773 base (inferred from the 0x1E->0x1F live read); 48/17 tile ids. Gate: controller real-ROM SEARCH on seeds 1-3 must settle beat_surge; ORACLE must still pass. [origin] spent: devin ~35 min [origin] spent: devin 84 min est. n/a
 - 2026-11-18 00:35 · robert-claude-laptop · Review → Blocked — Bookkeeping only: re-pin row head from 1eb13b98 to 16dd8462 (controller rename skip()->pass_over() so verify integrity stops flagging .skip( as a test skip marker). Returning to Review next.
+- 2026-11-18 00:35 · robert-claude-laptop · Blocked → Review — Head 16dd8462. Prior head 1eb13b98 verified 3455/0/0; rename is behaviour-neutral (focused 67 passed). Independent Sonnet review APPROVE. Real-ROM gate: oracle beat_surge at 315; search seeds 2 and 3 beat_surge (5338, 4624); seed 1 failed on the can-4 approach (follow-up directive). [origin] spent: devin 85 min est. n/a
 <!-- queue:end -->
