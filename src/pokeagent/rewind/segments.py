@@ -47,6 +47,7 @@ ACTIVITY: dict[str, str] = {
     "goal_talk": "move",         # walk to the one person a goal needs, then A
     "grind_drill": "move",       # pace a grass patch on a grind map
     "pickup": "move",            # detour to an item ball and press A
+    "gym_puzzle": "move",        # walk to a trash can and press A (Lt. Surge's locks)
     "learner_hunt": "move", "team_hunt": "move", "trainer_hunt": "move",
     # loop-breakers, replays, bookkeeping
     "guards": "other",           # shake walks / back-outs that break a detected loop

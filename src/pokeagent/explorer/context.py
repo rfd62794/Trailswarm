@@ -43,7 +43,7 @@ class ExplorerOptions:
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
     drill_grind: int | None = None  # grind drill: the map id whose grass the GrindDrill behaviour paces (pokeagent.grind.drill)
-    par_follow: bool = False  # plan_goal's route is walked along the ROM par path (pokeagent.explorer.par_follow)
+    par_follow: bool = False; gym_puzzle_mode: str = "search"  # par path walk; Lt. Surge's locks: "search" tries cans / "oracle" reads the lock indices
 
 
 @dataclass
