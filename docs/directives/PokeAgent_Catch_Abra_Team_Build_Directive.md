@@ -146,3 +146,17 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 ## Status row text (for the queue, when you finish)
 
 "Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head <sha>); synthetic tests only; real-ROM check from nugget_bridge.state is the controller's."
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Queued |
+| Assigned to | devin |
+| Branch | - |
+| Base branch | - |
+
+**Status log**
+- 2026-11-17 21:21 · robert-claude-laptop · none → Queued — Robert 2026-11-17: Abra team build as a goal. Merged as docs PR #328 (5021e481). Approve after the Surge fix round returns (one heavy local job at a time).
+<!-- queue:end -->
