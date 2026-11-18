@@ -11,10 +11,15 @@ Caps modelled on field_cut: PRESS_CAP steps spent on one can, MAX_TRIES failed t
 COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_ATTEMPTS /
 MAX_TOTAL). The readiness hold (_hold_clear) is NOT consulted: the puzzle may run only while the
 agent is already in the gym.
+
+Any lock verdict (first / reset / second) also forgets learned walls touching the barrier cells:
+a bump recorded while the gate was closed is stale the moment a lock moves (the controller's
+round-3 live bounce: beat_surge oscillated under an OPEN gate on a learned '5,5,UP').
 """
 from __future__ import annotations
 
 from pokeagent.explorer import gym_puzzle as gp
+from pokeagent.explorer import memory_purge
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.perceive import npc_positions
@@ -106,6 +111,10 @@ class GymPuzzle(BehaviourBase):
         st["await"] = None
         if solver is not None:
             solver.record(result)
+            if result != "nothing":  # a lock moved: walls learned bumping the barrier are stale now
+                gone = memory_purge.purge_walls_touching(ctx.mem.data, gp.GYM, gp.BARRIER)
+                if gone:
+                    ctx.log(f"[gym_puzzle: locks moved ({result}); forgot learned walls {gone}]", "res")
         self._log_press(ctx, can, result, "text" if said else "referee")
         st["can"] = st["stand"] = None
         if solver is not None and solver.done:

@@ -456,3 +456,55 @@ def test_search_mode_never_lets_ram_pick_the_can(tmp_path):
         picks.append(gp.state(ctx)["can"])
         assert d.rule in ("gym_puzzle_walk", "gym_puzzle_face", "gym_puzzle_press")
     assert picks == [(1, 7), (1, 7)]                                  # the fixed order, both times
+
+
+def test_purge_walls_touching_drops_only_edges_on_the_cells():
+    """Either endpoint counts: a wall learned ON a barrier cell and its ENTRY edges both go."""
+    from pokeagent.explorer import memory_purge
+    data = {"maps": {"92": {"blocked": ["5,5,UP", "5,6,UP", "3,4,RIGHT", "5,4,LEFT", "9,9,UP", "5,8,UP"],
+                            "fails": {"5,5,UP": 2, "9,9,UP": 1}}}}
+    gone = memory_purge.purge_walls_touching(data, gp.GYM, gp.BARRIER)
+    assert sorted(gone) == ["3,4,RIGHT", "5,4,LEFT", "5,5,UP", "5,6,UP"]  # on or into barrier cells
+    assert data["maps"]["92"]["blocked"] == ["9,9,UP", "5,8,UP"]          # order kept, others stay
+    assert data["maps"]["92"]["fails"] == {"9,9,UP": 1}                   # the fail counters went too
+    assert memory_purge.purge_walls_touching(data, 0x01, gp.BARRIER) == []
+
+
+def test_opened_forgets_the_walls_the_closed_barrier_taught(tmp_path):
+    """Round 3 (the controller's real-ROM bounce): the UP edge out of (5,5), learned bumping the CLOSED
+    barrier, left beat_surge oscillating under an OPEN gate - 'nearest known tile' (5,5) with UP ruled
+    out. The 'opened' verdict forgets every learned edge touching a barrier cell, and the learned
+    goal path then crosses the barrier."""
+    from pokeagent.explorer.world import WorldGraph
+    b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: 1, PY: 6})
+    d = ctx.mem.m(gp.GYM)
+    d["visited"] = {f"{x},{y}": 1 for x, y in ((5, 5), (5, 4), (5, 3), (5, 2), (5, 6), (4, 5))}
+    d["blocked"] = ["5,5,UP", "5,6,UP", "3,4,RIGHT", "9,9,UP"]
+    g = WorldGraph(ctx.mem.data["maps"])
+    assert g._bfs_node((gp.GYM, 5, 5), lambda n: n == (gp.GYM, 5, 2), 100) is None  # strict: the wall shuts it
+    ctx.facing = "DOWN"
+    ctx.refresh()
+    assert b.step(ctx).button == "A"
+    ctx.dialog = ["THE 2ND ELECTRIC LOCK OPENED!"]
+    ctx.talk_closed_frame = ctx.frame + 1
+    b.step(ctx)
+    assert gp.state(ctx)["open"]
+    assert d["blocked"] == ["9,9,UP"]                                   # barrier edges forgot, others stay
+    g = WorldGraph(ctx.mem.data["maps"])
+    assert g._bfs_node((gp.GYM, 5, 5), lambda n: n == (gp.GYM, 5, 2), 100) == \
+        ((gp.GYM, 5, 2), ["UP", "UP", "UP"])                            # the goal path passes the barrier
+
+
+def test_reset_forgets_the_barrier_walls_too(tmp_path):
+    """A reset re-randomizes the locks: the barrier's state moved, so its learned bumps are just as stale."""
+    b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: 1, PY: 6})
+    d = ctx.mem.m(gp.GYM)
+    d["blocked"] = ["5,5,UP", "9,9,UP"]
+    ctx.facing = "DOWN"
+    ctx.refresh()
+    assert b.step(ctx).button == "A"
+    ctx.dialog = ["NOPE  THERE'S ONLY TRASH HERE  HEY  THE ELECTRIC LOCKS WERE RESET!"]
+    ctx.talk_closed_frame = ctx.frame + 1
+    d2 = b.step(ctx)
+    assert d2.rule == "gym_puzzle_judge" and "reset" in d2.why
+    assert d["blocked"] == ["9,9,UP"]
