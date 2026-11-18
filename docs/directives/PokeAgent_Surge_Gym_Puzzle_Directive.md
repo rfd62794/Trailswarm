@@ -151,12 +151,12 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
 | Base commit | d60b76a694a293bc0f3d15ee940847515d7237a4 |
-| Head commit | 68adc6bcfd715e9c0d6eef7f195f5b0a6b8ba33e |
+| Head commit | 4ef866819535f97acb349ac7496047a7ae3e6bf9 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -180,4 +180,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 21:46 · robert-claude-laptop · Queued → Approved
 - 2026-11-17 21:47 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7P8STW2C79JTVG1VM15CA3N
 - 2026-11-17 21:55 · dispatcher · launched pid=9896; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; resynced: merged main into directive/pokeagent-pokeagent-surge-gym-puzzle-directive (8 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-17 22:05 · devin · In progress → Review — Round 3 done, head 4ef86681. Fix: a lock verdict (first/reset/second) now forgets learned walls touching the barrier cells (x4-5,y4-5) - new memory_purge.purge_walls_touching(data, map_id, cells) drops 'blocked' edges AND their fail counters where either endpoint is a barrier cell, called from GymPuzzle._judge on any result != 'nothing', logged with the dropped keys. This targets the bounce: UP out of (5,5), learned bumping the CLOSED gate, left beat_surge oscillating under an open gate since _approach rules out blocked directions and nothing re-presses them. Forget also runs on 'reset' (the barrier's state moved either way) and on 'first' (the first gate opens too). No goal_talk change needed: the APPROACH mechanic walks unmapped stand tiles and, with the wall gone, presses through and visits (5,4)->(5,2); forget also lets the ROM route plan re-plan (GYM already in ROUTE_MAPS). Tests: 3 new - unit (edges on/into cells drop, others + order kept, fails cleared), opened-forgets-walls-then-strict-WorldGraph-path-(5,5)->(5,2)=UPx3, reset-forgets-walls. Evidence: focused '117 passed'; full serial '3450 passed, 1 skipped, 2 warnings in 313.06s' (0 failed; skip = no-ROM gate). UNVERIFIED carried over from round 2 (lock strings, referee model, D744=0 blind spot, reset semantics). Next: controller re-runs vermilion_gym_entry.state SEARCH on the real ROM; it must settle beat_surge. [origin] spent: devin 57 min est. n/a
 <!-- queue:end -->
