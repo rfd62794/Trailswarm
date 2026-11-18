@@ -230,3 +230,15 @@ def test_a_stale_wait_flag_from_another_tile_still_counts_and_caps():
         rom_route_step({}, "through_mt_moon", pos, plan, (), cache)
         out = rom_route_step({}, "through_mt_moon", pos, plan, npc, cache)
     assert (0x3C, "23,3,RIGHT") in cache["edges"] and out[0] == "RIGHT" and "around" in out[1]
+
+
+@needs_rom
+def test_cells_with_tile_finds_the_gyms_trash_cans():
+    """cells_with_tile(0x5C, 0x1B) covers the 15 can cells; the tile also marks (6,1) beside Surge."""
+    plan = rom_cave_planner(maps=frozenset({0x5C}))
+    cans = {(1, 7), (1, 9), (1, 11), (3, 7), (3, 9), (3, 11), (5, 7), (5, 9), (5, 11),
+            (7, 7), (7, 9), (7, 11), (9, 7), (9, 9), (9, 11)}
+    found = plan.cells_with_tile(0x5C, 0x1B)
+    assert cans <= found          # all 15 cans share the tile (non-can cells like (6,1) do too)
+    assert (6, 1) in found        # UNVERIFIED identity: a same-tile fixture beside Lt. Surge
+    assert plan.cells_with_tile(0x3B, 0x1B) == set()  # a map outside the planner's set has no cells

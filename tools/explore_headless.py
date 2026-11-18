@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
 import tempfile
@@ -60,13 +61,14 @@ def run(args) -> dict:
                                                                    maps_path=str(work / "maps.json"),
                                                                    adaptive_pace=args.adaptive, fast_text=args.fast_text,
                                                                    bandit=args.bandit, bandit_path=args.bandit_path, par_follow=args.par_follow,
+                                                                   gym_puzzle_mode=args.gym_puzzle_mode or "search",
                                                                    role=args.role, novelty=args.novelty, novelty_path=args.novelty_path))
     from pokeagent.atlas.walkgrid import rom_cave_planner
     from pokeagent.explorer.world import SHIP_MAPS
     legs_attach.attach(ctx, drill_plan, args.save_leg_states, args.leg_states_dir, args.state, drills_log=args.drills_log or work / "drills.jsonl",
                        grind_log=args.grind_drills_log or work / "grind_drills.jsonl", goto=args.drill_goto)  # a check never writes the shared logs
-    from pokeagent.explorer.fan_club import PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
-    ctx.route_plan = rom_cave_planner(args.rom, maps=ROUTE_MAPS)  # cerulean_south: the Cut-free way to Route 5
+    from pokeagent.explorer.fan_club import GYM, PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
+    ctx.route_plan = rom_cave_planner(args.rom, maps=ROUTE_MAPS | {GYM})  # + the gym: the trash-can puzzle plans inside it
     ctx.ship_plan = rom_cave_planner(args.rom, maps=SHIP_MAPS)  # ship_gate's walk-off route (the swarm's explore_demo sets it too)
     if args.bandit:
         from pokeagent.bandit.driver import attach
@@ -155,12 +157,21 @@ def main(argv=None) -> int:
     ap.add_argument("--bandit", action="store_true", help="behaviour bandit on (reads --bandit-path, writes <work>/bandit_delta.json)")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
+    ap.add_argument("--gym-puzzle-mode", default=None, choices=("search", "oracle"),
+                    help="Lt. Surge's trash-can locks: search tries cans (default), oracle reads the lock indices "
+                         "(env POKEAGENT_GYM_PUZZLE_MODE; the flag wins)")
     ap.add_argument("--role", default="", help="swarm role; with --novelty only explorer is steered and paid by novelty")
     ap.add_argument("--novelty", action="store_true", help="novelty tracking on (reads --novelty-path; delta and discoveries stay in the work dir)")
     ap.add_argument("--novelty-path", default="runs/novelty.json", help="shared novelty table loaded at start (read-only here)")
     ap.add_argument("--verbose", action="store_true")
     legs_attach.add_args(ap)
-    print(json.dumps(run(ap.parse_args(argv)), indent=1))
+    a = ap.parse_args(argv)
+    from pokeagent.explorer import gym_puzzle
+    try:
+        a.gym_puzzle_mode = gym_puzzle.resolve_mode(a.gym_puzzle_mode, os.environ.get(gym_puzzle.ENV_MODE))
+    except ValueError as e:
+        ap.error(str(e))
+    print(json.dumps(run(a), indent=1))
     return 0
 
 

@@ -103,6 +103,9 @@ def main(argv=None) -> int:
                     help="probability that a run ignores known demonstrations and partly ignores the planner, to try to beat the record")
     ap.add_argument("--bandit", action="store_true", help="behaviour bandit: fight/flee, heal/push on, grind/skip chosen by Thompson sampling")
     ap.add_argument("--par-follow", action="store_true", help="walk purposeful trips (goal travel, heal, mart) along the ROM par path")
+    ap.add_argument("--gym-puzzle-mode", default=None, choices=("search", "oracle"),
+                    help="Lt. Surge's trash-can locks: search tries cans (default), oracle reads the lock indices "
+                         "(env POKEAGENT_GYM_PUZZLE_MODE; the flag wins)")
     ap.add_argument("--bandit-path", default="runs/bandit.json", help="shared bandit table loaded at start")
     ap.add_argument("--bandit-delta", default="", help="where this run writes its bandit delta (default <run dir>/bandit_delta.json)")
     ap.add_argument("--role", default="", help="swarm role (explorer/exploiter/...); with --novelty only explorer is steered and paid by novelty")
@@ -114,6 +117,11 @@ def main(argv=None) -> int:
     ap.add_argument("--cell-from", default=None, help="cid of the archived cell this run returned from (slice 4; the harvester parent)")
     ap.add_argument("--cell-steps", type=int, default=0, help="emulator steps already spent reaching that cell (slice 4; harvester steps_offset)")
     a = ap.parse_args(argv)
+    from pokeagent.explorer import gym_puzzle
+    try:
+        a.gym_puzzle_mode = gym_puzzle.resolve_mode(a.gym_puzzle_mode, os.environ.get(gym_puzzle.ENV_MODE))
+    except ValueError as e:
+        ap.error(str(e))
     drill_plan = legs_attach.plan(a.drill_leg, a.drill_grind, a.drill_steps, a.leg_states_dir, a.rom,
                                   a.state if a.state != "baselines/bedroom.state" else None, min_hp=a.drill_min_hp)
     if drill_plan:  # a drill starts from its saved entry state and runs its own step budget
@@ -172,6 +180,7 @@ def main(argv=None) -> int:
                              frames_per_step=a.frames_per_step, train_level=a.train_level, maps_path=a.maps,
                              adaptive_pace=a.adaptive_pace, fast_text=a.fast_text,
                              bandit=a.bandit, bandit_path=a.bandit_path, bandit_delta=a.bandit_delta, par_follow=a.par_follow,
+                             gym_puzzle_mode=a.gym_puzzle_mode or "search",
                              role=a.role, novelty=a.novelty, novelty_path=a.novelty_path, novelty_delta=a.novelty_delta))
     ctx.jsonl_buf = buf  # the shared cadence: per-step jsonl appends flush every 50 steps and on exit
     legs_attach.attach(ctx, drill_plan, a.save_leg_states, a.leg_states_dir, a.state, drills_log=a.drills_log, grind_log=a.grind_drills_log, goto=a.drill_goto)
@@ -190,8 +199,8 @@ def main(argv=None) -> int:
     from pokeagent.atlas.walkgrid import rom_cave_planner
     ctx.cave_plan = rom_cave_planner(a.rom)
     from pokeagent.explorer.world import SHIP_MAPS
-    from pokeagent.explorer.fan_club import PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
-    ctx.route_plan = rom_cave_planner(a.rom, maps=ROUTE_MAPS)
+    from pokeagent.explorer.fan_club import GYM, PLANNER_MAPS as ROUTE_MAPS  # Cerulean + Route 5/6 + Vermilion + the Fan Club
+    ctx.route_plan = rom_cave_planner(a.rom, maps=ROUTE_MAPS | {GYM})  # + the gym: the trash-can puzzle plans inside it
     ctx.ship_plan = rom_cave_planner(a.rom, maps=SHIP_MAPS)
     from pokeagent.atlas.collision import rom_walkable_ids
     mem.rom_walkable = rom_walkable_ids(a.rom)

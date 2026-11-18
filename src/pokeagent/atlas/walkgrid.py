@@ -206,4 +206,11 @@ def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0
         """(map, x, y) of the warps on ``map_id`` that lead to ``dest_map`` (any destination when None)."""
         return {(map_id, x, y) for x, y, _dw, dm in heads[map_id].warps if dest_map is None or dm == dest_map}
     plan.warp_tiles = warp_tiles
+
+    def cells_with_tile(map_id: int, tile: int) -> set:
+        """(x, y) cells whose stepping tile id equals ``tile`` (the Vermilion Gym's trash cans are 0x1B)."""
+        if map_id not in tiles:
+            return set()
+        return {(int(x), int(y)) for y, x in zip(*np.where(tiles[map_id] == tile))}
+    plan.cells_with_tile = cells_with_tile
     return plan
