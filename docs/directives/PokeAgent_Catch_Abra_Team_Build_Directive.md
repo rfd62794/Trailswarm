@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
@@ -178,4 +178,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 03:47 · robert-claude-laptop · Blocked → Queued — Requeue round 3: restock 'no route to a Mart' diagnosis (see previous note). Same branch.
 - 2026-11-18 03:48 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py exists on this directive's branch.
 - 2026-11-18 03:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PXFS8YQBN5NSJCYF996F3D
+- 2026-11-18 07:23 · agentflow-tick · In progress → Blocked — Run finished and reports pushing d416e83d with tests green, but its set-to-Review never reached the queue; verify the remote head, then move to Review
 <!-- queue:end -->
