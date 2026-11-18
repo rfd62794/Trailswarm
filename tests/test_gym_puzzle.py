@@ -43,32 +43,36 @@ class FakePlan:
 
 
 class FakeGame:
-    """The real game's answer for a can press (UNVERIFIED rules): 'first', 'second', 'reset', 'nothing',
-    plus the two RAM lock indices the referee reads: D743 always names the first lock's can, D744 reads
-    0 until the first hit arms it (the controller's real-ROM observation)."""
+    """The real game's answer for a can press (pokered ground truth, cited by the controller): the
+    1st lock is a random can; while it is open ANY press but the 2nd lock's can resets (D743
+    re-randomizes, D744 is NEVER cleared - a stale index while unarmed). ``flags`` is the lock event
+    byte the referee reads: bit1 = 1st lock opened, bit0 = 2nd."""
 
     def __init__(self, rng, first=None):
         self.rng = rng
+        self.d744 = 0                       # never cleared: stale while the 1st lock is closed
         self._locks(first)
 
     def _locks(self, first=None):
         self.first = first if first is not None else self.rng.choice(CANS)
-        self.second = self.rng.choice(gp.neighbours(CAN_SET, self.first))
-        self.armed = False
+        self.second = self.rng.choice(gp.neighbours(CAN_SET, self.first))  # D744 names it once armed
+        self.flags = 0x00                   # a reset drops the 1st-lock bit; D744 keeps its stale index
 
     def ram(self):
-        """(D743, D744) as the referee reads them: the second index only while armed."""
-        return gp.can_id(self.first), gp.can_id(self.second) if self.armed else 0
+        """(D743, D744, D773) as the referee and the oracle read them."""
+        return gp.can_id(self.first), self.d744, self.flags
 
     def answer(self, can):
-        if not self.armed:
+        if not (self.flags & gp.FLAG_1ST):
             if can == self.first:
-                self.armed = True
+                self.flags |= gp.FLAG_1ST
+                self.d744 = gp.can_id(self.second)
                 return "first"
             return "nothing"
         if can == self.second:
+            self.flags |= gp.FLAG_2ND
             return "second"
-        self._locks()  # a wrong can after the first resets both locks, re-randomized
+        self._locks()  # a wrong can while the 1st lock is open resets it, D743 re-randomized
         return "reset"
 
 
@@ -85,7 +89,7 @@ def solve(solver, game):
 
 def solve_blind(solver, game, locks=None):
     """Solve with the answer text lost on every press (--fast-text flashed the box): the only verdict is
-    referee_result's diff of the fake RAM pair. ``locks`` = the live set_locks feed an Oracle gets."""
+    referee_result's diff of the lock event byte. ``locks`` = the live set_locks feed an Oracle gets."""
     seen = []
     while not (solver.done or solver.gave_up):
         if locks is not None:
@@ -95,8 +99,8 @@ def solve_blind(solver, game, locks=None):
             break
         seen.append(can)
         before = game.ram()
-        game.answer(can)                        # the outcome lands in RAM; its text is never seen
-        solver.record(gp.referee_result(can, before, game.ram(), solver.can_set) or "nothing")
+        game.answer(can)                        # the outcome lands in the event byte; its text is never seen
+        solver.record(gp.referee_result(before[2], game.ram()[2]) or "nothing")
     return seen
 
 
@@ -138,12 +142,16 @@ def test_stand_tile_prefers_above_then_below_and_skips_blocked():
 
 
 def test_classify_matches_the_lock_text_loosely():
-    assert gp.classify("The 1st electric lock opened!") == "first"
-    assert gp.classify("The 2nd electric lock opened!") == "second"
-    assert gp.classify("Nope, there's only trash here! Hey! The electric locks were reset!") == "reset"
-    assert gp.classify("Nope, there's only trash here.") == "nothing"
+    # the four pokered lines (data/text/text_2.asm:714-748, cited by the controller round 5)
+    assert gp.classify("Hey! There's a switch under the trash! Turn it on! "
+                       "The 1st electric lock opened!") == "first"
+    assert gp.classify("The 2nd electric lock opened! The motorized door opened!") == "second"
+    assert gp.classify("Nope! There's only trash here. Hey! The electric locks were reset!") == "reset"
+    assert gp.classify("Nope, there's only trash here.") == "nothing"     # the comma Nope: never armed
+    assert gp.classify("Nope! There | only tra") == "reset"               # a fast-text flash keeps Nope!
     assert gp.classify("COOLTRAINER: I saw you!") == "nothing"
-    assert gp.is_can_text("trash and locks") and not gp.is_can_text("unrelated chatter")
+    assert gp.is_can_text("trash and locks") and gp.is_can_text("The 2nd electric / lock opened!")
+    assert not gp.is_can_text("unrelated chatter")
 
 
 def test_search_finds_both_locks_within_the_caps_for_many_seeds():
@@ -163,86 +171,103 @@ def test_search_finds_both_locks_within_the_caps_for_many_seeds():
 def test_reset_clears_the_tried_sets_and_counts():
     game, s = FakeGame(random.Random(0), first=(1, 7)), gp.Search(gp.can_cells(FakePlan()))
     game.second = (3, 7)                   # the wrong neighbour is then (1,9), the search's first pick
-    while not game.armed:  # walk the fixed order until the first lock lands
+    while not (game.flags & gp.FLAG_1ST):  # walk the fixed order until the first lock lands
         s.record(game.answer(s.next_can()))
     assert s.first == (1, 7) and s.hits == 1
-    assert s.next_can() == (1, 9)          # untried neighbours of the first lock only
-    s.record(game.answer((1, 9)))          # a wrong neighbour: the locks reset
-    assert s.resets == 1 and s.first is None and not s.tried and not s.wrong2 and not s.done
+    assert s.next_can() == (1, 9)          # the ONE armed guess: an untried neighbour of the first lock
+    s.record(game.answer((1, 9)))          # a wrong neighbour while armed: the locks reset
+    assert s.resets == 1 and s.first is None and not s.tried and not s.done
+
+
+def test_an_armed_press_never_answers_nothing_and_costs_one_guess():
+    """pokered: while the 1st lock is open every press but D744's resets - there is no probing the
+    neighbours, just one guess per arming. A 'nothing' verdict that slips in anyway (a lost page)
+    spends the guess and moves on instead of looping on it."""
+    s = gp.Search(gp.can_cells(FakePlan()))
+    s.next_can(); s.record("first")        # can (1,7) armed the lock
+    assert s.next_can() == (1, 9)
+    s.record("nothing")                    # impossible per the model: the guess is spent, not retried
+    assert s.next_can() == (3, 7)
+    s.record("nothing")
+    assert s.next_can() == (1, 11)         # neighbours exhausted: the arming is spent, the hunt resumes
+    assert s.first is None
 
 
 def test_oracle_goes_straight_to_each_lock_as_the_game_arms_it():
-    """D744 reads 0 until the first lock opens, so the plan is leg by leg: D743's can, then the armed
-    D744's. The controller's first real-ROM run failed exactly here - a one-shot [first, second] plan
-    with D744=0 fell back to search and walked every can in order."""
+    """The plan is leg by leg on the event bit: D743's can while the 1st-lock bit is clear, the live
+    D744's once it reads set (D744 is never cleared - a stale index would send the walk astray)."""
     cans = gp.can_cells(FakePlan())
-    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), 0])
+    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), 0, 0])
     assert isinstance(s, gp.Oracle)
-    assert s.next_can() == (3, 7)                          # only the first leg is planned while D744 is 0
+    assert s.next_can() == (3, 7)                          # only the first leg while the bit is clear
     s.record("first")
-    s.set_locks(gp.can_id((3, 7)), gp.can_id((3, 9)))      # armed: the behaviour's fresh read
+    s.set_locks(gp.can_id((3, 7)), gp.can_id((3, 9)), gp.FLAG_1ST)  # armed: the behaviour's fresh read
     assert s.next_can() == (3, 9)                          # straight to the second lock
     s.record("second")
     assert s.done
 
 
+def test_oracle_ignores_a_stale_d744_while_the_first_lock_is_closed():
+    """D744 is never cleared, so a leftover index sitting in it means nothing until the bit says
+    armed - the round-4 bug: 'second' logged on a comma-Nope press because stale D744 matched."""
+    cans = gp.can_cells(FakePlan())
+    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), gp.can_id((3, 9)), 0])
+    assert s.next_can() == (3, 7)                          # the stale D744 is ignored, not a target
+    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), gp.can_id((3, 9)), gp.FLAG_1ST])
+    assert s.next_can() == (3, 9)                          # the same index is the target once armed
+
+
 def test_oracle_follows_a_re_randomized_first_index():
     cans = gp.can_cells(FakePlan())
-    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), 0])
+    s = gp.make_solver("oracle", cans, [gp.can_id((3, 7)), 0, 0])
     assert s.next_can() == (3, 7)
     s.record("nothing")                                    # the read was stale: the lock moved
-    s.set_locks(gp.can_id((9, 11)), 0)                     # D743 re-randomized (14->2->0->14 in the live run)
+    s.set_locks(gp.can_id((9, 11)), 0, 0)                  # D743 re-randomized (14->2->0->14 in the live run)
     assert s.next_can() == (9, 11)
 
 
 def test_oracle_falls_back_per_pick_on_a_bad_value():
     cans = gp.can_cells(FakePlan())
-    for ids in ([0, 0], [40, 40], None):
+    for ids in ([40, 40], None):
         s = gp.make_solver("oracle", cans, ids)
         assert isinstance(s, gp.Oracle)                    # always an oracle; the bad leg falls back
         assert s.next_can() == cans[0]                     # ... to the plain search order
-    s = gp.make_solver("oracle", cans, [0, gp.can_id((3, 9))])
-    assert s.next_can() == cans[0]                         # a D744 with no first lock is meaningless: ignored
+    s = gp.make_solver("oracle", cans, [0, 0])
+    assert s.next_can() == (1, 7)                          # index 0 is can 0, a real index (no sentinel)
     assert type(gp.make_solver("search", cans, [1, 2])) is gp.Search
 
 
-def test_referee_result_scores_the_press_never_the_choice():
-    """ referee_result: armed D744 names the second can; unarmed, any pair move is the lock answering."""
-    # unarmed: the pair unmoved -> no signal; a moved pair with D744 armed -> first; without -> reset
-    assert gp.referee_result((3, 7), (4, 0), (4, 0), CAN_SET) is None
-    assert gp.referee_result((3, 7), (4, 0), (4, 1), CAN_SET) == "first"
-    assert gp.referee_result((3, 7), (4, 0), (9, 0), CAN_SET) == "reset"
-    # armed (D744 = can id 4 = cell (3,9)): that can -> second; another + a move -> reset; unmoved -> None
-    assert gp.referee_result((3, 9), (4, 4), (4, 4), CAN_SET) == "second"
-    assert gp.referee_result((1, 7), (4, 4), (9, 0), CAN_SET) == "reset"
-    assert gp.referee_result((1, 7), (4, 4), (4, 4), CAN_SET) is None
-    assert gp.referee_result((1, 7), (0, 5), (0, 5), CAN_SET) is None   # armed, but the pair unmoved
+def test_referee_result_reads_the_lock_event_flags():
+    """The referee is the lock event byte 0xD773 (UNVERIFIED base): bit1 = 1st lock, bit0 = 2nd - the
+    controller's live read moved it 0x1E -> 0x1F on the 2nd-lock press. The D743/D744 pair is never
+    judged: a stale D744 equal to the pressed can with bit1 clear is NOT a second (the round-4 bug)."""
+    assert gp.referee_result(0x00, 0x02) == "first"      # 00 -> 10
+    assert gp.referee_result(0x02, 0x00) == "reset"      # 10 -> 00 (the only way bit1 drops)
+    assert gp.referee_result(0x02, 0x03) == "second"     # 10 -> 11
+    assert gp.referee_result(0x1E, 0x1F) == "second"     # the live read itself
+    assert gp.referee_result(0x00, 0x00) is None         # unmoved: no lock answer, however the pair sits
+    assert gp.referee_result(0x02, 0x02) is None
 
 
-def test_solve_blind_finds_both_locks_on_the_referee_diff_alone():
+def test_solve_blind_finds_both_locks_on_the_event_flag_alone():
+    """--fast-text flashes every box: the only verdict is the event-byte diff, which is exact - the
+    can-0 blind spot of the old pair-diff referee is gone (0 is a real index, the bits say armed)."""
     unsolved = []
     for seed in range(200):
         game, s = FakeGame(random.Random(seed)), gp.Search(gp.can_cells(FakePlan()))
         solve_blind(s, game)
         if not s.done:
             unsolved.append((seed, s.score()))
-    # a few more give up than the text run: an armed can-0 second lock reads D744=0 ("unset") and its
-    # press leaves the pair unmoved - the UNVERIFIED blind spot a RAM-only verdict cannot see.
-    assert len(unsolved) <= 30, f"too many gave up: {unsolved}"
+    assert len(unsolved) <= 2, f"too many gave up: {unsolved}"
 
 
 def test_oracle_solves_blind_in_exactly_two_presses():
-    strict = 0
     for seed in range(50):
         game = FakeGame(random.Random(seed))
         first, second = game.first, game.second            # a straight run never resets: the pair holds
         s = gp.make_solver("oracle", gp.can_cells(FakePlan()), list(game.ram()))
         seen = solve_blind(s, game, locks=game)
-        assert len(seen) <= gp.MAX_TOTAL                   # never a hang, whatever the locks were
-        if gp.can_id(first) and gp.can_id(second):         # index 0 reads "unset": that leg falls back
-            strict += 1
-            assert s.done and seen == [first, second], (seed, seen)   # straight there, two presses
-    assert strict
+        assert s.done and seen == [first, second], (seed, seen)   # straight there, two presses
 
 
 def test_referee_values_never_change_search_choices():
@@ -292,7 +317,7 @@ def test_a_lost_first_pass_does_not_end_the_run():
     a flashed box that hid the first hit gets retried until the run cap."""
     game = FakeGame(random.Random(0), first=(9, 11))
     game._locks = lambda first=None: (setattr(game, "first", (9, 11)), setattr(game, "second", (7, 11)),
-                                      setattr(game, "armed", False))  # a fixed lock pair, reset after reset
+                                      setattr(game, "flags", 0))      # a fixed lock pair, reset after reset
     game._locks()                                                     # pin the initial pair too
     s = gp.Search(gp.can_cells(FakePlan()))
     seen = []
@@ -407,31 +432,47 @@ def test_goal_talk_is_held_until_the_barrier_reads_open(tmp_path):
 
 
 D743, D744 = gp.LOCK_ADDRS
+D773 = gp.LOCK_FLAGS
 
 
 def test_a_hit_is_counted_when_the_answer_text_flashed_past(tmp_path):
-    """--fast-text can drop every page of the can's box: no close event, no text, but the referee pair
-    moved. That diff is the verdict (the live run logged 'nothing' on a real first hit here)."""
+    """--fast-text can drop every page of the can's box: no close event, no text, but the lock event
+    byte moved. That diff is the verdict (the live run logged 'nothing' on a real first hit here)."""
     b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: 1, PY: 6, D743: 7, D744: 0})
     ctx.facing = "DOWN"
     ctx.refresh()
     assert b.step(ctx).button == "A"                                  # press at the first can, (1,7)
     ctx.emu.set(D744, gp.can_id((1, 9)))                              # the game armed a second lock, unseen
+    ctx.emu.set(D773, gp.FLAG_1ST)                                    # the 1st-lock bit landed
     d = b.step(ctx)
     assert d.rule == "gym_puzzle_judge" and "first" in d.why
     assert gp.state(ctx)["solver"].first == (1, 7)
 
 
 def test_an_armed_reset_is_counted_without_text(tmp_path):
-    b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: 1, PY: 6, D743: 7, D744: gp.can_id((3, 9))})
+    b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: 1, PY: 6, D743: 7,
+                                                     D744: gp.can_id((3, 9)), D773: gp.FLAG_1ST})
     ctx.facing = "DOWN"
     ctx.refresh()
     assert b.step(ctx).button == "A"                                  # press can (1,7), not the armed one
     ctx.emu.set(D743, 12)                                             # the locks re-randomized, unseen
-    ctx.emu.set(D744, 0)
+    ctx.emu.set(D773, 0)                                              # the 1st-lock bit dropped (D744 stays stale)
     d = b.step(ctx)
     assert d.rule == "gym_puzzle_judge" and "reset" in d.why
     assert gp.state(ctx)["solver"].resets == 1
+
+
+def test_the_barrier_tile_read_can_open_the_gate(tmp_path):
+    """The stepping tiles read 48/17 closed and all 17 once the 2nd lock opens (the controller's
+    round-5 read) - a known open signal now, not just a logged change."""
+    px, py = 4, 8
+    tiles = {TM + (2 * (by - py + 4) + 1) * 20 + 2 * (bx - px + 4): gp.BARRIER_OPEN_TILE
+             for bx, by in gp.BARRIER}
+    b, ctx = GymPuzzle(), make_ctx(tmp_path, memory={PX: px, PY: py, **tiles})
+    assert not applies(ctx, b)                        # the door reads open: the puzzle stops applying
+    assert gp.state(ctx)["open"]
+    ctx2 = make_ctx(tmp_path, memory={PX: px, PY: py, TM + 28: 48})   # a 48 in the mix: closed
+    assert applies(ctx2, b)
 
 
 def test_oracle_walks_to_the_named_can_not_the_first_in_order(tmp_path):

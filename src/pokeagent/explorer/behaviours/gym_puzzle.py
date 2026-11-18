@@ -1,11 +1,12 @@
 """GymPuzzle: Lt. Surge's trash-can locks (map 0x5C) - walk to a can's stand tile, face it, press A
 once, then judge the answer. Helpers and the why: explorer/gym_puzzle.py.
 
-A press is judged from two sources, text first (the controller's 2026-11-17 fix round): the can's box
-text collected in the press window (ctx.dialog pages plus a moved ctx.last_text - under --fast-text a
-box can flash past every read and leave words in neither), and the REFEREE diff of the two lock
-indices read around the press - a D743/D744 move counts the hit the text never showed. In SEARCH the
-pair only ever scores a made press, never picks the next one; in ORACLE it steers the walk directly.
+A press is judged from two sources (the controller's 2026-11-17 round-5 rules): the can's box text
+collected in the press window (ctx.dialog pages plus a moved ctx.last_text - under --fast-text a box
+can flash past every read and leave words in neither) is FINAL when it is a can's, and the REFEREE is
+the fallback - the diff of the lock event byte (0xD773: bit1 = 1st lock, bit0 = 2nd) read around the
+press. The D743/D744 pair is never judged: D744 is never cleared, so a stale index equal to the
+pressed can is not a hit. In SEARCH the pair only ever logs; in ORACLE it steers the walk directly.
 
 Caps modelled on field_cut: PRESS_CAP steps spent on one can, MAX_TRIES failed tries per can,
 COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_TOTAL - the
@@ -41,8 +42,11 @@ class GymPuzzle(BehaviourBase):
             return False
         changed = gp.watch_barrier(st, v.tm, v.x, v.y)
         if changed:
-            # the tile read is a logged secondary signal, never the gate: only the lock dialog opens it
             ctx.log(f"[gym_puzzle: {changed}]", "res")
+        if gp.barrier_is_open(v.tm, v.x, v.y):    # all four stepping tiles 17 = the door is open
+            st["open"] = True
+            self._summary(ctx, st, "opened")
+            return False
         return True
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
@@ -93,9 +97,9 @@ class GymPuzzle(BehaviourBase):
         can, solver = aw["can"], self._solver(ctx, st)
         text = self._press_text(ctx, aw)
         said = gp.classify(text) if gp.is_can_text(text) else None   # the can's own words, when seen
-        ref = gp.referee_result(can, aw["locks"], locks, solver.can_set) if isinstance(solver, gp.Search) else None
-        # an explicit lock line outranks the RAM read; a RAM move outranks a "nothing" text (the page was lost)
-        result = said if said in ("first", "second", "reset") else (ref or said)
+        ref = gp.referee_result(aw["locks"][2], locks[2]) if isinstance(solver, gp.Search) else None
+        # the can's own words are final; the flag diff only judges a press whose box text was lost
+        result = said if said is not None else ref
         if result is None:
             if ctx.talk_closed_frame > aw["closed_at"]:
                 if text:  # a box did run, and it was not a can's: the press hit something else entirely
@@ -115,7 +119,7 @@ class GymPuzzle(BehaviourBase):
                 gone = memory_purge.purge_walls_touching(ctx.mem.data, gp.GYM, gp.BARRIER)
                 if gone:
                     ctx.log(f"[gym_puzzle: locks moved ({result}); forgot learned walls {gone}]", "res")
-        self._log_press(ctx, can, result, "text" if said else "referee")
+        self._log_press(ctx, can, result, "text" if said is not None else "referee")
         st["can"] = st["stand"] = None
         if solver is not None and solver.done:
             st["open"] = True
@@ -128,9 +132,10 @@ class GymPuzzle(BehaviourBase):
     # --- pieces ---
 
     def _locks(self, ctx: ExplorerContext, st: dict) -> tuple:
-        """The referee pair (D743, D744), read every step in both modes: ORACLE plans on it, SEARCH only
-        logs - and a move is logged either way (the game re-randomizes D743; never assume it is fixed)."""
-        pair = (ctx.emu.read(gp.LOCK_ADDRS[0]), ctx.emu.read(gp.LOCK_ADDRS[1]))
+        """(D743, D744, lock event byte @0xD773), read every step in both modes: ORACLE plans on it,
+        SEARCH only logs and referees - and a move is logged either way (the game re-randomizes D743
+        on every reset; D744 is never cleared - a stale index, not a live armed one)."""
+        pair = (ctx.emu.read(gp.LOCK_ADDRS[0]), ctx.emu.read(gp.LOCK_ADDRS[1]), ctx.emu.read(gp.LOCK_FLAGS))
         prev = st.get("locks_seen")
         if prev is not None and pair != prev:
             ctx.log(f"[gym_puzzle: lock indices moved {prev} -> {pair}]", "res")
@@ -153,7 +158,7 @@ class GymPuzzle(BehaviourBase):
             cans = gp.can_cells(ctx.route_plan, gp.GYM)
             if cans:
                 mode = ctx.opts.gym_puzzle_mode
-                ids = [ctx.emu.read(a) for a in gp.LOCK_ADDRS] if mode == "oracle" else None
+                ids = [ctx.emu.read(a) for a in (*gp.LOCK_ADDRS, gp.LOCK_FLAGS)] if mode == "oracle" else None
                 st["solver"] = gp.make_solver(mode, cans, ids)
                 ctx.log(f"[gym_puzzle: {len(cans)} cans on 0x{gp.GYM:02X}, mode {mode}"
                         + (f", lock indices {ids}" if ids else "") + "]", "res")
@@ -195,9 +200,9 @@ class GymPuzzle(BehaviourBase):
         return no_press("gym_puzzle_fail", f"gym puzzle: can {gp.can_id(can)}: {why}")
 
     def _log_press(self, ctx: ExplorerContext, can: tuple, result: str, how: str = "referee") -> None:
-        d1, d2, cd = (ctx.emu.read(a) for a in (*gp.LOCK_ADDRS, gp.GYM_CAN_ADDR))  # referee: log only, never a choice
+        d1, d2, fl, cd = (ctx.emu.read(a) for a in (*gp.LOCK_ADDRS, gp.LOCK_FLAGS, gp.GYM_CAN_ADDR))
         ctx.log(f"[gym_puzzle: mode={ctx.opts.gym_puzzle_mode} can {gp.can_id(can)} at {can} -> {result} ({how}); "
-                f"referee D743={d1} D744={d2} CD5B={cd} (read after the press)]", "res")
+                f"referee D743={d1} D744={d2} D773=0x{fl:02x} CD5B={cd} (read after the press)]", "res")
 
     def _summary(self, ctx: ExplorerContext, st: dict, outcome: str) -> None:
         if st["summarised"]:
