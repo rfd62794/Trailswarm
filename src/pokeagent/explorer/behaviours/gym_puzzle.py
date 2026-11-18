@@ -1,11 +1,16 @@
 """GymPuzzle: Lt. Surge's trash-can locks (map 0x5C) - walk to a can's stand tile, face it, press A
-once, let advance_dialog finish the text, then judge it. SEARCH mode tries cans in a fixed order;
-ORACLE reads the two lock indices. Helpers and the why: explorer/gym_puzzle.py.
+once, then judge the answer. Helpers and the why: explorer/gym_puzzle.py.
+
+A press is judged from two sources, text first (the controller's 2026-11-17 fix round): the can's box
+text collected in the press window (ctx.dialog pages plus a moved ctx.last_text - under --fast-text a
+box can flash past every read and leave words in neither), and the REFEREE diff of the two lock
+indices read around the press - a D743/D744 move counts the hit the text never showed. In SEARCH the
+pair only ever scores a made press, never picks the next one; in ORACLE it steers the walk directly.
 
 Caps modelled on field_cut: PRESS_CAP steps spent on one can, MAX_TRIES failed tries per can,
-COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_TOTAL cans). The
-readiness hold (_hold_clear) is NOT consulted: the puzzle may run only while the agent is already in
-the gym.
+COOLDOWN steps after a give-up, plus the solver's own caps (MAX_PER_ATTEMPT / MAX_ATTEMPTS /
+MAX_TOTAL). The readiness hold (_hold_clear) is NOT consulted: the puzzle may run only while the
+agent is already in the gym.
 """
 from __future__ import annotations
 
@@ -37,16 +42,21 @@ class GymPuzzle(BehaviourBase):
 
     def step(self, ctx: ExplorerContext) -> Decision | None:
         st = gp.state(ctx)
+        locks = self._locks(ctx, st)
         if st["await"] is not None:
-            return self._judge(ctx, st)
+            return self._judge(ctx, st, locks)
         solver = self._solver(ctx, st)
         if solver is None:
             return None  # no can cells (planner not injected): leave the gym to exploration
         if solver.done:
             st["open"] = True
             return None
+        if isinstance(solver, gp.Oracle):
+            solver.set_locks(*locks)
+            if locks != st["can_locks"]:  # the named can moved (the game re-randomizes D743): re-pick
+                st["can"] = st["stand"] = None
         can = st["can"] or solver.next_can()
-        st["can"] = can
+        st["can"], st["can_locks"] = can, locks
         if can is None:
             st["gave_up"] = True
             self._summary(ctx, st, "gave up")
@@ -67,28 +77,36 @@ class GymPuzzle(BehaviourBase):
             return Decision(path[0], "gym_puzzle_walk", f"gym puzzle: {len(path)} steps to can {gp.can_id(can)} {can}")
         if ctx.facing != facing:
             return Decision(facing, "gym_puzzle_face", f"gym puzzle: facing can {gp.can_id(can)} {can} ({facing})")
-        st["await"] = {"can": can, "closed_at": ctx.talk_closed_frame, "waits": 0}
+        st["await"] = {"can": can, "closed_at": ctx.talk_closed_frame, "waits": 0, "locks": locks,
+                       "dlg": ctx.dialog, "dlen": len(ctx.dialog), "lt": ctx.last_text}
         return Decision("A", "gym_puzzle_press", f"gym puzzle: A at can {gp.can_id(can)} {can}")
 
     # --- one can's try: press -> box -> judge ---
 
-    def _judge(self, ctx: ExplorerContext, st: dict) -> Decision:
+    def _judge(self, ctx: ExplorerContext, st: dict, locks: tuple) -> Decision:
         aw = st["await"]
         can, solver = aw["can"], self._solver(ctx, st)
-        if ctx.talk_closed_frame <= aw["closed_at"]:  # no interaction closed since the press
-            aw["waits"] += 1
-            if aw["waits"] <= WAIT_BOX:
-                return no_press("gym_puzzle_wait", f"gym puzzle: waiting for can {gp.can_id(can)}'s text box")
-            st["await"] = None
-            return self._fail_can(ctx, st, can, "the press opened no box")
+        text = self._press_text(ctx, aw)
+        said = gp.classify(text) if gp.is_can_text(text) else None   # the can's own words, when seen
+        ref = gp.referee_result(can, aw["locks"], locks, solver.can_set) if isinstance(solver, gp.Search) else None
+        # an explicit lock line outranks the RAM read; a RAM move outranks a "nothing" text (the page was lost)
+        result = said if said in ("first", "second", "reset") else (ref or said)
+        if result is None:
+            if ctx.talk_closed_frame > aw["closed_at"]:
+                if text:  # a box did run, and it was not a can's: the press hit something else entirely
+                    st["await"] = None
+                    return self._fail_can(ctx, st, can, "the closed box was not a can's")
+                result = "nothing"  # the answer box closed unseen and the RAM is unmoved: a real miss
+            else:
+                aw["waits"] += 1
+                if aw["waits"] <= WAIT_BOX:
+                    return no_press("gym_puzzle_wait", f"gym puzzle: waiting for can {gp.can_id(can)}'s answer")
+                st["await"] = None
+                return self._fail_can(ctx, st, can, "the press opened no box")
         st["await"] = None
-        text = " / ".join(ctx.dialog)
-        result = gp.classify(text) if gp.is_can_text(text) else None
-        if result is None:  # the box that closed was not a can's (a trainer's '!', unrelated text): the press missed
-            return self._fail_can(ctx, st, can, "the closed box was not a can's")
         if solver is not None:
             solver.record(result)
-        self._log_press(ctx, can, result)
+        self._log_press(ctx, can, result, "text" if said else "referee")
         st["can"] = st["stand"] = None
         if solver is not None and solver.done:
             st["open"] = True
@@ -99,6 +117,27 @@ class GymPuzzle(BehaviourBase):
         return no_press("gym_puzzle_judge", f"gym puzzle: can {gp.can_id(can)} said {result}")
 
     # --- pieces ---
+
+    def _locks(self, ctx: ExplorerContext, st: dict) -> tuple:
+        """The referee pair (D743, D744), read every step in both modes: ORACLE plans on it, SEARCH only
+        logs - and a move is logged either way (the game re-randomizes D743; never assume it is fixed)."""
+        pair = (ctx.emu.read(gp.LOCK_ADDRS[0]), ctx.emu.read(gp.LOCK_ADDRS[1]))
+        prev = st.get("locks_seen")
+        if prev is not None and pair != prev:
+            ctx.log(f"[gym_puzzle: lock indices moved {prev} -> {pair}]", "res")
+        st["locks_seen"] = pair
+        return pair
+
+    @staticmethod
+    def _press_text(ctx: ExplorerContext, aw: dict) -> str:
+        """The box text the press window produced: the pages appended to ctx.dialog since the A press (a
+        new conversation gets a fresh list), plus ctx.last_text if it moved - a flashed box can leave
+        words only there."""
+        dlg = ctx.dialog
+        pages = list(dlg if dlg is not aw["dlg"] else dlg[aw["dlen"]:])
+        if ctx.last_text and ctx.last_text != aw["lt"] and ctx.last_text not in pages:
+            pages.append(ctx.last_text)
+        return " / ".join(pages)
 
     def _solver(self, ctx: ExplorerContext, st: dict):
         if st["solver"] is None:
@@ -146,9 +185,9 @@ class GymPuzzle(BehaviourBase):
         self._log_press(ctx, can, f"miss ({why}; try {tries[can]}/{MAX_TRIES})")
         return no_press("gym_puzzle_fail", f"gym puzzle: can {gp.can_id(can)}: {why}")
 
-    def _log_press(self, ctx: ExplorerContext, can: tuple, result: str) -> None:
+    def _log_press(self, ctx: ExplorerContext, can: tuple, result: str, how: str = "referee") -> None:
         d1, d2, cd = (ctx.emu.read(a) for a in (*gp.LOCK_ADDRS, gp.GYM_CAN_ADDR))  # referee: log only, never a choice
-        ctx.log(f"[gym_puzzle: mode={ctx.opts.gym_puzzle_mode} can {gp.can_id(can)} at {can} -> {result}; "
+        ctx.log(f"[gym_puzzle: mode={ctx.opts.gym_puzzle_mode} can {gp.can_id(can)} at {can} -> {result} ({how}); "
                 f"referee D743={d1} D744={d2} CD5B={cd} (read after the press)]", "res")
 
     def _summary(self, ctx: ExplorerContext, st: dict, outcome: str) -> None:
