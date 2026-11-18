@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | - |
@@ -177,4 +177,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 03:47 · robert-claude-laptop · Review → Blocked — Round-2 real-ROM (head d416e83d, nugget_bridge.state, --build abra, seeds 1-2, both with a FRESH map memory and with --maps-copy of the shared runs/maps.json): encounter count and gave-up flag now correct. FAIL: '[catch_abra: 0 balls under 12 - buying Poke Balls at a Mart first]' then '[restock: no route to a Mart]' x3 in all four runs, so no balls bought, no Abra caught (catch_abra_gave_up true). The shared map memory knows Cerulean and its Mart, so this is not a blank-memory artefact. Round 3: find why behaviours/restock.py returns 'no route to a Mart' (line ~62) from Route 24/Cerulean: check (a) self._marts(ctx, st, failed) - does the stock table list POKE BALL at Cerulean Mart (Red: Cerulean Mart sells POKE BALL; also Viridian, Pewter) or does the 'want' filter drop every Mart; (b) one_trip.usable_marts money/heal filter; (c) _path_to over WorldGraph(ctx.mem.data['maps']) - is the Mart map id in rs.MART_MAPS and reachable via a warp the graph knows; (d) MAX_TRIES/failed set poisoning after the first miss. Add a synthetic test that reproduces 'want POKE BALL from Route 24 with Cerulean + its Mart in a fake map memory' and must return a path. Log the reason the Mart set is empty when it is. Gate: controller real-ROM seeds 1-2 with --maps-copy must end with an ABRA in the party.
 - 2026-11-18 03:47 · robert-claude-laptop · Blocked → Queued — Requeue round 3: restock 'no route to a Mart' diagnosis (see previous note). Same branch.
 - 2026-11-18 03:48 · robert-claude-laptop · Queued → Approved — lint override: kb/rom_tables.json is gitignored ROM-derived data that dispatch provisioning copies into the worktree; knowledge/flee_catch.py exists on this directive's branch.
+- 2026-11-18 03:48 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7PXFS8YQBN5NSJCYF996F3D
 <!-- queue:end -->
