@@ -151,7 +151,7 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
@@ -171,4 +171,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 20:57 · robert-claude-laptop · Blocked → Review — Devin finished: head eae401e8, full serial suite 3436 passed/1 skipped, 107 focused. Blocked only because the status flip was refused (row never recorded In progress). Needs review + verify + real-ROM gym check (search and oracle modes) before merge. [origin] spent: devin 31 min est. n/a
 - 2026-11-17 21:09 · robert-claude-laptop · Review → Blocked — SENT BACK (controller real-ROM check, head eae401e8, vermilion_gym_entry.state, seed 1, --fast-text, 8000 steps, both modes): 0 hits, gave up after 15 cans, beat_surge not reached. (1) Oracle is not an oracle: logged 'lock indices [14, 0]' then walked cans 0..14 in order; must go straight to D743's can, then D744's. (2) Every press logged 'nothing' although CD5B (wGymTrashCanIndex) equals the pressed can each time, so the press registered; the can text is missed - suspect --fast-text dismissing the box before the read; classify from any text box in the press window plus D743/D744 changes; test with and without --fast-text. (3) Search pressed the right can (14 = D743) and logged 'nothing' (D744 5->0 after): count a hit on D743/D744 change or lock text. (4) D743 re-randomized while walking (14->2->0->14) after 'miss' retries: log it, do not assume the first lock is fixed; replace one-pass 'gave up' with a capped loop. Gate before Review: controller re-runs both modes on the real ROM; oracle must open both locks. Logs: controller scratchpad surge/search.json, oracle.json.
 - 2026-11-17 21:09 · robert-claude-laptop · Blocked → Queued — Requeue for the fix round described in the previous Blocked note (oracle routing, outcome detection under --fast-text, hit on D743/D744 change, capped retry loop). Same branch.
+- 2026-11-17 21:10 · robert-claude-laptop · Queued → Approved
 <!-- queue:end -->
