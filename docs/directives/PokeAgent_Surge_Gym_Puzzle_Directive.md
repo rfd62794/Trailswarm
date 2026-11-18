@@ -151,7 +151,7 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
@@ -184,4 +184,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 22:21 · robert-claude-laptop · Review → Blocked — Round-3 real-ROM check (head 4ef86681, gym entry, seed 1, --fast-text): ORACLE still passes (beat_surge at step 637). Wall-forget works (log: 'forgot learned walls [5,5,UP ...]'). SEARCH fails on the CAPS, not logic: this seed's locks differed from round 2; verdicts were right (first at can 2 by text, reset on wrong neighbour can 1 by text) but MAX_TOTAL=60 / MAX_ATTEMPTS=4 ran out after ~40 presses and 4 resets, then it patrolled to 8000. Round 2 only passed by luck of the draw. Fix round 4: (1) raise caps so success is near-certain: MAX_TOTAL ~250, attempts bounded only by MAX_TOTAL; (2) after a 'first' hit, try that can's orthogonal neighbours (only ones that are cans) in a fixed order and remember which neighbours were wrong for THAT first-lock position (after a reset the first lock re-randomizes, so clear that memory then); (3) do not re-press a can already answered 'nothing' since the last reset. Synthetic test: a simulated game with random locks per seed (100 seeds) solves within MAX_TOTAL in >= 99%. Gate: controller real-ROM search runs on seeds 1, 2 and 3 must all settle beat_surge.
 - 2026-11-17 22:21 · robert-claude-laptop · Blocked → Queued — Requeue round 4: search caps + neighbour memory (see previous note). Same branch.
 - 2026-11-17 22:22 · robert-claude-laptop · Queued → Approved
+- 2026-11-17 22:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7PATF6M27WEXS9226R8FTXA
 <!-- queue:end -->
