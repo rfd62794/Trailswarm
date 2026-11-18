@@ -151,7 +151,7 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-surge-gym-puzzle-directive |
 | Base branch | - |
@@ -165,4 +165,5 @@ commands), then a recommended next action (the real-ROM checks above). Keep it s
 - 2026-11-17 20:07 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7P33MS1M9FZM82QH19WNS93
 - 2026-11-17 20:22 · dispatcher · In progress → Approved — dispatch rolled back: stale dispatch marker (stage provision)
 - 2026-11-17 20:22 · dispatcher · launched pid=7444; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-surge-gym-puzzle-directive; resynced: merged main into directive/pokeagent-pokeagent-surge-gym-puzzle-directive (1 commit(s), clean); provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-17 20:53 · devin · Approved → Blocked — Work COMPLETE and pushed (branch head eae401e; full serial suite 3436 passed/1 skipped). Only the status flip failed: queue still says Approved (dispatch was never recorded as In progress) and refuses Approved->Review and Approved->In progress for actor devin.
 <!-- queue:end -->
