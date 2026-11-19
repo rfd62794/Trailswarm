@@ -12,7 +12,7 @@ blocks: the ABRA_STEP_CAP bookkeeping lives in plan_goal.
 """
 from __future__ import annotations
 
-from pokeagent.abra_goal import BALLS_MIN, ball_count, can_afford_ball
+from pokeagent.abra_goal import BALLS_MIN, ball_count, box_species, can_afford_ball
 from pokeagent.explorer import grind_episode
 from pokeagent.explorer import restock as rs
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -56,15 +56,20 @@ class AbraHunt(BehaviourBase):
     def __init__(self) -> None:
         self._armed = False      # we set ctx.hunt_grass (only then may we clear and re-arm it)
         self._target = None      # the LearnerTarget being walked to
+        self._trip_live = False  # a Mart trip (the errand's or Restock's own) was underway on the last check
 
     def applies(self, ctx: ExplorerContext) -> bool:
         pend = ctx.abra_pending  # a wild Abra's fight is over: report how it ended (once per encounter)
         if pend is not None and not ctx.view.battling:
             ctx.abra_pending = None
-            caught = any(c.name in ABRA_LINE for c in our_party(ctx.emu))
+            names = table(None, "name_of_internal")  # a full party boxes the catch: it still counts
+            caught = (any(c.name in ABRA_LINE for c in our_party(ctx.emu))
+                      or any(names.get(str(s), str(s)) in ABRA_LINE for s in box_species(ctx.emu)))
             thrown = pend.get("thrown", 0)
             why = f", {thrown} thrown" if thrown else f", no throw: {pend.get('no_throw') or 'catch never engaged'}"
-            ctx.log(f"[abra: {pend['species']} L{pend['level']} - {'caught' if caught else 'fled'}{why}]", "res")
+            rng = ",".join(f"{a:02X}/{s:02X}/{d:02X}" for a, s, d in pend.get("rng", ()))
+            ctx.log(f"[abra: {pend['species']} L{pend['level']} - {'caught' if caught else 'fled'}{why}"
+                    f"{', rng ' + rng if rng else ''}]", "res")
         if self._armed:
             ctx.hunt_grass = False
             self._armed = False
@@ -94,15 +99,28 @@ class AbraHunt(BehaviourBase):
         """Fewer than BALLS_MIN balls: the hunt needs throws in the bag - arm a restock trip and
         yield while Restock runs it (its own Mart walk, purchase, and leave; ``want`` picks a Mart
         that sells Balls). "0 balls AND no money for one" is the only settle the goal knows - short
-        of balls with money in the purse never gives up, it shops first."""
+        of balls with money in the purse never gives up, it shops first.
+
+        The back-off is the errand's own ``abra_next_check``, not Restock's ``next_check``: Restock
+        precedes AbraHunt in the registry and re-bumps its recheck on EVERY planning pass, so a
+        borrowed window never read expired to the errand - the bag hit 0 with money in the purse
+        and no second Mart trip ever armed (2026-11-18 real-ROM FAIL, round-6 note). Any armed
+        trip that ends with the bag still short (the errand's or Restock's own) backs the re-arm
+        off one recheck window instead."""
         st = ctx.restock
         if st.get("intent") or st.get("leave"):
+            self._trip_live = True
             return True  # a trip is armed or underway: Restock owns these steps
+        if self._trip_live:
+            self._trip_live = False
+            if ball_count(ctx.emu) < BALLS_MIN:   # the trip ended short: breathe a window, then retry
+                st["abra_next_check"] = ctx.step + rs.RECHECK_EVERY
         if (ball_count(ctx.emu) >= BALLS_MIN or not can_afford_ball(ctx.emu, ROM_KB)
-                or st.get("tries", 0) >= rs.MAX_TRIES or ctx.step < st.get("next_check", 0)):
-            return False  # stocked, broke, spent, or a trip that found no route is in its recheck window
+                or st.get("tries", 0) >= rs.MAX_TRIES or ctx.step < st.get("abra_next_check", 0)):
+            return False  # stocked, broke, spent, or a trip that found no Mart is in its recheck window
         st.update(intent=True, want=(rs.BALL_ID,), steps=0)
         ctx.shop_intent = ("mart", None)
+        self._trip_live = True
         ctx.log(f"[catch_abra: {ball_count(ctx.emu)} balls under {BALLS_MIN} - buying Poke Balls at a Mart first]", "res")
         return True
 

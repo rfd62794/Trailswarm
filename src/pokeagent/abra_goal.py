@@ -14,6 +14,7 @@ from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE
 from pokeagent.knowledge.flee_catch import ABRA_LINE
 from pokeagent.magikarp import party_species
+from pokeagent.ram_symbols import BOX_COUNT_ADDR, BOX_MONS
 from pokeagent.ramworld import read_money
 
 ABRA_STEP_CAP = 3000    # steps with catch_abra open before it is settled for this run (named; tune from runs)
@@ -55,9 +56,21 @@ def can_afford_ball(emu, kb) -> bool:
     return read_money(emu) >= cheapest_ball(kb)
 
 
+BOX_CAPACITY = 20      # MONS_PER_BOX (pokered)
+
+
+def box_species(emu) -> list[int]:
+    """Species ids in the current PC box (wBoxCount / wBoxMonN, verified in ram_map.json). A catch
+    lands here when the party is full - RBY sends it over on its own, no deposit prompt - so a full
+    party's caught Abra shows up in the box, not the party."""
+    n = min(emu.read(BOX_COUNT_ADDR), BOX_CAPACITY)
+    return [b for b in emu.read_range(BOX_MONS, n) if b != 0xFF] if n > 0 else []
+
+
 def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
     """catch_abra: settled for any build but "abra"; under it, an Abra-line species in the party
-    (sticky ``had_abra``), the stage's step cap spent (``abra_skipped``), no name table to judge
+    or the PC box (sticky ``had_abra`` - a full party boxes the catch, still ours), the stage's
+    step cap spent (``abra_skipped``), no name table to judge
     by, or an empty ball bag with no money for one - the ONLY "gave up" settle: short of balls but
     able to buy, the run restocks at a Mart first (abra_hunt arms the restock trip) and hunts on.
     ``abra_settle`` records why, so the run log and the give-up flag tell a catch from a failure."""
@@ -80,6 +93,13 @@ def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
     if any(names.get(str(s), str(s)) in ABRA_LINE for s in party_species(emu)):
         st["had_abra"] = True
         st["abra_settle"] = "caught"
+        return True
+    if any(names.get(str(s), str(s)) in ABRA_LINE for s in box_species(emu)):
+        # A full party sent the caught Abra to the PC box: the run HAS an Abra, and the goal is
+        # settled - hunting on for a party copy would waste the stage (2026-11-18 round-6 note:
+        # the full-party deposit mark on every Abra battle is the expected boxed outcome).
+        st["had_abra"] = True
+        st["abra_settle"] = "caught (boxed)"
         return True
     if ball_count(emu) == 0 and not can_afford_ball(emu, kb):
         st["abra_settle"] = "no balls and no money"

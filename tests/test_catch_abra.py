@@ -489,9 +489,13 @@ def test_armed_trip_reports_why_no_mart_can_be_walked(tmp_path):
     assert Restock().step(ctx) is None
     assert any("no Mart left" in t for t in logs)
     assert ctx.restock["next_check"] > 0 and "tries" not in ctx.restock
-    assert not AbraHunt()._ball_errand(ctx)                       # the recheck window mutes the re-arm
-    ctx.step = ctx.restock["next_check"]
-    assert AbraHunt()._ball_errand(ctx)                           # past it: the errand may try again
+    hunt = AbraHunt()
+    assert hunt._ball_errand(ctx)                                 # no trip watched end: the errand arms
+    ctx.restock["intent"] = False                                 # Restock ends it ('no route' again)
+    hunt._ball_errand(ctx)                                        # it watched the trip die short: backs off
+    assert not hunt._ball_errand(ctx)                             # the errand's own recheck window now
+    ctx.step += rs.RECHECK_EVERY
+    assert hunt._ball_errand(ctx)                                 # window over: try again
 
 
 def test_no_name_table_settles_open_but_says_so_out_loud():
@@ -571,7 +575,7 @@ def test_pending_throw_owns_turn_one_against_every_earlier_behaviour(tmp_path, m
     ctx.view.lines = BATTLE_MENU                                    # low HP + potions + RUN on screen
     d = sel.choose(ctx)
     assert d is not None and d.behaviour == "catch", d              # never a POTION, a switch or RUN
-    assert d.rule in ("item_menu_down", "item_open", "item_list_scroll", "item_use")
+    assert d.rule in ("catch_jitter", "item_menu_down", "item_open", "item_list_scroll", "item_use")
     assert ctx.bv is not None and not ctx.bv.want_potion            # Battle saw the HP and stood down
     assert flee_throw_pending(ctx, ABRA_ID)
     monkeypatch.setattr(switch_out_mod, "trainee_out", lambda c: 1)  # a swap candidate is right there
@@ -660,3 +664,104 @@ def test_a_catch_attempt_with_no_ball_thrown_is_never_a_success(tmp_path, monkey
     Battle().step(ctx)
     assert not any("SUCCEEDED" in t for t in logs)
     assert any("catch attempt failed" in t for t in logs)
+
+
+# --- the re-arm (round 6: a bag that hits 0 with money buys again) -------------------------------------------
+
+def test_ball_errand_rearms_when_balls_run_out_mid_hunt(tmp_path):
+    """2026-11-18 real-ROM FAIL (89c6cdd): the bag hit 0 with money for a ball and no second Mart trip
+    ever armed - the errand borrowed Restock's next_check, which Restock re-bumps on every planning
+    pass BEFORE the errand's own check runs (Restock precedes AbraHunt in the registry), so the
+    window never read expired to it. The errand's own abra_next_check re-arms a bag that hits 0 on
+    the spot: Restock's recheck window never gates it."""
+    ctx = make_ctx(tmp_path, balls=0, money=4000)
+    hunt = AbraHunt()
+    assert hunt._ball_errand(ctx)                               # the first Mart trip arms
+    ctx.restock["intent"] = False                               # ... Restock ran it and bought a lot ...
+    _set(ctx.emu, {0xD31D: 1, 0xD31E: 0x04, 0xD31F: 10})        # 10 balls in the bag now
+    assert not hunt._ball_errand(ctx)                           # stocked: hunting, and no back-off was set
+    assert "abra_next_check" not in ctx.restock
+    _set(ctx.emu, {0xD31F: 0})                                  # the hunt spent the lot: 0 balls again
+    ctx.restock["next_check"] = ctx.step + rs.RECHECK_EVERY     # Restock's own recheck is mid-window ...
+    assert hunt._ball_errand(ctx)                               # ... but the errand re-arms on the spot
+    assert ctx.restock["intent"] and hunt._ball_errand(ctx)     # and it yields to Restock while it walks
+
+
+def test_a_failed_trip_backs_the_errand_off_one_recheck(tmp_path):
+    """An armed trip that ends with the bag still short (a Mart it could not route to) does not
+    re-arm every step: it watches the trip end, backs off one recheck window of its own, then tries."""
+    ctx = make_ctx(tmp_path, balls=0, money=4000)
+    hunt = AbraHunt()
+    assert hunt._ball_errand(ctx)
+    ctx.restock["intent"] = False                               # the trip ended, bag still short
+    hunt._ball_errand(ctx)                                      # it watched the trip die: back off
+    assert not hunt._ball_errand(ctx) and ctx.restock["abra_next_check"] > 0
+    ctx.step = ctx.restock["abra_next_check"]
+    assert hunt._ball_errand(ctx)                               # window over: it may try again
+
+
+# --- jitter + RNG evidence (round 6: 0/24 full-HP throws) ----------------------------------------------------
+
+from pokeagent.explorer.behaviours.catch_track import throw_jitter
+
+
+def test_flee_throw_spends_seeded_jitter_presses_before_the_bag(tmp_path, monkeypatch):
+    """0/24 throws at ~30% each on full-HP Abras (2026-11-18 FAIL): the emulator replays the ROM's
+    RNG, so an identical press cadence draws identical bytes. A seeded count of B presses precedes
+    the bag walk of a flee-species throw, and the throw line logs the RNG bytes it drew at - the
+    per-encounter evidence of (or against) a repeated cadence."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    _set(ctx.emu, {0xFFD3: 0xAB, 0xFFD4: 0xCD, 0xFF04: 0x42})    # hRandomAdd / hRandomSub / rDIV
+    ctx.battles, ctx.step = 1, 0                                # jitter = (7 + 0 + 0) % 4 = 3
+    ctx.view.lines = ["FIGHT PKMN", ">ITEM RUN"]
+    for _ in range(3):
+        dec = Catch().step(ctx)
+        assert dec is not None and dec.rule == "catch_jitter" and dec.button == "B"
+    dec = Catch().step(ctx)                                     # jitter spent: the bag walk begins
+    assert dec is not None and dec.rule == "item_open" and dec.button == "A"
+    ctx.view.lines = BALL_LIST
+    _set(ctx.emu, {0xD31D: 1, 0xD31E: 0x04, 0xD31F: 5})
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_use"
+    assert any("rng AB/CD/div42" in t for t in logs)            # the press's RNG bytes are on the line
+    assert (ctx.abra_pending or {}).get("rng") == [(0xAB, 0xCD, 0x42)]
+    assert ctx.catch_attempt["jitter"] == throw_jitter(1, 0, 1)  # the next throw's walk re-arms fresh
+
+
+def test_jitter_is_flee_species_only(tmp_path, monkeypatch):
+    """A non-flee catch's sequence is unchanged: no spare presses precede its bag walk."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    kb = {"dex_of_internal": {"36": 16, "148": 63},
+          "name_of_internal": {"36": "PIDGEY", "148": "ABRA"}, "items": {}}
+    monkeypatch.setattr(catch_mod, "ROM_KB", kb)
+    ctx.bv = replace(ctx.bv, species=36)
+    ctx.battles, ctx.step = 1, 0                                # a flee species would press B x3 here
+    ctx.view.lines = ["FIGHT PKMN", ">ITEM RUN"]
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_open"          # straight to the bag
+    assert "jitter" not in (ctx.catch_attempt or {})
+
+
+# --- a boxed Abra counts (round 6: a full party sends the catch to the PC box) -------------------------------
+
+def test_boxed_abra_settles_the_goal_as_caught():
+    """A full party sends the catch to the PC box on its own (no deposit prompt in RBY): the run has
+    an Abra, so the goal settles caught - hunting on for a party copy would waste the stage."""
+    emu = _emu(((177, 14, 30, 30),))
+    _set(emu, {0xDA80: 1, 0xDA96: ABRA_ID})                       # wBoxCount / wBoxMonN
+    st = _st("abra")
+    assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})
+    assert st["had_abra"] and st["abra_settle"] == "caught (boxed)"
+
+
+def test_resolve_line_counts_a_boxed_abra_as_caught(tmp_path, monkeypatch):
+    """The encounter resolve line reads the box too: a caught Abra in a full party never reads 'fled'."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.view.battling = False
+    ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 8, "thrown": 1,
+                        "rng": [(0xAB, 0xCD, 0x42)]}
+    _set(ctx.emu, {0xDA80: 1, 0xDA96: ABRA_ID})
+    monkeypatch.setattr(abra_hunt_mod, "our_party", lambda emu: [])
+    monkeypatch.setattr(abra_hunt_mod, "table", lambda kb, name: NAMES if name == "name_of_internal" else {})
+    AbraHunt().applies(ctx)
+    assert any("caught" in t and "1 thrown" in t and "rng AB/CD/42" in t for t in logs)
