@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -211,4 +211,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 23:24 · robert-claude-laptop · Review → Blocked — Real-ROM at 3918d17 2026-11-18 seed 1: PASS on the gate - real catch (game asked 'give a nickname to ABRA?'), boxed (full party), catch_abra settled at step 1374 after 3 Abra encounters; 10 RNG tuples all distinct. Seed 2 killed at step 3668 by memory pressure (not a code fault). Follow-ups needed before merge: verdict/log bugs and post-settle hunting (see Queued note).
 - 2026-11-18 23:24 · robert-claude-laptop · Blocked → Queued — Round 8 (small, logging + post-settle; the catch itself now WORKS on real ROM at 3918d17). (1) battle.py/battle_run.catch_verdict printed 'catch attempt failed' on the encounter that really caught (step 1374, nickname prompt shown, box gained) - the new-ownership check must also see a box gain (wBoxSpecies count/species vs the attempt-start snapshot), not just party/dex. (2) abra_hunt's resolve line says 'caught' for every encounter after the first catch (vs the run-start baseline) incl. 'caught, no throw: no ball in the bag' - compare against a per-encounter snapshot taken at encounter start, so it reads caught only when THIS encounter added an Abra-line mon. (3) After catch_abra settled at step 1374 the bot kept hunting Abra (6 more encounters, burned the remaining balls). Once the goal is settled-caught, Abra is no longer wanted for the build (drop it from team_wants/catch_list want), unless another goal wants it. Tests for all three. Keep rounds 5-7. Evidence: controller log abra7_seed1.log lines 7491-7537, 8201, 8786, 9745.
 - 2026-11-18 23:24 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 8 per Queued note.
+- 2026-11-18 23:25 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7S0V948EER44DYRXPWVEEQW
 <!-- queue:end -->
