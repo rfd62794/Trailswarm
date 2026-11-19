@@ -151,12 +151,12 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
-| Head commit | 6af12e511e83ac2ed07662a86671ae23b637f144 |
+| Head commit | 3918d17880aa4e25572a0c371c623e119eeb6504 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -207,4 +207,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 22:38 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 7 per Queued note.
 - 2026-11-18 22:38 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RY5G45G10KPRB73SSA3PSY
 - 2026-11-18 22:46 · dispatcher · launched pid=13608; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
+- 2026-11-18 22:59 · devin · In progress → Review — Round 7 (head 3918d17): the false 'assumed done' had TWO causes, both fixed. (1) box_species read wBoxMons (0xDA96, the 33-byte struct array) as the species list - the species list is wBoxSpecies (0xDA81); reading n>=2 struct bytes as species invites false hits (fixed; a test pins the right bytes). (2) nugget_bridge.state's box GENUINELY holds an ABRA (wBoxCount=2, wBoxSpecies=[0x94,0x70]; wBoxMons[0] = ABRA L10, Psychic/Psychic, catch rate 200, TELEPORT) - so even the correct read settled at startup. catch_abra now snapshots the party+box species pool at the first settle check (the startup goal scan, same moment initial_goals are computed) and settles only on an Abra-line count ABOVE that baseline: a pre-existing boxed/party Abra never satisfies the goal or enters initial_goals, and a 2nd Abra caught on top of one still counts. abra_hunt's resolve line uses the same baseline (presence fallback for ctxs without one). Synthetic tests only (42 + 46 + 86 + 34 + 70 + 64 green incl. the layering test); UNVERIFIED assumptions: none new - the real-ROM re-check (nugget_bridge.state, --build abra, seeds 1-2, gate = ABRA in party/box) is the controller's. [origin] spent: devin 375 min est. n/a
 <!-- queue:end -->
