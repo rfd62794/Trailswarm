@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -204,4 +204,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 22:07 · devin · In progress → Review — Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head 6af12e51); round 6: errand re-arms a spent bag on its own abra_next_check (Restock's window no longer gates it), seeded B-press jitter + hRandomAdd/hRandomSub/rDIV logged per throw, boxed Abra counts as caught. Synthetic tests only (39+113+19 green); real-ROM check from nugget_bridge.state is the controller's. [origin] spent: devin 361 min est. n/a
 - 2026-11-18 22:37 · robert-claude-laptop · Review → Blocked — Real-ROM at 6af12e5 2026-11-18 seeds 1+2: catch_abra never ran - log line 7 lists it under 'goals assumed done' from nugget_bridge (round 5 at 89c6cdd did NOT). Only change touching that: round 6's PC-box check (box_species) in catch_abra_settled. 0 Abra encounters, 0 throws; RNG logging unexercised.
 - 2026-11-18 22:37 · robert-claude-laptop · Blocked → Queued — Round 7: round 6's PC-box check made catch_abra 'assumed done' at the start of nugget_bridge.state (startup goal scan; round 5 did not), so the hunt never ran. Fix: (1) find out what box_species reads on that state - either BOX_COUNT_ADDR/BOX_MONS are wrong (verify against pokered wBoxCount/wBoxSpecies and ram_map.json; note wBoxMon structs vs the species list) or the save genuinely holds an Abra-line mon in the current box. (2) Either way, catch_abra must only count an Abra-line mon gained THIS run: snapshot party+box species at run start (the same moment initial goals are computed) and settle on a new Abra-line entry vs that snapshot, never on one present at start; a pre-existing boxed Abra must not satisfy the goal or appear in initial_goals. (3) Add a test: a state whose box already holds ABRA at start leaves catch_abra open and the hunt arms. Keep all round 5/6 fixes (turn-1 ownership, restock re-arm, jitter, RNG logging). Evidence: controller logs abra6_seed1.log line 7 vs abra5_seed1.log line 7.
+- 2026-11-18 22:38 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 7 per Queued note.
 <!-- queue:end -->
