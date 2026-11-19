@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -217,4 +217,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-19 00:09 · robert-claude-laptop · Review → Blocked — Real-ROM PASS at 8d398fc 2026-11-18, both seeds: real catch (nickname prompt), 'catch attempt SUCCEEDED', only one 'caught' line, 0 balls after settle (seed1 step 1368, seed2 1641). Independent review: CHANGES-NEEDED - test_check_goals_wires_catch_abra_between_team_ready_and_to_bill fails on a clean tree (reads gitignored kb).
 - 2026-11-19 00:10 · robert-claude-laptop · Blocked → Queued — Round 9 (independent review of 8d398fc; real-ROM already PASSES both seeds - keep behaviour). (1) BLOCKING: tests/test_catch_abra.py:146 test_check_goals_wires_catch_abra_between_team_ready_and_to_bill fails on a clean tree - check_goals uses kb.ROM_KB from gitignored kb/rom_tables.json; monkeypatch ROM_KB to {'name_of_internal': NAMES} like test_a_boxed_abra_at_run_start; then run the suite from a clean archive/worktree WITHOUT kb/ to prove 0 failed. (2) catch.py throw branch now presses B ('catch_menu_b') for EVERY throw hint when no menu is readable, incl. default-build dex/HM catches (old code returned None) - scope the B fallback to flee_on_turn encounters, and add a non-flee regression test. (3) battle_run.catch_verdict: second catch of a species already in a non-full party reads 'failed' (species set diff) - use party species counts. (4) abra_goal.catch_abra_settled: a start-state Abra evolving to Kadabra counts as gained - count the Abra line as one family total vs baseline. (5) abra_hunt: ctx.team_wants = {ABRA: ...} clobbers other species' wants - set/del only the ABRA key. Tests for 2-5. battle.py and plan_goal.py are at the 300-line cap - split, don't compress.
 - 2026-11-19 00:10 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 9 per Queued note.
+- 2026-11-19 00:10 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7S3DWZPS1AYF7QCXGNN40SY
 <!-- queue:end -->
