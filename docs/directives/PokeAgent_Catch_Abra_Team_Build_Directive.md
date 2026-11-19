@@ -151,12 +151,12 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
-| Head commit | de69d2f69673e20c5b78a508fd0af7c7c431288e |
+| Head commit | 7bda95201a4542c93313156147c1afc519f36d69 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -189,4 +189,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 19:30 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as the 18:53 approval: knowledge/flee_catch.py is created by this directive (exists on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 4 fix: throw must execute (battle driver picks FIGHT).
 - 2026-11-18 19:30 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RKCQ1HRTDC3E7JZ6NN84ZP
 - 2026-11-18 19:40 · dispatcher · launched pid=6632; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
+- 2026-11-18 19:48 · devin · In progress → Review — Review: catch_abra round 4 on directive/pokeagent-pokeagent-catch-abra-team-build (head 7bda95201a4542c93313156147c1afc519f36d69). Throw no longer hands the step to battle_moves' A on menu-less frames: Catch answers B (advances text, backs a stray-opened FIGHT menu out, counted toward CATCH_BAG_PRESSES) then item_step walks ITEM->ball as before. BALLS_MIN now = the machinery's own trigger (5) so an armed trip always buys and one 10-ball lot clears it. Synthetic tests only; the real-ROM re-check (nugget_bridge.state, --build abra) is the controller's. [origin] spent: devin 326 min est. n/a
 <!-- queue:end -->
