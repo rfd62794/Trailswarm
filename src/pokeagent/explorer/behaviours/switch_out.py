@@ -13,6 +13,7 @@ import re
 from dataclasses import replace
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.behaviours.battle_run import flee_throw_pending
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.party_menu import MENU_ITEM, screen_lines, toward
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN, frame_lines
@@ -163,6 +164,8 @@ class SwitchOut(BehaviourBase):
     def applies(self, ctx: ExplorerContext) -> bool:
         if not ctx.view.battling or ctx.bv is None or ctx.switch_gave_up == ctx.battles:
             return False
+        if flee_throw_pending(ctx, getattr(ctx.bv, "species", None)):
+            return False  # a pending flee-species catch owns the turn: a swap hands the wild's turn to Teleport
         st = team_plan.of(ctx)
         return (ctx.switch_train is not None or trainee_out(ctx) is not None
                 or st.get("matchup") is not None or matchup_pick(ctx) is not None)

@@ -158,7 +158,7 @@ class ExplorerContext:
     btw_since: int = 0  # ctx.frame when that page last changed
     btw_waits: int = 0
     restock: dict = field(default_factory=dict)  # Poke Ball restock state (explorer/restock.py): intent, tries, steps, failed Marts
-    catch_want: tuple = (None, None)  # ((battle no., species), reason from catch_list.catch_wanted or None) for the current fight
+    catch_want: tuple = (None, None); catch_flee: tuple = (None, False)  # ((battle no., species), reason from catch_list.catch_wanted or None) for the current fight; ((battle, species), on) - battle_run._flee_latch's once-per-fight answer: a wanted flee-species catch owns the turns (Catch clears it when the catch is off)
     heal_trips: int = 0  # Pokecenter entries this run (area_grind bounds the 90% top-off trips)
     last_plan_map: int = -1
     area_grind: dict = field(default_factory=dict)  # steps / battles spent grinding in place on Route 2 / the Forest, and whether it was lifted

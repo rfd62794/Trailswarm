@@ -62,7 +62,9 @@ class AbraHunt(BehaviourBase):
         if pend is not None and not ctx.view.battling:
             ctx.abra_pending = None
             caught = any(c.name in ABRA_LINE for c in our_party(ctx.emu))
-            ctx.log(f"[abra: {pend['species']} L{pend['level']} - {'caught' if caught else 'fled'}]", "res")
+            thrown = pend.get("thrown", 0)
+            why = f", {thrown} thrown" if thrown else f", no throw: {pend.get('no_throw') or 'catch never engaged'}"
+            ctx.log(f"[abra: {pend['species']} L{pend['level']} - {'caught' if caught else 'fled'}{why}]", "res")
         if self._armed:
             ctx.hunt_grass = False
             self._armed = False

@@ -83,13 +83,35 @@ def _policy_hint(ctx: ExplorerContext, sp_name: str, e_lvl: int, e_hp: int, e_ma
                   battle_log_kind=(ctx.battle_log or {}).get("kind"), lead=lead, party_hp=party_hp)
 
 
-def _attempt(ctx: ExplorerContext, species: int, e_lvl: int, ratio: float, dex_no: int, ball: str | None) -> dict:
+def _abra_no_throw(ctx: ExplorerContext, why: str) -> None:
+    """Why this Abra encounter will not get a ball (the last decision wins): abra_hunt's resolve line
+    says it once - a reason for EVERY encounter that ends without a throw (2026-11-18 real-ROM FAIL:
+    44 of 48 encounters had none and the log gave no clue why)."""
+    pend = ctx.abra_pending
+    if pend is not None:
+        pend["no_throw"] = why
+
+
+def _thrown(ctx: ExplorerContext, ca: dict, pend) -> None:
+    """A ball really left the bag this battle: the attempt record and the Abra encounter both count it."""
+    ca["thrown"] = ca.get("thrown", 0) + 1
+    if pend is not None:
+        pend["thrown"] = pend.get("thrown", 0) + 1
+
+
+def _attempt(ctx: ExplorerContext, species: int, e_lvl: int, ratio: float, dex_no: int, ball: str | None,
+             owned: bool) -> dict:
     """The one catch_attempt record per (battle, species): refreshed in place so its ``step`` (the turn signature's
-    input) stays put, and carrying the bag-press count the cap and Battle's item_list_close yield read."""
+    input) stays put, and carrying the bag-press count the cap and Battle's item_list_close yield read.
+    ``owned0``/``party0`` pin what was true at the attempt's start: the dex bit says 'owned', never 'caught THIS
+    battle' - an already-owned species (a boxed catch) read 'SUCCEEDED' on a battle where no ball was even thrown
+    (2026-11-18 real-ROM FAIL)."""
     ca = ctx.catch_attempt
     if not ca or ca.get("battle") != ctx.battles or ca.get("species") != species:
         ca = ctx.catch_attempt = {"species": species, "level": e_lvl, "step": ctx.step, "dex": dex_no,
-                                  "battle": ctx.battles, "presses": 0, "last": ctx.step}
+                                  "battle": ctx.battles, "presses": 0, "last": ctx.step,
+                                  "owned0": owned,
+                                  "party0": tuple(getattr(m, "species", None) for m in read_party(ctx.emu))}
     ca["hp_pct"] = round(ratio, 2)
     if ball is not None:
         ca["ball"] = ball
@@ -102,6 +124,8 @@ def _bag_press(ctx: ExplorerContext, ca: dict, dec: Decision, key, sp_name) -> D
     ca["presses"] = 0 if dec.rule == "item_use" else ca["presses"] + 1
     if ca["presses"] > CATCH_BAG_PRESSES:
         ctx.catch_switch = (key, 10**6)   # the existing give-up marker: no new hint for the rest of this battle
+        ctx.catch_flee = (key, False)     # the catch is off: potion / switch / flee are this battle's again
+        _abra_no_throw(ctx, f"bag sequence gave up after {CATCH_BAG_PRESSES} presses")
         ctx.catch_mode, ctx.catch_hint = False, None
         ctx.log(f"[catch: bag sequence gave up after {CATCH_BAG_PRESSES} presses without a throw on {sp_name}; fighting on]", "res")
         return Decision("B", "catch_bag_failed", "catch bag sequence abandoned: backing out of the menu")
@@ -141,12 +165,15 @@ class Catch(BehaviourBase):
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
+            # (a wanted flee species also arms ctx.catch_flee - battle_run._flee_latch computes it lazily,
+            # for every behaviour ahead of Catch that must yield the turn)
         if kind == 1 and not balls and dex_no and e_max:
             # A flee species met with an empty ball bag: nothing to throw, and it leaves on its own turn.
             nb_key = (ctx.battles, species)
             if sp_name in FLEE_SPECIES and ctx.catch_skip_logged != nb_key:
                 ctx.catch_skip_logged = nb_key
                 ctx.log(f"[catch: no ball: Abra encounter let go ({sp_name} L{e_lvl})]", "res")
+            _abra_no_throw(ctx, "no ball in the bag")
         # Party full: throw only when the plan marks a member for deposit (a live release_pending
         # makes the deposit prompt answer YES); otherwise the catch is skipped with "party full".
         release_slot = None
@@ -162,6 +189,8 @@ class Catch(BehaviourBase):
                 if ctx.catch_skip_logged != ctx.catch_want[0]:
                     ctx.catch_skip_logged = ctx.catch_want[0]
                     ctx.log(f"[catch: skipping {sp_name}: party full]", "res")
+                _abra_no_throw(ctx, "party full: nobody to deposit")
+                ctx.catch_flee = (ctx.catch_want[0], False)
                 ctx.catch_mode, ctx.catch_hint = False, None   # a stale weaken-only mode must not outlive this battle
                 return None
             st["release_pending"] = {"species": sp_name, "slot": release_slot, "battle": ctx.battles}
@@ -169,6 +198,13 @@ class Catch(BehaviourBase):
         gave_up = ctx.catch_switch[0] == ctx.catch_want[0] and ctx.catch_switch[1] > MAX_PRESSES
         if gave_up or not (want and balls and dex_no and e_max and may_throw_ctx(ctx)
                            and (not owned or want.startswith(("can learn", "planned", "catch_abra")))):
+            # An encounter the catch never engages still gets its reason (the Abra resolve line prints it).
+            _abra_no_throw(ctx, "catch menus gave up" if gave_up else
+                           "no ball in the bag" if not balls else
+                           "not wanted" if not want else
+                           "no dex entry / enemy HP" if not (dex_no and e_max) else
+                           "not a wild battle (trainer flag)" if not may_throw_ctx(ctx) else "already owned")
+            ctx.catch_flee = ((ctx.battles, species), False)
             ctx.catch_mode = False
             ctx.catch_hint = None
             return None
@@ -193,13 +229,21 @@ class Catch(BehaviourBase):
             what = (hint.ball or hint.move) if hint is not None else ""
             ctx.log(f"[abra: {sp_name} L{e_lvl} turn {turn} {action}{' ' + what if what else ''}]", "res")
         ctx.catch_mode = hint is None or hint.kind != "skip"  # a skip means fight it out normally
-        if hint is not None and hint.kind == "skip" and ctx.catch_skip_logged != key:
-            ctx.catch_skip_logged = key
-            ctx.log(f"[catch: not catching {sp_name} L{e_lvl}: {hint.why}]", "res")
+        if hint is not None and hint.kind == "skip":
+            ctx.catch_flee = (key, False)                     # the policy passed on the catch: the floor rules take the battle back
+            _abra_no_throw(ctx, hint.why or "policy skip")
+            if ctx.catch_skip_logged != key:
+                ctx.catch_skip_logged = key
+                ctx.log(f"[catch: not catching {sp_name} L{e_lvl}: {hint.why}]", "res")
+        elif hint is None:
+            _abra_no_throw(ctx, "no catch policy data (no kb)")
+        elif hint.kind != "throw":
+            _abra_no_throw(ctx, f"policy chose {hint.kind} {hint.move}".rstrip())
         if hint is not None and hint.kind == "throw":
+            _abra_no_throw(ctx, "throw decided, ball never landed")  # overwritten in spirit by thrown below if the A lands
             ball_id = BALLS.get(hint.ball, POKE_BALL)           # unknown names fall back to the Poke Ball
             ball_name = BALL_NAME.get(hint.ball, "POKe BALL")
-            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, hint.ball)
+            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, hint.ball, owned)
             if release_slot is not None:
                 ca["release_slot"] = release_slot   # the party-full policy's deposit slot rides on the record
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
@@ -220,6 +264,7 @@ class Catch(BehaviourBase):
             if dec.rule == "item_use":  # the A that throws it
                 n = ctx.cave_catch_balls.get(species, 0) + 1
                 ctx.cave_catch_balls[species] = n
+                _thrown(ctx, ca, pend)
                 ctx.log(f"[catch: throwing {ball_name} {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
             return _bag_press(ctx, ca, dec, key, sp_name)
         if hint is not None and hint.kind == "switch":
@@ -237,13 +282,14 @@ class Catch(BehaviourBase):
         if hint is None and ratio <= 0.35 and (run_line is not None or item_list_open(lines_now)):
             # No ROM data for the policy (catch_hint is None): the original rule - a POKE BALL at <=35% HP.
             # A ball throw never opens a party prompt.
-            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, None)
+            ca = _attempt(ctx, species, e_lvl, ratio, dex_no, None, owned)
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
             dec = item_step(ctx, lines_now, cur_c, POKE_BALL, "POKe BALL", f"CATCH at {ratio:.0%} HP")
             if dec is not None:
                 if dec.rule == "item_use":  # the A that throws it
                     n = ctx.cave_catch_balls.get(species, 0) + 1
                     ctx.cave_catch_balls[species] = n
+                    _thrown(ctx, ca, pend)
                     ctx.log(f"[catch: throwing ball {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
                 return _bag_press(ctx, ca, dec, key, sp_name)
         return None

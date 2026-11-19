@@ -524,3 +524,139 @@ def test_record_goals_reports_a_caught_abra_as_an_ordinary_goal(tmp_path, monkey
     row = json.loads((run / "goal_frames.jsonl").read_text().splitlines()[0])
     assert row["goal"] == "catch_abra" and "gave_up" not in row
     assert any("GOAL REACHED: catch_abra" in m for m in logs)
+
+
+# --- the throw owns the turn (round 5: nothing ahead of Catch may spend a flee-species turn) -------
+
+from pokeagent.explorer.behaviours import abra_hunt as abra_hunt_mod
+from pokeagent.explorer.behaviours import battle as battle_mod
+from pokeagent.explorer.behaviours import battle_run as battle_run_mod
+from pokeagent.explorer.behaviours import switch_out as switch_out_mod
+from pokeagent.explorer.behaviours.battle import Battle
+from pokeagent.explorer.behaviours.battle_moves import BattleMoves
+from pokeagent.explorer.behaviours.battle_run import flee_throw_pending
+from pokeagent.explorer.behaviours.switch_out import SwitchOut
+from pokeagent.explorer.selector import Selector
+
+BATTLE_MENU = [">FIGHT PKMN", "ITEM RUN"]
+BALL_LIST = ["POKE BALL", "x5"]
+
+
+def _low_hp_ctx(tmp_path, monkeypatch):
+    """The wanted-Abra fight from _throw_ctx plus the RAM the REAL battle layer reads: ENEMY_MON =
+    ABRA, a bag with 5 Poke Balls and 2 POTIONs, and a fighter at 4/20 HP - the exact spot where a
+    POTION stole turn 1 on the real ROM (2026-11-18 FAIL: 4 throws in 48 encounters)."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    _set(ctx.emu, {0xCFE5: ABRA_ID, 0xCFF3: 10,                    # enemy: ABRA L10
+                   0xD31D: 2, 0xD31E: 0x04, 0xD31F: 5,             # bag: 5 Poke Balls ...
+                   0xD320: 0x14, 0xD321: 2})                       # ... and 2 POTIONs
+    monkeypatch.setattr(battle_run_mod, "ROM_KB", ABRA_KB)
+    monkeypatch.setattr(battle_run_mod, "catch_wanted", lambda *a, **k: "catch_abra goal (build abra)")
+    monkeypatch.setattr(battle_run_mod, "our_party", lambda emu: [])
+    monkeypatch.setattr(battle_run_mod, "dex_owned_count", lambda emu: 0)
+    monkeypatch.setattr(battle_run_mod, "upcoming_needs", lambda goals: [])
+    monkeypatch.setattr(battle_mod, "party_hp", lambda emu: (4, 20))
+    monkeypatch.setattr(battle_mod, "fighter", lambda emu: (177, 12, 4, 20))
+    ctx.refresh = lambda: None                                     # the fixture owns the screen
+    return ctx, logs
+
+
+def test_pending_throw_owns_turn_one_against_every_earlier_behaviour(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM FAIL (7bda952): 48 Abra encounters, 4 throws - Battle runs BEFORE Catch and
+    its POTION spent the one turn the Abra was staying for. With a wanted flee species the latch is
+    armed before any behaviour decides (flee_throw_pending computes it lazily - Readiness and the
+    guards ask before Battle does), and every earlier battle action yields to the bag walk."""
+    ctx, logs = _low_hp_ctx(tmp_path, monkeypatch)
+    sel = Selector([Battle(), SwitchOut(), Catch(), BattleMoves()])
+    ctx.view.lines = BATTLE_MENU                                    # low HP + potions + RUN on screen
+    d = sel.choose(ctx)
+    assert d is not None and d.behaviour == "catch", d              # never a POTION, a switch or RUN
+    assert d.rule in ("item_menu_down", "item_open", "item_list_scroll", "item_use")
+    assert ctx.bv is not None and not ctx.bv.want_potion            # Battle saw the HP and stood down
+    assert flee_throw_pending(ctx, ABRA_ID)
+    monkeypatch.setattr(switch_out_mod, "trainee_out", lambda c: 1)  # a swap candidate is right there
+    assert not SwitchOut().applies(ctx)                              # a swap hands Teleport the wild's turn
+    ctx.view.lines = BALL_LIST                                       # the bag is open: the ball lands
+    d = sel.choose(ctx)
+    assert d is not None and d.behaviour == "catch" and d.rule == "item_use"
+    assert (ctx.abra_pending or {}).get("thrown") == 1 and ctx.catch_attempt["thrown"] == 1
+    # The latch dies with the catch (a skip, a full party, a bag give-up): the floor rules take over.
+    ctx.catch_flee = ((ctx.battles, ABRA_ID), False)
+    assert not flee_throw_pending(ctx, ABRA_ID)
+    assert SwitchOut().applies(ctx)                                  # the swap candidate applies again
+    ctx.view.lines = BATTLE_MENU
+    d = sel.choose(ctx)
+    assert d is not None and d.behaviour == "battle"                 # Battle's potion path is its own again
+
+
+def test_a_policy_skip_releases_the_latch_and_the_battle_behaves_normally(tmp_path, monkeypatch):
+    ctx, logs = _low_hp_ctx(tmp_path, monkeypatch)
+    sel = Selector([Battle(), SwitchOut(), Catch(), BattleMoves()])
+    ctx.view.lines = BATTLE_MENU
+    d = sel.choose(ctx)
+    assert d.behaviour == "catch" and flee_throw_pending(ctx, ABRA_ID)
+    monkeypatch.setattr(catch_mod, "_policy_hint", lambda *a, **k: CatchStep("skip", why="rate too poor"))
+    sel.choose(ctx)                                                  # Catch passes the catch up
+    assert not flee_throw_pending(ctx, ABRA_ID)
+    assert ctx.catch_mode is False
+    ctx.view.lines = BATTLE_MENU
+    d = sel.choose(ctx)
+    assert d is not None and d.behaviour == "battle"                 # potion/flee decisions are back
+    assert any("no throw: rate too poor" in t or "not catching" in t for t in logs)
+
+
+def test_every_abra_encounter_without_a_throw_says_why(tmp_path, monkeypatch):
+    """44 of 48 encounters ended with no ball and no clue (2026-11-18 FAIL). The resolve line now
+    carries the reason the catch recorded - or 'catch never engaged' when none was."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)              # the fake bag is empty
+    Catch().step(ctx)
+    ctx.view.battling = False
+    AbraHunt().applies(ctx)                                          # resolves the pending encounter
+    assert any("fled" in t and "no throw: no ball in the bag" in t for t in logs)
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.view.battling = False
+    ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 8}   # nothing recorded at all
+    AbraHunt().applies(ctx)
+    assert any("no throw: catch never engaged" in t for t in logs)
+    ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 8, "thrown": 2}
+    AbraHunt().applies(ctx)
+    assert any("fled" in t and "2 thrown" in t for t in logs)
+    monkeypatch.setattr(abra_hunt_mod, "our_party", lambda emu: [_abra(10)])
+    ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 10, "thrown": 1}
+    AbraHunt().applies(ctx)
+    assert any("caught" in t and "1 thrown" in t for t in logs)
+
+
+def test_a_catch_attempt_with_no_ball_thrown_is_never_a_success(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM FAIL: '[catch attempt SUCCEEDED vs #148 L12 at 100%]' on a fight where the
+    Abra teleported and no ball left the bag - the dex bit only said 'owned'. A success now needs a
+    real throw AND new ownership (a member the party did not have, or a dex bit set during the fight)."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ca = {"species": ABRA_ID, "level": 12, "step": ctx.step, "dex": 63, "battle": ctx.battles,
+          "presses": 0, "last": ctx.step, "hp_pct": 1.0, "owned0": True, "party0": (177,)}
+    ctx.catch_attempt = dict(ca)
+    ctx.in_battle = True
+    ctx.view.battling = False
+    _set(ctx.emu, {0xD2F7 + 7: 0x40})                # dex 63's bit was ALREADY set when the fight began
+    Battle().step(ctx)
+    assert not any("SUCCEEDED" in t for t in logs)
+    assert any("no throw" in t and "#148" in t for t in logs)
+    assert ctx.mem.data["catches"][-1]["caught"] is False
+    # a throw that really landed and put the Abra in the party still reads SUCCEEDED
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.catch_attempt = {**ca, "thrown": 1}
+    ctx.in_battle = True
+    ctx.view.battling = False
+    _set(ctx.emu, {0xD2F7 + 7: 0x40, **party_mem([(177, 14, 30, 30), (ABRA_ID, 10, 25, 25)])})
+    Battle().step(ctx)
+    assert any("SUCCEEDED" in t and "#148" in t for t in logs)
+    assert ctx.mem.data["catches"][-1]["caught"] is True
+    # a real throw that missed and the wild one fled: 'failed', never 'SUCCEEDED' or 'no throw'
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.catch_attempt = {**ca, "thrown": 1}
+    ctx.in_battle = True
+    ctx.view.battling = False
+    _set(ctx.emu, party_mem([(177, 14, 30, 30)]))
+    Battle().step(ctx)
+    assert not any("SUCCEEDED" in t for t in logs)
+    assert any("catch attempt failed" in t for t in logs)
