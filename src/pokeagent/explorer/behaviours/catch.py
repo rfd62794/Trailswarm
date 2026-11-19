@@ -202,14 +202,21 @@ class Catch(BehaviourBase):
             abra_no_throw(ctx, "throw decided, ball never landed")  # overwritten in spirit by thrown below if the A lands
             ball_id = BALLS.get(hint.ball, POKE_BALL)           # unknown names fall back to the Poke Ball
             ball_name = BALL_NAME.get(hint.ball, "POKe BALL")
+            wild_row = trainer_mon(sp_name, e_lvl)
+            flee = flee_on_turn(sp_name, wild_row.moves if wild_row is not None else ())
+            if run_line is None and not item_list_open(lines_now) and not flee:
+                # Menu not readable yet and no one-turn race: the old answer, None - the usual dialog
+                # handling runs and the throw waits a frame. (The B fallthrough below exists only for a
+                # flee species; before round 4 EVERY throw returned None here, and letting it fire on a
+                # default-build dex/HM catch pressed aimless Bs through their frames - 2026-11-19 review.)
+                return None
             ca = attempt(ctx, species, e_lvl, ratio, dex_no, hint.ball, owned)
             if release_slot is not None:
                 ca["release_slot"] = release_slot   # the party-full policy's deposit slot rides on the record
             # A flee species gives the bag one visit per encounter: B-press jitter ahead of the walk
             # shifts the frame the ball's Random calls consume, so an identical cadence cannot draw the
             # same failing bytes twice. Non-flee catches never arm it: their sequence is unchanged.
-            wild_row = trainer_mon(sp_name, e_lvl)
-            if flee_on_turn(sp_name, wild_row.moves if wild_row is not None else ()):
+            if flee:
                 ca.setdefault("jitter", throw_jitter(ctx.battles, ctx.step, ctx.cave_catch_balls.get(species, 0)))
             if ca.get("jitter") and not item_list_open(lines_now):
                 ca["jitter"] -= 1
@@ -217,11 +224,11 @@ class Catch(BehaviourBase):
                                                    f"{ca['jitter']} spare presses before the bag"), key, sp_name)
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
             if run_line is None and not item_list_open(lines_now):
-                # The battle menu is not readable yet (intro / result text) - or a text-step A landed on
-                # the just-rendered menu and opened FIGHT (the move menu reads TYPE/): B advances the text
-                # and backs the move menu out to FIGHT/PKMN/ITEM/RUN. Handing the step on let battle_moves
-                # press A on FIGHT, which spends a flee species' only turn on a damaging move (2026-11-18
-                # real-ROM FAIL: 10 Abra encounters, 'turn 1 throw' logged, 0 balls thrown).
+                # Only a FLEE species reaches here with the menu unreadable (intro / result text - or a
+                # text-step A landed on the just-rendered menu and opened FIGHT, which reads TYPE/): B
+                # advances the text and backs the move menu out to FIGHT/PKMN/ITEM/RUN. Handing the step on
+                # let battle_moves press A on FIGHT and spend the wild's last turn on a damaging move
+                # (2026-11-18 real-ROM FAIL: 10 Abra encounters, 'turn 1 throw' logged, 0 balls thrown).
                 why = "FIGHT opened mid-throw: B backs out to the battle menu" if any(
                     "TYPE/" in ln for ln in lines_now) else f"{hint.why}: B through the text toward ITEM"
                 dec = Decision("B", "catch_menu_b", why)
@@ -229,6 +236,8 @@ class Catch(BehaviourBase):
                 dec = item_step(ctx, lines_now, cur_c, ball_id, ball_name,
                                 f"CATCH {hint.ball or 'POKE'} at {ratio:.0%} HP (p={hint.p:.2f})")
                 if dec is None:
+                    if not flee:
+                        return None  # menu mid-transition: a non-flee throw waits a frame (the old answer)
                     dec = Decision("B", "catch_menu_b", "catch: menu mid-transition: B")
             if dec.rule == "item_use":  # the A that throws it
                 ball_landed(ctx, ca, pend, species, sp_name, e_lvl, ratio, ball_name)

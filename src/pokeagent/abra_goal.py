@@ -80,11 +80,13 @@ def owned_species(emu) -> dict[int, int]:
 
 
 def gained_abra(owned_now: dict[int, int], owned0: dict[int, int], names) -> bool:
-    """An Abra-line species whose count in ``owned_now`` tops the run-start snapshot ``owned0``:
-    gained THIS run. A pre-existing boxed/party Abra (equal count) never counts."""
+    """The Abra LINE's total in ``owned_now`` tops the run-start snapshot ``owned0``: gained THIS
+    run. One family total, not per species - a start-state Abra that EVOLVED into Kadabra keeps the
+    total at 1 and must not settle the goal (2026-11-19 review); a pre-existing boxed/party Abra
+    (equal count) never counts either."""
     names = names or {}
-    return any(n > owned0.get(s, 0) for s, n in owned_now.items()
-               if names.get(str(s), str(s)) in ABRA_LINE)
+    line = lambda owned: sum(n for s, n in owned.items() if names.get(str(s), str(s)) in ABRA_LINE)
+    return line(owned_now) > line(owned0)
 
 
 def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:

@@ -111,9 +111,12 @@ def catch_verdict(ctx: ExplorerContext, ca: dict) -> tuple[bool, str]:
     the party did not have at the attempt's start, a species count the PC box gained (a full party sends
     the catch there - a dex bit already set by an earlier catch cannot prove THIS one, 2026-11-18 FAIL:
     the real boxed catch read 'failed'), or a dex bit set during the fight. The bit alone only
-    says 'owned' - a boxed catch read 'SUCCEEDED' on a fight with no throw and a flee (2026-11-18 FAIL)."""
+    says 'owned' - a boxed catch read 'SUCCEEDED' on a fight with no throw and a flee (2026-11-18 FAIL).
+    The party side is a COUNT, not a set diff: a second catch of a species the party already holds is
+    still a gain (set membership cannot see it, 2026-11-19 review)."""
     dn = ca.get("dex") or 0
-    joined = ca["species"] in set(m.species for m in read_party(ctx.emu)) - set(ca.get("party0") or ())
+    party_now = [m.species for m in read_party(ctx.emu)]
+    joined = party_now.count(ca["species"]) > tuple(ca.get("party0") or ()).count(ca["species"])
     boxed = box_species(ctx.emu).count(ca["species"]) > tuple(ca.get("box0") or ()).count(ca["species"])
     owned_now = bool(dn) and bool(ctx.emu.read(POKEDEX_OWNED + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
     caught = bool(ca.get("thrown")) and (joined or boxed or (owned_now and not ca.get("owned0")))

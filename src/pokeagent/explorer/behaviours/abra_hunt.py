@@ -83,7 +83,10 @@ class AbraHunt(BehaviourBase):
         ok = not ctx.view.battling and not ctx.view.box and ctx.proc is None \
             and grind_episode.active(ctx) is None   # a live episode pins the run to its map set
         if ok:
-            ctx.team_wants = {ABRA_SPECIES: ABRA_WANT}
+            wants = getattr(ctx, "team_wants", None)
+            if wants is None:
+                wants = ctx.team_wants = {}
+            wants.setdefault(ABRA_SPECIES, ABRA_WANT)  # ours only - never clobber another goal's wants
         return ok
 
     def _graph_dist(self, ctx: ExplorerContext, target_map: int) -> float:

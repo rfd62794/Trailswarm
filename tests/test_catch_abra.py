@@ -143,7 +143,12 @@ def test_goal_settles_on_the_step_cap_and_only_when_no_balls_no_money():
                                 {"name_of_internal": NAMES})
 
 
-def test_check_goals_wires_catch_abra_between_team_ready_and_to_bill():
+def test_check_goals_wires_catch_abra_between_team_ready_and_to_bill(monkeypatch):
+    """check_goals hands catch_abra_settled the module-level kb.ROM_KB - None on a checkout without
+    the gitignored rom_tables.json, where 'no name table' settles the goal and this read FAILS
+    (2026-11-19 review). Pin the name table the way test_a_boxed_abra_at_run_start does."""
+    from pokeagent.knowledge import kb as kb_mod
+    monkeypatch.setattr(kb_mod, "ROM_KB", {"name_of_internal": NAMES})
     assert GOALS.index("catch_abra") == GOALS.index("team_ready") + 1
     assert GOALS.index("to_bill") == GOALS.index("catch_abra") + 1
     g = check_goals(_emu(money=3000), _st("abra"))
@@ -881,3 +886,75 @@ def test_the_build_want_lapses_when_catch_abra_settles(tmp_path, monkeypatch):
     ctx.team_wants = {"ABRA": "can learn FLASH (needed ahead, nobody in the party can)"}
     assert not AbraHunt().applies(ctx)
     assert ctx.team_wants                                                   # another goal's want is not ours to drop
+
+
+# --- round 9 (2026-11-19 independent review): B only for a flee species, counted gains, family total ---
+
+def test_a_non_flee_throw_waits_for_a_readable_menu_instead_of_pressing_b(tmp_path, monkeypatch):
+    """The round-4 'catch_menu_b' fallback answered B for EVERY throw hint whose menu was not
+    readable - default-build dex/HM catches included - where the pre-round-4 code returned None
+    (2026-11-19 review). The B is the flee species' one-turn race only: a wanted PIDGEY's throw
+    hands the step back and waits a frame."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    kb = {"dex_of_internal": {"36": 16, "148": 63},
+          "name_of_internal": {"36": "PIDGEY", "148": "ABRA"}, "items": {}}
+    monkeypatch.setattr(catch_mod, "ROM_KB", kb)
+    monkeypatch.setattr(catch_mod, "catch_wanted", lambda *a, **k: "wanted")   # a plain dex catch
+    ctx.bv = replace(ctx.bv, species=36, run_line=None)                        # intro text, no menu yet
+    ctx.view.lines = ["Wild PIDGEY appeared!"]
+    assert Catch().step(ctx) is None                                           # the old answer: no aimless B
+    ctx.view.lines = ["TYPE/", "NORMAL", "29/30", ">TACKLE"]                   # FIGHT open: still not Catch's B
+    assert Catch().step(ctx) is None
+    ctx.view.lines = ["nothing parsed"]                                        # run_line set but mid-transition: the old None too
+    ctx.bv = replace(ctx.bv, run_line="RUN")
+    assert Catch().step(ctx) is None
+    ctx.view.lines = ["FIGHT PKMN", ">ITEM RUN"]                               # a readable menu: the bag walk is unchanged
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_open" and dec.button == "A"
+
+
+def test_a_second_catch_of_a_party_species_still_reads_succeeded(tmp_path, monkeypatch):
+    """catch_verdict's party check was a set diff: a party that already held the species could never
+    show a new member, so a second catch of a party species (party NOT full) read 'failed'
+    (2026-11-19 review). The join is a count now: party0's one ABRA -> two ABRAs is a gain."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.catch_attempt = {"species": ABRA_ID, "level": 12, "step": ctx.step, "dex": 63,
+                         "battle": ctx.battles, "presses": 0, "last": ctx.step, "hp_pct": 1.0,
+                         "owned0": True, "party0": (177, ABRA_ID), "box0": (), "thrown": 1}
+    ctx.in_battle, ctx.view.battling = True, False
+    _set(ctx.emu, {0xD2F7 + 7: 0x40,                                # dex bit already owned
+                   **party_mem([(177, 14, 30, 30), (ABRA_ID, 10, 25, 25), (ABRA_ID, 12, 28, 28)])})
+    Battle().step(ctx)                                              # party went 1 ABRA -> 2: still a catch
+    assert any("SUCCEEDED" in t and "#148" in t for t in logs)
+    assert ctx.mem.data["catches"][-1]["caught"] is True
+
+
+def test_a_start_state_abra_evolving_past_the_baseline_is_not_a_gain():
+    """gained_abra compared PER SPECIES: the start pool's Abra evolving to Kadabra (ABRA 1->0,
+    KADABRA 0->1) read as a gain and settled the goal without any catch (2026-11-19 review).
+    The line counts as one family total now - only a total ABOVE the baseline settles."""
+    emu = _emu(((177, 14, 30, 30), (ABRA_ID, 16, 30, 30)), money=3000, balls={4: 5})
+    st = _st("abra")
+    assert not catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})   # baseline: 1 line member
+    _set(emu, party_mem([(177, 14, 30, 30), (KADABRA_ID, 16, 35, 35)]))          # it evolved, not caught
+    assert not catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})   # family total still 1
+    _set(emu, party_mem([(177, 14, 30, 30), (KADABRA_ID, 16, 35, 35), (ABRA_ID, 8, 20, 20)]))
+    assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})       # a 2nd line member IS a gain
+    assert st["had_abra"] and st["abra_settle"] == "caught"
+
+
+def test_the_hunt_adds_only_its_own_want_never_clobbers_the_map(tmp_path, monkeypatch):
+    """Arming the hunt assigned ctx.team_wants wholesale - {ABRA: ABRA_WANT} wiped every other
+    species' catch want (an HM learner, a plan target; 2026-11-19 review). It sets its own key
+    only, and the settle path still deletes only its own entry."""
+    from pokeagent.knowledge import kb as kb_mod
+    monkeypatch.setattr(kb_mod, "ROM_KB", {"name_of_internal": NAMES})
+    ctx = make_ctx(tmp_path, balls=5, money=4000)
+    ctx.opts.build = "abra"
+    other = {"PIDGEY": "planned: x"}
+    ctx.team_wants = dict(other)
+    assert AbraHunt().applies(ctx)
+    assert ctx.team_wants == {**other, "ABRA": ABRA_WANT}            # the arm keeps the map's own entries
+    ctx.goals = lambda: {g: True for g in GOALS}                     # catch_abra settled
+    assert not AbraHunt().applies(ctx)
+    assert ctx.team_wants == other                                   # and only OUR want lapses
