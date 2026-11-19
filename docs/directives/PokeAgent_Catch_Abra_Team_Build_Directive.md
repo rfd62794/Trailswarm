@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Approved |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -186,4 +186,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 19:12 · devin · In progress → Review — Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head de69d2f6); round 3: armed Mart trips route past MAX_PATH (R24 grass -> Cerulean Mart ~65-80 steps), empty-Mart reason logged, no-route spends no try (recheck), no-kb settle logs under --build abra; synthetic tests only; real-ROM check from nugget_bridge.state is the controller's. [origin] spent: devin 319 min est. n/a
 - 2026-11-18 19:29 · robert-claude-laptop · Review → Blocked — Real-ROM FAIL at de69d2f 2026-11-18: Mart fix works (0 'no route'), but throw never executes - 10 Abra encounters log 'turn 1 throw POKE' then the battle driver picks FIGHT/A; balls stay 10; all fled; gave up step 5344. Fix: (1) throw decision must drive BAG -> Poke Ball on turn 1 (find why the battle driver chooses FIGHT), with a test that a throw yields bag/menu inputs not FIGHT; (2) BALLS_MIN=12 vs restock buying 10 must agree. Evidence: abra2_seed1.log.
 - 2026-11-18 19:29 · robert-claude-laptop · Blocked → Queued — Round 4 send-back (Robert 2026-11-18): fix per the Blocked note - throw decision must drive BAG -> Poke Ball on turn 1 (battle driver currently picks FIGHT); align BALLS_MIN=12 with restock buy qty 10. Evidence: controller log abra2_seed1.log (10 encounters, 0 balls used).
+- 2026-11-18 19:30 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as the 18:53 approval: knowledge/flee_catch.py is created by this directive (exists on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 4 fix: throw must execute (battle driver picks FIGHT).
 <!-- queue:end -->
