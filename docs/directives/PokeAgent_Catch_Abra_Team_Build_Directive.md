@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -187,4 +187,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 19:29 · robert-claude-laptop · Review → Blocked — Real-ROM FAIL at de69d2f 2026-11-18: Mart fix works (0 'no route'), but throw never executes - 10 Abra encounters log 'turn 1 throw POKE' then the battle driver picks FIGHT/A; balls stay 10; all fled; gave up step 5344. Fix: (1) throw decision must drive BAG -> Poke Ball on turn 1 (find why the battle driver chooses FIGHT), with a test that a throw yields bag/menu inputs not FIGHT; (2) BALLS_MIN=12 vs restock buying 10 must agree. Evidence: abra2_seed1.log.
 - 2026-11-18 19:29 · robert-claude-laptop · Blocked → Queued — Round 4 send-back (Robert 2026-11-18): fix per the Blocked note - throw decision must drive BAG -> Poke Ball on turn 1 (battle driver currently picks FIGHT); align BALLS_MIN=12 with restock buy qty 10. Evidence: controller log abra2_seed1.log (10 encounters, 0 balls used).
 - 2026-11-18 19:30 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as the 18:53 approval: knowledge/flee_catch.py is created by this directive (exists on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 4 fix: throw must execute (battle driver picks FIGHT).
+- 2026-11-18 19:30 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RKCQ1HRTDC3E7JZ6NN84ZP
 <!-- queue:end -->
