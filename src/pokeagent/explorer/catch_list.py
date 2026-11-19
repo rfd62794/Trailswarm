@@ -68,17 +68,19 @@ def _party_covers(hm: str, party) -> bool:
 
 
 def catch_wanted(species: str, party, dex_owned: int, upcoming: list[str], owned: bool = False,
-                 wants: dict[str, str] | None = None, build: str = "") -> str | None:
+                 wants: dict[str, str] | None = None, build: str = "", abra_open: bool = True) -> str | None:
     """Why a ball should go on ``species`` (a reason string), or None. ``owned``: the species is already in the dex.
     ``wants``: the catch plan's species -> reason map (knowledge.catch_plan via ctx.team_wants); a planned species
     reports its plan reason after the HM check and before the dex check. A NEVER_CATCH species is never wanted.
-    ``build`` = the ExplorerOptions team build: "abra" makes any Abra-line member wanted for its goal."""
+    ``build`` = the ExplorerOptions team build: "abra" makes an Abra-line member wanted while its goal is open
+    (``abra_open``); once catch_abra settles the build want lapses - another goal's want (an HM need, a plan)
+    still counts (2026-11-18 real-ROM: the post-catch hunt burned the restock balls on Abras nobody wanted)."""
     if species in NEVER_CATCH:
         return None
     for hm in HM_MOVE:
         if hm in upcoming and species in hm_table().get(hm, ()) and not _party_covers(hm, party):
             return f"can learn {hm.upper()} (needed ahead, nobody in the party can)"
-    if build == "abra" and species in ABRA_LINE:
+    if build == "abra" and abra_open and species in ABRA_LINE:
         return "catch_abra goal (build abra)"
     if wants and species in wants:
         return wants[species]

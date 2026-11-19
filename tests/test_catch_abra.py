@@ -18,7 +18,7 @@ from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer import press_goals
 from pokeagent.explorer.behaviours import Catch, Restock
 from pokeagent.explorer.behaviours import catch as catch_mod
-from pokeagent.explorer.behaviours.abra_hunt import AbraHunt
+from pokeagent.explorer.behaviours.abra_hunt import ABRA_WANT, AbraHunt
 from pokeagent.explorer.behaviours.battle import BattleView
 from pokeagent.explorer.behaviours.catch import full_party_slot
 from pokeagent.explorer.catch_list import catch_wanted
@@ -811,3 +811,73 @@ def test_a_party_abra_at_run_start_never_settles_either():
     _set(emu, party_mem([(177, 14, 30, 30), (ABRA_ID, 10, 25, 25), (KADABRA_ID, 20, 40, 40)]))
     assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})       # a NEW line member counts
     assert st["had_abra"] and st["abra_settle"] == "caught"
+
+
+# --- round 8: the verdict sees a box gain; the resolve line is per-encounter; the want lapses --------
+
+def test_a_box_gain_counts_as_new_ownership(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM (abra7 seed 1, step 1374): the real catch logged 'catch attempt failed' -
+    the party was full so the Abra went to the PC box, and its dex bit was ALREADY set by the boxed
+    Abra the save started with (round-7 find), so neither the party diff nor the dex bit could prove
+    it. The attempt now snapshots wBoxSpecies (box0): a species count the box gained IS ownership."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ca = {"species": ABRA_ID, "level": 12, "step": ctx.step, "dex": 63, "battle": ctx.battles,
+          "presses": 0, "last": ctx.step, "hp_pct": 1.0, "owned0": True, "party0": (177,),
+          "box0": (0x70,), "thrown": 1}
+    ctx.catch_attempt = dict(ca)
+    ctx.in_battle, ctx.view.battling = True, False
+    _set(ctx.emu, {0xD2F7 + 7: 0x40,                                        # dex bit already owned
+                   0xDA80: 2, 0xDA81: 0x70, 0xDA82: ABRA_ID,                # the box gained THIS Abra
+                   **party_mem([(177, 14, 30, 30)])})                       # the party is unchanged
+    Battle().step(ctx)
+    assert any("SUCCEEDED" in t and "#148" in t for t in logs)
+    assert ctx.mem.data["catches"][-1]["caught"] is True
+    # the same throw with the box UNCHANGED (the wild fled) still reads 'failed', not 'SUCCEEDED'
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.catch_attempt = {**ca, "box0": (0x70, ABRA_ID)}                     # both were there at the start
+    ctx.in_battle, ctx.view.battling = True, False
+    _set(ctx.emu, {0xD2F7 + 7: 0x40, 0xDA80: 2, 0xDA81: 0x70, 0xDA82: ABRA_ID,
+                   **party_mem([(177, 14, 30, 30)])})
+    Battle().step(ctx)
+    assert not any("SUCCEEDED" in t for t in logs)
+    assert any("catch attempt failed" in t for t in logs)
+
+
+def test_resolve_line_compares_against_the_encounters_own_snapshot(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM (abra7 seed 1): after the first catch every later Abra encounter logged
+    'caught' - even 'caught, no throw: no ball in the bag' - because the check ran against the
+    run-start baseline. The pending record's own owned0 (written at the battle's start) is the
+    baseline now: 'caught' means THIS encounter added an Abra-line member."""
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    ctx.view.battling = False
+    monkeypatch.setattr(abra_hunt_mod, "table", lambda kb, name: NAMES if name == "name_of_internal" else {})
+    _set(ctx.emu, {0xDA80: 1, 0xDA81: ABRA_ID})                             # the box holds the EARLIER catch
+    ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 8,
+                        "owned0": {ABRA_ID: 1}}                             # it was already there when THIS fight began
+    AbraHunt().applies(ctx)
+    assert any("fled" in t for t in logs) and not any("caught" in t for t in logs)
+    ctx.abra_pending = {"battle": ctx.battles + 1, "species": "ABRA", "level": 10, "thrown": 1,
+                        "owned0": {ABRA_ID: 1}}                             # this fight's snapshot: 1 Abra
+    _set(ctx.emu, {0xDA80: 2, 0xDA82: ABRA_ID})                             # ... and the box holds 2 now
+    AbraHunt().applies(ctx)
+    assert any("caught" in t and "1 thrown" in t for t in logs)
+
+
+def test_the_build_want_lapses_when_catch_abra_settles(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM (abra7 seed 1): the goal settled at step 1374 and the hunt still met 6
+    more Abras, burning the restock balls - the armed team_wants entry was stale and the build
+    clause wanted every Abra-line mon anyway. The want lives only while the goal is open; another
+    goal's want (an HM need, a plan) survives the settle."""
+    assert catch_wanted("ABRA", [], 20, [], build="abra") == "catch_abra goal (build abra)"   # open: wanted
+    assert catch_wanted("KADABRA", [], 20, [], build="abra", abra_open=False) is None          # settled: not
+    assert catch_wanted("ABRA", [], 20, [], build="abra", abra_open=False,
+                       wants={"ABRA": "planned: x"}) == "planned: x"                         # another goal's want stays
+    ctx = make_ctx(tmp_path, balls=5, money=4000)
+    ctx.opts.build = "abra"
+    ctx.goals = lambda: {g: True for g in GOALS}                            # catch_abra settled
+    ctx.team_wants = {"ABRA": ABRA_WANT}                                    # the want abra_hunt armed, now stale
+    assert not AbraHunt().applies(ctx)
+    assert ctx.team_wants == {}                                             # dropped once the goal is done
+    ctx.team_wants = {"ABRA": "can learn FLASH (needed ahead, nobody in the party can)"}
+    assert not AbraHunt().applies(ctx)
+    assert ctx.team_wants                                                   # another goal's want is not ours to drop

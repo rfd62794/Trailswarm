@@ -1,6 +1,7 @@
 """battle_run: inside a dungeon a wild fight is time lost - run, and keep walking to the exit (unless it is a catch target)."""
 from __future__ import annotations
 
+from pokeagent.abra_goal import box_species
 from pokeagent.explorer.catch_list import catch_wanted, dex_owned_count, upcoming_needs
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
@@ -76,10 +77,15 @@ def _flee_latch(ctx: ExplorerContext, species: int) -> bool:
             if balls and dex_no and e_max and cave_catch_allowed(ctx, species):
                 key = (getattr(ctx, "battles", -1), species)
                 is_owned = owned(ctx.emu, species)
-                want = ctx.catch_want[1] if getattr(ctx, "catch_want", (None, None))[0] == key else catch_wanted(
-                    name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()),
-                    owned=is_owned, wants=getattr(ctx, "team_wants", None),
-                    build=getattr(getattr(ctx, "opts", None), "build", ""))
+                latched = getattr(ctx, "catch_want", (None, None))
+                want = latched[1]
+                if latched[0] != key:
+                    goals_now = ctx.goals()
+                    want = catch_wanted(
+                        name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(goals_now),
+                        owned=is_owned, wants=getattr(ctx, "team_wants", None),
+                        build=getattr(getattr(ctx, "opts", None), "build", ""),
+                        abra_open=not goals_now.get("catch_abra"))
                 on = bool(want) and (not is_owned or want.startswith(("can learn", "planned", "catch_abra")))
     ctx.catch_flee = ((getattr(ctx, "battles", -1), species), on)
     return on
@@ -102,10 +108,13 @@ def flee_throw_pending(ctx: ExplorerContext, species: int | None = None) -> bool
 def catch_verdict(ctx: ExplorerContext, ca: dict) -> tuple[bool, str]:
     """(caught, verdict) for a popped catch_attempt at the battle's end. 'SUCCEEDED' needs a ball that
     really left the bag (``thrown``, counted by Catch at the item_use press) AND new ownership: a member
-    the party did not have at the attempt's start, or a dex bit set during the fight. The bit alone only
+    the party did not have at the attempt's start, a species count the PC box gained (a full party sends
+    the catch there - a dex bit already set by an earlier catch cannot prove THIS one, 2026-11-18 FAIL:
+    the real boxed catch read 'failed'), or a dex bit set during the fight. The bit alone only
     says 'owned' - a boxed catch read 'SUCCEEDED' on a fight with no throw and a flee (2026-11-18 FAIL)."""
     dn = ca.get("dex") or 0
     joined = ca["species"] in set(m.species for m in read_party(ctx.emu)) - set(ca.get("party0") or ())
+    boxed = box_species(ctx.emu).count(ca["species"]) > tuple(ca.get("box0") or ()).count(ca["species"])
     owned_now = bool(dn) and bool(ctx.emu.read(POKEDEX_OWNED + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
-    caught = bool(ca.get("thrown")) and (joined or (owned_now and not ca.get("owned0")))
+    caught = bool(ca.get("thrown")) and (joined or boxed or (owned_now and not ca.get("owned0")))
     return caught, "SUCCEEDED" if caught else ("no throw" if not ca.get("thrown") else "failed")

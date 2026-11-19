@@ -8,6 +8,7 @@ ctx.cave_catch_balls, ctx.catch_switch, ctx.catch_flee.
 """
 from __future__ import annotations
 
+from pokeagent.abra_goal import box_species
 from pokeagent.explorer.behaviours.base import Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.ramstructs import read_party
@@ -45,15 +46,17 @@ def attempt(ctx: ExplorerContext, species: int, e_lvl: int, ratio: float, dex_no
             owned: bool) -> dict:
     """The one catch_attempt record per (battle, species): refreshed in place so its ``step`` (the turn signature's
     input) stays put, and carrying the bag-press count the cap and Battle's item_list_close yield read.
-    ``owned0``/``party0`` pin what was true at the attempt's start: the dex bit says 'owned', never 'caught THIS
-    battle' - an already-owned species (a boxed catch) read 'SUCCEEDED' on a battle where no ball was even thrown
-    (2026-11-18 real-ROM FAIL)."""
+    ``owned0``/``party0``/``box0`` pin what was true at the attempt's start: the dex bit says 'owned', never
+    'caught THIS battle' - an already-owned species (a boxed catch) read 'SUCCEEDED' on a battle where no ball
+    was even thrown (2026-11-18 real-ROM FAIL); and a full party sends the catch to the PC box, where only a
+    species-count gain proves THIS battle caught (same date: the real boxed catch read 'failed')."""
     ca = ctx.catch_attempt
     if not ca or ca.get("battle") != ctx.battles or ca.get("species") != species:
         ca = ctx.catch_attempt = {"species": species, "level": e_lvl, "step": ctx.step, "dex": dex_no,
                                   "battle": ctx.battles, "presses": 0, "last": ctx.step,
                                   "owned0": owned,
-                                  "party0": tuple(getattr(m, "species", None) for m in read_party(ctx.emu))}
+                                  "party0": tuple(getattr(m, "species", None) for m in read_party(ctx.emu)),
+                                  "box0": tuple(box_species(ctx.emu))}
     ca["hp_pct"] = round(ratio, 2)
     if ball is not None:
         ca["ball"] = ball

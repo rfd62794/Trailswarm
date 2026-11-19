@@ -63,7 +63,7 @@ class AbraHunt(BehaviourBase):
         if pend is not None and not ctx.view.battling:
             ctx.abra_pending = None
             names = table(None, "name_of_internal")  # a full party boxes the catch: it still counts
-            owned0 = getattr(ctx, "abra_owned0", None)
+            owned0 = pend.get("owned0", getattr(ctx, "abra_owned0", None))  # THIS encounter's snapshot first
             caught = (gained_abra(owned_species(ctx.emu), owned0, names) if owned0 is not None
                       else any(c.name in ABRA_LINE for c in our_party(ctx.emu))
                       or any(names.get(str(s), str(s)) in ABRA_LINE for s in box_species(ctx.emu)))
@@ -76,6 +76,9 @@ class AbraHunt(BehaviourBase):
             ctx.hunt_grass = False
             self._armed = False
         if getattr(getattr(ctx, "opts", None), "build", "") != "abra" or ctx.goals().get("catch_abra"):
+            wants = getattr(ctx, "team_wants", None)
+            if wants and wants.get(ABRA_SPECIES) == ABRA_WANT:
+                del wants[ABRA_SPECIES]  # the goal settled: the want we armed lapses (another goal's stays)
             return False
         ok = not ctx.view.battling and not ctx.view.box and ctx.proc is None \
             and grind_episode.active(ctx) is None   # a live episode pins the run to its map set

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from pokeagent.abra_goal import owned_species
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.kb import ROM_KB
@@ -106,14 +107,20 @@ class Catch(BehaviourBase):
             sp_name = (ROM_KB or {}).get("name_of_internal", {}).get(str(species), str(species))
             if sp_name in ABRA_LINE and (ctx.abra_pending or {}).get("battle") != ctx.battles:
                 # The Abra encounter counts from the battle's first step - with balls or without, caught or fled.
-                ctx.abra_pending = {"battle": ctx.battles, "species": sp_name, "level": e_lvl}
+                # owned0 snapshots the party+box pool at THIS encounter's start: the resolve line's 'caught'
+                # must mean this fight added an Abra-line member, not 'the run owns one' (2026-11-18 real-ROM:
+                # every post-catch encounter read 'caught' against the run-start baseline).
+                ctx.abra_pending = {"battle": ctx.battles, "species": sp_name, "level": e_lvl,
+                                    "owned0": owned_species(ctx.emu)}
                 ctx.abra_encounters += 1
         if kind == 1 and balls and dex_no and e_max and cave_catch_allowed(ctx, species):
             key = (ctx.battles, species)
             if ctx.catch_want[0] != key:  # decided once per fight: the party read is not free
-                why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(ctx.goals()),
+                goals_now = ctx.goals()
+                why = catch_wanted(sp_name, our_party(ctx.emu), dex_owned_count(ctx.emu), upcoming_needs(goals_now),
                                    owned=owned, wants=ctx.team_wants,
-                                   build=getattr(getattr(ctx, "opts", None), "build", ""))
+                                   build=getattr(getattr(ctx, "opts", None), "build", ""),
+                                   abra_open=not goals_now.get("catch_abra"))
                 ctx.catch_want = (key, why)
                 ctx.log(f"[catch: {'wanted' if why else 'skipping'} {sp_name}: {why or 'not on the need-list'}]", "res")
             want = ctx.catch_want[1]
