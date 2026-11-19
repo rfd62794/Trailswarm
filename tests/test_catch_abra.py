@@ -358,6 +358,87 @@ def test_record_goals_marks_a_catch_abra_settle_without_an_abra_a_give_up(tmp_pa
     assert any("gave up" in m for m in logs) and not any("GOAL REACHED" in m for m in logs)
 
 
+# --- the Mart route (round 3: an armed trip walks a long learned route, and says why when it cannot) ---
+
+from pokeagent.explorer import restock as rs
+from pokeagent.explorer.world import WorldGraph
+
+
+def _r24_cerulean_maps():
+    """Faithful to the ROM geometry: Route 24's Abra grass is the x4-5 corridor y18-31 (walls x6-9
+    below y15); the middle corridor x10-11 runs to the south edge openings (y35), whose crossing
+    lands on Cerulean's north strip x20-21; the Mart door press is UP from (25,26) -> map 67's
+    (3,7). A learned walk from deep grass is ~65 steps - over rs.MAX_PATH, inside the trip budget."""
+    r24 = {"visited": {}, "blocked": [], "warps": {}}
+    for y in range(15, 32):                                     # the west grass corridor
+        for x in (4, 5):
+            r24["visited"][f"{x},{y}"] = 1
+    for x in range(4, 12):                                      # the open band at y15 joining grass to the bridge corridor
+        r24["visited"][f"{x},15"] = 1
+    for y in range(15, 36):                                     # the middle corridor down to the south edge
+        for x in (10, 11):
+            r24["visited"][f"{x},{y}"] = 1
+    r24["warps"]["11,35,DOWN"] = [3, 21, 2]                     # the south crossing into Cerulean
+    r24["npcs"] = {f"slot{i}:pic7": {"pic": 7, "slot": i, "positions": {f"{x},{y}": 5},
+                                    "moves": False, "last": [x, y]}   # the beaten bridge trainers: static, BFS skips
+                   for i, (x, y) in enumerate([(5, 20), (10, 22), (11, 25), (10, 28), (11, 31)], 1)}
+    cer = {"visited": {}, "blocked": [], "warps": {}}
+    for y in range(2, 13):                                      # the north strip down to the mid street
+        for x in (20, 21):
+            cer["visited"][f"{x},{y}"] = 1
+    for x in range(20, 26):                                     # the mid street east toward the Mart
+        cer["visited"][f"{x},12"] = 1
+    for y in range(12, 27):                                     # down the Mart's column to the door tile
+        cer["visited"][f"25,{y}"] = 1
+    cer["warps"]["25,26,UP"] = [67, 3, 7]                       # the Mart door press -> map 67
+    mart = {"visited": {f"3,{y}": 1 for y in (5, 6, 7)} | {"2,5": 1}, "blocked": [],
+            "warps": {"3,7,DOWN": [3, 25, 26]}}
+    return {"35": r24, "3": cer, "67": mart}
+
+
+def test_armed_ball_errand_walks_a_long_learned_route_to_the_mart(tmp_path):
+    """From the Route 24 grass the Cerulean Mart is ~65 learned steps away - over rs.MAX_PATH (the
+    'is a Mart near' planning rule) but inside the trip budget: an ARMED errand must still walk it
+    (2026-11-18 real-ROM FAIL: 'no route to a Mart' burned all three tries, no balls ever bought)."""
+    ctx = make_ctx(tmp_path, balls=0, money=4000, m=35, x=5, y=28)
+    ctx.mem.data["maps"] = _r24_cerulean_maps()
+    ctx.restock = {"intent": True, "want": (rs.BALL_ID,), "steps": 0}
+    d = Restock().step(ctx)
+    assert d is not None and d.rule == "restock_walk"
+    g = WorldGraph(ctx.mem.data["maps"])
+    assert len(g.path(ctx.pos(), lambda n: n[0] in rs.MART_MAPS, 5000)) > rs.MAX_PATH   # the route is real, just long
+
+
+def test_armed_trip_reports_why_no_mart_can_be_walked(tmp_path):
+    """Every candidate Mart failed this run: the log must say the Mart set is empty - and a trip
+    that never started spends no try; the recheck window holds the next arm off."""
+    ctx = make_ctx(tmp_path, balls=0, money=4000, m=35, x=5, y=28)
+    ctx.mem.data["maps"] = _r24_cerulean_maps()
+    logs = []
+    ctx.log = lambda t, tag=None: logs.append(t)
+    ctx.restock = {"intent": True, "want": (rs.BALL_ID,), "steps": 0, "failed": set(rs.MART_MAPS)}
+    assert Restock().step(ctx) is None
+    assert any("no Mart left" in t for t in logs)
+    assert ctx.restock["next_check"] > 0 and "tries" not in ctx.restock
+    assert not AbraHunt()._ball_errand(ctx)                       # the recheck window mutes the re-arm
+    ctx.step = ctx.restock["next_check"]
+    assert AbraHunt()._ball_errand(ctx)                           # past it: the errand may try again
+
+
+def test_no_name_table_settles_open_but_says_so_out_loud():
+    st = _st("abra")
+    assert catch_abra_settled(_emu(money=3000), st, set(), None)          # cannot judge: settled, never blocks
+    assert st["abra_settle"] == "no name table"
+    logs = []
+    st2 = _st("abra", log=lambda t, tag=None: logs.append(t))             # the ctx's log, when it is there
+    assert catch_abra_settled(_emu(money=3000), st2, set(), None)
+    assert sum("no kb name table" in t for t in logs) == 1
+    catch_abra_settled(_emu(money=3000), st2, set(), None)
+    assert sum("no kb name table" in t for t in logs) == 1                # loud once, not every goals check
+    st3 = _st("", log=lambda t, tag=None: logs.append(t))
+    assert catch_abra_settled(_emu(money=3000), st3, set(), None)         # the default build never reaches the check
+
+
 def test_record_goals_reports_a_caught_abra_as_an_ordinary_goal(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     state = {g: False for g in GOALS}

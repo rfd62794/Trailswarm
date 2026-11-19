@@ -97,8 +97,8 @@ class AbraHunt(BehaviourBase):
         if st.get("intent") or st.get("leave"):
             return True  # a trip is armed or underway: Restock owns these steps
         if (ball_count(ctx.emu) >= BALLS_MIN or not can_afford_ball(ctx.emu, ROM_KB)
-                or st.get("tries", 0) >= rs.MAX_TRIES):
-            return False
+                or st.get("tries", 0) >= rs.MAX_TRIES or ctx.step < st.get("next_check", 0)):
+            return False  # stocked, broke, spent, or a trip that found no route is in its recheck window
         st.update(intent=True, want=(rs.BALL_ID,), steps=0)
         ctx.shop_intent = ("mart", None)
         ctx.log(f"[catch_abra: {ball_count(ctx.emu)} balls under {BALLS_MIN} - buying Poke Balls at a Mart first]", "res")

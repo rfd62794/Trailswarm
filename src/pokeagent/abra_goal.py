@@ -69,7 +69,11 @@ def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
     names = (kb or {}).get("name_of_internal")
     if not names:
         st["abra_settle"] = "no name table"
-        return True  # no ROM name table: cannot judge, never block
+        log = st.get("log")   # check_goals hands in the ctx: under the build this is not a silent settle
+        if callable(log) and not st.get("abra_no_kb_logged"):
+            st["abra_no_kb_logged"] = True
+            log("[catch_abra: no kb name table - an Abra catch cannot be judged; the goal settles open]", "res")
+        return True  # no ROM name table: cannot judge, never block - but say so out loud under --build abra
     if any(names.get(str(s), str(s)) in ABRA_LINE for s in party_species(emu)):
         st["had_abra"] = True
         st["abra_settle"] = "caught"
