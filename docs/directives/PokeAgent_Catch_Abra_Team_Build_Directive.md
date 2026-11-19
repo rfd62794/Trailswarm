@@ -151,12 +151,12 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Blocked |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
-| Head commit | 2d4f2c31399732be355f7b8e6103087912d47494 |
+| Head commit | d8e978d5fa8e25fae74ccf623952b54b818acce7 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -223,4 +223,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-19 06:56 · robert-claude-laptop · Review → Blocked — Head moved to 2d4f2c3 (controller: restored test_ladder_is_long_and_starts_with_todays_26 name; integrity gate read the round-9 rename as a removed test). Re-recording head via Review.
 - 2026-11-19 06:57 · robert-claude-laptop · Blocked → Review — Head 2d4f2c3. Round 9 re-review APPROVE (all 5 findings closed); real-ROM seed 1 (nugget_bridge.state, --build abra, maps.json copy) caught Abra at step 1374, 8000/8000 steps, no traceback. Controller commit only restores the ladder test's original name. [origin] spent: devin 409 min est. n/a
 - 2026-11-19 07:05 · robert-claude-laptop · Review → Blocked — Head moved to d8e978d (main's queue bookkeeping merged in so the ff-only merge can apply; dry-run at 2d4f2c3 was 3504 passed / 0 failed / 0 skipped). Re-recording head via Review.
+- 2026-11-19 07:05 · robert-claude-laptop · Blocked → Review — Head d8e978d (= 2d4f2c3 + main's queue bookkeeping). Round 9 re-review APPROVE; real-ROM seed 1 caught Abra at step 1374; dry-run at 2d4f2c3: 3504 passed / 0 failed / 0 skipped. [origin] spent: devin 409 min est. n/a
 <!-- queue:end -->
