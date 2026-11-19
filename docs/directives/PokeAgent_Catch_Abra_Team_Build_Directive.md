@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -196,4 +196,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 20:18 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RP565VDEPN7QBX05RXDCCJ
 - 2026-11-18 20:26 · dispatcher · launched pid=19524; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
 - 2026-11-18 20:48 · devin · In progress → Review — Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head 89c6cdda634bfe3e03b90d4ed693b39d00f8816f); synthetic tests only; real-ROM check from nugget_bridge.state is the controller's. [origin] spent: devin 348 min est. n/a
+- 2026-11-18 21:02 · robert-claude-laptop · Review → Blocked — Real-ROM at 89c6cdd 2026-11-18 seed 1: turn-1 ownership FIXED (10/10 Abra encounters threw on turn 1, no potion/switch first; false SUCCEEDED gone). New failures: 0 of 10 caught at 100% HP (8 L8-L12 battles 'catch attempt failed'); then 'no ball in the bag' x8 and NO restock after balls hit 0 though money 13420 (only 1 restock all run, at step ~580); gave up step 5573.
 <!-- queue:end -->
