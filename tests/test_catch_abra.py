@@ -148,7 +148,14 @@ def test_check_goals_wires_catch_abra_between_team_ready_and_to_bill():
 
 
 def test_constants_named():
-    assert ABRA_STEP_CAP == 3000 and BALLS_MIN == 12
+    from pokeagent.explorer import restock as rs
+    from pokeagent.explorer.economy import shopping
+    assert ABRA_STEP_CAP == 3000 and BALLS_MIN == 5
+    # the goal's low-water mark IS the machinery's own ball trigger: every armed trip really buys balls,
+    # and one trip's lot clears the threshold (the round-4 note: BALLS_MIN 12 vs a 10-ball buy could
+    # never agree - the errand re-armed a Mart that had nothing more to sell and the hunts between
+    # rechecks ran on 10 balls while the goal still read 'short')
+    assert BALLS_MIN == shopping.BALL_MIN == rs.BALL_MIN and BALLS_MIN <= rs.BALL_BUY
 
 
 def test_resolve_build_accepts_only_the_known_builds():
@@ -289,6 +296,68 @@ def test_abra_encounter_counts_with_balls_and_logs_one_action_line(tmp_path, mon
     assert sum("abra:" in t for t in logs) == 1 and any("throw" in t and "ABRA" in t for t in logs)
     Catch().step(ctx)
     assert ctx.abra_encounters == 1 and sum("abra:" in t for t in logs) == 1   # one line per encounter
+
+
+# --- the throw drives the bag (round 4: a throw decision never yields a FIGHT press) ---------------------------------
+
+def _throw_ctx(tmp_path, monkeypatch):
+    ctx, logs = _abra_battle_ctx(tmp_path, monkeypatch)
+    monkeypatch.setattr(catch_mod, "bag_contents", lambda emu: {0x04: 5})
+    monkeypatch.setattr(catch_mod, "catch_wanted", lambda *a, **k: "catch_abra goal (build abra)")
+    monkeypatch.setattr(catch_mod, "cave_catch_allowed", lambda ctx, sp: True)
+    monkeypatch.setattr(catch_mod, "our_party", lambda emu: [])
+    monkeypatch.setattr(catch_mod, "dex_owned_count", lambda emu: 0)
+    monkeypatch.setattr(catch_mod, "upcoming_needs", lambda goals: [])
+    monkeypatch.setattr(catch_mod, "_policy_hint", lambda *a, **k: CatchStep("throw", ball="POKE", p=0.4))
+    return ctx, logs
+
+
+def test_throw_never_hands_battle_moves_a_fight_press(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM FAIL (de69d2f): 10 Abra encounters logged 'turn 1 throw POKE' and the battle
+    driver still picked FIGHT/A; balls stayed 10. On a step with no readable menu Catch returned None and
+    battle_moves' fallthrough pressed A - a Gen 1 menu renders mid-step, so that A either lands on the
+    just-drawn FIGHT (switch_press documents the race and backs out with B) or, once the move menu is up,
+    picks a damaging move. Either way the Abra teleports on its turn. A pending throw must answer with
+    bag/menu inputs only."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    # intro text, no menu readable: B advances the text - it cannot select FIGHT the way an A can
+    ctx.bv = replace(ctx.bv, run_line=None)
+    ctx.view.lines = ["Wild ABRA appeared!"]
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.button == "B" and dec.rule == "catch_menu_b"
+    # the stray A already opened FIGHT (the move menu reads TYPE/): B backs out to FIGHT/PKMN/ITEM/RUN
+    ctx.view.lines = ["TYPE/", "NORMAL", "29/30", ">TACKLE"]
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.button == "B" and dec.rule == "catch_menu_b"
+    # the battle menu itself: item_step walks it to ITEM
+    ctx.bv = replace(ctx.bv, run_line="RUN")
+    ctx.view.lines = [">FIGHT PKMN", "ITEM RUN"]
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_menu_down" and dec.button == "DOWN"
+    # ITEM under the cursor: A opens the bag
+    ctx.view.lines = ["FIGHT PKMN", ">ITEM RUN"]
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_open" and dec.button == "A"
+    # the bag list on screen: the A on the ball row is item_use - the throw itself, never 'fight'
+    ctx.view.lines = ["POKE BALL", "x5"]
+    _set(ctx.emu, {0xD31D: 1, 0xD31E: 0x04, 0xD31F: 5})
+    dec = Catch().step(ctx)
+    assert dec is not None and dec.rule == "item_use" and dec.button == "A"
+    assert any("throwing" in t for t in logs)
+
+
+def test_throw_sequence_presses_are_capped(tmp_path, monkeypatch):
+    """The B steps count toward CATCH_BAG_PRESSES: a screen that never parses a menu abandons the
+    catch instead of pressing B until the step cap - on a flee species the battle ends long first."""
+    ctx, logs = _throw_ctx(tmp_path, monkeypatch)
+    ctx.bv = replace(ctx.bv, run_line=None)
+    ctx.view.lines = ["Wild ABRA appeared!"]
+    for _ in range(catch_mod.CATCH_BAG_PRESSES):
+        assert Catch().step(ctx).button == "B"
+    dec = Catch().step(ctx)                                   # one press too many: abandon, fight on
+    assert dec is not None and dec.rule == "catch_bag_failed" and dec.button == "B"
+    assert ctx.catch_mode is False and ctx.catch_hint is None
+    assert Catch().step(ctx) is None                          # no new hint for the rest of this battle
 
 
 # --- the give-up (round 2: a settle without an Abra is never a success) ----------------------------------------------

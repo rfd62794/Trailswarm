@@ -197,23 +197,31 @@ class Catch(BehaviourBase):
             ctx.catch_skip_logged = key
             ctx.log(f"[catch: not catching {sp_name} L{e_lvl}: {hint.why}]", "res")
         if hint is not None and hint.kind == "throw":
-            if run_line is None and not item_list_open(lines_now):
-                return None
             ball_id = BALLS.get(hint.ball, POKE_BALL)           # unknown names fall back to the Poke Ball
             ball_name = BALL_NAME.get(hint.ball, "POKe BALL")
             ca = _attempt(ctx, species, e_lvl, ratio, dex_no, hint.ball)
             if release_slot is not None:
                 ca["release_slot"] = release_slot   # the party-full policy's deposit slot rides on the record
             cur_c = next((ln for ln in lines_now if ">" in ln), "")
-            dec = item_step(ctx, lines_now, cur_c, ball_id, ball_name,
-                            f"CATCH {hint.ball or 'POKE'} at {ratio:.0%} HP (p={hint.p:.2f})")
-            if dec is not None:
-                if dec.rule == "item_use":  # the A that throws it
-                    n = ctx.cave_catch_balls.get(species, 0) + 1
-                    ctx.cave_catch_balls[species] = n
-                    ctx.log(f"[catch: throwing {ball_name} {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
-                return _bag_press(ctx, ca, dec, key, sp_name)
-            return None
+            if run_line is None and not item_list_open(lines_now):
+                # The battle menu is not readable yet (intro / result text) - or a text-step A landed on
+                # the just-rendered menu and opened FIGHT (the move menu reads TYPE/): B advances the text
+                # and backs the move menu out to FIGHT/PKMN/ITEM/RUN. Handing the step on let battle_moves
+                # press A on FIGHT, which spends a flee species' only turn on a damaging move (2026-11-18
+                # real-ROM FAIL: 10 Abra encounters, 'turn 1 throw' logged, 0 balls thrown).
+                why = "FIGHT opened mid-throw: B backs out to the battle menu" if any(
+                    "TYPE/" in ln for ln in lines_now) else f"{hint.why}: B through the text toward ITEM"
+                dec = Decision("B", "catch_menu_b", why)
+            else:
+                dec = item_step(ctx, lines_now, cur_c, ball_id, ball_name,
+                                f"CATCH {hint.ball or 'POKE'} at {ratio:.0%} HP (p={hint.p:.2f})")
+                if dec is None:
+                    dec = Decision("B", "catch_menu_b", "catch: menu mid-transition: B")
+            if dec.rule == "item_use":  # the A that throws it
+                n = ctx.cave_catch_balls.get(species, 0) + 1
+                ctx.cave_catch_balls[species] = n
+                ctx.log(f"[catch: throwing {ball_name} {n} at {sp_name} L{e_lvl} ({ratio:.0%} HP) on map 0x{ctx.view.m:02X}]", "res")
+            return _bag_press(ctx, ca, dec, key, sp_name)
         if hint is not None and hint.kind == "switch":
             btn = switch_press(frame_lines(ctx.view.tm), screen_lines(ctx.view.tm),
                                ctx.emu.read(MENU_ITEM), hint.slot)

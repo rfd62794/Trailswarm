@@ -17,7 +17,10 @@ from pokeagent.magikarp import party_species
 from pokeagent.ramworld import read_money
 
 ABRA_STEP_CAP = 3000    # steps with catch_abra open before it is settled for this run (named; tune from runs)
-BALLS_MIN = 12          # under this many balls the goal buys Poke Balls at a Mart first (restock machinery; tune from runs)
+BALLS_MIN = 5           # under this many balls the goal buys Poke Balls at a Mart first. = the machinery's
+                        # own low-water mark (explorer/restock.py + economy/shopping.py BALL_MIN): an armed
+                        # trip always buys balls, and one trip's BALL_BUY lot (10) clears it - a 12 could
+                        # never be reached by a single buy (2026-11-18 round-4 note; tune from runs)
 BUILDS = ("", "abra")
 ENV_BUILD = "POKEAGENT_BUILD"
 
