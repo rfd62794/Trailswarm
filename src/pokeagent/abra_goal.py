@@ -2,7 +2,8 @@
 
 Opt-in team build (ExplorerOptions.build == "abra"; the tools expose --build / POKEAGENT_BUILD).
 Pure settle function over RAM + run state, the same shape as magikarp.magikarp_goal_settled:
-sticky once an ABRA/KADABRA/ALAKAZAM is in the party, settled when the stage's step cap is spent
+sticky once an ABRA/KADABRA/ALAKAZAM was GAINED this run (party or PC box - a full party's catch
+lands in the box), settled when the stage's step cap is spent
 (plan_goal latches ``abra_skipped``) or when there is no way left to throw a ball - an EMPTY ball
 bag with no money for the cheapest one. Short of BALLS_MIN but able to buy, the run restocks at a
 Mart first (abra_hunt arms the restock trip); broke with throws still in the bag, it hunts on.
@@ -14,7 +15,7 @@ from pokeagent.knowledge import team_plan
 from pokeagent.knowledge.catch_math import BALLS, FALLBACK_PRICE
 from pokeagent.knowledge.flee_catch import ABRA_LINE
 from pokeagent.magikarp import party_species
-from pokeagent.ram_symbols import BOX_COUNT_ADDR, BOX_MONS
+from pokeagent.ram_symbols import BOX_COUNT_ADDR, BOX_SPECIES
 from pokeagent.ramworld import read_money
 
 ABRA_STEP_CAP = 3000    # steps with catch_abra open before it is settled for this run (named; tune from runs)
@@ -60,20 +61,45 @@ BOX_CAPACITY = 20      # MONS_PER_BOX (pokered)
 
 
 def box_species(emu) -> list[int]:
-    """Species ids in the current PC box (wBoxCount / wBoxMonN, verified in ram_map.json). A catch
-    lands here when the party is full - RBY sends it over on its own, no deposit prompt - so a full
-    party's caught Abra shows up in the box, not the party."""
+    """Species ids in the current PC box: wBoxCount / wBoxSpecies, the 0xFF-terminated species LIST
+    (verified in ram_map.json) - not wBoxMons, whose 33-byte structs put level/move/catch-rate bytes
+    where a read like that sees species (2026-11-18 round-7 audit). A catch lands here when the
+    party is full - RBY sends it over on its own, no deposit prompt - so a full party's caught
+    Abra shows up in the box, not the party."""
     n = min(emu.read(BOX_COUNT_ADDR), BOX_CAPACITY)
-    return [b for b in emu.read_range(BOX_MONS, n) if b != 0xFF] if n > 0 else []
+    return [b for b in emu.read_range(BOX_SPECIES, n) if b != 0xFF] if n > 0 else []
+
+
+def owned_species(emu) -> dict[int, int]:
+    """The owned-mon pool as {internal species id: count}: party and current PC box together - a
+    full party's catch lands in the box, and a deposit moves a member without gaining one."""
+    counts: dict[int, int] = {}
+    for s in party_species(emu) + box_species(emu):
+        counts[s] = counts.get(s, 0) + 1
+    return counts
+
+
+def gained_abra(owned_now: dict[int, int], owned0: dict[int, int], names) -> bool:
+    """An Abra-line species whose count in ``owned_now`` tops the run-start snapshot ``owned0``:
+    gained THIS run. A pre-existing boxed/party Abra (equal count) never counts."""
+    names = names or {}
+    return any(n > owned0.get(s, 0) for s, n in owned_now.items()
+               if names.get(str(s), str(s)) in ABRA_LINE)
 
 
 def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
-    """catch_abra: settled for any build but "abra"; under it, an Abra-line species in the party
-    or the PC box (sticky ``had_abra`` - a full party boxes the catch, still ours), the stage's
-    step cap spent (``abra_skipped``), no name table to judge
+    """catch_abra: settled for any build but "abra"; under it, an Abra-line species GAINED this run
+    in the party or the PC box (sticky ``had_abra`` - a full party boxes the catch, still ours),
+    the stage's step cap spent (``abra_skipped``), no name table to judge
     by, or an empty ball bag with no money for one - the ONLY "gave up" settle: short of balls but
     able to buy, the run restocks at a Mart first (abra_hunt arms the restock trip) and hunts on.
-    ``abra_settle`` records why, so the run log and the give-up flag tell a catch from a failure."""
+    ``abra_settle`` records why, so the run log and the give-up flag tell a catch from a failure.
+
+    "Gained this run" is judged against ``abra_owned0`` - the party+box species counts snapshotted
+    at this function's first call, which IS the startup goal scan (seed_initial_goals runs it
+    before the first decision). A start state that already holds an Abra-line mon (the real
+    nugget_bridge.state boxes one) must not satisfy the goal or seed it into initial_goals:
+    the hunt still has to produce its own (2026-11-18 round-7)."""
     if getattr(st.get("opts"), "build", "") != "abra":
         return True
     if st.get("had_abra"):
@@ -82,6 +108,9 @@ def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
     if st.get("abra_skipped"):
         st["abra_settle"] = "step cap"
         return True
+    owned0 = st.get("abra_owned0")
+    if owned0 is None:
+        st["abra_owned0"] = owned0 = owned_species(emu)  # the baseline every later check compares against
     names = (kb or {}).get("name_of_internal")
     if not names:
         st["abra_settle"] = "no name table"
@@ -90,16 +119,10 @@ def catch_abra_settled(emu, st: dict, seen: set, kb=None) -> bool:
             st["abra_no_kb_logged"] = True
             log("[catch_abra: no kb name table - an Abra catch cannot be judged; the goal settles open]", "res")
         return True  # no ROM name table: cannot judge, never block - but say so out loud under --build abra
-    if any(names.get(str(s), str(s)) in ABRA_LINE for s in party_species(emu)):
+    if gained_abra(owned_species(emu), owned0, names):
         st["had_abra"] = True
-        st["abra_settle"] = "caught"
-        return True
-    if any(names.get(str(s), str(s)) in ABRA_LINE for s in box_species(emu)):
-        # A full party sent the caught Abra to the PC box: the run HAS an Abra, and the goal is
-        # settled - hunting on for a party copy would waste the stage (2026-11-18 round-6 note:
-        # the full-party deposit mark on every Abra battle is the expected boxed outcome).
-        st["had_abra"] = True
-        st["abra_settle"] = "caught (boxed)"
+        st["abra_settle"] = ("caught" if any(names.get(str(s), str(s)) in ABRA_LINE
+                                             for s in party_species(emu)) else "caught (boxed)")
         return True
     if ball_count(emu) == 0 and not can_afford_ball(emu, kb):
         st["abra_settle"] = "no balls and no money"

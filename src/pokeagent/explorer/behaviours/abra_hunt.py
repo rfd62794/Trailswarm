@@ -12,7 +12,7 @@ blocks: the ABRA_STEP_CAP bookkeeping lives in plan_goal.
 """
 from __future__ import annotations
 
-from pokeagent.abra_goal import BALLS_MIN, ball_count, box_species, can_afford_ball
+from pokeagent.abra_goal import BALLS_MIN, ball_count, box_species, can_afford_ball, gained_abra, owned_species
 from pokeagent.explorer import grind_episode
 from pokeagent.explorer import restock as rs
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -63,7 +63,9 @@ class AbraHunt(BehaviourBase):
         if pend is not None and not ctx.view.battling:
             ctx.abra_pending = None
             names = table(None, "name_of_internal")  # a full party boxes the catch: it still counts
-            caught = (any(c.name in ABRA_LINE for c in our_party(ctx.emu))
+            owned0 = getattr(ctx, "abra_owned0", None)
+            caught = (gained_abra(owned_species(ctx.emu), owned0, names) if owned0 is not None
+                      else any(c.name in ABRA_LINE for c in our_party(ctx.emu))
                       or any(names.get(str(s), str(s)) in ABRA_LINE for s in box_species(ctx.emu)))
             thrown = pend.get("thrown", 0)
             why = f", {thrown} thrown" if thrown else f", no throw: {pend.get('no_throw') or 'catch never engaged'}"

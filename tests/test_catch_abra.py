@@ -11,7 +11,8 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 from pokeagent import team_fp
-from pokeagent.abra_goal import ABRA_STEP_CAP, BALLS_MIN, abra_stage, catch_abra_settled, resolve_build
+from pokeagent.abra_goal import (ABRA_STEP_CAP, BALLS_MIN, abra_stage, box_species,
+                                 catch_abra_settled, resolve_build)
 from pokeagent.campaign import goal_ids
 from pokeagent.emulator import FakeEmulator
 from pokeagent.explorer import press_goals
@@ -117,8 +118,11 @@ def test_goal_opens_until_an_abra_line_member_is_in_the_party():
 
 def test_kadabra_and_alakazam_count_too():
     for sp in (KADABRA_ID, ALAKAZAM_ID):
-        emu = _emu(((177, 14, 30, 30), (sp, 20, 40, 40)), money=0)
-        assert catch_abra_settled(emu, _st("abra"), set(), {"name_of_internal": NAMES})
+        emu = _emu(((177, 14, 30, 30),), money=3000)
+        st = _st("abra")
+        assert not catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})   # the start pool
+        _set(emu, party_mem([(177, 14, 30, 30), (sp, 20, 40, 40)]))                 # gained this run
+        assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})
 
 
 def test_goal_settles_on_the_step_cap_and_only_when_no_balls_no_money():
@@ -747,11 +751,22 @@ def test_jitter_is_flee_species_only(tmp_path, monkeypatch):
 def test_boxed_abra_settles_the_goal_as_caught():
     """A full party sends the catch to the PC box on its own (no deposit prompt in RBY): the run has
     an Abra, so the goal settles caught - hunting on for a party copy would waste the stage."""
-    emu = _emu(((177, 14, 30, 30),))
-    _set(emu, {0xDA80: 1, 0xDA96: ABRA_ID})                       # wBoxCount / wBoxMonN
+    emu = _emu(((177, 14, 30, 30),), money=3000)
     st = _st("abra")
+    assert not catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})   # the start pool: no Abra
+    _set(emu, {0xDA80: 1, 0xDA81: ABRA_ID})                       # the catch lands in wBoxSpecies
     assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})
     assert st["had_abra"] and st["abra_settle"] == "caught (boxed)"
+
+
+def test_box_species_reads_the_species_list_not_the_box_structs():
+    """wBoxSpecies (0xDA81) is the 0xFF-terminated species list; wBoxMons (0xDA96) is the 33-byte
+    struct array - reading n bytes THERE sees the first mon's level/move/catch-rate bytes as
+    species. The real nugget_bridge.state holds 2 boxed mons and trips that misread."""
+    emu = _emu()
+    _set(emu, {0xDA80: 2, 0xDA81: 0x70, 0xDA82: ABRA_ID, 0xDA83: 0xFF,   # the species list: [112, ABRA]
+               0xDA96: 0x70, 0xDA97: 0x00, 0xDA98: 0x26})              # wBoxMons[0] struct head
+    assert box_species(emu) == [0x70, ABRA_ID]
 
 
 def test_resolve_line_counts_a_boxed_abra_as_caught(tmp_path, monkeypatch):
@@ -760,8 +775,39 @@ def test_resolve_line_counts_a_boxed_abra_as_caught(tmp_path, monkeypatch):
     ctx.view.battling = False
     ctx.abra_pending = {"battle": ctx.battles, "species": "ABRA", "level": 8, "thrown": 1,
                         "rng": [(0xAB, 0xCD, 0x42)]}
-    _set(ctx.emu, {0xDA80: 1, 0xDA96: ABRA_ID})
+    _set(ctx.emu, {0xDA80: 1, 0xDA81: ABRA_ID})
     monkeypatch.setattr(abra_hunt_mod, "our_party", lambda emu: [])
     monkeypatch.setattr(abra_hunt_mod, "table", lambda kb, name: NAMES if name == "name_of_internal" else {})
     AbraHunt().applies(ctx)
     assert any("caught" in t and "1 thrown" in t and "rng AB/CD/42" in t for t in logs)
+
+
+# --- only an Abra gained THIS run counts (round 7: a pre-existing boxed Abra never settles) --------
+
+def test_a_boxed_abra_at_run_start_leaves_the_goal_open_and_the_hunt_armed(tmp_path, monkeypatch):
+    """2026-11-18 real-ROM FAIL (6af12e5): nugget_bridge.state's PC box already held an ABRA
+    (wBoxSpecies [0x94, 0x70] - the wBoxMons struct reads L10, Psychic/Psychic, catch rate 200,
+    TELEPORT). The box read settled catch_abra at the startup goal scan, so it landed in 'goals
+    assumed done' and the hunt never ran (0 encounters). The first settle check snapshots the
+    party+box species pool - the same moment initial_goals are computed - and the goal wants an
+    Abra-line count ABOVE that baseline: only this run's catch counts."""
+    from pokeagent.knowledge import kb as kb_mod
+    monkeypatch.setattr(kb_mod, "ROM_KB", {"name_of_internal": NAMES})
+    ctx = make_ctx(tmp_path, balls=5, money=4000)
+    ctx.opts.build = "abra"
+    _set(ctx.emu, {0xDA80: 1, 0xDA81: ABRA_ID})                        # the box ALREADY holds an Abra
+    press_goals.seed_initial_goals(ctx)
+    assert "catch_abra" not in ctx.initial_goals                     # pre-existing is not 'assumed done'
+    assert AbraHunt().applies(ctx) and ctx.team_wants                # the hunt arms on the open goal
+    _set(ctx.emu, {0xDA80: 2, 0xDA82: ABRA_ID})                      # a SECOND Abra lands: this run's catch
+    assert ctx.goals()["catch_abra"] and ctx.had_abra and ctx.abra_settle == "caught (boxed)"
+
+
+def test_a_party_abra_at_run_start_never_settles_either():
+    """Same rule for a pre-existing PARTY Abra: presence at the first check is the baseline."""
+    emu = _emu(((177, 14, 30, 30), (ABRA_ID, 10, 25, 25)), money=3000, balls={4: 5})
+    st = _st("abra")
+    assert not catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})   # already there: not ours
+    _set(emu, party_mem([(177, 14, 30, 30), (ABRA_ID, 10, 25, 25), (KADABRA_ID, 20, 40, 40)]))
+    assert catch_abra_settled(emu, st, set(), {"name_of_internal": NAMES})       # a NEW line member counts
+    assert st["had_abra"] and st["abra_settle"] == "caught"
