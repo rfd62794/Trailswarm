@@ -151,12 +151,12 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base commit | efc28246939f05164af6a22d589627bd75f36297 |
-| Head commit | 3918d17880aa4e25572a0c371c623e119eeb6504 |
+| Head commit | 8d398fc8bbca343cf10ba36d86e54b5519ac74a7 |
 | Head remote | rfd62794/trailswarm |
 
 **Status log**
@@ -213,4 +213,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 23:24 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 8 per Queued note.
 - 2026-11-18 23:25 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7S0V948EER44DYRXPWVEEQW
 - 2026-11-18 23:33 · dispatcher · launched pid=18168; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
+- 2026-11-18 23:43 · devin · In progress → Review — Review: catch_abra round 8 on directive/pokeagent-pokeagent-catch-abra-team-build (head 8d398fc8bbca343cf10ba36d86e54b5519ac74a7). (1) catch_verdict sees a PC-box gain: attempt() snapshots wBoxSpecies (box0) and the verdict counts a species the box gained - the real boxed catch no longer reads 'failed' (the dex bit was already set by the save's pre-existing Abra). (2) abra_hunt's resolve line compares owned_species against the per-encounter owned0 snapshot written at battle start - post-catch encounters read 'fled', not 'caught'. (3) the build want lives only while catch_abra is open: catch_wanted takes abra_open (catch.py + the flee latch pass the live goal state) and abra_hunt drops its stale ABRA entry from team_wants on settle; another goal's want (HM, plan) still counts. 3 new synthetic tests; full suite 3499 passed / 1 skipped (no ROM) / 0 failed. UNVERIFIED assumptions: none new - the real-ROM re-check (nugget_bridge.state, --build abra) is the controller's. [origin] spent: devin 384 min est. n/a
 <!-- queue:end -->
