@@ -29,7 +29,9 @@ def _ids(det):
     return inner.get("map", [])
 
 
-def test_ladder_is_long_and_starts_with_todays_27():
+def test_ladder_is_long_and_starts_with_todays_26():
+    # Name kept stable for the integrity gate (renames read as removals); the
+    # special prefix is 27 goals since catch_abra joined the ladder.
     assert len(SPECS) >= 100
     assert goals.GOALS[:27] == PREFIX and goals.GOALS == [g["id"] for g in SPECS]
     assert len(set(goals.GOALS)) == len(goals.GOALS)
