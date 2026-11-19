@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -202,4 +202,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 21:46 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RV6BJ01J74QKYMDWNKG3M9
 - 2026-11-18 21:54 · dispatcher · launched pid=29280; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
 - 2026-11-18 22:07 · devin · In progress → Review — Review: catch_abra goal + flee-species turn-1 throw + build flag abra implemented on directive/pokeagent-catch-abra-team-build (head 6af12e51); round 6: errand re-arms a spent bag on its own abra_next_check (Restock's window no longer gates it), seeded B-press jitter + hRandomAdd/hRandomSub/rDIV logged per throw, boxed Abra counts as caught. Synthetic tests only (39+113+19 green); real-ROM check from nugget_bridge.state is the controller's. [origin] spent: devin 361 min est. n/a
+- 2026-11-18 22:37 · robert-claude-laptop · Review → Blocked — Real-ROM at 6af12e5 2026-11-18 seeds 1+2: catch_abra never ran - log line 7 lists it under 'goals assumed done' from nugget_bridge (round 5 at 89c6cdd did NOT). Only change touching that: round 6's PC-box check (box_species) in catch_abra_settled. 0 Abra encounters, 0 throws; RNG logging unexercised.
 <!-- queue:end -->
