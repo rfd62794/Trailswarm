@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Blocked |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -190,4 +190,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 19:30 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RKCQ1HRTDC3E7JZ6NN84ZP
 - 2026-11-18 19:40 · dispatcher · launched pid=6632; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (6 declared need(s), repo-scoped only))
 - 2026-11-18 19:48 · devin · In progress → Review — Review: catch_abra round 4 on directive/pokeagent-pokeagent-catch-abra-team-build (head 7bda95201a4542c93313156147c1afc519f36d69). Throw no longer hands the step to battle_moves' A on menu-less frames: Catch answers B (advances text, backs a stray-opened FIGHT menu out, counted toward CATCH_BAG_PRESSES) then item_step walks ITEM->ball as before. BALLS_MIN now = the machinery's own trigger (5) so an armed trip always buys and one 10-ball lot clears it. Synthetic tests only; the real-ROM re-check (nugget_bridge.state, --build abra) is the controller's. [origin] spent: devin 326 min est. n/a
+- 2026-11-18 20:17 · robert-claude-laptop · Review → Blocked — Real-ROM FAIL at 7bda952 2026-11-18 (seed 1, provisional - duplicate run): FIGHT race fixed (ball before FIGHT when thrown) but 48 Abra encounters, only 4 balls thrown, 0 caught; gave up step 4854. Battle 2: a POTION was used on Abra's turn instead of the throw, and '[catch attempt SUCCEEDED vs #148 L12 at 100%]' was logged though Abra fled.
 <!-- queue:end -->
