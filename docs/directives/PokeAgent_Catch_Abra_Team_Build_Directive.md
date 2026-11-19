@@ -151,7 +151,7 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 
 | Field | Value |
 |---|---|
-| Status | Approved |
+| Status | In progress |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
 | Base branch | directive/pokeagent-pokeagent-catch-abra-team-build-d-bb6946 |
@@ -193,4 +193,5 @@ Findings first (what you built, design choices, every UNVERIFIED assumption), th
 - 2026-11-18 20:17 · robert-claude-laptop · Review → Blocked — Real-ROM FAIL at 7bda952 2026-11-18 (seed 1, provisional - duplicate run): FIGHT race fixed (ball before FIGHT when thrown) but 48 Abra encounters, only 4 balls thrown, 0 caught; gave up step 4854. Battle 2: a POTION was used on Abra's turn instead of the throw, and '[catch attempt SUCCEEDED vs #148 L12 at 100%]' was logged though Abra fled.
 - 2026-11-18 20:17 · robert-claude-laptop · Blocked → Queued — Round 5 (Robert-approved 2026-11-18): (1) while a catch throw is pending against a flee species (FLEE_SPECIES / flee_on_turn), the throw owns turn 1 - Potion/heal, SwitchOut, Battle flee, and any other battle behaviour that runs before Catch must yield; find every behaviour ahead of Catch in the registry that can act on a battle turn and gate it; test: a flee-species battle with a low-HP active mon and a pending throw yields the bag/throw path, never POTION/switch/run. (2) Find why only 4 of 48 Abra encounters threw a ball - log a reason line for every Abra encounter with no throw. (3) '[catch attempt SUCCEEDED vs #148 L12 at 100%]' was logged in a battle where no ball was thrown and the Abra fled - find what emits it and fix the false success. Evidence: controller scratchpad abra3_seed1.log (provisional).
 - 2026-11-18 20:18 · robert-claude-laptop · Queued → Approved — lint override: Same two false positives as earlier rounds: knowledge/flee_catch.py is created by this directive (on the base branch); kb/rom_tables.json is ROM-derived and gitignored by design. Round 5 per Queued note.
+- 2026-11-18 20:18 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-catch-abra-team-build-d-bb6946; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7RP565VDEPN7QBX05RXDCCJ
 <!-- queue:end -->
