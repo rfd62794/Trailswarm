@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.party_menu import is_start_menu, screen_lines
 from pokeagent.explorer.perceive import TILEMAP, TILEMAP_LEN
-from pokeagent.glitch_signals import active_reasons, read_signals
+from pokeagent.glitch_signals import MISC_SEEN_BY_TRAINER, active_reasons, engaged_now, read_signals
 from pokeagent.glitchlab.script import Step, load_script, run_script
 from pokeagent.ram import RAM_MAP
 from pokeagent.ram_symbols import CUR_OPPONENT, ENEMY_MON, TRAINER_CLASS
@@ -54,7 +54,8 @@ def read_probe(emu, menu_probe=None) -> dict:
         start_open = None
     return {
         "misc_flags": sig.misc_flags, "status5": sig.status5,
-        "engaged_class": sig.engaged_class, "engaged_set": sig.engaged_set,
+        "seen_by_trainer": bool(sig.misc_flags & MISC_SEEN_BY_TRAINER), "engaged": engaged_now(sig),
+        "engaged_class": sig.engaged_class, "engaged_set": sig.engaged_set,   # stale bytes: log only
         "in_battle": sig.in_battle, "reasons": active_reasons(sig),
         "map": emu.read(RAM_MAP["map_id"]), "y": emu.read(RAM_MAP["player_y"]),
         "x": emu.read(RAM_MAP["player_x"]),
@@ -87,7 +88,9 @@ def verdict(rows) -> dict:
 
     opened = _ram(start, "start_menu_open")
     start_opened = None if opened is None else bool(opened)
-    notes.append(f"at_exclaim engaged_class={_ram(exclaim, 'engaged_class')}")
+    seen_at_exclaim = _ram(exclaim, "seen_by_trainer")
+    notes.append(f"at_exclaim engaged_class={_ram(exclaim, 'engaged_class')} (stale byte, log only)")
+    notes.append(f"at_exclaim seen_by_trainer={seen_at_exclaim}")
 
     stuck = None
     if after is not None and before is not None:
@@ -115,7 +118,7 @@ def verdict(rows) -> dict:
 
     return {"start_opened_before_engagement": start_opened, "trainer_state_stuck": stuck,
             "enemy_special": enemy_special, "instant_encounter": instant,
-            "species_matches_special": matches, "notes": notes}
+            "species_matches_special": matches, "seen_at_exclaim": seen_at_exclaim, "notes": notes}
 
 
 def run_recipe(emu, steps=None, *, allow_placeholder=False, probes=read_probe, record=None) -> list:
