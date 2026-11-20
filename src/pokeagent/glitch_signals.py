@@ -18,6 +18,7 @@ MISC_FLAGS = 0xCD60               # wMiscFlags (ram_map.json); bit 0 stuck = tra
 STATUS_FLAGS5 = 0xD730            # wStatusFlags5 (ram_map.json: "bit 7 = no joypad input / scripted walk"); bit 0 per research row 2
 ENGAGED_TRAINER_CLASS = 0xCD2D    # wEngagedTrainerClass (ram_map.json)
 ENGAGED_TRAINER_SET = 0xCD2E      # wEngagedTrainerSet (ram_map.json): aliases wEnemyMonStatMods, so read only outside battle
+MISC_SEEN_BY_TRAINER = 0x01       # wMiscFlags BIT_SEEN_BY_TRAINER (pokered ram_constants.asm); set by TrainerEngage
 MOVE_OVERRIDE = 0xCD3B            # wOverrideSimulatedJoypadStatesMask (ram_map.json); research row 7's movement override byte
 TEXT_DELAY_D358 = 0xD358          # wLetterPrintingDelayFlags (ram_map.json; ram_findings.json: bit 1 clears on menu_open)
 INSTANT_TEXT_CANDIDATE = 0x40     # UNVERIFIED: wStatusFlags5 bit 6 (ram_findings.json: sets on menu_open); whether the
@@ -81,3 +82,24 @@ def active_reasons(sig: Signals) -> list[str]:
 def instant_text_candidate(sig: Signals) -> bool:
     """UNVERIFIED instant-text signature (wStatusFlags5 bit 6): logged by a detector only, never an active reason."""
     return bool(sig.status5 & INSTANT_TEXT_CANDIDATE)
+
+
+def engaged_now(sig: Signals) -> bool:
+    """True while a trainer has spotted the player outside battle: wMiscFlags BIT_SEEN_BY_TRAINER is set.
+
+    NEVER reads ``engaged_class`` / ``engaged_set``: wEngagedTrainerClass is written only by EngageMapTrainer and
+    never cleared, so it is a stale last-engaged byte that reads nonzero with no trainer engaged (real-ROM
+    2026-11-19: 21, 14, 230). This function cannot tell "engaged" from "bit stuck at 1"; ``engagement_edge`` can.
+    """
+    return not sig.in_battle and bool(sig.misc_flags & MISC_SEEN_BY_TRAINER)
+
+
+def engagement_edge(prev: Signals, cur: Signals) -> str | None:
+    """``"seen"`` on a 0 -> 1 edge of BIT_SEEN_BY_TRAINER outside battle, ``"battle"`` when a battle starts
+    (``in_battle`` is a bool, so wild and trainer are not told apart), else None. A bit stuck at 1 on both
+    samples yields None: unlike ``engaged_now``, an edge separates a fresh engagement from a stuck flag."""
+    if not prev.misc_flags & MISC_SEEN_BY_TRAINER and cur.misc_flags & MISC_SEEN_BY_TRAINER and not cur.in_battle:
+        return "seen"
+    if not prev.in_battle and cur.in_battle:
+        return "battle"
+    return None

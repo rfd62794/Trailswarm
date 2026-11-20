@@ -113,3 +113,21 @@ def test_recipe_loads_in_order_and_placeholders_block_run_recipe():
     rows = te.run_recipe(emu, allow_placeholder=True, probes=lambda e: {"ok": 1})
     assert [r["id"] for r in rows] == ids
     assert emu.presses == [Button.START]   # the only concrete press in the default recipe
+
+
+def test_read_probe_uses_the_seen_bit_and_ignores_stale_engaged_class():
+    from pokeagent.glitch_signals import ENGAGED_TRAINER_CLASS, MISC_FLAGS
+    emu = FakeEmulator({ENGAGED_TRAINER_CLASS: 21})
+    r = te.read_probe(emu, menu_probe=lambda e: False)
+    assert (r["seen_by_trainer"], r["engaged"], r["engaged_class"]) == (False, False, 21)
+    emu.set(MISC_FLAGS, 1)
+    r = te.read_probe(emu, menu_probe=lambda e: False)
+    assert (r["seen_by_trainer"], r["engaged"]) == (True, True)
+
+
+def test_verdict_reports_seen_at_exclaim_and_marks_engaged_class_stale():
+    v = te.verdict(stuck_rows(at_exclaim={"seen_by_trainer": True, "engaged_class": 21}))
+    assert v["seen_at_exclaim"] is True
+    assert "at_exclaim engaged_class=21 (stale byte, log only)" in v["notes"]
+    assert "at_exclaim seen_by_trainer=True" in v["notes"]
+    assert te.verdict([])["seen_at_exclaim"] is None

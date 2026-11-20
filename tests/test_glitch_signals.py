@@ -118,3 +118,21 @@ def test_instant_text_needs_no_battle_and_empty_sig_fires_nothing(tmp_path):
         assert lg.check(battling, battling, step, FakeEmulator(), ctx_for()) == []
     assert lg.check(Snapshot(), Snapshot(), 99, FakeEmulator(), ctx_for()) == []
     assert not lg.records and not (tmp_path / dc.LOG_NAME).exists()
+
+
+def test_engaged_now_reads_only_the_seen_by_trainer_bit():
+    assert gs.engaged_now(gs.Signals()) is False
+    assert gs.engaged_now(gs.Signals(misc_flags=1)) is True
+    assert gs.engaged_now(gs.Signals(misc_flags=1, in_battle=True)) is False
+    assert gs.engaged_now(gs.Signals(misc_flags=2)) is False
+    for stale in (21, 14, 230):   # real-ROM 2026-11-19: nonzero engaged_class with nobody engaged
+        assert gs.engaged_now(gs.Signals(engaged_class=stale)) is False
+
+
+def test_engagement_edge_separates_fresh_engagement_from_a_stuck_bit():
+    S = gs.Signals
+    assert gs.engagement_edge(S(misc_flags=0), S(misc_flags=1)) == "seen"
+    assert gs.engagement_edge(S(), S(in_battle=True)) == "battle"
+    assert gs.engagement_edge(S(misc_flags=1), S(misc_flags=1)) is None
+    assert gs.engagement_edge(S(), S()) is None
+    assert gs.engagement_edge(S(misc_flags=0), S(misc_flags=1, in_battle=True)) == "battle"

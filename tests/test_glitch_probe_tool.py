@@ -78,3 +78,20 @@ def test_a_source_under_checkpoints_is_refused(tmp_path):
     rc = tool.main(["repro", "--state", str(state), "--runs-dir", str(tmp_path / "runs"),
                     "--allow-placeholder"], emu_factory=lambda p: FakeEmulator())
     assert rc == 2
+
+
+def test_survey_writes_under_discoveries_and_refuses_checkpoints(tmp_path, capsys):
+    tool = _tool()
+    state = tmp_path / "near.state"
+    state.write_bytes(b"fake state")
+    runs = tmp_path / "runs"
+    rc = tool.main(["survey", "--state", str(state), "--map", "0x24", "--runs-dir", str(runs), "--name", "sv"],
+                   emu_factory=lambda p: FakeEmulator())
+    assert rc == 0 and (runs / "discoveries" / "glitchlab-sv.jsonl").is_file()
+    assert json.loads(capsys.readouterr().out.splitlines()[0])["trainers"] == []
+    assert state.read_bytes() == b"fake state"
+    cp = tmp_path / "checkpoints"
+    cp.mkdir()
+    (cp / "x.state").write_bytes(b"x")
+    assert tool.main(["survey", "--state", str(cp / "x.state"), "--map", "1", "--runs-dir", str(runs)],
+                     emu_factory=lambda p: FakeEmulator()) == 2
