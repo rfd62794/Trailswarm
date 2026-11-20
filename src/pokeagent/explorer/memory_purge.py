@@ -61,6 +61,31 @@ def purge_enclosed_walls(data: dict) -> int:
     return removed
 
 
+def purge_walls_touching(data: dict, map_id: int, cells) -> list:
+    """Drop 'blocked' entries (and fail counters) on ``map_id`` whose edge touches one of ``cells`` - either
+    endpoint, so a cell's entry edges go too. For walls learned against a feature whose state changed under
+    the agent (the Vermilion Gym's electric barrier: a bump on the CLOSED gate is stale once the locks move -
+    the controller's round-3 live bounce had beat_surge oscillating under an open gate on a learned
+    '5,5,UP'). Returns the dropped keys."""
+    d = data.get("maps", {}).get(str(map_id), {})
+    cells = {tuple(c) for c in cells}
+    drop = []
+    for key in d.get("blocked", []):
+        try:
+            x, y, name = key.split(",")
+            dx, dy = DIRS[name]
+            hit = (int(x), int(y)) in cells or (int(x) + dx, int(y) + dy) in cells
+        except (ValueError, KeyError):
+            hit = False
+        if hit:
+            drop.append(key)
+            d.get("fails", {}).pop(key, None)
+    if drop:
+        gone = set(drop)
+        d["blocked"] = [k for k in d["blocked"] if k not in gone]
+    return drop
+
+
 def purge_crossed_edge_walls(data: dict) -> int:
     """Drop 'blocked' entries (and fail counters) on a warp/connection edge that was taken at least once: a bump there was a
     moving NPC or a cut-short transition (Cerulean (20,0) UP, 2026-11-13), and the crossing may be the only way on."""

@@ -1,6 +1,6 @@
 """Campaign goals: the single source of truth for the goal ladder (data/campaign.json) and its RAM detectors.
 
-The first 26 goals keep the hand-coded detectors in check_goals; the rest are generic detectors from the data file (pokeagent.campaign).
+The first 27 goals keep the hand-coded detectors in check_goals; the rest are generic detectors from the data file (pokeagent.campaign).
 
 tools/{explore_demo,overnight,swarm,review_runs,status}.py all read GOALS from here —
 tests/test_goal_order.py guards against new local copies. goals.json is a stale
@@ -9,6 +9,7 @@ sibling, not a source.
 from __future__ import annotations
 
 from pokeagent import campaign
+from pokeagent.abra_goal import catch_abra_settled
 from pokeagent.game.stores import store_path  # re-exported for the explorer package (its layering rule bars pokeagent.game)
 from pokeagent.knowledge import kb as _kbmod
 from pokeagent.knowledge.cut_learner import cut_capable, party_names
@@ -17,7 +18,7 @@ from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import PARTY_COUNT
 
 is_unverified = campaign.is_unverified  # re-exported for the explorer package (no detector of its own)
-GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 26 ids are the hand-coded ones below
+GOALS = campaign.goal_ids()  # the ladder lives in data/campaign.json; the first 27 ids are the hand-coded ones below
 
 def goals_brief(goals: dict) -> str:
     """One short log line for the whole ladder: done/total and the next few unmet goals."""
@@ -120,9 +121,12 @@ def check_goals(emu, st: dict) -> dict[str, bool]:
          # Robert 2026-11-07 (team builder v2): "a party that beats the next boss (hurt-lead sim)" replaces the
          # Gyarados mandate - the Gyarados is now one catch-plan candidate. Settled (never blocks) when the team
          # verdict is ready (sticky), the stage's step cap is spent, or there is no boss data (plan_goal).
-         "team_ready": team_ready_settled(emu, st, seen), "to_bill": 0x58 in seen,
+         "team_ready": team_ready_settled(emu, st, seen),
+         # Robert 2026-11-17 (catch_abra directive): an Abra kept in the party as the Teleport carrier - only a goal
+         # under --build abra; settled for every other build so the default route is unchanged.
+         "catch_abra": catch_abra_settled(emu, st, seen, _kbmod.ROM_KB), "to_bill": 0x58 in seen,
          "ss_ticket": SS_TICKET in bag_contents(emu)}
-    g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 26+: generic detectors from campaign.json
+    g.update(campaign.campaign_goals(emu, st, seen, bag_contents(emu)))  # goals 27+: generic detectors from campaign.json
     g["cut_learner"] = g["hm01_cut"] and cut_learner_settled(emu, st, _kbmod.ROM_KB)  # only after HM01 is in hand; special goal: hand-coded, skipped by campaign_goals
     # A goal, once achieved in this run (or already true at its start), stays achieved: using the potion in a battle
     # must not send the agent back to an empty PC (seen 2026-11-03 04:30).

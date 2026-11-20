@@ -71,6 +71,7 @@ def test_after_misty_push_north_then_east(tmp_path):
     assert step[0] == "UP" and "nugget_bridge" in step[1]
     goals["nugget_bridge"] = True
     goals["team_ready"] = True  # settled (the sim says the party beats the next boss): the planner moves on to Bill's
+    goals["catch_abra"] = True  # settled for every build but "abra" (the default route never blocks on it)
     assert "to_bill" in plan_step(goals, maps, (0x23, 3, 9), "UP")[1]
 
 

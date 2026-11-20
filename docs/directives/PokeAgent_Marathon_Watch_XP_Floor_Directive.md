@@ -73,3 +73,24 @@ None expected.
 
 ## Report
 Findings first: the floor source used per goal, how Magikarp was handled, which goals had no floor and fell back to the old behaviour. Then evidence: the tails of both pytest runs. Then files changed and any rule or case you could not implement and why.
+
+<!-- queue:start -->
+## Queue
+
+| Field | Value |
+|---|---|
+| Status | Review |
+| Assigned to | devin |
+| Branch | directive/pokeagent-pokeagent-marathon-watch-xp-floor-cb13a3 |
+| Base branch | - |
+| Base commit | 5c1a6f7b6693172955e2a8dde976b550616e8d06 |
+| Head commit | 1ed3857ccb3f0df4b5cb5b33de625e694d96ce02 |
+| Head remote | rfd62794/trailswarm |
+
+**Status log**
+- 2026-11-16 07:24 · robert-claude-laptop · none → Queued
+- 2026-11-16 07:24 · robert-claude-laptop · Queued → Approved
+- 2026-11-16 07:24 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-xp-floor-cb13a3; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J52M3P9HPWD9ZZPFYMYB2D
+- 2026-11-16 07:31 · dispatcher · launched pid=14480; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-marathon-watch-xp-floor-cb13a3; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-16 07:46 · devin · In progress → Review — train_at now advances only on floor-directed gains (marathon/floor.py + reader pending-goal-at-step); 5 new tests; marathon files 31/31, full suite 3425 passed 0 failed. [origin] spent: devin 15 min est. n/a
+<!-- queue:end -->

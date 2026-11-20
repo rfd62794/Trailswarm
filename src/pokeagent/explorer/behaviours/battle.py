@@ -15,7 +15,7 @@ from pokeagent.explorer.grind import battle_outcome, outcome_of, ran_away, recor
 from pokeagent.explorer.battle import enemy_types, move_by_name, norm_name, record_threat, record_type_effect
 from pokeagent.explorer.battle_text import battle_events
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
-from pokeagent.explorer.behaviours.battle_run import cave_run
+from pokeagent.explorer.behaviours.battle_run import catch_verdict, cave_run, flee_throw_pending
 from pokeagent.explorer.behaviours.battle_switch import yield_to_switch
 from pokeagent.explorer.behaviours.battle_train import train_fight
 from pokeagent.explorer.behaviours.low_yield import stall_run
@@ -152,6 +152,8 @@ class Battle(BehaviourBase):
             run_line = next((ln for ln in lines_now if "RUN" in ln), None)
             # --- learn the opponent's damage: HP drop since our last battle decision, per enemy species ---
             species = ctx.emu.read(ENEMY_MON)
+            # A wanted flee-species catch owns the turns: a potion/switch/RUN hands the wild's turn to Teleport.
+            pend_flee = flee_throw_pending(ctx, species)  # (2026-11-18 real-ROM FAIL: a POTION replaced the throw)
             my_sp, my_lvl = fighter(ctx.emu)[:2]; e_lvl = ctx.emu.read(0xCFF3)
             if ctx.last_battle_hp is not None and hp < ctx.last_battle_hp:
                 taken = ctx.last_battle_hp - hp
@@ -174,14 +176,14 @@ class Battle(BehaviourBase):
             heal_hp = heal_items.HEAL_HP[pick if pick is not None else ctx.heal_item]
             heal = max(ctx.mem.data.get("item_heal", {}).get(str(heal_hp), [heal_hp]) or [heal_hp])
             want_potion = (pick is not None and mx and hp <= max(expected * 2, 6) and (mx - hp) >= min(heal, 12) and kind != 0
-                           and not item_is_blocked(ctx, pick))
+                           and not item_is_blocked(ctx, pick) and not pend_flee)
             # A member that cannot hurt the foe, and a wild-fight member a healthy switch-in would save, are
             # never potioned or fled: SwitchOut is next in line and swaps it this step. No candidate: unchanged.
-            sw_out = yield_to_switch(ctx, kind, want_potion)
+            sw_out = False if pend_flee else yield_to_switch(ctx, kind, want_potion)
             if sw_out:
                 want_potion = False
             cur = next((ln for ln in lines_now if ">" in ln), "")
-            xdec = None if want_potion or sw_out else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
+            xdec = None if want_potion or sw_out or pend_flee else x_battle_step(ctx, lines_now, cur, kind)  # X items: trainer battles, thin margin, one per battle
             if xdec is not None:
                 return xdec
             if want_potion:
@@ -190,7 +192,7 @@ class Battle(BehaviourBase):
                 if dec is not None:
                     return dec
             else:
-                dec = close_unwanted_list(ctx, lines_now)
+                dec = None if pend_flee else close_unwanted_list(ctx, lines_now)  # the open list is the catch's own bag
                 if dec is not None:
                     return dec
             if ctx.potion_hp_before is not None and hp > ctx.potion_hp_before:
@@ -203,11 +205,11 @@ class Battle(BehaviourBase):
             hurry = (gn.get("deliver_parcel") and not gn.get("to_pewter") and ctx.emu.read(0xD35E) in (0x0D, 0x33)
                      and not (bag_contents(ctx.emu).get(0x04, 0) and ctx.emu.read(ENEMY_MON)))
             skip = stall_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0))  # a Harden-only cocoon is a stall, not XP
-            flee = kind == 1 and not sw_out and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
+            flee = kind == 1 and not sw_out and not pend_flee and bool(weak or hurry or skip or cave_run(ctx, kind, species, bag_contents(ctx.emu).get(0x04, 0)))
             stand = kind == 1 and flee and not skip and train_fight(ctx, hp, mx, my_lvl, e_lvl, expected)  # levelling on purpose: XP needs the fight
             if stand:
                 flee = weak = hurry = False
-            if kind == 1 and not stand:
+            if kind == 1 and not stand and not pend_flee:   # the bandit never turns a pending flee-catch into a RUN
                 flee = wild_flee(ctx, flee) and not sw_out  # bandit decision point (Explorer's answer when off); a swap still wins
             if flee and run_line is not None:  # wild battle and too weak (or in a hurry): flee
                 tnote = f", threat {threat:g}" if weak and threat else ""
@@ -229,10 +231,9 @@ class Battle(BehaviourBase):
             team_plan.of(ctx).pop("release_pending", None)  # the catch resolved: the deposit YES dies with the battle
             ca = ctx.pop("catch_attempt")
             if ca:  # resolved at the END of the battle, against the species we threw at (not the next enemy)
-                dn = ca.get("dex") or 0
-                caught = bool(dn) and bool(ctx.emu.read(0xD2F7 + (dn - 1) // 8) >> ((dn - 1) % 8) & 1)
-                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k not in ("dex", "battle", "presses", "last")}, "caught": caught}); del ctx.mem.data["catches"][:-100]
-                ctx.log(f"[catch attempt {'SUCCEEDED' if caught else 'failed'} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
+                caught, verdict = catch_verdict(ctx, ca)  # 'SUCCEEDED' needs a real throw AND new ownership
+                ctx.mem.data.setdefault("catches", []).append({**{k: v for k, v in ca.items() if k not in ("dex", "battle", "presses", "last", "owned0", "party0", "box0")}, "caught": caught}); del ctx.mem.data["catches"][:-100]
+                ctx.log(f"[catch attempt {verdict} vs #{ca['species']} L{ca['level']} at {ca['hp_pct']:.0%}]", "res")
                 try:  # record-only: a decode failure must never end a run
                     rec = record_catch(ctx.mem.data, read_party(ctx.emu), ca["species"], ctx.step) if caught else None
                 except Exception as exc:

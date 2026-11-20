@@ -18,6 +18,7 @@ from dataclasses import dataclass, replace
 
 from pokeagent.knowledge.catch_math import STATUS_BONUS, best_ball, p_catch
 from pokeagent.knowledge.catcher import catcher_slot, max_damage, move_row, raw_damage, safe_moves
+from pokeagent.knowledge.flee_catch import flee_on_turn
 from pokeagent.knowledge.moves import effect_of
 from pokeagent.knowledge.party import Combatant
 from pokeagent.knowledge.team_plan import SWITCH_HP_TURNS
@@ -110,6 +111,17 @@ def decide(active: Combatant, party: list[Combatant], wild: Combatant, wild_hp: 
     if ball is None:
         return CatchStep("skip", why="no ball in the bag")
     ball_name, p_now = ball
+    if flee_on_turn(wild.name, wild.moves):
+        # A flee species (Abra's Teleport) leaves on ITS turn: never weaken it, never switch - the ball
+        # goes now, or a status move on the first policy turn when one qualifies (a status that sticks
+        # spends the wild's turn, buying a second throw). Policy turns are 1-based here (the signature
+        # increments before decide's first call), so ``turn <= 1`` is "the first turn of the encounter".
+        if turn <= 1 and not wild_status:
+            step = _status_step(active, wild_hp, wild_hp_max, catch_rate, ball_name, p_now, moves)
+            if step is not None:
+                return step
+        return CatchStep("throw", ball=ball_name, p=p_now,
+                         why="flee species: throw on turn 1 (it teleports on its own turn)")
     if not safe_moves(active, wild, chart, moves):
         # the overpower gate: every damaging move KOs even at the minimum roll (or none exists)
         if lead is None:

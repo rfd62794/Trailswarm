@@ -28,7 +28,8 @@ def _beh_ctx(goals, **kw):
 # 1. the team_ready detector: met and sticky / skipped / nodata / open with a weak Magikarp party
 def test_team_ready_detector_and_ladder_position():
     assert GOALS.index("team_ready") == GOALS.index("nugget_bridge") + 1
-    assert GOALS.index("to_bill") == GOALS.index("team_ready") + 1
+    assert GOALS.index("catch_abra") == GOALS.index("team_ready") + 1
+    assert GOALS.index("to_bill") == GOALS.index("catch_abra") + 1
     assert "gyarados" not in GOALS
     assert campaign.selectable("team_ready")
     karp = FakeEmulator(party_mem([(STARTER, 14, 30, 30), (MAGIKARP, 5, 17, 17)]))

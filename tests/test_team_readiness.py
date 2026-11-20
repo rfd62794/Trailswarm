@@ -98,7 +98,8 @@ def test_evolved_magikarp_is_judged_as_gyarados():
 
 def test_team_ready_detector_never_blocks():
     assert GOALS.index("team_ready") == GOALS.index("nugget_bridge") + 1
-    assert GOALS.index("to_bill") == GOALS.index("team_ready") + 1
+    assert GOALS.index("catch_abra") == GOALS.index("team_ready") + 1
+    assert GOALS.index("to_bill") == GOALS.index("catch_abra") + 1
     assert "gyarados" not in GOALS and "team_ready" not in SIDE_GOALS
     assert campaign.selectable("team_ready")   # the segment picker may target it: nugget_bridge -> team_ready
     karp = FakeEmulator(party_mem([(0xB1, 14, 30, 30), (MAGIKARP, 5, 17, 17)]))

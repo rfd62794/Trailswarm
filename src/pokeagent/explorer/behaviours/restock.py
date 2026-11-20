@@ -56,10 +56,14 @@ class Restock(BehaviourBase):
         if st["steps"] % 10 == 0 and plan.trip_plan(ctx) is None:
             return self._end(ctx, "nothing left to do at a Mart")
         if m not in rs.MART_MAPS:
-            path = self._path_to(ctx, lambda n: n[0] in marts)
+            # An armed trip is already committed: bound its route by the trip budget, not the "is a
+            # Mart near" MAX_PATH rule (Route 24's Abra grass is ~65-80 learned steps from the
+            # Cerulean Mart - over MAX_PATH, well inside MAX_TRIP_STEPS; 2026-11-18 real-ROM FAIL).
+            path = self._path_to(ctx, lambda n: n[0] in marts, rs.MAX_TRIP_STEPS) if marts else None
             if path:
                 return Decision(path[0], "restock_walk", f"{len(path)} steps to a Mart")
-            return self._end(ctx, "no route to a Mart", failed=True)
+            st["next_check"] = ctx.step + rs.RECHECK_EVERY  # an unstarted trip spends no try: retry on the next recheck
+            return self._end(ctx, "no route to a Mart" if marts else self._mart_gap(ctx, st))
         return self._in_mart(ctx, m, x, y)
 
     @staticmethod
@@ -67,6 +71,15 @@ class Restock(BehaviourBase):
         """Candidate Marts that sell what the trip wants (the Vermilion Mart has Balls and Super Potions but no Potion)."""
         marts = rs.candidate_marts(ctx.goals(), failed)
         return floor.marts_selling([(i, 1) for i in st.get("want", ())], marts) if st.get("want") else marts
+
+    @staticmethod
+    def _mart_gap(ctx, st) -> str:
+        """Why no Mart can be walked to at all: the want list emptied the candidate set - none of
+        them stocks it, or every one is in the failed set (the reason goes on the log line)."""
+        want = ", ".join(f"0x{i:02X}" for i in st.get("want", ())) or "the want list"
+        if rs.candidate_marts(ctx.goals(), st.get("failed", ())):
+            return f"no route to a Mart - none left that stocks {want}"
+        return f"no route to a Mart - no Mart left (failed: {sorted(st.get('failed', ())) or 'none'})"
 
     @staticmethod
     def _describe(trip) -> str:
@@ -89,11 +102,11 @@ class Restock(BehaviourBase):
         return Decision("RIGHT" if x < door_x else "LEFT" if x > door_x else "DOWN", "restock_leave", "out of the Mart (default layout)")
 
     @staticmethod
-    def _path_to(ctx, goal_fn) -> list[str] | None:
+    def _path_to(ctx, goal_fn, max_len=rs.MAX_PATH) -> list[str] | None:
         g = WorldGraph(ctx.mem.data["maps"])
         g.blocked_now = frozenset(ctx.mem.temp_blocked)
         p = g.path(ctx.pos(), goal_fn, 5000)
-        return p if p and len(p) <= rs.MAX_PATH else None
+        return p if p and len(p) <= max_len else None
 
     def _in_mart(self, ctx, m, x, y) -> Decision:
         spot = (m, *rs.SHOP_SPOT)

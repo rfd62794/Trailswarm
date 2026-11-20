@@ -17,8 +17,11 @@ CAVE_LOOKAHEAD = 4     # unmet goals ahead that count as "a cave segment is next
 
 
 def ball_need(goals: dict) -> bool:
+    """The abra build's open catch_abra goal is a ball need outright (no catch without a throw); the
+    rest are the campaign's catch needs (dex10, and the HM learners that come out of a ball)."""
     from pokeagent.explorer.catch_list import upcoming_needs
-    return any(n in ("dex10", "cut", "flash", "surf", "strength") for n in upcoming_needs(goals))
+    return (goals.get("catch_abra") is False
+            or any(n in ("dex10", "cut", "flash", "surf", "strength") for n in upcoming_needs(goals)))
 
 
 def cave_ahead(goals: dict) -> bool:

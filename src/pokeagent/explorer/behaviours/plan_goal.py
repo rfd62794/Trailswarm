@@ -22,6 +22,7 @@ from pokeagent.knowledge.cut_learner import LEARNER_STEP_CAP
 from pokeagent.knowledge.encounters import level_ceiling
 from pokeagent.knowledge.party import our_party
 from pokeagent.knowledge.readiness import TEAM_GAP
+from pokeagent.abra_goal import abra_stage
 from pokeagent.magikarp import EVOLVE_LEVEL, GYARADOS_STEP_CAP, GYARADOS_IDLE_CAP, MAGIKARP, party_species, trainee_slot
 
 
@@ -44,6 +45,8 @@ class PlanGoal(BehaviourBase):
                 ctx.cut_learner_skipped = True
                 ctx.log(f"[cut_learner: {LEARNER_STEP_CAP} steps without a Cut-capable party member - settled for this run]", "res")
             goals_now_all = ctx.goals()
+        if getattr(getattr(ctx, "opts", None), "build", "") == "abra":
+            goals_now_all = abra_stage(ctx, goals_now_all)  # catch_abra's step cap + settle log
         team_ready_stage = next((g for g in GOALS if not goals_now_all.get(g)), None) == "team_ready"
         if team_ready_stage:
             ctx.team_ready_steps += 1  # building the team is the stage's work while it is the next goal
