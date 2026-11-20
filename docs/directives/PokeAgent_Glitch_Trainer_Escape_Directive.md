@@ -251,7 +251,7 @@ address table with any change you were forced to make; (4) full-suite summary li
 
 | Field | Value |
 |---|---|
-| Status | Review |
+| Status | Done |
 | Assigned to | devin |
 | Branch | directive/pokeagent-pokeagent-glitch-trainer-escape-d-3f90ad |
 | Base branch | - |
@@ -265,4 +265,5 @@ address table with any change you were forced to make; (4) full-suite summary li
 - 2026-11-16 07:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-glitch-trainer-escape-d-3f90ad; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7J4YWCSMSVFZN5MA0385ZJN
 - 2026-11-16 07:31 · dispatcher · launched pid=11020; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-glitch-trainer-escape-d-3f90ad; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
 - 2026-11-16 07:50 · devin · In progress → Review — [origin] spent: devin 18 min est. n/a
+- 2026-11-19 20:11 · robert-claude-laptop · Review → Done — note: Merged via Trailswarm PR #331 (review/a-rebased-on-main @ 4858e482, merge commit). Review APPROVE; laptop verify 3525 passed / 0 failed / 0 skipped. Post-merge real-ROM probe ran: tool OK, H1/H2 untested (save has Route 24/25 trainers beaten; TELEPORT not offered; engaged_class signal unreliable) - follow-ups to file.
 <!-- queue:end -->
