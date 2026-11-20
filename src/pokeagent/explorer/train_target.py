@@ -120,8 +120,8 @@ def stage_target(ctx) -> int:
     """The map train_route walks to for the current stage: the area ladder's rung when it answers (stages with
     rungs only), else ``_pinned``. Any ladder failure falls back to the pin."""
     stage = getattr(ctx, "stage_goal", None)
-    maps, here = ctx.mem.data.get("maps", {}), ctx.pos()
     try:
+        maps, here = ctx.mem.data.get("maps", {}), ctx.pos()
         spots, slot = release.ladder_spots(ctx, stage, maps, here)
         out, old = area_ladder.decide(ctx.__dict__.setdefault("ladder", {}), spots,
                                       lambda m: release.verdict(ctx, slot, m),

@@ -263,8 +263,7 @@ class Battle(BehaviourBase):
                 from pokeagent.explorer.procedures.state import of as proc_state
                 ctx.__dict__["trainer_win_step"] = ctx.step  # burst_gate: a gain right after this is the fight's aftermath
                 proc_state(ctx)["twins"] += 1  # AfterVictory decides once per TRAINER win, never on a wild one
-            record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer)
-            release.note_wild(ctx, battle_map, won=won, outcome=outcome, trainer=trainer)
+            record_battle_result(ctx, won=won, moved_away=moved_away, trainer=trainer); release.note_wild(ctx, battle_map, won=won, outcome=outcome, trainer=trainer)  # 300-line cap
             ctx.log(f"[battle over - {'WON' if won else 'lost?'}; {ctx.battles} battles this run]", "res")
             bl = ctx.pop("battle_log")
             if bl:  # one record per battle: who, choices per turn with HP, result - the data for battle strategy
