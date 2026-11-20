@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from pokeagent import party_rules, statefp
+from pokeagent import checkpoint_goals, glitch_guard, party_rules, statefp
 from pokeagent.party_view import read_party_view
 from pokeagent.ram_symbols import IS_IN_BATTLE
 
@@ -84,6 +84,7 @@ def save_entry(emu, d: str | Path, m: int, x: int, y: int, keep: int = KEEP) -> 
             _move_fp(src, d / name(m, x, y, i))
     os.replace(tmp, d / name(m, x, y))
     statefp.sidecar(d / name(m, x, y)).unlink(missing_ok=True)   # a stale stamp must not describe the new state
+    checkpoint_goals.sidecar(d / name(m, x, y)).unlink(missing_ok=True)   # nor a stale goals sidecar
     return d / name(m, x, y)
 
 
@@ -100,14 +101,17 @@ def save_named(emu, d: str | Path, stem: str, keep: int = KEEP) -> Path:
             _move_fp(d / nm(i - 1), d / nm(i))
     os.replace(tmp, d / nm(0))
     statefp.sidecar(d / nm(0)).unlink(missing_ok=True)
+    checkpoint_goals.sidecar(d / nm(0)).unlink(missing_ok=True)
     return d / nm(0)
 
 
 def _move_fp(src: Path, dst: Path) -> None:
-    if statefp.sidecar(src).exists():
-        os.replace(statefp.sidecar(src), statefp.sidecar(dst))
-    else:
-        statefp.sidecar(dst).unlink(missing_ok=True)
+    """Move a state's sidecars (RAM fingerprint and goals) with it; a missing source sidecar clears the destination's."""
+    for side in (statefp.sidecar, checkpoint_goals.sidecar):
+        if side(src).exists():
+            os.replace(side(src), side(dst))
+        else:
+            side(dst).unlink(missing_ok=True)
 
 
 def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
@@ -126,6 +130,7 @@ def evict(d: str | Path, max_files: int = MAX_FILES) -> int:
         for f in groups[k]:
             f.unlink(missing_ok=True)
             statefp.sidecar(f).unlink(missing_ok=True)
+            checkpoint_goals.sidecar(f).unlink(missing_ok=True)
         dropped += len(groups[k])
     return dropped
 
@@ -135,6 +140,18 @@ def _mtime(f: Path) -> float:
         return f.stat().st_mtime
     except OSError:
         return 0.0
+
+
+def write_goals_sidecar(ctx, state: Path) -> None:
+    """Record the goals complete NOW beside a leg state (as checkpoints do), so a run started from it seeds its goals correctly
+    (a leg state has no goal name; map-visit goals read false from a fresh emulator). Best effort: never raises."""
+    try:
+        from pokeagent.checkpoint_goals import completed_goals, write_completed
+        from pokeagent.goals import GOALS, check_goals
+        done = completed_goals(check_goals(ctx.emu, ctx), getattr(ctx, "initial_goals", ()) or (), GOALS)
+        write_completed(state, done, ctx.emu.read(0xD719))
+    except Exception as e:  # noqa: BLE001
+        ctx.log(f"[leg state goals sidecar skipped: {e!r}]", "res")
 
 
 class LegStateSaver:
@@ -156,6 +173,11 @@ class LegStateSaver:
                 return None
             if not calm(ctx.emu, bool(fr.box_after)):
                 return None
+            if not glitch_guard.allow_write(ctx.emu, f"leg:{a[0]}_{a[1]}_{a[2]}",
+                                            runs_dir=Path(getattr(ctx, "run_dir", ".")).parent,
+                                            run=Path(getattr(ctx, "run_dir", ".")).name,
+                                            log=lambda t: ctx.log(t, "res")):
+                return None  # not marked done: a later calm press retries once the signature clears
             self.done.add(tuple(a))
             if self.count is None:
                 self.count = len(list(self.dir.glob("*.state"))) if self.dir.is_dir() else 0
@@ -169,6 +191,7 @@ class LegStateSaver:
                 party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001  an unstamped state is still a state
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
+            write_goals_sidecar(ctx, p)
             self.saved += 1
             self.count += 1 if fresh else 0
             if self.count > self.max_files:
@@ -193,6 +216,11 @@ class LegStateSaver:
                 self.trainee_level = self.trainee_pending = level
             if not self.trainee_pending or not calm(ctx.emu, bool(fr.box_after)):
                 return None
+            if not glitch_guard.allow_write(ctx.emu, f"trainee:gyarados@L{self.trainee_pending}",
+                                            runs_dir=Path(getattr(ctx, "run_dir", ".")).parent,
+                                            run=Path(getattr(ctx, "run_dir", ".")).name,
+                                            log=lambda t: ctx.log(t, "res")):
+                return None  # trainee_pending stays set: the next calm press retries
             p = save_named(ctx.emu, self.dir, f"gyarados@L{self.trainee_pending}", self.keep)
             try:
                 fp = statefp.stamp(ctx.emu, p, Path(ctx.run_dir).name,
@@ -200,6 +228,7 @@ class LegStateSaver:
                 party_rules.gate_stamp(fp, p, party_rules.rom_kb(), log=lambda t: ctx.log(t, "res"))
             except Exception as e:  # noqa: BLE001
                 ctx.log(f"[leg state unstamped: {e!r}]", "res")
+            write_goals_sidecar(ctx, p)
             ctx.log(f"[trainee reached L{self.trainee_pending}: saved {p.name}]", "res")
             self.trainee_pending = 0
             self.saved += 1

@@ -6,6 +6,7 @@ left to exploration plus learned warps, never scripted. Map ids are ROM-verified
 """
 from __future__ import annotations
 
+from pokeagent.explorer import cerulean_south, fan_club, route5_vermilion
 from pokeagent.explorer.cave_route import ladder_step, rom_route_step
 from pokeagent.explorer.planner_checkpoint import checkpoint_step
 from pokeagent.explorer.planner_magikarp import magikarp_step
@@ -37,7 +38,9 @@ TARGETS = {"to_route3": _on(0x0E), "to_route4": _on(ROUTE4), "buy_magikarp": _on
            # S.S. Anne: the rival and the captain's cabin are both at the east end of 2F (ROM warp 0x60 (36,4) -> 0x65); the ROM route
            # there is ship_gate.board_step. The bow target (PR #114) parked every segment attempt on a dead-end map.
            "rival_ss_anne": _on(SS_ANNE_CAPTAIN), "ss_anne_captain": _on(SS_ANNE_CAPTAIN),
-           "to_route5": _on(0x10)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
+           "to_route5": _on(0x10), "to_route6": _on(0x11), "to_vermilion": _on(0x05),
+           # Vermilion after Cut: the Fan Club chairman gives the Bike Voucher, the Cerulean Bike Shop clerk swaps it (marathon 2026-11-16a patrolled the Old Rod house 8,000 steps: no target)
+           "pokemon_fan_club": _on(fan_club.FAN_CLUB), "bike_voucher": _on(fan_club.FAN_CLUB), "bike_shop": _on(fan_club.BIKE_SHOP), "bicycle": _on(fan_club.BIKE_SHOP), fan_club.GYM_STAGE: _on(fan_club.GYM)}  # Route 5 is south of Cerulean; unmapped, so the stage walks back to Cerulean and exploration finds the south exit
 
 
 def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str, occupied: frozenset = frozenset()) -> tuple[str, str] | None:
@@ -46,13 +49,14 @@ def _edge_frontier(g: WorldGraph, maps: dict, pos: tuple, stage: str, side: str,
     (a person is never learned as a wall), and pushing into him loops forever (Nugget Bridge trainers, 2026-11-06)."""
     d = maps.get(str(pos[0]), {})
     visited, blocked = d.get("visited", {}), set(d.get("blocked", []))
-    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1)}[side]
+    dx, dy = {"RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}[side]
     tiles = [tuple(map(int, k.split(","))) for k in visited]
     tiles = [t for t in tiles if f"{t[0]},{t[1]},{side}" not in blocked and f"{t[0] + dx},{t[1] + dy}" not in visited
              and f"{t[0]},{t[1]},{side}" not in d.get("jumps", {}) and f"{t[0]},{t[1]},{side}" not in d.get("warps", {})
              and (t[0] + dx, t[1] + dy) not in occupied]
-    order = (lambda t: (-t[0], abs(t[1] - pos[2]))) if side == "RIGHT" else (lambda t: (t[1], abs(t[0] - pos[1])))
-    word = "easternmost" if side == "RIGHT" else "northernmost"
+    order = {"RIGHT": lambda t: (-t[0], abs(t[1] - pos[2])), "UP": lambda t: (t[1], abs(t[0] - pos[1])),
+             "DOWN": lambda t: (-t[1], abs(t[0] - pos[1]))}[side]
+    word = {"RIGHT": "easternmost", "UP": "northernmost", "DOWN": "southernmost"}[side]
     for tx, ty in sorted(tiles, key=order)[:8]:  # each try is a BFS
         if (pos[1], pos[2]) == (tx, ty):
             return side, f"goal {stage}: at the {word} open tile, pushing {side} for the map edge"
@@ -136,7 +140,18 @@ def east_road_step(g: WorldGraph, maps: dict, goals: dict, pos: tuple, facing: s
     if stage == "through_mt_moon" and pos[0] not in CAVE:  # out on Route 3/4 again: back in, the exit is inside
         return (_back_to(g, pos, stage, 0x3C, "Mt Moon B1F, where the exit is") or _back_to(g, pos, stage, 0x3B, "Mt Moon 1F"))
     if stage == "to_route5":  # after Bill's S.S. Ticket the agent sat in his house: no stage had a target (live marathon, 2026-11-15)
-        return None if pos[0] == CERULEAN else _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5")
+        rom = cerulean_south.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))  # the ROM route round the wall (burgled house hole): exploration never found it
+        if rom or pos[0] == cerulean_south.HOUSE:
+            return rom
+        return _back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None
+    if stage in route5_vermilion.STAGES:  # Route 5 -> Underground Path -> Route 6 -> Vermilion: the stages had no target (live marathon, 2026-11-15)
+        rom = route5_vermilion.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))
+        if rom or pos[0] in route5_vermilion.MAPS:
+            return rom
+        rom = cerulean_south.route_step(pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()))  # still on the Cerulean side of the wall
+        return rom or (_back_to(g, pos, stage, CERULEAN, "Cerulean City, then south to Route 5") if pos[0] != CERULEAN else None)
+    if stage in fan_club.STAGES:  # ROM route to the Fan Club door / back to the Bike Shop door; inside either map the stage is a GoalTalk
+        return fan_club.route_step(stage, pos, goals.get("_route_plan"), maps, goals.get("_blocked_now", ()), goals.get("_field_cut"))
     push = {"to_route3": (PEWTER, "RIGHT", "Pewter City"), "to_route4": (ROUTE3, "UP", "Route 3"),
             "to_cerulean": (ROUTE4, "RIGHT", "Route 4"), "nugget_bridge": (CERULEAN, "UP", "Cerulean City"),
             "to_bill": (ROUTE24, "RIGHT", "Route 24")}.get(stage)

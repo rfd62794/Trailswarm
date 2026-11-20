@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision, no_press
+from pokeagent.explorer.behaviours.battle_run import flee_throw_pending
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.world import DUNGEON_MAPS
 from pokeagent.explorer.mash_skill import WAIT, MashSkill, gap_frames, signature
@@ -52,7 +53,9 @@ class Readiness(BehaviourBase):
     name = "readiness"
 
     def applies(self, ctx: ExplorerContext) -> bool:
-        return self._busy(ctx) or ctx.mash > 0
+        # A pending flee-species catch owns the battle's turns: a busy-A here can land on FIGHT and spend
+        # the wild's last turn on a damaging move instead of the ball.
+        return not flee_throw_pending(ctx) and (self._busy(ctx) or ctx.mash > 0)
 
     def _busy(self, ctx: ExplorerContext) -> bool:
         # Only the OVERWORLD needs the stillness check (forced walks, fades, Oak dragging you to the lab).

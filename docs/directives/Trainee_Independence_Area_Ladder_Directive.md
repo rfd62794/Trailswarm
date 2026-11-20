@@ -209,14 +209,18 @@ Nothing for the build. Queue only after `Level_Banded_Grind_Directive.md` has me
 
 | Field | Value |
 |---|---|
-| Status | In progress |
+| Status | Review |
 | Assigned to | devin |
 | Branch | directive/pokeagent-trainee-independence-area-ladder--9f407a |
 | Base branch | - |
 | Base commit | 1381767f53b5bdbf6c704e9ed375bef383a29fa2 |
+| Head commit | fcd79e8df0c853f14f99f709f5ad48882fb7d952 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
 - 2026-11-15 18:55 · robert-claude-laptop · Queued → Approved — lint override: The three cited paths (grind/area_ladder.py, training_ctl/release.py, tests/test_area_ladder.py) are new files this directive creates; absent at main by design.
 - 2026-11-15 19:22 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-trainee-independence-area-ladder--9f407a; lane=default; model=swe-2-high; perm=smart; persona=steady-builder; agent_id=01M7GVR1KBH7MY4AT7FTH3F8NS
+- 2026-11-15 19:34 · dispatcher · launched pid=17920; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-trainee-independence-area-ladder--9f407a; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=smart (`## Sandbox needs` declared (13 declared need(s); 9 external))
+- 2026-11-15 20:05 · devin · In progress → Review — Review: ladder+release implemented on fcd79e8. Evidence: Python 3.12.12; targeted suite 181 passed; full suite 3304 passed / 1 skipped (pre-existing ROM skip; the earlier 1 failure - solo-episode test hitting release on a None emu - was fixed by short-circuit order in switch_out and re-verified); wc: area_ladder 55, release 118 (<120), train_target 54 (+15 cap), roster 45, switch_out 250 (+3), plan_goal 298 (net 0), battle 300 (+1), stage_maps 16 (+3). Synthetic model: Rattata L5 0.94 win/0.72 hp, L6 1.00/0.75, Pidgey L5 0.94/0.62, L6 0.94/0.73 - all released. Monotone test asserts shared-XP fights == 2x solo. Shadow test pins the 70-mismatch hypothesis: ctx.view.battling => derived party [] => floor_unmet False / train_member None vs stale old flags (True/1); supports measurement artifact, not a controller verdict. Unsettled: real-ROM A/B (tools/ab.py seeds 1-3 per starter, 15k cap) is the Claude merge gate - no ROM/emulator was touched. Branch base b0375a28 (newer than directive-recorded 1381767f); diff vs origin/main shows upstream drift, diff vs HEAD is exactly the 11 directive files. [origin] spent: devin 30 min est. n/a
 <!-- queue:end -->

@@ -23,6 +23,7 @@ from pokeagent.game.pokemon_red import RED
 _DEFAULT_ROM = str(RED.default_rom).replace("\\", "/")
 
 DIRS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
+CUT_TREE_TILE, OVERWORLD_TILESET = 0x3D, 0  # UsedCut compares wTileInFrontOfPlayer with $3d on the overworld tileset (ROM 0xEF6F; the swap table is at 0xF100)
 
 
 def cell_tiles(rom: bytes, hd: rom_maps.MapHeader) -> np.ndarray:
@@ -142,8 +143,10 @@ def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0
             else:
                 warp_to[(m, x, y)] = None  # a way out of the dungeon: only ever a goal
     objs = {m: frozenset((o["x"], o["y"]) for o in h.objects) for m, h in heads.items()}
+    trees = {m: frozenset((int(x), int(y)) for y, x in zip(*np.where(tiles[m] == CUT_TREE_TILE))) if h.tileset == OVERWORLD_TILESET else frozenset()
+             for m, h in heads.items()}  # the cuttable trees by their ROM stepping tile: (x, y) cells, per map
 
-    def search(start, goals, solid, walls, blocked):
+    def search(start, goals, solid, walls, blocked, cut=False):
         prev = {start: None}
         q = deque([start])
         while q:
@@ -157,7 +160,7 @@ def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0
                 if not (0 <= cell[1] < g.shape[1] and 0 <= cell[2] < g.shape[0]):
                     continue
                 is_goal = cell in goals
-                if not is_goal and (not g[cell[2], cell[1]] and cell not in warp_to):
+                if not is_goal and (not g[cell[2], cell[1]] and cell not in warp_to and not (cut and cell[1:] in trees[m])):
                     continue
                 if cell not in warp_to and (m, x, y) not in warp_to and pair_blocked(tiles[m], pairs[m], (x, y), cell[1:]):
                     continue
@@ -176,14 +179,15 @@ def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0
                 q.append(nxt)
         return None
 
-    def plan(start, goals, walls=None, blocked=None, hard=None):
+    def plan(start, goals, walls=None, blocked=None, hard=None, cut=False):
+        """``cut=True``: the cuttable trees (``plan.trees``) count as walkable (the party can use CUT); the route may then enter one."""
         goals, start = {tuple(g) for g in goals}, tuple(start)
         if start[0] not in heads:
             return None
         walls, blocked, hard = walls or {}, blocked or {}, hard or {}
         for solid, w, b in ((objs, walls, blocked), (objs, {}, blocked), ({}, {}, blocked), ({}, {}, {})):
             # ``hard`` edges (the ROM model called them open but presses failed repeatedly) hold in every pass
-            path = search(start, goals, solid, {m: set(w.get(m, ())) | set(hard.get(m, ())) for m in set(w) | set(hard)}, b)
+            path = search(start, goals, solid, {m: set(w.get(m, ())) | set(hard.get(m, ())) for m in set(w) | set(hard)}, b, cut)
             if path is not None:
                 return path
         return None
@@ -196,9 +200,17 @@ def rom_cave_planner(rom_path: str = _DEFAULT_ROM, maps=frozenset({0x3B, 0x3C, 0
             seen.append(cur)
         return seen
     plan.follow = follow
+    plan.trees = lambda map_id: trees.get(map_id, frozenset())
 
     def warp_tiles(map_id: int, dest_map: int | None = None) -> set:
         """(map, x, y) of the warps on ``map_id`` that lead to ``dest_map`` (any destination when None)."""
         return {(map_id, x, y) for x, y, _dw, dm in heads[map_id].warps if dest_map is None or dm == dest_map}
     plan.warp_tiles = warp_tiles
+
+    def cells_with_tile(map_id: int, tile: int) -> set:
+        """(x, y) cells whose stepping tile id equals ``tile`` (the Vermilion Gym's trash cans are 0x1B)."""
+        if map_id not in tiles:
+            return set()
+        return {(int(x), int(y)) for y, x in zip(*np.where(tiles[map_id] == tile))}
+    plan.cells_with_tile = cells_with_tile
     return plan

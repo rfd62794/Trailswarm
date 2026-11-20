@@ -1,0 +1,222 @@
+"""Marathon 2026-11-16a: after Cut the stage pokemon_fan_club had no target, planner step, patrol exit or talk: 8,000 steps in the Old Rod house (0xA3)."""
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from pokeagent.explorer import cerulean_south, fan_club as fc, patrol_exit, planner_east, route5_vermilion as rv
+from pokeagent.explorer.behaviours import goal_talk
+from pokeagent.explorer.behaviours.goal_talk import GoalTalk
+from pokeagent.goals import GOALS
+
+ROM = Path(__file__).resolve().parents[1] / "roms" / "Pokemon Red.gb"
+G = SimpleNamespace(path=lambda pos, goal: None, blocked_now=frozenset())
+
+
+def _goals(upto):
+    return {g: True for g in GOALS[:GOALS.index(upto)]}
+
+
+@pytest.fixture(autouse=True)
+def _quiet(monkeypatch):
+    monkeypatch.setattr(planner_east, "checkpoint_step", lambda *a, **k: None)
+    monkeypatch.setattr(planner_east, "ship_gate_step", lambda *a, **k: None)
+
+
+def _asking(answer=("UP",)):
+    asked = []
+
+    def plan(start, goals, walls=None, blocked=None, hard=None):
+        asked.append(set(goals))
+        return list(answer)
+    return plan, asked
+
+
+def test_every_stage_after_cut_has_a_map_target():
+    for stage, m in (("pokemon_fan_club", 0x5A), ("bike_voucher", 0x5A), ("bike_shop", 0x42), ("bicycle", 0x42)):
+        assert planner_east.TARGETS[stage]((m, 1, 1)) and not planner_east.TARGETS[stage]((0xA3, 1, 1))
+
+
+def test_vermilion_walks_to_the_fan_club_door():
+    plan, asked = _asking(("LEFT",))
+    out = planner_east.east_road_step(G, {}, {**_goals("pokemon_fan_club"), "_route_plan": plan}, (fc.VERMILION, 20, 10))
+    assert out and out[0] == "LEFT" and "Fan Club door" in out[1] and asked == [{fc.FAN_DOOR}]
+
+
+def test_plan_step_reaches_the_east_road_after_the_captain_until_the_bicycle():
+    """The gate was `ss_ticket and not ss_anne_captain`: once Cut was taught plan_step returned None for good and exploration patrolled."""
+    from pokeagent.explorer.planner import plan_step
+    plan, asked = _asking(("LEFT",))
+    base = {**_goals("pokemon_fan_club"), "_route_plan": plan}
+    assert plan_step(base, {}, (fc.VERMILION, 20, 10), "UP")[0] == "LEFT" and asked == [{fc.FAN_DOOR}]
+    asked.clear()
+    assert plan_step({**_goals("bicycle"), "_route_plan": plan}, {}, (fc.CERULEAN, 20, 33), "UP")[0] == "LEFT" and asked == [{fc.BIKE_DOOR}]
+    asked.clear()
+    out = plan_step({**_goals("vermilion_gym_entry"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP")
+    assert out[0] == "LEFT" and asked == [{fc.GYM_DOOR}]
+    assert plan_step({**_goals("beat_surge"), "_route_plan": plan}, {}, (fc.VERMILION, 20, 10), "UP") is None
+
+
+def test_after_the_bicycle_the_bike_shop_is_left_for_the_gym():
+    """Live headless run: the Bicycle landed at step 424 and the agent then patrolled the shop for 2,588 steps (no target for vermilion_gym_entry)."""
+    plan, asked = _asking(("DOWN",))
+    goals = {**_goals("vermilion_gym_entry"), "_route_plan": plan}
+    assert planner_east.east_road_step(G, {}, goals, (fc.BIKE_SHOP, 3, 7))[0] == "DOWN" and not asked
+    assert planner_east.east_road_step(G, {}, goals, (fc.BIKE_SHOP, 4, 4))[0] == "DOWN" and asked == [fc.BIKE_EXIT]
+    assert planner_east.TARGETS["vermilion_gym_entry"]((0x5C, 1, 1))
+
+
+def test_inside_the_fan_club_the_voucher_stage_is_a_talk_not_a_route():
+    plan, asked = _asking()
+    assert planner_east.east_road_step(G, {}, {**_goals("bike_voucher"), "_route_plan": plan}, (fc.FAN_CLUB, 3, 6)) is None and not asked
+
+
+def test_after_the_voucher_the_way_back_leaves_the_club_then_vermilion_by_its_north_edge():
+    plan, asked = _asking()
+    goals = {**_goals("bike_shop"), "_route_plan": plan}
+    assert planner_east.east_road_step(G, {}, goals, (fc.FAN_CLUB, 3, 7))[0] == "DOWN"
+    planner_east.east_road_step(G, {}, goals, (fc.VERMILION, 9, 14))
+    assert asked[-1] == fc.VERMILION_TOP
+    assert planner_east.east_road_step(G, {}, goals, (fc.VERMILION, 25, 0))[0] == "UP"
+
+
+def test_route6_path_route5_and_cerulean_each_chain_to_the_next_goal():
+    plan, asked = _asking()
+    goals = {**_goals("bike_shop"), "_route_plan": plan}
+    for pos, want in (((rv.ROUTE6, 14, 30), fc.HOUSE_5_EXIT), ((rv.PATH_NS, 2, 40), fc.HOUSE_5_EXIT), ((rv.ROUTE5, 16, 20), fc.ROUTE5_TOP),
+                      ((cerulean_south.CERULEAN, 20, 33), {fc.BIKE_DOOR})):
+        asked.clear()
+        assert planner_east.east_road_step(G, {}, goals, pos)[0] == "UP" and asked == [want], pos
+    assert planner_east.east_road_step(G, {}, goals, (rv.PATH_5, 3, 7))[0] == "DOWN"
+
+
+def test_old_rod_house_is_left_by_its_learned_exit_while_the_fan_club_is_the_target(tmp_path, monkeypatch):
+    from pokeagent.explorer.memory import MapMemory
+    from pokeagent.ramworld import MapHeader
+    mem = MapMemory(tmp_path / "maps.json")
+    mem.data["maps"]["163"] = {"visited": {"4,6": 1, "4,5": 1}, "warps": {"4,6,DOWN": [5, 7, 4]}}
+    mem.data["maps"]["5"] = {"visited": {"7,4": 1}}
+    monkeypatch.setattr(patrol_exit, "read_map_header", lambda emu: MapHeader(12, 4, 4, (), (), ()))
+    c = SimpleNamespace(emu=None, mem=mem, stage_goal="pokemon_fan_club", center_intent=None, step=100)
+    assert patrol_exit.exit_step(c, 0xA3, 4, 5)[0] == "DOWN"
+
+
+def _ctx(goals, m, x, y, facing="UP"):
+    return SimpleNamespace(goals=lambda: goals, view=SimpleNamespace(m=m, x=x, y=y, box=False, battling=False), proc=None, facing=facing,
+                           goal_talk_tries={}, mem=SimpleNamespace(data={"maps": {}}, temp_blocked=set()), log=lambda *a, **k: None)
+
+
+def test_the_chairman_is_talked_to_until_the_voucher_is_in_the_bag():
+    stand = goal_talk.GOAL_TALKS["bike_voucher"]
+    assert stand[0] == fc.FAN_CLUB and goal_talk.TALK_CAPS["bike_voucher"] > goal_talk.MAX_TALKS
+    c = _ctx({"bike_voucher": False}, 0x5A, stand[1], stand[2], stand[3])
+    assert GoalTalk().applies(c) and GoalTalk().step(c).button == "A"
+    assert not GoalTalk().applies(_ctx({"bike_voucher": True}, 0x5A, 2, 1))
+    assert not GoalTalk().applies(_ctx({"bike_voucher": False}, 0xA3, 2, 1))
+
+
+def test_the_clerk_is_talked_to_only_with_the_voucher_goal_met():
+    assert not GoalTalk().applies(_ctx({"bike_voucher": False, "bicycle": False}, 0x42, 4, 2, "RIGHT"))
+    assert GoalTalk().applies(_ctx({"bike_voucher": True, "bicycle": False}, 0x42, 4, 2, "RIGHT"))
+
+
+def test_the_campaign_detectors_match_the_items_and_maps():
+    import json
+    d = json.loads((Path(__file__).resolve().parents[1] / "src/pokeagent/data/campaign.json").read_text(encoding="utf-8"))
+    rows = {r["id"]: r["detector"] for r in d["goals"]}
+    assert rows["pokemon_fan_club"] == {"map": [fc.FAN_CLUB]} and rows["bike_voucher"] == {"item": 45}
+    assert rows["bike_shop"]["map_now_with_item"] == {"map": [fc.BIKE_SHOP], "item": 45} and rows["bicycle"] == {"item": 6}
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="needs the ROM")
+def test_rom_routes_reach_the_fan_club_and_back_to_the_bike_shop():
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
+    assert plan.warp_tiles(fc.VERMILION, fc.FAN_CLUB) == {fc.FAN_DOOR} and plan.warp_tiles(fc.CERULEAN, fc.BIKE_SHOP) == {fc.BIKE_DOOR}
+    assert plan((fc.VERMILION, 18, 25), {fc.FAN_DOOR})
+    for start, goals in (((fc.FAN_CLUB, 3, 6), fc.FAN_EXIT), ((fc.BIKE_SHOP, 4, 2), fc.BIKE_EXIT), ((fc.VERMILION, 9, 14), fc.VERMILION_TOP), ((rv.ROUTE6, 8, 35), fc.HOUSE_5_EXIT),
+                         ((rv.ROUTE5, 16, 28), fc.ROUTE5_TOP), ((fc.CERULEAN, 27, 11), {fc.BIKE_DOOR}), ((cerulean_south.HOUSE, 3, 0), fc.HOUSE_MATS)):
+        path = plan(start, goals)
+        end = plan.follow(start, path)[-1] if path else None
+        assert end in goals or (goals == {fc.BIKE_DOOR} and end == (fc.BIKE_SHOP, 2, 7)), start  # a goal warp is followed into the shop
+    for _m, x, _y in fc.ROUTE5_TOP:  # every Route 5 exit cell lands on a Cerulean cell joined to the burgled house's hole (none in the walled pocket)
+        assert plan((fc.CERULEAN, x + 10, 35), {(fc.CERULEAN, 27, 9)}), x
+    south = (fc.CERULEAN, 20, 33)  # Route 5's end: the shop is not reachable on foot from here, the burgled house's hole is
+    assert not plan(south, {fc.BIKE_DOOR}) and plan.follow(south, plan(south, {(fc.CERULEAN, 27, 9)}))[-1] == (cerulean_south.HOUSE, 3, 0)
+    assert fc.route_step("bike_shop", south, plan)[0] in ("UP", "DOWN", "LEFT", "RIGHT")
+
+
+def _only(*reachable, answer="DOWN"):
+    """A planner that knows a route only to the given goal sets (everything else is walled off, like the ROM-sealed yard)."""
+    asked = []
+
+    def plan(start, goals, walls=None, blocked=None, hard=None, cut=False):
+        asked.append(set(goals))
+        return [answer] if any(set(goals) == set(r) for r in reachable) else None
+    return plan, asked
+
+
+@pytest.mark.parametrize("stage", ["bike_shop", "bicycle", "vermilion_gym_entry"])
+def test_the_walled_yard_behind_the_two_door_house_is_left_by_the_back_door(stage):
+    """marathon-2026-11-16b: after the Bicycle the agent left the 0xE6 house by its back door into a sealed yard and patrolled it for 17,000 steps (no route from there)."""
+    plan, asked = _only(fc.YARD_MATS, {fc.YARD_DOOR})
+    for pos in ((fc.CERULEAN, 10, 7), (fc.CERULEAN, 17, 8), (fc.CERULEAN, 9, 8)):
+        out = fc.route_step(stage, pos, plan, {}, (), {"can": False})
+        assert out and out[0] == "DOWN" and "yard" in out[1], pos
+        assert {fc.YARD_DOOR} in asked
+    assert fc.route_step(stage, (fc.CERULEAN, 9, 9), plan)[0] == "UP"  # arrived on the door tile: step off it, then back on
+    assert fc.route_step(stage, (fc.YARD_HOUSE, 2, 3), plan)[0] == "DOWN" and fc.YARD_MATS in asked
+    assert fc.route_step(stage, (fc.YARD_HOUSE, 3, 7), plan)[0] == "DOWN"  # the front mat: out onto the town side
+
+
+def test_the_town_side_still_prefers_the_real_route_over_the_yard():
+    plan, asked = _only({fc.BIKE_DOOR})
+    out = fc.route_step("bicycle", (fc.CERULEAN, 20, 20), plan)
+    assert out and "yard" not in out[1] and asked == [{fc.BIKE_DOOR}]
+
+
+def test_the_planner_maps_include_the_two_door_house():
+    assert fc.YARD_HOUSE in fc.PLANNER_MAPS
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="needs the ROM")
+def test_rom_yard_routes_come_out_on_the_town_side():
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
+    yard = (fc.CERULEAN, 10, 7)
+    assert not plan(yard, {fc.BIKE_DOOR}) and not plan(yard, {fc.GYM_DOOR})  # sealed on foot
+    for stage in ("bicycle", "vermilion_gym_entry"):
+        assert fc.route_step(stage, yard, plan)[0] in ("LEFT", "DOWN", "UP", "RIGHT")
+    assert fc.route_step("bicycle", (fc.CERULEAN, 9, 8), plan)[0] == "DOWN"
+    assert fc.route_step("bicycle", (fc.YARD_HOUSE, 2, 1), plan)[0] == "DOWN"
+
+
+def test_cerulean_pocket_cells_are_not_the_way_down_to_route_5():
+    """Fresh-memory headless run 2026-11-16: DOWN on Cerulean's row 35 at x 16-23 enters Route 5's sealed middle (x 6-13), where 2,000 steps were lost."""
+    plan, asked = _only({fc.BIKE_DOOR}, cerulean_south.BOTTOM)
+    for x in (16, 19, 23):
+        out = cerulean_south.route_step((fc.CERULEAN, x, 35), plan)
+        assert out is None or out[1].find("pushing DOWN") < 0, x
+    assert cerulean_south.route_step((fc.CERULEAN, 12, 35), plan)[0] == "DOWN" and cerulean_south.route_step((fc.CERULEAN, 27, 35), plan)[0] == "DOWN"
+    assert not {(fc.CERULEAN, x, 35) for x in range(16, 24)} & cerulean_south.BOTTOM
+
+
+def test_the_sealed_middle_of_route_5_is_left_back_up():
+    plan, _ = _only()  # no route from inside the sealed rooms
+    assert rv.route_step((rv.ROUTE5, 13, 0), plan)[0] == "UP"
+    plan2, asked = _only(rv.SEALED_TOP, answer="LEFT")
+    out = rv.route_step((rv.ROUTE5, 9, 5), plan2)
+    assert out and out[0] == "LEFT" and rv.SEALED_TOP in asked
+    assert fc.route_step("vermilion_gym_entry", (rv.ROUTE5, 13, 0), plan)[0] == "UP"
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="needs the ROM")
+def test_rom_pocket_and_sealed_route_5_lead_out():
+    from pokeagent.atlas.walkgrid import rom_cave_planner
+    plan = rom_cave_planner(str(ROM), maps=fc.PLANNER_MAPS)
+    assert cerulean_south.route_step((fc.CERULEAN, 19, 33), plan)[0] in ("UP", "DOWN", "LEFT", "RIGHT")
+    for x in range(6, 14):
+        assert plan((rv.ROUTE5, x, 1), rv.BOTTOM) is None  # sealed: no route on
+        assert rv.route_step((rv.ROUTE5, x, 1), plan)[0] in ("UP", "LEFT", "RIGHT", "DOWN")
+    for x in (1, 2, 3, 4, 15, 16, 17, 18):
+        assert rv.route_step((rv.ROUTE5, x, 0), plan)[1].find("sealed") < 0

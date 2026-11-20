@@ -31,7 +31,11 @@ ENTRY_IDLE_DROP = LOOP_VETO_STEPS * 4  # an entry with no new press this long is
 # shows the same text for several presses, and vetoing it stranded heals mid-dialog (663 vetoes in one 9k-step run,
 # 2026-11-12). Restarting dialogs are caught on the behaviour that STARTS the talk, not on the paging.
 NEVER_VETO = frozenset({"battle", "battle_moves", "battle_text_wait", "catch", "switch_out", "party_order", "settle_wait",
-                        "advance_dialog"})
+                        "advance_dialog", "field_cut", "gym_puzzle"})
+
+# field_cut: START -> POKeMON -> member -> CUT is a fixed press sequence over a menu whose cursor does not change the text hash, so the ledger
+# read the cursor moves as no-progress and swapped in B/A presses (marathon-2026-11-16c: Vermilion tree never cut). It caps itself (PRESS_CAP, MAX_TRIES).
+# gym_puzzle: walking can to can looks like a no-progress loop to the ledger; it self-caps, like field_cut.
 
 # --- cross-run persistence (all untuned first values) ---
 PROMOTE_FLUSH_STEPS = 500      # steps between folds of this run's veto keys into the shared memory (and at run end)

@@ -32,6 +32,8 @@ Details, dates and caveats are in [docs/RESULTS.md](docs/RESULTS.md).
 
 **Intervention tools.** `tools/agentctl.py` lets you or Claude read any live agent and step in safely. `ls` ranks agents by progress, `show` prints a detailed block, `hold` takes a time-limited lease so the agent makes no decisions of its own, `nudge` does a short hold plus a back-out, and `macro` runs a named multi-press routine under the lease. Every intervention is journaled to `runs/agent_interventions.jsonl`.
 
+**Marathon watch.** `tools/marathon_watch.py --tag marathon- --once` reads every tagged run dir and prints one JSON line per run: `ok`, `stalled` (hung, guard-stall burst, map-pair oscillation, map dwell, or goal budget overrun), `held` (a Claude lease is active), or `young`. It exists because the swarm watchdog's 600-press loop window never trips on a marathon run that trickles new tiles and XP for thousands of presses without a campaign goal. On a stall it writes a diagnostic bundle to `runs/stalls/<run>-<reason>-<press>.json` once per stall episode, asks the run for a save state over its control API, and - only with `--stop` - asks it to stop cleanly.
+
 ## Setup
 
 You need Python 3.12 and [uv](https://docs.astral.sh/uv/).

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
 from pokeagent.explorer.context import ExplorerContext
-from pokeagent.explorer import door_exit, grind_episode, train_route
+from pokeagent.explorer import door_exit, grind_episode, patrol_exit, train_route
 from pokeagent.explorer.training_ctl import exit_rule, sustain
 from pokeagent.explorer.perceive import lead_level, party_needs_heal
 from pokeagent.novelty import steer as novelty_steer
@@ -98,6 +98,9 @@ def _memory_step(ctx: ExplorerContext, m: int, x: int, y: int, *, avoid_maps=Non
     door = door_exit.door_press(ctx, m, x, y) if allowed is None else None
     if door:
         return door
+    leave = patrol_exit.exit_step(ctx, m, x, y) if allowed is None else None
+    if leave:
+        return leave
     patrol = pick(PATROL_REVERSE_PENALTY)
     if patrol is None:
         return None

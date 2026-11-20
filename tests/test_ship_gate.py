@@ -277,3 +277,51 @@ def test_run_starting_in_vermilion_with_respawn_behind_heads_for_the_pokecenter_
     assert step and step[0] == "LEFT" and "checkpoint" in step[1] and seen == [(0x05, 11, 4)], step
     at_door = plan_step(goals, {}, (0x05, 11, 4), "UP")
     assert at_door and at_door[0] == "UP" and "door" in at_door[1], at_door
+
+
+def _route11_to_vermilion(tmp_path):
+    mem = MapMemory(tmp_path / "r11.json")
+    mem.visit(0x16, 10, 10, 1); mem.visit(0x16, 9, 10, 1)
+    mem.m(0x16)["warps"]["9,10,LEFT"] = [0x05, 30, 10]
+    mem.visit(0x05, 30, 10, 1); mem.visit(0xC5, 5, 5, 1); mem.visit(0xC5, 5, 6, 1)
+    mem.m(0xC5)["warps"]["5,6,DOWN"] = [0x16, 10, 10]
+    return mem.data["maps"]
+
+
+def test_captain_stage_after_the_rival_ignores_the_next_bosss_level():
+    """2026-11-15: need L29 (Lt. Surge's) read as 'under-level' for ss_anne_captain; a fit L19 lead walked off the ship, then explored."""
+    rival_done = {**FIT, "rival_ss_anne": True, "_level": 19, "_need": 29, "_ship": {}, "_ship_plan": FakeShipPlan(["UP"])}
+    assert not sg.under_level(rival_done)
+    step = plan_step(rival_done, {}, (0x60, 2, 5), "UP")
+    assert step and "walk-off" not in step[1] and "goal boarding" in step[1], step
+    assert sg.under_level({**rival_done, "rival_ss_anne": False})      # before the rival the level gate stands
+
+
+def test_ship_stage_pulls_the_agent_back_from_diglett_s_cave_to_vermilion(tmp_path):
+    maps = _route11_to_vermilion(tmp_path)
+    goals = {**FIT, "rival_ss_anne": True, "_level": 19, "_need": 29}
+    g = WorldGraph(maps)
+    step = sg.return_step(g, goals, (0xC5, 5, 5))
+    assert step and step[0] == "DOWN" and "back to Vermilion" in step[1], step
+    assert sg.return_step(g, {**FIT, "_level": 12}, (0xC5, 5, 5)) is None   # under-level before the rival: grinding there is the plan
+    assert sg.return_step(g, goals, (0x05, 30, 10)) is None
+
+
+def test_after_the_captain_the_agent_walks_off_the_ship():
+    """2026-11-15: HM01 in hand, the next goal ashore, and no planner stage had a ship target: 1,100 steps wandering the bow."""
+    plan = FakeShipPlan(["LEFT", "UP"])
+    goals = {**DONE, "rival_ss_anne": True, "ss_anne_captain": True, "_ship_plan": plan, "_ship": {}}
+    step = plan_step(goals, {}, (0x63, 5, 7), "UP")
+    assert step and step[0] == "LEFT" and "leave the ship" in step[1], step
+    assert plan.asked[-1][1] == {(0x5E, 14, 0)}
+    assert plan_step(goals, {}, (0x05, 18, 31), "UP") is None            # ashore: nothing to do
+    assert plan_step({**goals, "ss_anne_captain": False}, {}, (0x63, 5, 7), "UP")[1].find("leave the ship") < 0
+
+
+def test_fit_in_vermilion_without_a_learned_dock_warp_takes_the_rom_route(monkeypatch):
+    """The walk-off learned the dock's way OUT only; board_step returned None and the frontier explored Vermilion for 1,400 steps."""
+    monkeypatch.setattr(sg, "_rom_step", lambda pos, tile, grid_get=None: "RIGHT" if tile == (0x05, 18, 31) else None)
+    goals = {**FIT, "rival_ss_anne": True, "_ship": {"off": 2}}
+    step = sg.board_step(WorldGraph({}), goals, (0x05, 5, 10))
+    assert step and step[0] == "RIGHT" and "dock warp" in step[1], step
+    assert sg.board_step(WorldGraph({}), goals, (0x05, 19, 31))[0] == "DOWN"

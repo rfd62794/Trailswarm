@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
+import pokeagent.glitch_guard as glitch_guard
 from pokeagent.checkpoint_goals import stamp_fingerprint
 from pokeagent.explorer.behaviours.frontier import TABU_LEN
 from pokeagent.explorer.burst_gate import burst_allowed
@@ -57,7 +59,9 @@ def track_progress(ctx: ExplorerContext, fr: PressFrame) -> None:
             best = max(best, int(side.read_text())) if side.exists() else best
         except Exception:
             pass
-        if lvl > best and ctx.emu.read(IS_IN_BATTLE) == 0 and not box_after:
+        if lvl > best and ctx.emu.read(IS_IN_BATTLE) == 0 and not box_after \
+                and glitch_guard.allow_write(ctx.emu, "team_best", runs_dir=Path(ctx.run_dir).parent,
+                                             run=Path(ctx.run_dir).name, log=lambda t: ctx.log(t, "res")):
             try:
                 cp = store_path("runs/checkpoints", scope="game"); cp.mkdir(parents=True, exist_ok=True)
                 side.write_text(str(lvl))

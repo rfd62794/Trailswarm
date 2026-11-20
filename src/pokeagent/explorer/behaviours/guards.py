@@ -10,6 +10,7 @@ import random
 from pokeagent.explorer import center_visit
 from pokeagent.explorer.behaviours import grind_loop
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
+from pokeagent.explorer.behaviours.battle_run import flee_throw_pending
 from pokeagent.explorer.context import ExplorerContext
 from pokeagent.explorer.demos import grade_replay
 from pokeagent.explorer.perceive import DIRS, TILEMAP, TILEMAP_LEN, box_open
@@ -47,7 +48,7 @@ class LoopGuard(BehaviourBase):
         if ctx.shake > 0:
             tm_s = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
             ctx.shake -= 1
-            if box_open(tm_s):
+            if box_open(tm_s) and not flee_throw_pending(ctx):  # the open box is the catch's bag, not a stray dialog
                 return Decision("B", "shake_close_box", f"shake: closing a box ({ctx.shake} left)")
             if ctx.emu.read(IS_IN_BATTLE) == 0:
                 away = random.choice(list(DIRS))
@@ -70,7 +71,7 @@ class LoopGuard(BehaviourBase):
             ctx.a_streak = ctx.a_streak + 1
         if ctx.a_streak >= 40:
             tm_g = ctx.emu.read_range(TILEMAP, TILEMAP_LEN)
-            if box_open(tm_g):
+            if box_open(tm_g) and not flee_throw_pending(ctx):
                 return Decision("B", "a40_close_box", "40 A presses at the same tile: closing the box with B")
             ctx.a_streak = 0; ctx.stalls = ctx.stalls + 1; ctx.shake = 25
             away = random.choice([d for d in DIRS if d != ctx.facing])

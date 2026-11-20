@@ -137,11 +137,8 @@ uv run pytest -q -p no:cacheprovider -rfEs tests/test_frame_slot_layout.py tests
 Expected: `41 passed, 1 warning in ...s` (the only two test files that reference docs/ paths). Run the full suite
 `uv run pytest -q -p no:cacheprovider -rfEs` only if the machine is idle (about 5 minutes); it must stay 0 failed.
 Do NOT use `-p xdist -n 4`: pytest-xdist is not installed here and the command errors.
-```
-uv run pokeagent --help
-uv run pokeagent rewind --help
-```
-Expected: the subcommand list and flags in section 5. Every flag you document must appear in a `--help` you ran.
+Do NOT run `uv run pokeagent ... --help` (not on the dispatch allow list). Every flag you document must appear in the
+help text pasted in section 5; if a flag is not there, leave it out.
 `uv run pokeagent bytecheck scan` needs `runs/bytecheck/index.npz`, which needs the ROM and is absent in a worktree (it exits with
 "no bytecheck index"); it is NOT usable for this run. Run these text checks instead (not run by the author; the first must print
 nothing, the second must print nothing except possibly the existing "bring your own ROM" paragraph):
@@ -176,11 +173,22 @@ List every claim you could not verify and therefore omitted. State no conclusion
 
 | Field | Value |
 |---|---|
-| Status | Queued |
+| Status | Review |
 | Assigned to | devin |
-| Branch | - |
+| Branch | directive/pokeagent-pokeagent-docs-refresh-directive |
 | Base branch | - |
+| Base commit | 8d9e0e2e6a8da2a220c6f8fd046426456349b405 |
+| Head commit | 9dc6192427612c4a620a506b582fad91141fc446 |
+| Head remote | rfd62794/trailswarm |
 
 **Status log**
 - 2026-11-15 18:54 · robert-claude-laptop · none → Queued
+- 2026-11-15 20:09 · robert-claude-laptop · Queued → Approved — lint override: Remaining hits are gitignored runs/ paths the directive only names, and docs/CLI.md, docs/TRAINING.md, docs/OPERATING.md which the directive creates.
+- 2026-11-15 20:10 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-docs-refresh-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GYEVBH1YMJG3S9D89D8SHE
+- 2026-11-15 20:16 · dispatcher · In progress → Blocked — launch failed: [WinError 267] The directory name is invalid
+- 2026-11-15 20:17 · robert-claude-laptop · Blocked → Queued — Launch failed (WinError 267, directory name invalid): the controller's disk cleanup removed the freshly provisioned dispatch worktree (clean, 0 ahead of main) mid-launch. Requeue.
+- 2026-11-15 20:17 · robert-claude-laptop · Queued → Approved — lint override: Remaining hits are gitignored runs/ paths the directive only names, and docs/CLI.md, docs/TRAINING.md, docs/OPERATING.md which the directive creates.
+- 2026-11-15 20:17 · dispatcher · Approved → In progress — dispatched devin on personal-laptop in C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-docs-refresh-directive; lane=default; model=swe-2-high; perm=accept-edits; persona=steady-builder; agent_id=01M7GYXBM8PHEQ3M6VMX6CC3NH
+- 2026-11-15 20:24 · dispatcher · launched pid=5444; worktree C:\GitHub\.worktrees\PokeAgent--pokeagent-pokeagent-docs-refresh-directive; provisioned: uv sync --group vision; uv run --no-project python -c "import shutil, pathlib; shutil.copytree(r'C:\Github\PokeAgent\roms', 'roms', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\kb', 'kb', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\baselines', 'baselines', dirs_exist_ok=True); shutil.copytree(r'C:\Github\PokeAgent\runs\checkpoints', 'runs/checkpoints', dirs_exist_ok=True); pathlib.Path('roms/verify.env').write_text('POKEAGENT_ROM=\"roms/Pokemon Red.gb\"\n')"; permission-mode=accept-edits (no `## Sandbox needs` — default deny)
+- 2026-11-15 20:35 · devin · In progress → Review — Docs-only refresh committed as 9dc6192 on directive/pokeagent-pokeagent-docs-refresh-directive (pushed). Diff stat: 10 files, +459/-124 -- README.md 29, docs/CLI.md 116 new, docs/OPERATING.md 66 new, docs/TRAINING.md 76 new, docs/RESULTS.md 39, docs/SEGMENTS.md 19, docs/ROADMAP.md 10, docs/campaign_goals.md 221 (renumber to 131 goals), docs/plans/* 7. All 20 audit items resolved. Verify: uv run python --version -> 3.12.12; collect -> 3295 tests (no drop vs 3282); targeted -> 41 passed; full suite uv run pytest -q -p no:cacheprovider -rfEs -> 3294 passed, 1 skipped, 0 failed in 274.95s. New docs all <150 lines and linked from README; links resolve; no ROM links/keys/tokens in changed files. [origin] spent: devin 11 min est. n/a
 <!-- queue:end -->

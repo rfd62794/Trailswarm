@@ -43,7 +43,7 @@ class ExplorerOptions:
     novelty_delta: str = ""  # where this run writes its novelty delta ("" = <run_dir>/novelty_delta.json)
     item_tms: bool = False  # explorer/item_policies: teach TMs too (off: HMs only)
     drill_grind: int | None = None  # grind drill: the map id whose grass the GrindDrill behaviour paces (pokeagent.grind.drill)
-    par_follow: bool = False  # plan_goal's route is walked along the ROM par path (pokeagent.explorer.par_follow)
+    par_follow: bool = False; gym_puzzle_mode: str = "search"; build: str = ""  # par path walk; Lt. Surge's locks: "search" tries cans / "oracle" reads the lock indices; team-build variant ("": default; "abra": catch + keep an Abra-line member for catch_abra)
 
 
 @dataclass
@@ -158,7 +158,7 @@ class ExplorerContext:
     btw_since: int = 0  # ctx.frame when that page last changed
     btw_waits: int = 0
     restock: dict = field(default_factory=dict)  # Poke Ball restock state (explorer/restock.py): intent, tries, steps, failed Marts
-    catch_want: tuple = (None, None)  # ((battle no., species), reason from catch_list.catch_wanted or None) for the current fight
+    catch_want: tuple = (None, None); catch_flee: tuple = (None, False)  # ((battle no., species), reason from catch_list.catch_wanted or None) for the current fight; ((battle, species), on) - battle_run._flee_latch's once-per-fight answer: a wanted flee-species catch owns the turns (Catch clears it when the catch is off)
     heal_trips: int = 0  # Pokecenter entries this run (area_grind bounds the 90% top-off trips)
     last_plan_map: int = -1
     area_grind: dict = field(default_factory=dict)  # steps / battles spent grinding in place on Route 2 / the Forest, and whether it was lifted
@@ -179,11 +179,11 @@ class ExplorerContext:
     team_ready_idle: int = 0  # consecutive plan steps at the team_ready stage with the training gate closed or lifted
     team_ready_skipped: bool = False  # GYARADOS_STEP_CAP spent: the team_ready goal is settled for this run
     team_ready_ok: bool = False  # plan_goal's last team verdict at the team_ready stage (team_for().ready)
-    had_team_ready: bool = False  # team_ready_ok latched: once the sim says ready the goal stays settled
-    team_ready_nodata: bool = False  # no ROM/boss data to judge the team_ready stage: settled, never blocks
+    had_team_ready: bool = False; team_ready_nodata: bool = False  # team_ready_ok latched: once the sim says ready the goal stays settled; no ROM/boss data to judge the team_ready stage: settled, never blocks
+    abra_steps: int = 0; abra_skipped: bool = False; abra_encounters: int = 0  # steps with catch_abra open under --build abra (plan_goal; ABRA_STEP_CAP settles); the stage ran out of steps: settled for this run; wanted flee-species encounters seen this run (catch.py logs one line each)
+    abra_pending: dict | None = None; had_abra: bool = False; abra_gave_up: bool = False; abra_settle: str = ""; abra_owned0: dict | None = None  # the last Abra encounter awaiting its caught/fled result (abra_hunt); an Abra-line member was GAINED this run (party or PC box - a full party boxes the catch): catch_abra stays settled; settled without an Abra: a give-up, not a success; why the settle landed; party+box species counts at the first goal check (run start): only an Abra-line count ABOVE this baseline settles catch_abra - a pre-existing one never does (round-7)
     team_plan: list = field(default_factory=list)  # the ranked CatchAction list team_hunt last built
-    team_wants: dict = field(default_factory=dict)  # species -> catch reason for catch_list.catch_wanted(wants=)
-    team_hunt_steps: int = 0  # steps team_hunt has spent hunting this run (TEAM_HUNT_STEP_CAP)
+    team_wants: dict = field(default_factory=dict); team_hunt_steps: int = 0  # species -> catch reason for catch_list.catch_wanted(wants=); steps team_hunt has spent hunting this run (TEAM_HUNT_STEP_CAP)
     train_member: int | None = None  # party slot team_readiness names as the shortfall (None when the team is ready)
     team_note: str = ""  # last team-readiness verdict logged (plan_goal)
     center_intent: str | None = None  # why we are inside a Pokecenter on purpose (heal, PC, a purchase goal); the planner will not walk out while set
@@ -203,7 +203,7 @@ class ExplorerContext:
     potion_hp_before: int | None = None
     heal_item: int = 0x14  # heal item the current battle use / top-up sequence is working on (economy.heal_items)
     rom_route: dict = field(default_factory=dict)  # cave_route's cached ROM path + bump counters (this run only)
-    ship_plan: Any = None  # atlas.walkgrid.rom_cave_planner over the dock + S.S. Anne maps (ship_gate walk-off); set by the demo
+    route_plan: Any = None; ship_plan: Any = None  # route_plan: cerulean_south.MAPS planner (Cerulean -> Route 5); ship_plan: atlas.walkgrid.rom_cave_planner over the dock + S.S. Anne maps (ship_gate walk-off); set by the demo
     cave_plan: Any = None  # atlas.walkgrid.rom_cave_planner(): multi-floor ROM route; set by the demo
     ladders: Any = None  # cave_route.rom_ladders(): (map, dest_map) -> ROM-header warp tiles; set by the demo
     cave_catch_balls: dict = field(default_factory=dict)  # species -> balls thrown this run (battle_run caps it inside dungeons)

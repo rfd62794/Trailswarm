@@ -10,6 +10,12 @@ import json
 import time
 from pathlib import Path
 
+from pokeagent.glitch_signals import (
+    VIRIDIAN_FOREST_SCRIPT,
+    Signals,
+    active_reasons,
+    instant_text_candidate,
+)
 from pokeagent.novelty.features import Snapshot, flag_bits
 
 DIR_NAME, LOG_NAME, STATE_SUFFIX = "discoveries", "discoveries.jsonl", ".discovery.state"
@@ -18,6 +24,8 @@ ITEM_JUMP = 3          # bag stack growth in one step that a pickup does not exp
 CHEAPEST_ITEM = 50     # ...unless money fell by at least this much per unit (a purchase)
 MONEY_JUMP = 50        # money gain no battle prize or sale explains
 BATTLE_WINDOW = 20     # steps after a battle in which a money gain is a prize
+STUCK_STEPS = 30       # consecutive snapshots a stuck-flag signature must hold before it is logged (a scripted
+                       # walk or a text box holds the same bits briefly during normal play)
 MAX_PER_RUN = 25
 
 _NAMES: dict | None = None
@@ -129,7 +137,63 @@ def species_unseen(prev, cur, ctx) -> list:
     return out
 
 
-DETECTORS = (new_map, flag_out_of_order, item_duplication, money_jump, level_without_xp, species_unseen)
+def _signals(cur) -> Signals | None:
+    """The glitch-signal bytes on a Snapshot (``cur.sig``), or None when the snapshot carries none."""
+    return Signals.from_tuple(cur.sig)
+
+
+def _streak(ctx, key: str, hit: bool) -> int:
+    """Consecutive snapshots ``key``'s rule has held, counted in the shared ``ctx["streaks"]`` dict."""
+    st = ctx.get("streaks")
+    if st is None:
+        return 0
+    st[key] = st.get(key, 0) + 1 if hit else 0
+    return st[key]
+
+
+def script_byte_oor(prev, cur, ctx) -> list:
+    """Viridian Forest's meta-map script byte out of range (research row 4: death-warp + double fight)."""
+    sig = _signals(cur)
+    if sig is None or "script_oor" not in active_reasons(sig):
+        return []
+    psig = _signals(prev) if prev is not None else None
+    return [("glitch_script_oor", f"s:0x{VIRIDIAN_FOREST_SCRIPT:04X}",
+             psig.forest_script if psig is not None else None, sig.forest_script)]
+
+
+def trainer_flags_stuck(prev, cur, ctx) -> list:
+    """Trainer bookkeeping flags set with no trainer engaged (research row 2: trainer-escape leftovers)."""
+    sig = _signals(cur)
+    hit = sig is not None and "trainer_flags_stuck" in active_reasons(sig)
+    streak = _streak(ctx, "trainer_flags_stuck", hit)   # always counted: a miss resets the run of hits
+    if not hit or streak < STUCK_STEPS:
+        return []
+    return [("glitch_trainer_flags", "tf", None, {"misc_flags": sig.misc_flags, "status5": sig.status5})]
+
+
+def move_override_set(prev, cur, ctx) -> list:
+    """The movement-override byte nonzero outside battle (research rows 5/7: buffer overflow into 0xCD3B)."""
+    sig = _signals(cur)
+    hit = sig is not None and "move_override" in active_reasons(sig)
+    streak = _streak(ctx, "move_override", hit)
+    if not hit or streak < STUCK_STEPS:
+        return []
+    return [("glitch_move_override", "mo", None, sig.move_override)]
+
+
+def instant_text_flag(prev, cur, ctx) -> list:
+    """UNVERIFIED instant-text signature (wStatusFlags5 bit 6, the Cerulean Bike Shop trick, research row 24).
+    Log only: the bit's role is unconfirmed, so it never feeds ``active_reasons`` or the checkpoint guard."""
+    sig = _signals(cur)
+    hit = sig is not None and not sig.in_battle and instant_text_candidate(sig)
+    streak = _streak(ctx, "instant_text", hit)
+    if not hit or streak < STUCK_STEPS:
+        return []
+    return [("glitch_instant_text", "it", None, {"status5": sig.status5, "d358": sig.text_d358})]
+
+
+DETECTORS = (new_map, flag_out_of_order, item_duplication, money_jump, level_without_xp, species_unseen,
+             script_byte_oor, trainer_flags_stuck, move_override_set, instant_text_flag)
 
 
 class DiscoveryLog:
@@ -140,12 +204,14 @@ class DiscoveryLog:
         self.done: set = set()
         self.last_battle_step = -10 ** 9
         self.lvl_exp: dict = {}  # mon identity -> its exp when its level was last read to change (or first seen)
+        self.streaks: dict = {}  # detector name -> consecutive snapshots its stuck-flag rule has held
         self.records: list[dict] = []
 
     def check(self, prev: Snapshot | None, cur: Snapshot, step: int, emu, ctx: dict) -> list[dict]:
         if cur.in_battle:
             self.last_battle_step = step
-        ctx = {**ctx, "step": step, "last_battle_step": self.last_battle_step, "lvl_exp": self.lvl_exp}
+        ctx = {**ctx, "step": step, "last_battle_step": self.last_battle_step, "lvl_exp": self.lvl_exp,
+               "streaks": self.streaks}
         out = []
         for det in DETECTORS:
             try:
@@ -166,6 +232,13 @@ class DiscoveryLog:
             if old.get(ident) != lv:
                 self.lvl_exp[ident] = exp
 
+    def record(self, kind, feature, before, after, step, emu, cur) -> dict | None:
+        """Log one record outside ``check`` (the checkpoint guard's refusals): same done-set and per-run cap."""
+        if (kind, feature) in self.done or len(self.done) >= MAX_PER_RUN:
+            return None
+        self.done.add((kind, feature))
+        return self._write(kind, feature, before, after, step, emu, cur)
+
     def _write(self, kind, feature, before, after, step, emu, cur) -> dict:
         d = self.runs_dir / DIR_NAME
         state = d / f"{self.run}-{step}-{kind}{STATE_SUFFIX}"
@@ -176,7 +249,7 @@ class DiscoveryLog:
         except Exception:  # noqa: BLE001
             saved = None
         rec = {"run": self.run, "role": self.role, "step": step, "kind": kind, "feature": feature, "before": before, "after": after,
-               "pos": [cur.map, cur.x, cur.y], "state": saved, "t": round(self.clock(), 1)}
+               "pos": [cur.map, cur.x, cur.y] if cur is not None else None, "state": saved, "t": round(self.clock(), 1)}
         try:
             with (self.runs_dir / LOG_NAME).open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")

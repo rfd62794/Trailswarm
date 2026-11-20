@@ -7,6 +7,7 @@ that map, it walks the learned graph to the stand tile, faces the person and pre
 """
 from __future__ import annotations
 
+from pokeagent.explorer import gym_puzzle
 from pokeagent.explorer.behaviours import goal_talk_alt as alt
 from pokeagent.explorer.behaviours import goal_talk_bill as bill
 from pokeagent.explorer.behaviours.base import BehaviourBase, Decision
@@ -23,13 +24,21 @@ GOAL_TALKS = {"hm01_cut": (0x65, 4, 3, "UP", "the S.S. Anne captain"),
               # Misty stands static at (4,2) in Cerulean Gym (0x41; run log "next MISTY p1 (4,2)"): fought from (4,3) facing up.
               "beat_misty": (0x41, 4, 3, "UP", "Misty"),
               # Bill's house (0x58): three stages (monster, console, human), picked live by goal_talk_bill.spec; this row is the first stage.
-              "ss_ticket": bill.STAGES["monster"]}
-APPROACH = ("beat_brock", "beat_misty")  # gym-leader goals: goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
-REQUIRES = {"deliver_parcel": "oaks_parcel"}  # goal -> the goal that must already be met before the talk is wanted
+              "ss_ticket": bill.STAGES["monster"],
+              # Vermilion Fan Club (0x5A): the chairman stands at (3,1) with the table below him, so he is talked to from the west side;
+              # YES to hear his story (the dialog default), then the Bike Voucher (bag item 45, the campaign detector).
+              "bike_voucher": (0x5A, 2, 1, "RIGHT", "the Fan Club chairman"),
+              # Cerulean Bike Shop (0x42): the clerk stands at (6,2) behind the counter column x=5; talked to across it from (4,2).
+              "bicycle": (0x42, 4, 2, "RIGHT", "the Bike Shop clerk"),
+              # Lt. Surge stands static at (5,1) in Vermilion Gym (0x5C) behind the trash-can locks: fought from (5,2) facing up,
+              # and ONLY once the gym_puzzle state reads open (the barrier guard in pending(), not a new hold).
+              "beat_surge": (0x5C, 5, 2, "UP", "Lt. Surge")}
+APPROACH = ("beat_brock", "beat_misty", "beat_surge")  # gym-leader goals: goals whose stand tile may be unmapped on arrival: walk to the nearest known tile and push towards it
+REQUIRES = {"deliver_parcel": "oaks_parcel", "bicycle": "bike_voucher"}  # goal -> the goal that must already be met before the talk is wanted
 HOLD_FRESH = 30  # steps a PlanGoal readiness verdict stays good; GoalTalk preempts PlanGoal, so a stale one lets PlanGoal run and refresh it
 BAD_TTL = 50  # steps a no-move direction stays ruled out (an NPC or a dialog tick is not a wall)
 APPROACH_CAP = 60  # approach steps per run before giving up on walking towards an unmapped stand tile
-TALK_CAPS = {"ss_ticket": bill.TALK_CAP}  # per-goal override of MAX_TALKS
+TALK_CAPS = {"ss_ticket": bill.TALK_CAP, "bike_voucher": 12, "bicycle": 10}  # per-goal override of MAX_TALKS
 MAX_TALKS = 8  # A presses at the person per run before giving up on the goal (a dialog box in between resets nothing: counted per press)
 
 
@@ -37,6 +46,8 @@ def pending(ctx: ExplorerContext) -> tuple[str, tuple] | None:
     goals = ctx.goals()
     for goal, spec in GOAL_TALKS.items():
         if not goals.get(goal) and ctx.view.m == spec[0] and (goal not in REQUIRES or goals.get(REQUIRES[goal])):
+            if goal == "beat_surge" and not gym_puzzle.is_open(ctx):
+                continue  # the electric barrier is still closed: the GymPuzzle behaviour opens it first
             if goal in APPROACH and not _hold_clear(ctx):
                 continue  # an unready team inside the gym is pulled out by PlanGoal's hold (or the hold is unknown): not the leader's to walk to
             return goal, (bill.spec(ctx) if goal == "ss_ticket" else spec)

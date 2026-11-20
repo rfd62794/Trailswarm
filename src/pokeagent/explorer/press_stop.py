@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
+import pokeagent.glitch_guard as glitch_guard
 from pokeagent.checkpoint_goals import (
     completed_goals,
     stamp_fingerprint,
@@ -20,6 +22,9 @@ CUR_MAP = 0xD35E  # wCurMap
 def save_end_state(ctx: ExplorerContext) -> None:
     """Write <run dir>/end.state: the curriculum copies it to <goal>.best.state when the solve is confirmed."""
     try:
+        if not glitch_guard.allow_write(ctx.emu, "end_state", runs_dir=Path(ctx.run_dir).parent,
+                                        run=Path(ctx.run_dir).name, log=lambda t: ctx.log(t, "res")):
+            return  # keep the last clean checkpoint: no end.state and no sidecars while a signature is active
         tmp = ctx.run_dir / f"end.{os.getpid()}.tmp"
         ctx.emu.save_state(tmp); replace_retry(tmp, ctx.run_dir / "end.state")
         write_completed(ctx.run_dir / "end.state", completed_goals(check_goals(ctx.emu, ctx), ctx.initial_goals, GOALS), ctx.emu.read(0xD719))
