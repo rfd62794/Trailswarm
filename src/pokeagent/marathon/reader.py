@@ -16,6 +16,7 @@ from pokeagent import training_progress as tp
 from pokeagent.campaign import infer_unverified
 from pokeagent.goals import GOALS, is_unverified
 from pokeagent.intervene.lease import lease_active
+from pokeagent.marathon import floor
 
 STEP_RE = re.compile(r"^--- step (\d+)/\d+\s+map=0x([0-9a-fA-F]+)")
 STALL_RE = re.compile(r"STALL #(\d+)")
@@ -65,12 +66,13 @@ class RunView:
         self.last_pos: list | None = None
         self.segments: list[list] = []              # [map, first_press, last_press]
         self.goal_steps: list[tuple[str, int]] = []  # (goal, press) in landing order
-        self.train_at = 0                            # press of the last levels.jsonl XP/level gain
+        self.train_at = 0                            # press of the last floor-directed XP/level gain
         self.stall_count = 0                         # last "STALL #N" number console.log printed
         self._stalls: deque = deque(maxlen=STALL_KEPT)  # (n, press) escalation events
         self._think: deque = deque()                 # (press, text) of `thinking:` lines
         self._console_step = 0
         self._lv_marks: tp.Marks | None = None
+        self._lv_party = None                        # previous levels row's raw party (floor judge)
         self._off: dict[str, int] = {}
         self._meta: dict | None = None
         self._meta_mtime = -1.0
@@ -118,11 +120,14 @@ class RunView:
             try:
                 row = json.loads(line)
                 cur = tp.marks(row.get("party"))
-            except (ValueError, AttributeError):
+                step = int(row.get("step") or self.presses)
+            except (ValueError, AttributeError, TypeError):
                 continue
-            if self._lv_marks is not None and tp.gained(self._lv_marks, cur):
-                self.train_at = int(row.get("step") or self.presses)
+            if (self._lv_marks is not None and tp.gained(self._lv_marks, cur)
+                    and self._floor_bound(row.get("party"), step)):
+                self.train_at = step
             self._lv_marks = cur
+            self._lv_party = row.get("party")
         for line in self._read("console.log"):
             self._console_line(line)
         return self
@@ -143,6 +148,13 @@ class RunView:
             while self._think and self._think[0][0] <= self._console_step - THINK_PRESSES:
                 self._think.popleft()
 
+    def _floor_bound(self, party, step: int) -> bool:
+        """Whether this gain moved the team toward the floor of the goal pending at ``step``:
+        XP resets the grind clock only toward the floor (a goal no floor table names keeps the
+        old any-gain behaviour)."""
+        level = floor.level_for(self._pending_goal_at(step))
+        return level is None or floor.toward(party, self._lv_party, level)
+
     # -- derived state ------------------------------------------------------------
 
     def held(self) -> bool:
@@ -157,21 +169,33 @@ class RunView:
     def last_goal_name(self) -> str:
         return self.goal_steps[-1][0] if self.goal_steps else ""
 
-    @property
-    def pending_goals(self) -> list[str]:
-        """Ladder goals still ahead: GOALS minus goal_frames rows minus the goals the run's own
-        start state settled (meta initial_goals, taken as an exact set, else the ``start`` checkpoint's prefix). Unverified
-        goals never produce a goal_frames row, so they cannot count as pending."""
+    def _done(self, upto: int | None = None) -> set:
+        """Goals settled by press ``upto`` (goal_frames rows landed by then plus the run's own
+        start state); ``upto`` None sees every row read so far."""
         # initial_goals is the exact set done at start and goal_frames the landings since: neither chains (an early
         # to_route22 must not settle the ladder before it). Only unverified goals are inferred, by the agent's own rule.
-        reached = {g: True for g, _ in self.goal_steps}
+        reached = {g: True for g, p in self.goal_steps if upto is None or p <= upto}
         reached.update({g: True for g in self.meta.get("initial_goals") or []})
         infer_unverified(reached)
         done = {g for g, v in reached.items() if v}
         start = self.meta.get("start")
         if start in GOALS and not self.meta.get("initial_goals"):
             done |= set(GOALS[: GOALS.index(start) + 1])
+        return done
+
+    @property
+    def pending_goals(self) -> list[str]:
+        """Ladder goals still ahead: GOALS minus goal_frames rows minus the goals the run's own
+        start state settled (meta initial_goals, taken as an exact set, else the ``start`` checkpoint's prefix). Unverified
+        goals never produce a goal_frames row, so they cannot count as pending."""
+        done = self._done()
         return [g for g in GOALS if g not in done and not is_unverified(g)]
+
+    def _pending_goal_at(self, step: int) -> str:
+        """current_goal as of press ``step``: a levels row is judged against the goal pending
+        when it was written, not the run's latest."""
+        done = self._done(step)
+        return next((g for g in GOALS if g not in done and not is_unverified(g)), "")
 
     @property
     def current_goal(self) -> str:

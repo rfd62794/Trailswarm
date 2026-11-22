@@ -52,9 +52,11 @@ def ladder_upto(d, name, step0=100):
     goals(d, *rows[: [g for g, _ in rows].index(name) + 1])
 
 
-def level_gain(d, step, exp):
+def level_gain(d, step, exp, party=None):
+    """A levels.jsonl row; ``party`` [(species, level), ...] gives a multi-member snapshot."""
+    rows = [[sp, lv, exp, 50, 50] for sp, lv in party] if party else [[25, 20, exp, 50, 50]]
     with open(d / "levels.jsonl", "a") as f:
-        f.write(json.dumps({"step": step, "party": [[25, 20, exp, 50, 50]]}) + "\n")
+        f.write(json.dumps({"step": step, "party": rows}) + "\n")
 
 
 def thinking(d, lines):
@@ -142,6 +144,97 @@ def test_digletts_cave_flags_guard_stall(tmp_path):
     r = rules.evaluate(v)
     assert v.current_goal == "ss_anne_captain"  # rival_ss_anne is unverified: skipped, not pending
     assert r["reason"] == "guard_stall" and r["hits"] == ["guard_stall", "goal_budget"]
+
+
+# -- XP resets the grind clock only toward the pending goal's floor --------------------------------
+
+
+def test_grind_stage_xp_past_the_floor_still_flags(tmp_path):
+    """The Route 24 detour bug: beat_surge pending (floor L22, 2 members) and the team already
+    there - an XP trickle past the floor never resets the grind clock."""
+    d = make_run(tmp_path)
+    ladder_upto(d, "vermilion_gym_entry")  # pending: beat_surge, FLOOR_BY_GOAL = 22
+    for s in range(300, 6600, 300):
+        presses(d, [(0x23, 300)])
+        level_gain(d, s, 1000 + s, [(25, 30), (16, 25)])  # both >= 22: the floor is met
+    v = view(d)
+    r = rules.evaluate(v)
+    assert v.current_goal == "beat_surge" and v.current_goal in rules.GRIND_GOALS
+    assert v.train_at == 0  # every gain landed past the floor: none was floor-directed
+    assert r["reason"] == "map_dwell" and r["hits"] == ["map_dwell", "goal_budget"]
+
+
+def test_grind_stage_xp_toward_the_floor_resets_the_clock(tmp_path):
+    """Same stage, both members below L22 and the strongest still rising: each gain is
+    floor-directed, so the grind clock resets and the run stays ok inside the budget."""
+    d = make_run(tmp_path)
+    ladder_upto(d, "vermilion_gym_entry")
+    level_gain(d, 200, 1000, [(25, 10), (16, 8), (133, 12)])  # the Magikarp never counts
+    lv = 10
+    for s in range(400, 5000, 400):
+        presses(d, [(0x23, 400)])
+        lv += 1
+        level_gain(d, s, 1000 + s, [(25, lv), (16, 8), (133, 12)])
+    v = view(d)
+    r = rules.evaluate(v)
+    assert v.current_goal == "beat_surge" and v.train_at == 4800  # the last gain
+    assert r["status"] == "ok", r
+
+
+def test_grind_stage_second_member_reaching_the_floor_resets(tmp_path):
+    """A member crossing the floor counts toward it too: the second member reaching L22 is the
+    gain that meets the floor, and it still resets the clock."""
+    d = make_run(tmp_path)
+    ladder_upto(d, "vermilion_gym_entry")
+    presses(d, [(0x23, 400)])
+    level_gain(d, 400, 1000, [(25, 30), (16, 21)])
+    presses(d, [(0x23, 300)])
+    level_gain(d, 700, 1200, [(25, 30), (16, 22)])  # member 2 reaches L22: count 1 -> 2
+    v = view(d)
+    assert v.train_at == 700
+
+
+def test_grind_stage_floor_reached_partway(tmp_path):
+    """Gains reset the clock until the second member reaches L22; once the floor is met they do
+    not, and the run flags once the budget since the last reset passes."""
+    d = make_run(tmp_path)
+    ladder_upto(d, "vermilion_gym_entry")
+    for i, s in enumerate(range(300, 8100, 300)):
+        presses(d, [(0x23, 300)])
+        level_gain(d, s, 1000 + s, [(25, 30), (16, 18 + i)])
+    v = view(d)
+    r = rules.evaluate(v)
+    assert v.train_at == 1500  # member 2 hit L22 at step 1500: the last floor-directed gain
+    assert r["reason"] == "map_dwell" and r["hits"] == ["map_dwell", "goal_budget"]
+
+
+def test_xp_is_judged_against_the_goal_pending_at_the_row(tmp_path):
+    """A goal landing between two levels rows changes the floor: the party that met beat_misty's
+    L19 is under beat_surge's L22, and the previous party is still the comparison (a goal change
+    is not a gain)."""
+    d = make_run(tmp_path)
+    ladder_upto(d, "heal_cerulean")  # pending: beat_misty, FLOOR_BY_GOAL = 19
+    presses(d, [(0x03, 300)])
+    level_gain(d, 300, 1000, [(25, 18), (16, 17)])
+    presses(d, [(0x03, 300)])
+    level_gain(d, 600, 1200, [(25, 19), (16, 18)])   # member 1 reaches 19: count 0 -> 1
+    v = view(d)
+    assert v.current_goal == "beat_misty" and v.train_at == 600
+    presses(d, [(0x03, 300)])
+    level_gain(d, 900, 1400, [(25, 19), (16, 19)])   # count 1 -> 2: the L19 floor is met
+    ladder_upto(d, "vermilion_gym_entry", step0=1000)  # pending: beat_surge, floor 22
+    presses(d, [(0x03, 300)])
+    level_gain(d, 1200, 1600, [(25, 20), (16, 20)])  # under the new floor, still rising
+    v.refresh()
+    assert v.current_goal == "beat_surge" and v.train_at == 1200
+    presses(d, [(0x03, 300)])
+    level_gain(d, 1500, 1800, [(25, 23), (16, 22)])  # count reaches 2 at L22
+    v.refresh()
+    assert v.train_at == 1500
+    presses(d, [(0x03, 300)])
+    level_gain(d, 1800, 2000, [(25, 24), (16, 23)])  # floor met again: no more resets
+    v.refresh()
+    assert v.train_at == 1500
 
 
 # -- the healthy runs it must not touch ----------------------------------------------------------
