@@ -54,6 +54,16 @@ def test_describe_reads_live_value():
     assert "= 7" in describe(e, FakeEmulator({0xD18C: 7}))
 
 
+def test_loaded_entries_carry_trust_and_usable():
+    from pokeagent.ram_lookup import MapEntry, is_usable
+    entries = load_map()
+    assert all(e.trust in ("sym", "verified", "caveat", "discovered") for e in entries)
+    assert {e.name for e in entries if e.trust == "caveat"} == {"wBattleMon", "wPlayerMonNumber", "wGrassRate", "wGrassMons"}
+    assert all(is_usable(e) for e in entries if e.trust != "discovered")
+    d = MapEntry("wDisc", 0xD430, 1, "other", trust="discovered", evidence="probe")
+    assert not is_usable(d) and is_usable(d, allow_discovered=True)
+
+
 def test_builder_sizes_regions_and_merge():
     sym = ["00:c100 wFoo", "00:c104 wBar", "00:c105 wBar.local", "00:d16b wPartyMon1", "01:c200 wBank1", "00:ff80 hA", "00:ff90 hB"]
     labels = build.parse_sym(_write(sym))
