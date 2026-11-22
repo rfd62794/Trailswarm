@@ -1,6 +1,7 @@
 # Go-Explore for PokeAgent: an archive of returnable cells (2026-11-14)
 
-Status: design draft, no code. Needs Robert's approval of this doc before any slice starts. Phase 2 of Go-Explore
+Status: BUILT - `src/pokeagent/goexplore/` (archive, cell, cell_dump, census, runner, select, store); the slice 1-4
+directives are Done. See docs/TRAINING.md. The design text below stays as history. Phase 2 of Go-Explore
 (robustify / distil into a policy) is out of scope; see the last section. Paths are under `src/pokeagent/` unless shown.
 Limits (house rules): new modules < ~120 lines with their own tests; explorer files <= 300 lines; no lines added to
 `explorer/context.py`, `explorer/memory.py`, `explorer/behaviours/plan_goal.py`. Loop guard untouched.

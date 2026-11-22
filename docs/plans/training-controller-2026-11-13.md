@@ -1,6 +1,8 @@
 # Training Controller: one owner for "who trains, where, and when to heal" (2026-11-13, rev 3)
 
-Status: design draft, no code. Evidence: seed 12, heal_cerulean -> beat_misty, 12000 steps,
+Status: BUILT - `src/pokeagent/explorer/training_ctl/` (controller, target, sustain, roster, exit_rule, state,
+adapters); the slice 2-5 directives are Done. See docs/TRAINING.md. The design text below stays as history.
+Evidence: seed 12, heal_cerulean -> beat_misty, 12000 steps,
 `rev-c3/runs/explore-20261113-045255-6868/console.log` (counts = decision lines; one line = one step). All paths are
 under `src/pokeagent/` unless shown. Limits: explorer files <= 300 lines (`explorer/context.py`, `explorer/memory.py`,
 `explorer/behaviours/plan_goal.py` at 300; `explorer/battle.py` is 230); new modules < ~120 lines with own tests.

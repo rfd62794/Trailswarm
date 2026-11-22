@@ -37,11 +37,11 @@ and asks a human or Claude only at genuinely new situations - all of it watchabl
 | Layer | Modules (status) | Job |
 |---|---|---|
 | 0 Emulation | emulator, ram, hexmap, names(+ram_names.json), screentext (all merged) | PyBoy seam, RAM facts, decoding |
-| 1 Perception | textbox (dir 7), vision/ascii (demo), battle state (dir 12, new) | what is on screen / in RAM right now |
+| 1 Perception | textbox (dir 7), vision/ascii (demo), battle state (dir 12, merged) | what is on screen / in RAM right now |
 | 2 Memory & knowledge | mapmem (dir 8), kb (dir 9), demos + review (dir 11), KNOWLEDGE.md | what we have learned; graded, shared |
 | 3 Policy & planning | policies/explorer (dir 11), planner + goals.json (dir 11), LLMPolicy (merged as backend/prompt/decision), hybrid (dir 11) | choose the next button |
-| 4 Interfaces | viewer GUI (dir 6), MCP server (dir 5, building), control API (demo), CLI (merged) | humans and Claude watch and steer |
-| 5 Operations | swarm (demo), checkpoints/branching (dir 10, new), review reports | run many, rewind, measure |
+| 4 Interfaces | viewer GUI (dir 6), MCP server (dir 5, merged: `pokeagent mcp`), control API (demo), CLI (merged) | humans and Claude watch and steer |
+| 5 Operations | swarm (demo), checkpoints/branching (dir 10, merged: `pokeagent states`, `pokeagent rewind`), review reports | run many, rewind, measure |
 
 Rule: a layer imports only from layers below it. The demo is the one place that wires all layers together.
 
@@ -91,8 +91,8 @@ Slices, each one directive, each shippable on its own:
 
 | Slice | Delivers | Needs new logging | Status |
 |---|---|---|---|
-| 1 Playback core | Any step as one frame; activity segments; moments; `pokeagent rewind` (pure, no window, no ROM) | no | `docs/directives/Rewinder_Slice1_Playback_Core_Directive.md` |
-| 2 Viewer mode | Rewind mode in the viewer: scrubber, play/pause/speed, sprite on the map, timeline, moments, party bars | no | written after slice 1 merges (it pastes slice 1's real API) |
+| 1 Playback core | Any step as one frame; activity segments; moments; `pokeagent rewind` (pure, no window, no ROM) | no | merged (PR #301; `docs/directives/Rewinder_Slice1_Playback_Core_Directive.md`) |
+| 2 Viewer mode | Rewind mode in the viewer: scrubber, play/pause/speed, sprite on the map, timeline, moments, party bars | no | not started; written now that slice 1 has merged (it pastes slice 1's real API) |
 | 3 Battle face | What happened inside a fight at a step: enemy, HP, move chosen | yes: per-turn battle rows | pool |
 | 4 Reasons | The gate verdict, training target and grind episode at each step, logged per step and shown on rewind | yes: a per-step reasons file | pool |
 
