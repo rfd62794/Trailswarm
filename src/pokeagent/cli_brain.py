@@ -263,6 +263,9 @@ def _add_commands(bsub) -> None:
     q.add_argument("--text", action="store_true")
     q.set_defaults(func=_cmd_q)
 
+    from pokeagent import cli_brain_runs  # late import: it reuses this module's _emit/_err
+    cli_brain_runs.add_commands(bsub)
+
 
 def register(sub) -> None:
     """Attach the ``brain`` subcommand tree to the main CLI's subparsers."""
