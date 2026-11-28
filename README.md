@@ -108,6 +108,10 @@ uv run pytest -q
 
 Tests run without a ROM or a model. Tests that need a real ROM skip unless `POKEAGENT_ROM` points at one.
 
+## Related projects
+
+- **RFD Game Studio** ([github.com/rfd62794/RFDGameStudio](https://github.com/rfd62794/RFDGameStudio)): the author's game studio. Trailswarm's agent tooling (behaviours, checkpoints, replay and intervention tools) is being reviewed as of 2026-11-28 for a shared way for an agent to drive a studio game, read its state and check the result. Nothing is wired yet. No ROM, save state or other game material moves into the studio.
+
 ## Credits and legal
 
 RAM labels in `src/pokeagent/data/ram_map.json` are derived from pret/pokered's `pokered.sym`. That repository publishes no licence file, so the symbol file itself is not redistributed here.
